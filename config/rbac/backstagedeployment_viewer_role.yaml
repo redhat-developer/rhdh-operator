@@ -1,0 +1,27 @@
+# permissions for end users to view backstagedeployments.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: backstagedeployment-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: backstage-deploy-operator
+    app.kubernetes.io/part-of: backstage-deploy-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: backstagedeployment-viewer-role
+rules:
+- apiGroups:
+  - backstage.io
+  resources:
+  - backstagedeployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - backstage.io
+  resources:
+  - backstagedeployments/status
+  verbs:
+  - get

@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: BackstageDeployment
+metadata:
+  labels:
+    app.kubernetes.io/name: backstagedeployment
+    app.kubernetes.io/instance: backstagedeployment-sample
+    app.kubernetes.io/part-of: backstage-deploy-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: backstage-deploy-operator
+  name: backstagedeployment-sample
+spec:
+  # TODO(user): Add fields here

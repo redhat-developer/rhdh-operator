@@ -1,0 +1,33 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - backstage.io
+  resources:
+  - backstagedeployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - backstage.io
+  resources:
+  - backstagedeployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - backstage.io
+  resources:
+  - backstagedeployments/status
+  verbs:
+  - get
+  - patch
+  - update
