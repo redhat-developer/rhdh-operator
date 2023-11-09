@@ -1,0 +1,31 @@
+# permissions for end users to edit backstagedeployments.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: backstagedeployment-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: backstage-deploy-operator
+    app.kubernetes.io/part-of: backstage-deploy-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: backstagedeployment-editor-role
+rules:
+- apiGroups:
+  - backstage.io
+  resources:
+  - backstagedeployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - backstage.io
+  resources:
+  - backstagedeployments/status
+  verbs:
+  - get

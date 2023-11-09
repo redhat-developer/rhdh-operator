@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: janus-config
+  namespace: backstage
+data:
+  deploy: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: backstage
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: backstage  # backstage-<cr-name>
+      template:
+         metadata:
+           labels:
+             app: backstage # backstage-<cr-name>
+         spec:
+           containers:
+             - name: backstage
+               image: quay.io/janus-idp/backstage-showcase
+               imagePullPolicy: IfNotPresent
+               ports:
+                 - name: http
+                   containerPort: 7007
+               envFrom:
+                 - secretRef:
+                     name: postgres-secrets
+

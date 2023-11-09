@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Backstage
+metadata:
+  name: bs-janus
+  namespace: backstage
+spec:
+  runtimeConfig:
+    backstageConfig: janus-config
+#  dryRun: true
