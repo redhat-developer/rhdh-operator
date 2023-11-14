@@ -70,7 +70,7 @@ spec:
 `
 )
 
-func (r *BackstageDeploymentReconciler) applyLocalDbDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) applyLocalDbDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	lg := log.FromContext(ctx)
 
@@ -105,7 +105,7 @@ func (r *BackstageDeploymentReconciler) applyLocalDbDeployment(ctx context.Conte
 	return nil
 }
 
-func (r *BackstageDeploymentReconciler) applyLocalDbService(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) applyLocalDbService(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	lg := log.FromContext(ctx)
 

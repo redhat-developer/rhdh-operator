@@ -59,7 +59,7 @@ spec:
 `
 )
 
-func (r *BackstageDeploymentReconciler) applyPV(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) applyPV(ctx context.Context, backstage bs.Backstage, ns string) error {
 	// Postgre PersistentVolume
 	lg := log.FromContext(ctx)
 
@@ -94,7 +94,7 @@ func (r *BackstageDeploymentReconciler) applyPV(ctx context.Context, backstage b
 	return nil
 }
 
-func (r *BackstageDeploymentReconciler) applyPVC(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) applyPVC(ctx context.Context, backstage bs.Backstage, ns string) error {
 	// Postgre PersistentVolumeClaim
 	lg := log.FromContext(ctx)
 

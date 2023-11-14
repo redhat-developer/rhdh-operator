@@ -88,7 +88,7 @@ type LocalDbPersistentVolume struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Backstage is the Schema for the backstagedeployments API
+// Backstage is the Schema for the backstages API
 type Backstage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

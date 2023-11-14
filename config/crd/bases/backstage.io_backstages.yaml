@@ -18,7 +18,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Backstage is the Schema for the backstagedeployments API
+        description: Backstage is the Schema for the backstages API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

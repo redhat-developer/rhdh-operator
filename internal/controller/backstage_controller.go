@@ -32,15 +32,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// BackstageDeploymentReconciler reconciles a Backstage object
-type BackstageDeploymentReconciler struct {
+// BackstageReconciler reconciles a Backstage object
+type BackstageReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=backstage.io,resources=backstagedeployments,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=backstage.io,resources=backstagedeployments/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=backstage.io,resources=backstagedeployments/finalizers,verbs=update
+//+kubebuilder:rbac:groups=backstage.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=backstage.io,resources=backstages/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=backstage.io,resources=backstages/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=configmaps;persistentvolumes;persistentvolumeclaims;services,verbs=get;watch;create;update;list;delete
+//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;watch;create;update;list;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -51,7 +53,7 @@ type BackstageDeploymentReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
-func (r *BackstageDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	lg := log.FromContext(ctx)
 
 	lg.V(1).Info("starting reconciliation")
@@ -111,7 +113,7 @@ func (r *BackstageDeploymentReconciler) Reconcile(ctx context.Context, req ctrl.
 	return ctrl.Result{}, nil
 }
 
-func (r *BackstageDeploymentReconciler) readConfigMapOrDefault(ctx context.Context, name string, key string, ns string, def string, object v1.Object) error {
+func (r *BackstageReconciler) readConfigMapOrDefault(ctx context.Context, name string, key string, ns string, def string, object v1.Object) error {
 
 	// ConfigMap name not set, default
 	lg := log.FromContext(ctx)
@@ -149,7 +151,7 @@ func (r *BackstageDeploymentReconciler) readConfigMapOrDefault(ctx context.Conte
 	return nil
 }
 
-func (r *BackstageDeploymentReconciler) labels(meta v1.ObjectMeta, name string) {
+func (r *BackstageReconciler) labels(meta v1.ObjectMeta, name string) {
 	if meta.Labels == nil {
 		meta.Labels = map[string]string{}
 	}
@@ -166,7 +168,7 @@ func readYaml(manifest string, object interface{}) error {
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *BackstageDeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	//if err := initDefaults(); err != nil {
 	//	return err

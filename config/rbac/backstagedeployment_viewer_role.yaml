@@ -9,12 +9,12 @@ metadata:
     app.kubernetes.io/created-by: backstage-deploy-operator
     app.kubernetes.io/part-of: backstage-deploy-operator
     app.kubernetes.io/managed-by: kustomize
-  name: backstagedeployment-viewer-role
+  name: backstage-viewer-role
 rules:
 - apiGroups:
   - backstage.io
   resources:
-  - backstagedeployments
+  - backstages
   verbs:
   - get
   - list
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - backstage.io
   resources:
-  - backstagedeployments/status
+  - backstages/status
   verbs:
   - get

@@ -58,7 +58,7 @@ spec:
 `
 )
 
-func (r *BackstageDeploymentReconciler) applyBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	lg := log.FromContext(ctx)
 

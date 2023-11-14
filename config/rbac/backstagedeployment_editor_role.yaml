@@ -9,12 +9,12 @@ metadata:
     app.kubernetes.io/created-by: backstage-deploy-operator
     app.kubernetes.io/part-of: backstage-deploy-operator
     app.kubernetes.io/managed-by: kustomize
-  name: backstagedeployment-editor-role
+  name: backstage-editor-role
 rules:
 - apiGroups:
   - backstage.io
   resources:
-  - backstagedeployments
+  - backstages
   verbs:
   - create
   - delete
@@ -26,6 +26,6 @@ rules:
 - apiGroups:
   - backstage.io
   resources:
-  - backstagedeployments/status
+  - backstagedes/status
   verbs:
   - get

@@ -44,7 +44,7 @@ spec:
 
 // selector for deploy.spec.template.spec.meta.label
 // targetPort: http for deploy.spec.template.spec.containers.ports.name=http
-func (r *BackstageDeploymentReconciler) applyBackstageService(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) applyBackstageService(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	lg := log.FromContext(ctx)
 
