@@ -105,17 +105,8 @@ var _ = Describe("Backstage controller", func() {
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking the latest Status added to the Backstage instance")
-			Eventually(func() error {
-				//TODO the status is under construction
-				err = k8sClient.Get(ctx, typeNamespaceName, backstage)
-				if err != nil {
-					return err
-				}
-				if backstage.Status.BackstageState != "deployed" {
-					return fmt.Errorf("The status is not 'deployed' '%s'", backstage.Status)
-				}
-				return nil
-			}, time.Minute, time.Second).Should(Succeed())
+
+			verifyBackstageInstance(ctx, typeNamespaceName, backstage)
 		})
 	})
 
@@ -202,17 +193,7 @@ spec:
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
-				Eventually(func() error {
-					//TODO the status is under construction
-					err := k8sClient.Get(ctx, typeNamespaceName, backstage)
-					if err != nil {
-						return err
-					}
-					if backstage.Status.BackstageState != "deployed" {
-						return fmt.Errorf("The status is not 'deployed' '%s'", backstage.Status)
-					}
-					return nil
-				}, time.Minute, time.Second).Should(Succeed())
+				verifyBackstageInstance(ctx, typeNamespaceName, backstage)
 			})
 		})
 
@@ -296,18 +277,18 @@ spec:
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
-				Eventually(func() error {
-					//TODO the status is under construction
-					err := k8sClient.Get(ctx, typeNamespaceName, backstage)
-					if err != nil {
-						return err
-					}
-					if backstage.Status.BackstageState != "deployed" {
-						return fmt.Errorf("The status is not 'deployed' '%s'", backstage.Status)
-					}
-					return nil
-				}, time.Minute, time.Second).Should(Succeed())
+				verifyBackstageInstance(ctx, typeNamespaceName, backstage)
 			})
 		})
 	})
 })
+
+func verifyBackstageInstance(ctx context.Context, typeNamespaceName types.NamespacedName, backstage *bsv1alphav1.Backstage) {
+	Eventually(func(g Gomega) {
+		err := k8sClient.Get(ctx, typeNamespaceName, backstage)
+		g.Expect(err).NotTo(HaveOccurred())
+		//TODO the status is under construction
+		g.Expect(backstage.Status.BackstageState).To(Equal("deployed"),
+			fmt.Sprintf("The status is not 'deployed' '%s'", backstage.Status))
+	}, time.Minute, time.Second).Should(Succeed())
+}
