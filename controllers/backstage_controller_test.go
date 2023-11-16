@@ -33,35 +33,55 @@ import (
 
 var _ = Describe("Backstage controller", func() {
 	var (
-		ctx               context.Context
-		backstageName     string
-		namespace         *corev1.Namespace
-		typeNamespaceName types.NamespacedName
+		ctx                 context.Context
+		ns                  string
+		backstageName       string
+		backstageReconciler *BackstageReconciler
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		ns := fmt.Sprintf("ns-%d-%s", GinkgoParallelProcess(), randString(5))
+		ns = fmt.Sprintf("ns-%d-%s", GinkgoParallelProcess(), randString(5))
 		backstageName = "test-backstage-" + randString(5)
-		namespace = &corev1.Namespace{
+
+		By("Creating the Namespace to perform the tests")
+		err := k8sClient.Create(ctx, &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ns,
 				Namespace: ns,
 			},
-		}
-		typeNamespaceName = types.NamespacedName{Name: backstageName, Namespace: ns}
-
-		By("Creating the Namespace to perform the tests")
-		err := k8sClient.Create(ctx, namespace)
+		})
 		Expect(err).To(Not(HaveOccurred()))
+
+		backstageReconciler = &BackstageReconciler{
+			Client:    k8sClient,
+			Scheme:    k8sClient.Scheme(),
+			Namespace: ns,
+		}
 	})
 
 	AfterEach(func() {
-		// TODO(user): Attention if you improve this code by adding other context test you MUST
-		// be aware of the current delete namespace limitations. More info: https://book.kubebuilder.io/reference/envtest.html#testing-considerations
+		// NOTE: Be aware of the current delete namespace limitations.
+		// More info: https://book.kubebuilder.io/reference/envtest.html#testing-considerations
 		By("Deleting the Namespace to perform the tests")
-		_ = k8sClient.Delete(ctx, namespace)
+		_ = k8sClient.Delete(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ns,
+				Namespace: ns,
+			},
+		})
 	})
+
+	verifyBackstageInstance := func(ctx context.Context) {
+		Eventually(func(g Gomega) {
+			var backstage bsv1alphav1.Backstage
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
+			g.Expect(err).NotTo(HaveOccurred())
+			//TODO the status is under construction
+			g.Expect(backstage.Status.BackstageState).To(Equal("deployed"),
+				fmt.Sprintf("The status is not 'deployed' '%s'", backstage.Status))
+		}, time.Minute, time.Second).Should(Succeed())
+	}
 
 	When("creating default CR with no spec", func() {
 		var backstage *bsv1alphav1.Backstage
@@ -69,7 +89,7 @@ var _ = Describe("Backstage controller", func() {
 			backstage = &bsv1alphav1.Backstage{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      backstageName,
-					Namespace: namespace.Name,
+					Namespace: ns,
 				},
 				Spec: bsv1alphav1.BackstageSpec{},
 			}
@@ -82,18 +102,12 @@ var _ = Describe("Backstage controller", func() {
 			By("Checking if the custom resource was successfully created")
 			Eventually(func() error {
 				found := &bsv1alphav1.Backstage{}
-				return k8sClient.Get(ctx, typeNamespaceName, found)
+				return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Reconciling the custom resource created")
-			backstageReconciler := &BackstageReconciler{
-				Client:    k8sClient,
-				Scheme:    k8sClient.Scheme(),
-				Namespace: namespace.Name,
-			}
-
 			_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespaceName,
+				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 			})
 			Expect(err).To(Not(HaveOccurred()))
 
@@ -101,12 +115,12 @@ var _ = Describe("Backstage controller", func() {
 			Eventually(func() error {
 				found := &appsv1.Deployment{}
 				// TODO to get name from default
-				return k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: "backstage"}, found)
+				return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking the latest Status added to the Backstage instance")
 
-			verifyBackstageInstance(ctx, typeNamespaceName, backstage)
+			verifyBackstageInstance(ctx)
 		})
 	})
 
@@ -122,7 +136,7 @@ var _ = Describe("Backstage controller", func() {
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-bs-config",
-						Namespace: namespace.Name,
+						Namespace: ns,
 					},
 					Data: map[string]string{
 						"deploy": `
@@ -154,7 +168,7 @@ spec:
 				backstage = &bsv1alphav1.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      backstageName,
-						Namespace: namespace.Name,
+						Namespace: ns,
 					},
 					Spec: bsv1alphav1.BackstageSpec{
 						RuntimeConfig: bsv1alphav1.RuntimeConfig{
@@ -171,29 +185,23 @@ spec:
 				By("Checking if the custom resource was successfully created")
 				Eventually(func() error {
 					found := &bsv1alphav1.Backstage{}
-					return k8sClient.Get(ctx, typeNamespaceName, found)
+					return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Reconciling the custom resource created")
-				backstageReconciler := &BackstageReconciler{
-					Client:    k8sClient,
-					Scheme:    k8sClient.Scheme(),
-					Namespace: namespace.Name,
-				}
 				_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: typeNamespaceName,
+					NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 				})
 				Expect(err).To(Not(HaveOccurred()))
 
 				By("Checking if Deployment was successfully created in the reconciliation")
 				Eventually(func() error {
 					found := &appsv1.Deployment{}
-					// TODO to get name from default
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: "bs1-deployment"}, found)
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "bs1-deployment"}, found)
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
-				verifyBackstageInstance(ctx, typeNamespaceName, backstage)
+				verifyBackstageInstance(ctx)
 			})
 		})
 
@@ -208,7 +216,7 @@ spec:
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-db-config",
-						Namespace: namespace.Name,
+						Namespace: ns,
 					},
 					Data: map[string]string{
 						"deployment": `
@@ -238,7 +246,7 @@ spec:
 				backstage = &bsv1alphav1.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      backstageName,
-						Namespace: namespace.Name,
+						Namespace: ns,
 					},
 					Spec: bsv1alphav1.BackstageSpec{
 						RuntimeConfig: bsv1alphav1.RuntimeConfig{
@@ -255,17 +263,12 @@ spec:
 				By("Checking if the custom resource was successfully created")
 				Eventually(func() error {
 					found := &bsv1alphav1.Backstage{}
-					return k8sClient.Get(ctx, typeNamespaceName, found)
+					return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Reconciling the custom resource created")
-				backstageReconciler := &BackstageReconciler{
-					Client:    k8sClient,
-					Scheme:    k8sClient.Scheme(),
-					Namespace: namespace.Name,
-				}
 				_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: typeNamespaceName,
+					NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 				})
 				Expect(err).To(Not(HaveOccurred()))
 
@@ -273,22 +276,12 @@ spec:
 				Eventually(func() error {
 					found := &appsv1.Deployment{}
 					// TODO to get name from default
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: "db-deployment"}, found)
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "db-deployment"}, found)
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
-				verifyBackstageInstance(ctx, typeNamespaceName, backstage)
+				verifyBackstageInstance(ctx)
 			})
 		})
 	})
 })
-
-func verifyBackstageInstance(ctx context.Context, typeNamespaceName types.NamespacedName, backstage *bsv1alphav1.Backstage) {
-	Eventually(func(g Gomega) {
-		err := k8sClient.Get(ctx, typeNamespaceName, backstage)
-		g.Expect(err).NotTo(HaveOccurred())
-		//TODO the status is under construction
-		g.Expect(backstage.Status.BackstageState).To(Equal("deployed"),
-			fmt.Sprintf("The status is not 'deployed' '%s'", backstage.Status))
-	}, time.Minute, time.Second).Should(Succeed())
-}
