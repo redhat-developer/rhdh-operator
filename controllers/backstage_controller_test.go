@@ -41,15 +41,15 @@ var _ = Describe("Backstage controller", func() {
 
 	BeforeEach(func() {
 		ctx = context.Background()
+		ns := fmt.Sprintf("ns-%d-%s", GinkgoParallelProcess(), randString(5))
 		backstageName = "test-backstage-" + randString(5)
 		namespace = &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      backstageName,
-				Namespace: backstageName,
+				Name:      ns,
+				Namespace: ns,
 			},
 		}
-
-		typeNamespaceName = types.NamespacedName{Name: backstageName, Namespace: backstageName}
+		typeNamespaceName = types.NamespacedName{Name: backstageName, Namespace: ns}
 
 		By("Creating the Namespace to perform the tests")
 		err := k8sClient.Create(ctx, namespace)
