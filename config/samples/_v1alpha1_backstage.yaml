@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Backstage
+metadata:
+  labels:
+    app.kubernetes.io/name: backstage
+    app.kubernetes.io/instance: backstage-sample
+    app.kubernetes.io/part-of: operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: operator
+  name: backstage-sample
+spec:
+  # TODO(user): Add fields here

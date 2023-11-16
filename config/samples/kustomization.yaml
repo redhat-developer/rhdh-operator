@@ -1,4 +1,4 @@
-## Append samples of your project ##
+## Append samples you want in your CSV to this file as resources ##
 resources:
-- _v1alpha1_backstagedeployment.yaml
+- _v1alpha1_backstage.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

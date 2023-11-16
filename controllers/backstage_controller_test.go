@@ -17,9 +17,13 @@ limitations under the License.
 package controller
 
 import (
-	bsv1alphav1 "backstage.io/backstage-deploy-operator/api/v1alpha1"
 	"context"
 	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	bsv1alphav1 "backstage.io/backstage-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,10 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"testing"
-	"time"
 )
 
 func TestCreateBackstage(t *testing.T) {

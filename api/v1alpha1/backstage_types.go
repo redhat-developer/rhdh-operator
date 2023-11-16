@@ -29,13 +29,6 @@ type BackstageSpec struct {
 
 	//+kubebuilder:default=false
 	SkipLocalDb bool `json:"skipLocalDb,omitempty"`
-	//LocalDb     LocalDbConfig `json:"localDb,omitempty"`
-
-	//+kubebuilder:validation:XEmbeddedResource
-	//Deployment appsv1.Deployment `json:"deployment,omitempty"`
-
-	//+kubebuilder:validation:XEmbeddedResource
-	//Service corev1.Service `json:"service,omitempty"`
 }
 
 type RuntimeConfig struct {
@@ -43,37 +36,9 @@ type RuntimeConfig struct {
 	LocalDbConfigName   string `json:"localDbConfig,omitempty"`
 }
 
-//// Configuration works like this (for the time):
-//// * if some object PV, PVC, etc defined - it is taken as a basis
-//// * otherwise default will be taken (TODO: move defaults to Operator's ConfigMap?)
-//// * and it is also possible to ovewrite some with Parameters if any (TODO: do we need it?)
-//// TODO do we need to move this to ConfigMap to not to overload CR?
-//type LocalDbConfig struct {
-//	Parameters LocalDbParameters `json:"parameters,omitempty"`
-//	//+kubebuilder:validation:XEmbeddedResource
-//	PersistentVolume corev1.PersistentVolume `json:"persistentVolume,omitempty"`
-//	//+kubebuilder:validation:XEmbeddedResource
-//	PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim,omitempty"`
-//	//+kubebuilder:validation:XEmbeddedResource
-//	Deployment appsv1.Deployment `json:"deployment,omitempty"`
-//	//+kubebuilder:validation:XEmbeddedResource
-//	Service corev1.Service `json:"service,omitempty"`
-//}
-
-//type LocalDbParameters struct {
-//	DeploymentName  string `json:"deploymentName,omitempty"`
-//	Replicas        int    `json:"replicas,omitempty"`
-//	StorageCapacity string `json:"capacity,omitempty"`
-//	SecretRefName   string `json:"secretRefName,omitempty"`
-//	Image           string `json:"image,omitempty"`
-//	PullPolicy      string `json:"pullPolicy,omitempty"`
-//}
-
 // BackstageStatus defines the observed state of Backstage
 type BackstageStatus struct {
-	//TODO
 	BackstageState string `json:"backstageState,omitempty"`
-	//LocalDb        LocalDbStatus `json:"localDb,omitempty"`
 }
 
 type LocalDbStatus struct {
