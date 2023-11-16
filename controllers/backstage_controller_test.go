@@ -87,8 +87,9 @@ var _ = Describe("Backstage controller", func() {
 
 			By("Reconciling the custom resource created")
 			backstageReconciler := &BackstageReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				Namespace: namespace.Name,
 			}
 
 			_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
@@ -184,8 +185,9 @@ spec:
 
 				By("Reconciling the custom resource created")
 				backstageReconciler := &BackstageReconciler{
-					Client: k8sClient,
-					Scheme: k8sClient.Scheme(),
+					Client:    k8sClient,
+					Scheme:    k8sClient.Scheme(),
+					Namespace: namespace.Name,
 				}
 				_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: typeNamespaceName,

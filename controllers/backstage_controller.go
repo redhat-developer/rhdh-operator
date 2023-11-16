@@ -17,10 +17,11 @@ limitations under the License.
 package controller
 
 import (
-	bs "backstage.io/backstage-operator/api/v1alpha1"
 	"bytes"
 	"context"
 	"fmt"
+
+	bs "backstage.io/backstage-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,8 @@ import (
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme    *runtime.Scheme
+	Namespace string // restrict namespaces to reconcile
 }
 
 //+kubebuilder:rbac:groups=backstage.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
@@ -56,7 +58,12 @@ type BackstageReconciler struct {
 func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	lg := log.FromContext(ctx)
 
-	lg.V(1).Info("starting reconciliation")
+	lg.V(1).Info(fmt.Sprintf("starting reconciliation (namespace: %q)", req.NamespacedName))
+
+	// Ignore requests for other namespaces, if specified
+	if r.Namespace != "" && req.Namespace != r.Namespace {
+		return ctrl.Result{}, nil
+	}
 
 	backstage := bs.Backstage{}
 	if err := r.Get(ctx, req.NamespacedName, &backstage); err != nil {
