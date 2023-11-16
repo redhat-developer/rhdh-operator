@@ -215,5 +215,99 @@ spec:
 				}, time.Minute, time.Second).Should(Succeed())
 			})
 		})
+
+		When("creating CR with runtime config for the database", func() {
+			var backstage *bsv1alphav1.Backstage
+
+			BeforeEach(func() {
+				localDbConfigMap := &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-db-config",
+						Namespace: namespace.Name,
+					},
+					Data: map[string]string{
+						"deployment": `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: db
+          image: busybox
+`,
+					},
+				}
+				err := k8sClient.Create(ctx, localDbConfigMap)
+				Expect(err).To(Not(HaveOccurred()))
+
+				backstage = &bsv1alphav1.Backstage{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      backstageName,
+						Namespace: namespace.Name,
+					},
+					Spec: bsv1alphav1.BackstageSpec{
+						RuntimeConfig: bsv1alphav1.RuntimeConfig{
+							LocalDbConfigName: localDbConfigMap.Name,
+						},
+					},
+				}
+
+				err = k8sClient.Create(ctx, backstage)
+				Expect(err).To(Not(HaveOccurred()))
+			})
+
+			It("should create the resources", func() {
+				By("Checking if the custom resource was successfully created")
+				Eventually(func() error {
+					found := &bsv1alphav1.Backstage{}
+					return k8sClient.Get(ctx, typeNamespaceName, found)
+				}, time.Minute, time.Second).Should(Succeed())
+
+				By("Reconciling the custom resource created")
+				backstageReconciler := &BackstageReconciler{
+					Client:    k8sClient,
+					Scheme:    k8sClient.Scheme(),
+					Namespace: namespace.Name,
+				}
+				_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespaceName,
+				})
+				Expect(err).To(Not(HaveOccurred()))
+
+				By("Checking if StatefulSet was successfully created in the reconciliation")
+				Eventually(func() error {
+					found := &appsv1.Deployment{}
+					// TODO to get name from default
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: namespace.Name, Name: "db-deployment"}, found)
+				}, time.Minute, time.Second).Should(Succeed())
+
+				By("Checking the latest Status added to the Backstage instance")
+				Eventually(func() error {
+					//TODO the status is under construction
+					err := k8sClient.Get(ctx, typeNamespaceName, backstage)
+					if err != nil {
+						return err
+					}
+					if backstage.Status.BackstageState != "deployed" {
+						return fmt.Errorf("The status is not 'deployed' '%s'", backstage.Status)
+					}
+					return nil
+				}, time.Minute, time.Second).Should(Succeed())
+			})
+		})
 	})
 })
