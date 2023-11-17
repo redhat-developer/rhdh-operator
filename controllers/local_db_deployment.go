@@ -16,9 +16,10 @@ limitations under the License.
 package controller
 
 import (
-	bs "backstage.io/backstage-deploy-operator/api/v1alpha1"
 	"context"
 	"fmt"
+
+	bs "backstage.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

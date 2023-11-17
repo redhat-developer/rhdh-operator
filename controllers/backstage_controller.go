@@ -17,7 +17,7 @@ limitations under the License.
 package controller
 
 import (
-	bs "backstage.io/backstage-deploy-operator/api/v1alpha1"
+	bs "backstage.io/backstage-operator/api/v1alpha1"
 	"bytes"
 	"context"
 	"fmt"

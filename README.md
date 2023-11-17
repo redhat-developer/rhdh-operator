@@ -1,7 +1,5 @@
-# backstage-install-operator
+# backstage-operator
 Operator for deploying Backstage
-
-
 
 ## Description
 Implementing https://backstage.io/docs/deployment/k8s/ procedure
@@ -108,4 +106,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
