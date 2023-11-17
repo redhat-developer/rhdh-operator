@@ -1,0 +1,53 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: backstage-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Backstage is the Schema for the backstages API
+      displayName: Backstage
+      kind: Backstage
+      name: backstages.backstage.io
+      version: v1alpha1
+  description: Operator to deploy Backstage on Kubernetes
+  displayName: Janus-IDP Backstage Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - Backstage
+  - Janus-IDP
+  links:
+  - name: Backstage Operator
+    url: https://github.com/janus-idp/operator
+  maintainers:
+  - email: asoro@redhat.com
+    name: Armel Soro
+  - email: gazarenk@redhat.com
+    name: Gennady Azarenkov
+  - email: jianrzha@redhat.com
+    name: Jianrong Zhang
+  maturity: alpha
+  provider:
+    name: Red Hat Inc.
+    url: https://www.redhat.com/
+  version: 0.0.0
