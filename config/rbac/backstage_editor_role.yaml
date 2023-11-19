@@ -6,8 +6,8 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/instance: backstage-editor-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: operator
-    app.kubernetes.io/part-of: operator
+    app.kubernetes.io/created-by: backstage-operator
+    app.kubernetes.io/part-of: backstage-operator
     app.kubernetes.io/managed-by: kustomize
   name: backstage-editor-role
 rules:
