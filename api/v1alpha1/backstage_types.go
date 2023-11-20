@@ -26,12 +26,18 @@ const (
 // BackstageSpec defines the desired state of Backstage
 type BackstageSpec struct {
 	// Backstage application AppConfigs
-	AppConfigs []string `json:"appConfigs,omitempty"`
+	AppConfigs []AppConfig `json:"appConfigs,omitempty"`
 	// Raw Runtime Objects configuration
 	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
 
 	//+kubebuilder:default=false
 	SkipLocalDb bool `json:"skipLocalDb,omitempty"`
+}
+
+type AppConfig struct {
+	Name string `json:"name,omitempty"`
+	//+kubebuilder:validation:Enum=ConfigMap;Secret
+	Kind string `json:"kind,omitempty"`
 }
 
 type RuntimeConfig struct {

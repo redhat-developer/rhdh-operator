@@ -38,7 +38,15 @@ spec:
               appConfigs:
                 description: Backstage application AppConfigs
                 items:
-                  type: string
+                  properties:
+                    kind:
+                      enum:
+                      - ConfigMap
+                      - Secret
+                      type: string
+                    name:
+                      type: string
+                  type: object
                 type: array
               rawRuntimeConfig:
                 description: Raw Runtime Objects configuration

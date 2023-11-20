@@ -1,0 +1,52 @@
+apiVersion: backstage.io/v1alpha1
+kind: Backstage
+metadata:
+  name: my-backstage-app-with-app-config
+spec:
+  appConfigs:
+    - name: "my-backstage-config-cm1"
+      kind: ConfigMap
+    - name: "my-backstage-config-secret1"
+      kind: Secret
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-backstage-config-cm1
+data:
+  my-app-config.prod.yaml: |
+    backend:
+      auth:
+        keys:
+          - secret: ${BACKEND_SECRET}
+      database:
+        connection:
+          password: ${POSTGRESQL_PASSWORD}
+          user: ${POSTGRESQL_USER}
+    # Backstage override configuration for your prod development environment
+    auth:
+      # see https://backstage.io/docs/auth/ to learn about auth providers
+      environment: development
+      providers:
+        github:
+          development:
+            clientId: 'xxx'
+            clientSecret: 'yyy'
+  my-app-config-2.yaml: |
+    # Some comment in this file
+  dynamic-plugins.yaml: |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins: []
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-backstage-config-secret1
+data:
+  # {}
+  my-app-config-1.secret.yaml: e30K
+  # # a comment
+  my-app-config-2.secret.yaml: IyBhIGNvbW1lbnQK
