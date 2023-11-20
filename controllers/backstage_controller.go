@@ -36,8 +36,12 @@ import (
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	Namespace string // restrict namespaces to reconcile
+	Scheme *runtime.Scheme
+
+	// Namespace allows to restrict the reconciliation to this particular namespace,
+	// and ignore requests from other namespaces.
+	// This is mostly useful for our tests, to overcome a limitation of EnvTest about namespace deletion.
+	Namespace string
 }
 
 //+kubebuilder:rbac:groups=backstage.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
@@ -60,7 +64,9 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	lg.V(1).Info(fmt.Sprintf("starting reconciliation (namespace: %q)", req.NamespacedName))
 
-	// Ignore requests for other namespaces, if specified
+	// Ignore requests for other namespaces, if specified.
+	// This is mostly useful for our tests, to overcome a limitation of EnvTest about namespace deletion.
+	// More details on https://book.kubebuilder.io/reference/envtest.html#namespace-usage-limitation
 	if r.Namespace != "" && req.Namespace != r.Namespace {
 		return ctrl.Result{}, nil
 	}
