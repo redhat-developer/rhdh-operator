@@ -1,0 +1,11 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: backstage-operator
+spec:
+  channel: alpha
+  installPlanApproval: Automatic
+  name: backstage-operator
+  source: backstage-operator
+  sourceNamespace: openshift-marketplace
+  startingCSV: backstage-operator.v0.0.1

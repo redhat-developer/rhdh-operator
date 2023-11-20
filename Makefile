@@ -5,6 +5,8 @@
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 VERSION ?= 0.0.1
 
+CONTAINER_ENGINE ?= docker  #Using docker or podman to build and push images
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -115,16 +117,25 @@ build: generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
+PLATFORM ?= linux/amd64
 # If you wish built the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+docker-build: test ## Build docker image with the manager using docker.
+	docker build --platform ${PLATFORM} -t ${IMG} .
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
+docker-push: ## Push docker image with the manager using docker.
 	docker push ${IMG}
+
+.PHONY: podman-build
+podman-build: test ## Build docker image with the manager using podman.
+	podman build --platform ${PLATFORM} -t ${IMG} .
+
+.PHONY: podman-push
+podman-push: ## Push docker image with the manager using podman.
+	podman push ${IMG}
 
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -207,11 +218,11 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_ENGINE) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+	$(MAKE) $(CONTAINER_ENGINE)-push IMG=$(BUNDLE_IMG)
 
 .PHONY: opm
 OPM = ./bin/opm
@@ -246,10 +257,31 @@ endif
 # This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
-catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+catalog-build: opm bundle-push ## Build a catalog image. Bundle image must have been pushed into the registry.
+	$(OPM) index add --container-tool $(CONTAINER_ENGINE) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
 
-# Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+	$(MAKE) $(CONTAINER_ENGINE)-push IMG=$(CATALOG_IMG)
+
+.PHONY:
+release-build: bundle $(CONTAINER_ENGINE)-build bundle-build catalog-build ## Build operator docker, bundle, catalog images
+
+.PHONY:
+release-push: $(CONTAINER_ENGINE)-push bundle-push catalog-push ## Push operator docker, bundle, catalog images
+
+.PHONY: deploy-olm
+deploy-olm: ## Deploy the operator with OLM
+	kubectl apply -f config/samples/catalog-operator-group.yaml
+	kubectl apply -f config/samples/catalog-subscription.yaml
+
+.PHONY: undeploy-olm
+undeploy-olm: ## Un-deploy the operator with OLM
+	-kubectl delete subscriptions.operators.coreos.com backstage-operator
+	-kubectl delete operatorgroup backstage-operator-group
+	-kubectl delete clusterserviceversion backstage-operator.v${VERSION}
+
+.PHONY: catalog-update
+catalog-update: ## Update catalog source in namespace openshift-marketplace 
+	-kubectl delete catalogsource backstage-operator -n openshift-marketplace
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | oc apply -f -
