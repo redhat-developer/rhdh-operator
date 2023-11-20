@@ -68,7 +68,13 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 	if err != nil {
 		return err
 	}
+	if deployment.Spec.Template.ObjectMeta.Labels == nil {
+		deployment.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	}
 	deployment.Spec.Template.ObjectMeta.Labels["app"] = fmt.Sprintf("backstage-%s", backstage.Name)
+	if deployment.Spec.Selector.MatchLabels == nil {
+		deployment.Spec.Selector.MatchLabels = map[string]string{}
+	}
 	deployment.Spec.Selector.MatchLabels["app"] = fmt.Sprintf("backstage-%s", backstage.Name)
 
 	err = r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: ns}, deployment)
