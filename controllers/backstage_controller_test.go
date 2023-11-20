@@ -33,12 +33,14 @@ import (
 
 var _ = Describe("Backstage controller", func() {
 	var (
+		ctx                 context.Context
 		ns                  string
 		backstageName       string
 		backstageReconciler *BackstageReconciler
 	)
 
-	BeforeEach(func(ctx SpecContext) {
+	BeforeEach(func() {
+		ctx = context.Background()
 		ns = fmt.Sprintf("ns-%d-%s", GinkgoParallelProcess(), randString(5))
 		backstageName = "test-backstage-" + randString(5)
 
@@ -58,7 +60,7 @@ var _ = Describe("Backstage controller", func() {
 		}
 	})
 
-	AfterEach(func(ctx SpecContext) {
+	AfterEach(func() {
 		// NOTE: Be aware of the current delete namespace limitations.
 		// More info: https://book.kubebuilder.io/reference/envtest.html#testing-considerations
 		By("Deleting the Namespace to perform the tests")
@@ -83,8 +85,7 @@ var _ = Describe("Backstage controller", func() {
 
 	When("creating default CR with no spec", func() {
 		var backstage *bsv1alphav1.Backstage
-
-		BeforeEach(func(ctx SpecContext) {
+		BeforeEach(func() {
 			backstage = &bsv1alphav1.Backstage{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      backstageName,
@@ -97,7 +98,7 @@ var _ = Describe("Backstage controller", func() {
 			Expect(err).To(Not(HaveOccurred()))
 		})
 
-		It("should successfully reconcile a custom resource for default Backstage", func(ctx SpecContext) {
+		It("should successfully reconcile a custom resource for default Backstage", func() {
 			By("Checking if the custom resource was successfully created")
 			Eventually(func() error {
 				found := &bsv1alphav1.Backstage{}
@@ -127,7 +128,7 @@ var _ = Describe("Backstage controller", func() {
 		When("creating CR with runtime config for Backstage deployment", func() {
 			var backstage *bsv1alphav1.Backstage
 
-			BeforeEach(func(ctx SpecContext) {
+			BeforeEach(func() {
 				backstageConfigMap := &corev1.ConfigMap{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: "v1",
@@ -180,7 +181,7 @@ spec:
 				Expect(err).To(Not(HaveOccurred()))
 			})
 
-			It("should create the resources", func(ctx SpecContext) {
+			It("should create the resources", func() {
 				By("Checking if the custom resource was successfully created")
 				Eventually(func() error {
 					found := &bsv1alphav1.Backstage{}
@@ -207,7 +208,7 @@ spec:
 		When("creating CR with runtime config for the database", func() {
 			var backstage *bsv1alphav1.Backstage
 
-			BeforeEach(func(ctx SpecContext) {
+			BeforeEach(func() {
 				localDbConfigMap := &corev1.ConfigMap{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: "v1",
@@ -258,7 +259,7 @@ spec:
 				Expect(err).To(Not(HaveOccurred()))
 			})
 
-			It("should create the resources", func(ctx SpecContext) {
+			It("should create the resources", func() {
 				By("Checking if the custom resource was successfully created")
 				Eventually(func() error {
 					found := &bsv1alphav1.Backstage{}
