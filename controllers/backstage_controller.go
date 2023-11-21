@@ -24,6 +24,7 @@ import (
 	bs "backstage.io/backstage-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +32,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+const (
+	BackstageAppLabel = "backstage.io/app"
 )
 
 // BackstageReconciler reconciles a Backstage object
@@ -119,10 +124,14 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	backstage.Status.BackstageState = "deployed"
-	r.Status().Update(ctx, &backstage)
+	//TODO: it is just a placeholder for the time
+	r.setRunningStatus(ctx, &backstage, req.Namespace)
+	r.setSyncStatus(ctx, &backstage, req.Namespace)
+	err := r.Status().Update(ctx, &backstage)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "unable to update backstage.status")
+	}
 
-	//return ctrl.Result{Requeue: !r.checkPostgreSecret(ctx, backstage, req.Namespace)}, nil
 	return ctrl.Result{}, nil
 }
 
@@ -164,20 +173,60 @@ func (r *BackstageReconciler) readConfigMapOrDefault(ctx context.Context, name s
 	return nil
 }
 
-func (r *BackstageReconciler) labels(meta v1.ObjectMeta, name string) {
-	if meta.Labels == nil {
-		meta.Labels = map[string]string{}
-	}
-	meta.Labels["app.kubernetes.io/name"] = "backstage"
-	meta.Labels["app.kubernetes.io/instance"] = name
-}
-
 func readYaml(manifest string, object interface{}) error {
 	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(manifest)), 1000)
 	if err := dec.Decode(object); err != nil {
 		return err
 	}
 	return nil
+}
+
+// sets the RuntimeRunning condition
+func (r *BackstageReconciler) setRunningStatus(ctx context.Context, backstage *bs.Backstage, ns string) {
+	meta.SetStatusCondition(&backstage.Status.Conditions, v1.Condition{
+		Type:               bs.RuntimeConditionRunning,
+		Status:             "Unknown",
+		LastTransitionTime: v1.Time{},
+		Reason:             "Unknown",
+		Message:            "Runtime in unknown status",
+	})
+}
+
+// sets the RuntimeSyncedWithConfig condition
+func (r *BackstageReconciler) setSyncStatus(ctx context.Context, backstage *bs.Backstage, ns string) {
+	meta.SetStatusCondition(&backstage.Status.Conditions, v1.Condition{
+		Type:               bs.RuntimeConditionSynced,
+		Status:             "Unknown",
+		LastTransitionTime: v1.Time{},
+		Reason:             "Unknown",
+		Message:            "Sync in unknown status",
+	})
+}
+
+// sets backstage-{Id} for labels and selectors
+func setBackstageAppLabel(labels map[string]string, backstage bs.Backstage) {
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[BackstageAppLabel] = fmt.Sprintf("backstage-%s", backstage.Name)
+}
+
+// sets backstage-db-{Id} for labels and selectors
+func setBackstageLocalDbLabel(labels map[string]string, backstage bs.Backstage) {
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[BackstageAppLabel] = fmt.Sprintf("backstage-db-%s", backstage.Name)
+}
+
+// sets labels on Backstage's instance resources
+func (r *BackstageReconciler) labels(meta *v1.ObjectMeta, backstage bs.Backstage) {
+	if meta.Labels == nil {
+		meta.Labels = map[string]string{}
+	}
+	meta.Labels["app.kubernetes.io/name"] = "backstage"
+	meta.Labels["app.kubernetes.io/instance"] = backstage.Name
+	//meta.Labels[BackstageAppLabel] = backstageAppId(backstage)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -190,12 +239,3 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&bs.Backstage{}).
 		Complete(r)
 }
-
-//func initDefaults() error {
-//	//deployment = &appsv1.Deployment{}
-//	if err := readYaml(DefaultBackstageDeployment, DefBackstageDeployment); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}

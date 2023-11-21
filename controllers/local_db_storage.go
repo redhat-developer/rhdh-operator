@@ -65,12 +65,11 @@ func (r *BackstageReconciler) applyPV(ctx context.Context, backstage bs.Backstag
 	lg := log.FromContext(ctx)
 
 	pv := &corev1.PersistentVolume{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RuntimeConfig.LocalDbConfigName, "persistentVolume", ns, DefaultLocalDbPV, pv)
+	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "persistentVolume", ns, DefaultLocalDbPV, pv)
 	if err != nil {
 		return err
 	}
 
-	//pv.Namespace = ns
 	err = r.Get(ctx, types.NamespacedName{Name: pv.Name, Namespace: ns}, pv)
 
 	if err != nil {
@@ -83,13 +82,12 @@ func (r *BackstageReconciler) applyPV(ctx context.Context, backstage bs.Backstag
 		return nil
 	}
 
-	r.labels(pv.ObjectMeta, backstage.Name)
-	if !backstage.Spec.DryRun {
-		err = r.Create(ctx, pv)
-		if err != nil {
-			//status = fmt.Sprintf("failed to create postgre persistent volume, reason:%s", err)
-			return fmt.Errorf("failed to create postgre persistent volume, reason:%s", err)
-		}
+	r.labels(&pv.ObjectMeta, backstage)
+
+	err = r.Create(ctx, pv)
+	if err != nil {
+		//status = fmt.Sprintf("failed to create postgre persistent volume, reason:%s", err)
+		return fmt.Errorf("failed to create postgre persistent volume, reason:%s", err)
 	}
 
 	return nil
@@ -100,12 +98,11 @@ func (r *BackstageReconciler) applyPVC(ctx context.Context, backstage bs.Backsta
 	lg := log.FromContext(ctx)
 
 	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RuntimeConfig.LocalDbConfigName, "persistentVolumeClaim", ns, DefaultLocalDbPVC, pvc)
+	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "persistentVolumeClaim", ns, DefaultLocalDbPVC, pvc)
 	if err != nil {
 		return err
 	}
 
-	//pvc.Namespace = ns
 	err = r.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: ns}, pvc)
 
 	if err != nil {
@@ -118,13 +115,12 @@ func (r *BackstageReconciler) applyPVC(ctx context.Context, backstage bs.Backsta
 		return nil
 	}
 
-	r.labels(pvc.ObjectMeta, backstage.Name)
-	if !backstage.Spec.DryRun {
-		err = r.Create(ctx, pvc)
-		if err != nil {
-			//status = fmt.Sprintf("failed to create postgre persistent volume, reason:%s", err)
-			return fmt.Errorf("failed to create postgre persistent volume claim, reason:%s", err)
-		}
+	r.labels(&pvc.ObjectMeta, backstage)
+
+	err = r.Create(ctx, pvc)
+	if err != nil {
+		//status = fmt.Sprintf("failed to create postgre persistent volume, reason:%s", err)
+		return fmt.Errorf("failed to create postgre persistent volume claim, reason:%s", err)
 	}
 
 	return nil

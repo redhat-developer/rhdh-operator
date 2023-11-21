@@ -35,7 +35,7 @@ metadata:
 spec:
   type: NodePort
   selector:
-    app: backstage # backstage-<cr-name>
+    backstage.io/app:  # placeholder for 'backstage-<cr-name>'
   ports:
     - name: http
       port: 80
@@ -50,11 +50,12 @@ func (r *BackstageReconciler) applyBackstageService(ctx context.Context, backsta
 	lg := log.FromContext(ctx)
 
 	service := &corev1.Service{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RuntimeConfig.BackstageConfigName, "service", ns, DefaultBackstageService, service)
+	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "service", ns, DefaultBackstageService, service)
 	if err != nil {
 		return err
 	}
-	service.Spec.Selector["app"] = fmt.Sprintf("backstage-%s", backstage.Name)
+
+	setBackstageAppLabel(service.Spec.Selector, backstage)
 
 	err = r.Get(ctx, types.NamespacedName{Name: service.Name, Namespace: ns}, service)
 	if err != nil {
@@ -67,11 +68,10 @@ func (r *BackstageReconciler) applyBackstageService(ctx context.Context, backsta
 		return nil
 	}
 
-	if !backstage.Spec.DryRun {
-		err = r.Create(ctx, service)
-		if err != nil {
-			return fmt.Errorf("failed to create backstage service, reason: %s", err)
-		}
+	r.labels(&service.ObjectMeta, backstage)
+	err = r.Create(ctx, service)
+	if err != nil {
+		return fmt.Errorf("failed to create backstage service, reason: %s", err)
 	}
 	return nil
 }

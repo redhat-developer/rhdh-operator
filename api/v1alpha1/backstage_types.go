@@ -20,34 +20,34 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	RuntimeConditionRunning string = "RuntimeRunning"
+	RuntimeConditionSynced  string = "RuntimeSyncedWithConfig"
+)
+
 // BackstageSpec defines the desired state of Backstage
 type BackstageSpec struct {
-	AppConfigs    []string      `json:"appConfigs,omitempty"`
-	RuntimeConfig RuntimeConfig `json:"runtimeConfig,omitempty"`
-	//+kubebuilder:default=false
-	DryRun bool `json:"dryRun,omitempty"`
+	// Backstage application AppConfigs
+	AppConfigs []string `json:"appConfigs,omitempty"`
+	// Raw Runtime Objects configuration
+	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
 
 	//+kubebuilder:default=false
 	SkipLocalDb bool `json:"skipLocalDb,omitempty"`
 }
 
 type RuntimeConfig struct {
+	// Name of ConfigMap containing Backstage runtime objects configuration
 	BackstageConfigName string `json:"backstageConfig,omitempty"`
-	LocalDbConfigName   string `json:"localDbConfig,omitempty"`
+	// Name of ConfigMap containing LocalDb (P|ostgreSQL) runtime objects configuration
+	LocalDbConfigName string `json:"localDbConfig,omitempty"`
 }
 
 // BackstageStatus defines the observed state of Backstage
 type BackstageStatus struct {
-	BackstageState string `json:"backstageState,omitempty"`
-}
-
-type LocalDbStatus struct {
-	PersistentVolume LocalDbPersistentVolume `json:"PersistentVolume,omitempty"`
-}
-
-type LocalDbPersistentVolume struct {
-	Name   string `json:"name,omitempty"`
-	Status string `json:"status,omitempty"`
+	// Conditions is the list of conditions describing the state of the runtime
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

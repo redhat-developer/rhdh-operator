@@ -36,11 +36,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: backstage  # backstage-<cr-name>
+      backstage.io/app:  # placeholder for 'backstage-<cr-name>'
   template:
     metadata:
       labels:
-        app: backstage # backstage-<cr-name>
+        backstage.io/app:  # placeholder for 'backstage-<cr-name>'
     spec:
       containers:
         - name: backstage
@@ -64,18 +64,20 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 	lg := log.FromContext(ctx)
 
 	deployment := &appsv1.Deployment{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RuntimeConfig.BackstageConfigName, "deploy", ns, DefaultBackstageDeployment, deployment)
+	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "deploy", ns, DefaultBackstageDeployment, deployment)
 	if err != nil {
 		return err
 	}
-	if deployment.Spec.Template.ObjectMeta.Labels == nil {
-		deployment.Spec.Template.ObjectMeta.Labels = map[string]string{}
-	}
-	deployment.Spec.Template.ObjectMeta.Labels["app"] = fmt.Sprintf("backstage-%s", backstage.Name)
-	if deployment.Spec.Selector.MatchLabels == nil {
-		deployment.Spec.Selector.MatchLabels = map[string]string{}
-	}
-	deployment.Spec.Selector.MatchLabels["app"] = fmt.Sprintf("backstage-%s", backstage.Name)
+	setBackstageAppLabel(deployment.Spec.Template.ObjectMeta.Labels, backstage)
+	setBackstageAppLabel(deployment.Spec.Selector.MatchLabels, backstage)
+	//if deployment.Spec.Template.ObjectMeta.Labels == nil {
+	//	deployment.Spec.Template.ObjectMeta.Labels = map[string]string{}
+	//}
+	//deployment.Spec.Template.ObjectMeta.Labels[BackstageAppLabel] = backstageAppId(backstage)
+	//if deployment.Spec.Selector.MatchLabels == nil {
+	//	deployment.Spec.Selector.MatchLabels = map[string]string{}
+	//}
+	//deployment.Spec.Selector.MatchLabels[BackstageAppLabel] = backstageAppId(backstage)
 
 	err = r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: ns}, deployment)
 	if err != nil {
@@ -89,12 +91,10 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 		return nil
 	}
 
-	if !backstage.Spec.DryRun {
-		err = r.Create(ctx, deployment)
-		if err != nil {
-			return fmt.Errorf("failed to create backstage deplyment, reason: %s", err)
-		}
+	r.labels(&deployment.ObjectMeta, backstage)
+	err = r.Create(ctx, deployment)
+	if err != nil {
+		return fmt.Errorf("failed to create backstage deplyment, reason: %s", err)
 	}
-
 	return nil
 }

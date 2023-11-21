@@ -78,8 +78,7 @@ var _ = Describe("Backstage controller", func() {
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
 			g.Expect(err).NotTo(HaveOccurred())
 			//TODO the status is under construction
-			g.Expect(backstage.Status.BackstageState).To(Equal("deployed"),
-				fmt.Sprintf("The status is not 'deployed' '%s'", backstage.Status))
+			g.Expect(len(backstage.Status.Conditions)).To(Equal(2))
 		}, time.Minute, time.Second).Should(Succeed())
 	}
 
@@ -171,7 +170,7 @@ spec:
 						Namespace: ns,
 					},
 					Spec: bsv1alphav1.BackstageSpec{
-						RuntimeConfig: bsv1alphav1.RuntimeConfig{
+						RawRuntimeConfig: bsv1alphav1.RuntimeConfig{
 							BackstageConfigName: backstageConfigMap.Name,
 						},
 					},
@@ -249,7 +248,7 @@ spec:
 						Namespace: ns,
 					},
 					Spec: bsv1alphav1.BackstageSpec{
-						RuntimeConfig: bsv1alphav1.RuntimeConfig{
+						RawRuntimeConfig: bsv1alphav1.RuntimeConfig{
 							LocalDbConfigName: localDbConfigMap.Name,
 						},
 					},
