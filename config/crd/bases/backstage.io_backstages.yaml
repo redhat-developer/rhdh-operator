@@ -48,6 +48,17 @@ spec:
                       type: string
                   type: object
                 type: array
+              dynamicPluginsConfig:
+                description: Dynamic Plugins configuration
+                properties:
+                  kind:
+                    enum:
+                    - ConfigMap
+                    - Secret
+                    type: string
+                  name:
+                    type: string
+                type: object
               rawRuntimeConfig:
                 description: Raw Runtime Objects configuration
                 properties:

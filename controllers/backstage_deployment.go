@@ -28,6 +28,7 @@ import (
 )
 
 const (
+	_defaultBackstageInitContainerName = "install-dynamic-plugins"
 	_defaultBackstageMainContainerName = "backstage-backend"
 )
 
@@ -59,25 +60,16 @@ spec:
                   requests:
                     storage: 1Gi
           name: dynamic-plugins-root
-        - configMap:
-            defaultMode: 420
-            name: dynamic-plugins
-            optional: true
-          name: dynamic-plugins
         - name: dynamic-plugins-npmrc
           secret:
             defaultMode: 420
             optional: true
             secretName: dynamic-plugins-npmrc
-# TODO(rm3l): to mount if value set in CR
-        #- name: backstage-app-config
-        #  configMap:
-        #    name: my-backstage-from-helm-app-config
 
       initContainers:
         - command:
           - ./install-dynamic-plugins.sh
-          - /dynamic-plugins-root
+          - dynamic-plugins-root
           env:
           - name: NPM_CONFIG_USERCONFIG
             value: /opt/app-root/src/.npmrc.dynamic-plugins
@@ -85,12 +77,8 @@ spec:
           imagePullPolicy: IfNotPresent
           name: install-dynamic-plugins
           volumeMounts:
-          - mountPath: /dynamic-plugins-root
+          - mountPath: /opt/app-root/src/dynamic-plugins-root
             name: dynamic-plugins-root
-          - mountPath: /opt/app-root/src/dynamic-plugins.yaml
-            name: dynamic-plugins
-            readOnly: true
-            subPath: dynamic-plugins.yaml
           - mountPath: /opt/app-root/src/.npmrc.dynamic-plugins
             name: dynamic-plugins-npmrc
             readOnly: true
@@ -104,9 +92,6 @@ spec:
           args:
             - "--config"
             - "dynamic-plugins-root/app-config.dynamic-plugins.yaml"
-# TODO(rm3l): to mount if value set in CR
-            #- "--config"
-            #- "/opt/app-root/src/app-config-from-configmap.yaml"
           readinessProbe:
             failureThreshold: 3
             httpGet:
@@ -140,10 +125,6 @@ spec:
 #            - secretRef:
 #                name: backstage-secrets
           volumeMounts:
-# TODO(rm3l): to mount if value set in CR
-            #- name: backstage-app-config
-            #  mountPath: "/opt/app-root/src/app-config-from-configmap.yaml"
-            #  subPath: app-config.yaml
             - mountPath: /opt/app-root/src/dynamic-plugins-root
               name: dynamic-plugins-root
 `, _defaultBackstageMainContainerName)
@@ -182,7 +163,7 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				if err != nil {
 					return err
 				}
-				r.addVolumeMounts(deployment, appConfigFileNamesMap)
+				r.addVolumeMounts(backstage, deployment, appConfigFileNamesMap)
 				r.addContainerArgs(deployment, appConfigFileNamesMap)
 				r.addEnvVars(deployment)
 			}
@@ -226,9 +207,44 @@ func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, deployment *app
 				VolumeSource: volumeSource,
 			})
 	}
+	if backstage.Spec.DynamicPluginsConfig.Name != "" {
+		var volumeSource v1.VolumeSource
+		switch backstage.Spec.DynamicPluginsConfig.Kind {
+		case "ConfigMap":
+			volumeSource.ConfigMap = &v1.ConfigMapVolumeSource{
+				DefaultMode:          pointer.Int32(420),
+				LocalObjectReference: v1.LocalObjectReference{Name: backstage.Spec.DynamicPluginsConfig.Name},
+			}
+		case "Secret":
+			volumeSource.Secret = &v1.SecretVolumeSource{
+				DefaultMode: pointer.Int32(420),
+				SecretName:  backstage.Spec.DynamicPluginsConfig.Name,
+			}
+		}
+		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes,
+			v1.Volume{
+				Name:         backstage.Spec.DynamicPluginsConfig.Name,
+				VolumeSource: volumeSource,
+			})
+	}
 }
 
-func (r *BackstageReconciler) addVolumeMounts(deployment *appsv1.Deployment, appConfigFileNamesMap map[string][]string) {
+func (r *BackstageReconciler) addVolumeMounts(backstage bs.Backstage, deployment *appsv1.Deployment, appConfigFileNamesMap map[string][]string) {
+	if backstage.Spec.DynamicPluginsConfig.Name != "" {
+		for i, c := range deployment.Spec.Template.Spec.InitContainers {
+			if c.Name == _defaultBackstageInitContainerName {
+				deployment.Spec.Template.Spec.InitContainers[i].VolumeMounts = append(deployment.Spec.Template.Spec.InitContainers[i].VolumeMounts,
+					v1.VolumeMount{
+						Name:      backstage.Spec.DynamicPluginsConfig.Name,
+						MountPath: "/opt/app-root/src/dynamic-plugins.yaml",
+						ReadOnly:  true,
+						SubPath:   "dynamic-plugins.yaml",
+					})
+				break
+			}
+		}
+	}
+
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == _defaultBackstageMainContainerName {
 			for appConfigName := range appConfigFileNamesMap {
