@@ -30,6 +30,7 @@ import (
 const (
 	_defaultBackstageInitContainerName = "install-dynamic-plugins"
 	_defaultBackstageMainContainerName = "backstage-backend"
+	_defaultBackendAuthSecretValue     = "pl4s3Ch4ng3M3"
 )
 
 var (
@@ -278,11 +279,13 @@ func (r *BackstageReconciler) addContainerArgs(deployment *appsv1.Deployment, ap
 func (r *BackstageReconciler) addEnvVars(deployment *appsv1.Deployment) {
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == _defaultBackstageMainContainerName {
-			// FIXME(rm3l): Hack to set the 'BACKEND_SECRET' env var
-			deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env, v1.EnvVar{
-				Name:  "BACKEND_SECRET",
-				Value: "ch4ng3M3",
-			})
+			deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env,
+				// TODO(rm3l): backend.auth.keys[0].secret is required for service-to-service communication.
+				// This is a default value that will be modifiable by the user using environment variables.
+				v1.EnvVar{
+					Name:  "APP_CONFIG_backend_auth_keys",
+					Value: fmt.Sprintf(`[{"secret": "%s"}]`, _defaultBackendAuthSecret),
+				})
 			break
 		}
 	}
