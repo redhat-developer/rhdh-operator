@@ -28,6 +28,9 @@ type BackstageSpec struct {
 	// Backstage application AppConfigs
 	AppConfigs []Config `json:"appConfigs,omitempty"`
 
+	// Optional Backend Auth Secret Name. A new one will be generated if not set.
+	BackendAuthSecretRef BackendAuthSecretRef `json:"backendAuthSecretRef,omitempty"`
+
 	// Dynamic Plugins configuration
 	DynamicPluginsConfig Config `json:"dynamicPluginsConfig,omitempty"`
 
@@ -42,6 +45,15 @@ type Config struct {
 	Name string `json:"name,omitempty"`
 	//+kubebuilder:validation:Enum=ConfigMap;Secret
 	Kind string `json:"kind,omitempty"`
+}
+
+type BackendAuthSecretRef struct {
+	// Name of the secret to use for the backend auth
+	Name string `json:"name,omitempty"`
+
+	// Key in the secret to use for the backend auth. Default value is: backend-secret
+	//+kubebuilder:default=backend-secret
+	Key string `json:"key,omitempty"`
 }
 
 type RuntimeConfig struct {

@@ -16,12 +16,15 @@ package controller
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 
 	bs "backstage.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -156,6 +159,11 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				}
 			}
 
+			backendAuthSecretName, err := r.handleBackendAuthSecret(ctx, backstage, ns)
+			if err != nil {
+				return err
+			}
+
 			r.addVolumes(backstage, deployment)
 
 			if backstage.Spec.RawRuntimeConfig.BackstageConfigName == "" {
@@ -166,7 +174,7 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				}
 				r.addVolumeMounts(backstage, deployment, appConfigFileNamesMap)
 				r.addContainerArgs(deployment, appConfigFileNamesMap)
-				r.addEnvVars(deployment)
+				r.addEnvVars(backstage, deployment, backendAuthSecretName)
 			}
 
 			err = r.Create(ctx, deployment)
@@ -185,6 +193,52 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 		}
 	}
 	return nil
+}
+
+func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backstage bs.Backstage, ns string) (secretName string, err error) {
+	backendAuthSecretName := backstage.Spec.BackendAuthSecretRef.Name
+	if backendAuthSecretName == "" {
+		//Generate a secret if it does not exist
+		backendAuthSecretName = fmt.Sprintf("%s-auth", backstage.Name)
+		sec := &v1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "v1",
+				APIVersion: "Secret",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      backendAuthSecretName,
+				Namespace: ns,
+			},
+		}
+		err = r.Get(ctx, types.NamespacedName{Name: backendAuthSecretName, Namespace: ns}, sec)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				return "", fmt.Errorf("failed to get secret for backend auth (%q), reason: %s", backendAuthSecretName, err)
+			}
+			// Create a secret with a random value
+			authVal := func(length int) string {
+				bytes := make([]byte, length)
+				if _, randErr := rand.Read(bytes); randErr != nil {
+					// Do not fail, but use a fallback value
+					return _defaultBackendAuthSecretValue
+				}
+				return base64.StdEncoding.EncodeToString(bytes)
+			}(24)
+			k := backstage.Spec.BackendAuthSecretRef.Key
+			if k == "" {
+				//TODO(rm3l): why kubebuilder default values do not work
+				k = "backend-secret"
+			}
+			sec.Data = map[string][]byte{
+				k: []byte(authVal),
+			}
+			err = r.Create(ctx, sec)
+			if err != nil {
+				return "", fmt.Errorf("failed to create secret for backend auth, reason: %s", err)
+			}
+		}
+	}
+	return backendAuthSecretName, nil
 }
 
 func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, deployment *appsv1.Deployment) {
@@ -276,15 +330,33 @@ func (r *BackstageReconciler) addContainerArgs(deployment *appsv1.Deployment, ap
 	}
 }
 
-func (r *BackstageReconciler) addEnvVars(deployment *appsv1.Deployment) {
+func (r *BackstageReconciler) addEnvVars(backstage bs.Backstage, deployment *appsv1.Deployment, backendAuthSecretName string) {
+	if backendAuthSecretName == "" {
+		return
+	}
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == _defaultBackstageMainContainerName {
+			k := backstage.Spec.BackendAuthSecretRef.Key
+			if k == "" {
+				//TODO(rm3l): why kubebuilder default values do not work
+				k = "backend-secret"
+			}
 			deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env,
-				// TODO(rm3l): backend.auth.keys[0].secret is required for service-to-service communication.
-				// This is a default value that will be modifiable by the user using environment variables.
+				v1.EnvVar{
+					Name: "BACKEND_SECRET",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: backendAuthSecretName,
+							},
+							Key:      k,
+							Optional: pointer.Bool(false),
+						},
+					},
+				},
 				v1.EnvVar{
 					Name:  "APP_CONFIG_backend_auth_keys",
-					Value: fmt.Sprintf(`[{"secret": "%s"}]`, _defaultBackendAuthSecret),
+					Value: `[{"secret": "$(BACKEND_SECRET)"}]`,
 				})
 			break
 		}

@@ -48,6 +48,19 @@ spec:
                       type: string
                   type: object
                 type: array
+              backendAuthSecretRef:
+                description: Optional Backend Auth Secret Name. A new one will be
+                  generated if not set.
+                properties:
+                  key:
+                    default: backend-secret
+                    description: 'Key in the secret to use for the backend auth. Default
+                      value is: backend-secret'
+                    type: string
+                  name:
+                    description: Name of the secret to use for the backend auth
+                    type: string
+                type: object
               dynamicPluginsConfig:
                 description: Dynamic Plugins configuration
                 properties:
