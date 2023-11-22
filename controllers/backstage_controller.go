@@ -56,6 +56,7 @@ type BackstageReconciler struct {
 //+kubebuilder:rbac:groups=backstage.io,resources=backstages/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=configmaps;persistentvolumes;persistentvolumeclaims;services,verbs=get;watch;create;update;list;delete
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;watch;create;update;list;delete
+//+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;watch;create;update;list;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -88,24 +89,21 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if !backstage.Spec.SkipLocalDb {
-		// log Debug
+
+		/* We use default strogeclass currently, and no PV is needed in that case.
+		If we decide later on to support user provided storageclass we can enable pv creation.
 		if err := r.applyPV(ctx, backstage, req.Namespace); err != nil {
-			//backstage.Status.LocalDb.PersistentVolume.Status = err.Error()
 			return ctrl.Result{}, err
 		}
+		*/
 
-		if err := r.applyPVC(ctx, backstage, req.Namespace); err != nil {
-			//backstage.Status.PostgreState = err.Error()
-			return ctrl.Result{}, err
-		}
-
-		err := r.applyLocalDbDeployment(ctx, backstage, req.Namespace)
+		err := r.applyLocalDbStatefulSet(ctx, backstage, req.Namespace)
 		if err != nil {
 			//backstage.Status.PostgreState = err.Error()
 			return ctrl.Result{}, err
 		}
 
-		err = r.applyLocalDbService(ctx, backstage, req.Namespace)
+		err = r.applyLocalDbServices(ctx, backstage, req.Namespace)
 		if err != nil {
 			//backstage.Status.PostgreState = err.Error()
 			return ctrl.Result{}, err
@@ -215,19 +213,19 @@ func (r *BackstageReconciler) setSyncStatus(backstage *bs.Backstage) {
 }
 
 // sets backstage-{Id} for labels and selectors
-func setBackstageAppLabel(labels map[string]string, backstage bs.Backstage) {
-	if labels == nil {
-		labels = map[string]string{}
+func setBackstageAppLabel(labels *map[string]string, backstage bs.Backstage) {
+	if *labels == nil {
+		*labels = map[string]string{}
 	}
-	labels[BackstageAppLabel] = fmt.Sprintf("backstage-%s", backstage.Name)
+	(*labels)[BackstageAppLabel] = fmt.Sprintf("backstage-%s", backstage.Name)
 }
 
-// sets backstage-db-{Id} for labels and selectors
-func setBackstageLocalDbLabel(labels map[string]string, backstage bs.Backstage) {
-	if labels == nil {
-		labels = map[string]string{}
+// sets backstage-psql-{Id} for labels and selectors
+func setBackstageLocalDbLabel(labels *map[string]string, name string) {
+	if *labels == nil {
+		*labels = map[string]string{}
 	}
-	labels[BackstageAppLabel] = fmt.Sprintf("backstage-db-%s", backstage.Name)
+	(*labels)[BackstageAppLabel] = name
 }
 
 // sets labels on Backstage's instance resources

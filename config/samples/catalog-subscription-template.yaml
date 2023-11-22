@@ -8,4 +8,4 @@ spec:
   name: backstage-operator
   source: backstage-operator
   sourceNamespace: openshift-marketplace
-  startingCSV: backstage-operator.v0.0.1
+  startingCSV: backstage-operator.v{{VERSION}}

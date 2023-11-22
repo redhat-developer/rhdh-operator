@@ -69,6 +69,17 @@ spec:
           - update
           - watch
         - apiGroups:
+          - apps
+          resources:
+          - statefulsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
           - backstage.io
           resources:
           - backstages

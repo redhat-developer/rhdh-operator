@@ -216,13 +216,13 @@ spec:
 						Namespace: ns,
 					},
 					Data: map[string]string{
-						"deployment": `
+						"statefulset": `
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: db-deployment
+  name: db-statefulset
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: db
@@ -270,10 +270,12 @@ spec:
 				Expect(err).To(Not(HaveOccurred()))
 
 				By("Checking if StatefulSet was successfully created in the reconciliation")
-				Eventually(func() error {
-					found := &appsv1.Deployment{}
-					// TODO to get name from default
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "db-deployment"}, found)
+				Eventually(func(g Gomega) {
+					found := &appsv1.StatefulSet{}
+					name := fmt.Sprintf("backstage-psql-%s", backstage.Name)
+					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					g.Expect(found.Spec.Replicas).Should(HaveValue(BeEquivalentTo(3)))
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")

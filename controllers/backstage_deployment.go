@@ -71,9 +71,8 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 	if err != nil {
 		if errors.IsNotFound(err) {
 
-			setBackstageAppLabel(deployment.Spec.Template.ObjectMeta.Labels, backstage)
-			setBackstageAppLabel(deployment.Spec.Selector.MatchLabels, backstage)
-
+			setBackstageAppLabel(&deployment.Spec.Template.ObjectMeta.Labels, backstage)
+			setBackstageAppLabel(&deployment.Spec.Selector.MatchLabels, backstage)
 			r.labels(&deployment.ObjectMeta, backstage)
 
 			if r.OwnsRuntime {

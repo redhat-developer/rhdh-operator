@@ -14,6 +14,7 @@
 
 package controller
 
+/*
 import (
 	"context"
 	"fmt"
@@ -35,27 +36,13 @@ metadata:
   labels:
     type: local
 spec:
-  storageClassName: manual
   capacity:
-    storage: 2G
+    storage: 2Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   hostPath:
     path: '/mnt/data'
-`
-	DefaultLocalDbPVC = `
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgres-storage-claim
-spec:
-  storageClassName: manual
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2G
 `
 )
 
@@ -90,47 +77,9 @@ func (r *BackstageReconciler) applyPV(ctx context.Context, backstage bs.Backstag
 
 	err = r.Create(ctx, pv)
 	if err != nil {
-		//status = fmt.Sprintf("failed to create postgre persistent volume, reason:%s", err)
 		return fmt.Errorf("failed to create postgre persistent volume, reason:%s", err)
 	}
 
 	return nil
 }
-
-func (r *BackstageReconciler) applyPVC(ctx context.Context, backstage bs.Backstage, ns string) error {
-	// Postgre PersistentVolumeClaim
-	//lg := log.FromContext(ctx)
-
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "persistentVolumeClaim", ns, DefaultLocalDbPVC, pvc)
-	if err != nil {
-		return err
-	}
-
-	err = r.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: ns}, pvc)
-
-	if err != nil {
-		if errors.IsNotFound(err) {
-		} else {
-			return fmt.Errorf("failed to get PVC, reason: %s", err)
-		}
-	} else {
-		//lg.Info("CR update is ignored for the time")
-		return nil
-	}
-
-	r.labels(&pvc.ObjectMeta, backstage)
-	if r.OwnsRuntime {
-		if err := controllerutil.SetControllerReference(&backstage, pvc, r.Scheme); err != nil {
-			return fmt.Errorf("failed to set owner reference: %s", err)
-		}
-	}
-
-	err = r.Create(ctx, pvc)
-	if err != nil {
-		//status = fmt.Sprintf("failed to create postgre persistent volume, reason:%s", err)
-		return fmt.Errorf("failed to create postgre persistent volume claim, reason:%s", err)
-	}
-
-	return nil
-}
+*/
