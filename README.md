@@ -45,6 +45,27 @@ UnDeploy the controller from the cluster:
 ```sh
 make undeploy
 ```
+## Build and Deploy with OLM
+1. To build operator, bundle and catalog images:
+```sh
+make release-build
+```
+2. To push operator, bundle and catalog images to the registry:
+```sh
+make release-push
+```
+3. To deploy or update catalog source:
+```sh
+make catalog-update
+```
+4. To deloy the operator with OLM
+```sh
+make deploy-olm
+```
+4. To undeloy the operator with OLM
+```sh
+make undeploy-olm
+```
 ## Contributing
 // TODO(user): Add detailed information on how you would like others to contribute to this project
 
