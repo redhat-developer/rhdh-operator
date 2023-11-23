@@ -134,6 +134,11 @@ spec:
 `, _defaultBackstageMainContainerName)
 )
 
+type appConfigData struct {
+	ref   string
+	files []string
+}
+
 func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	//lg := log.FromContext(ctx)
@@ -167,13 +172,13 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 			r.addVolumes(backstage, deployment)
 
 			if backstage.Spec.RawRuntimeConfig.BackstageConfigName == "" {
-				var appConfigFileNamesMap map[string][]string
-				appConfigFileNamesMap, err = r.extractAppConfigFileNames(ctx, backstage, ns)
+				var appConfigFilenamesList []appConfigData
+				appConfigFilenamesList, err = r.extractAppConfigFileNames(ctx, backstage, ns)
 				if err != nil {
 					return err
 				}
-				r.addVolumeMounts(backstage, deployment, appConfigFileNamesMap)
-				r.addContainerArgs(deployment, appConfigFileNamesMap)
+				r.addVolumeMounts(backstage, deployment, appConfigFilenamesList)
+				r.addContainerArgs(deployment, appConfigFilenamesList)
 				r.addEnvVars(backstage, deployment, backendAuthSecretName)
 			}
 
@@ -284,7 +289,7 @@ func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, deployment *app
 	}
 }
 
-func (r *BackstageReconciler) addVolumeMounts(backstage bs.Backstage, deployment *appsv1.Deployment, appConfigFileNamesMap map[string][]string) {
+func (r *BackstageReconciler) addVolumeMounts(backstage bs.Backstage, deployment *appsv1.Deployment, appConfigFilenamesList []appConfigData) {
 	if backstage.Spec.DynamicPluginsConfig.Name != "" {
 		for i, c := range deployment.Spec.Template.Spec.InitContainers {
 			if c.Name == _defaultBackstageInitContainerName {
@@ -302,11 +307,11 @@ func (r *BackstageReconciler) addVolumeMounts(backstage bs.Backstage, deployment
 
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == _defaultBackstageMainContainerName {
-			for appConfigName := range appConfigFileNamesMap {
+			for _, appConfigFilenames := range appConfigFilenamesList {
 				deployment.Spec.Template.Spec.Containers[i].VolumeMounts = append(deployment.Spec.Template.Spec.Containers[i].VolumeMounts,
 					v1.VolumeMount{
-						Name:      appConfigName,
-						MountPath: "/opt/app-root/src/" + appConfigName,
+						Name:      appConfigFilenames.ref,
+						MountPath: "/opt/app-root/src/" + appConfigFilenames.ref,
 					})
 			}
 			break
@@ -314,15 +319,15 @@ func (r *BackstageReconciler) addVolumeMounts(backstage bs.Backstage, deployment
 	}
 }
 
-func (r *BackstageReconciler) addContainerArgs(deployment *appsv1.Deployment, appConfigFileNamesMap map[string][]string) {
+func (r *BackstageReconciler) addContainerArgs(deployment *appsv1.Deployment, appConfigFilenamesList []appConfigData) {
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == _defaultBackstageMainContainerName {
-			for appConfigName, fileNames := range appConfigFileNamesMap {
+			for _, appConfigFilenames := range appConfigFilenamesList {
 				// Args
-				for _, fileName := range fileNames {
+				for _, fileName := range appConfigFilenames.files {
 					deployment.Spec.Template.Spec.Containers[i].Args =
 						append(deployment.Spec.Template.Spec.Containers[i].Args, "--config",
-							fmt.Sprintf("/opt/app-root/src/%s/%s", appConfigName, fileName))
+							fmt.Sprintf("/opt/app-root/src/%s/%s", appConfigFilenames.ref, fileName))
 				}
 			}
 			break
@@ -363,9 +368,13 @@ func (r *BackstageReconciler) addEnvVars(backstage bs.Backstage, deployment *app
 	}
 }
 
-func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, backstage bs.Backstage, ns string) (map[string][]string, error) {
-	m := make(map[string][]string)
+// extractAppConfigFileNames returns a mapping of app-config object name and the list of files in it.
+// We intentionally do not return a Map, to preserve the iteration order of the AppConfigs in the Custom Resource,
+// even though we can't guarantee the iteration order of the files listed inside each ConfigMap or Secret.
+func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, backstage bs.Backstage, ns string) ([]appConfigData, error) {
+	var result []appConfigData
 	for _, appConfig := range backstage.Spec.AppConfigs {
+		var files []string
 		switch appConfig.Kind {
 		case "ConfigMap":
 			cm := v1.ConfigMap{}
@@ -373,7 +382,12 @@ func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, bac
 				return nil, err
 			}
 			for filename := range cm.Data {
-				m[appConfig.Name] = append(m[appConfig.Name], filename)
+				// Bear in mind that iteration order over this map is not guaranteed by Go
+				files = append(files, filename)
+			}
+			for filename := range cm.BinaryData {
+				// Bear in mind that iteration order over this map is not guaranteed by Go
+				files = append(files, filename)
 			}
 		case "Secret":
 			sec := v1.Secret{}
@@ -381,9 +395,18 @@ func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, bac
 				return nil, err
 			}
 			for filename := range sec.Data {
-				m[appConfig.Name] = append(m[appConfig.Name], filename)
+				// Bear in mind that iteration order over this map is not guaranteed by Go
+				files = append(files, filename)
+			}
+			for filename := range sec.StringData {
+				// Bear in mind that iteration order over this map is not guaranteed by Go
+				files = append(files, filename)
 			}
 		}
+		result = append(result, appConfigData{
+			ref:   appConfig.Name,
+			files: files,
+		})
 	}
-	return m, nil
+	return result, nil
 }
