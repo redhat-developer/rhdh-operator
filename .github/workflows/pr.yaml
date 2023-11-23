@@ -17,4 +17,15 @@ jobs:
     - name: Build
       run: make test
 
+  container-image-build:
+    runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        engine: [docker, podman]
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: ${{ matrix.engine }}-build
+        run: make ${{ matrix.engine }}-build
