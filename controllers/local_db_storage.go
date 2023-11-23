@@ -1,18 +1,17 @@
-/*
-Copyright 2023.
+//
+// Copyright (c) 2023 Red Hat, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package controller
 
 import (
@@ -23,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var (
@@ -62,7 +61,7 @@ spec:
 
 func (r *BackstageReconciler) applyPV(ctx context.Context, backstage bs.Backstage, ns string) error {
 	// Postgre PersistentVolume
-	lg := log.FromContext(ctx)
+	//lg := log.FromContext(ctx)
 
 	pv := &corev1.PersistentVolume{}
 	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "persistentVolume", ns, DefaultLocalDbPV, pv)
@@ -78,11 +77,16 @@ func (r *BackstageReconciler) applyPV(ctx context.Context, backstage bs.Backstag
 			return fmt.Errorf("failed to get PV, reason: %s", err)
 		}
 	} else {
-		lg.Info("CR update is ignored for the time")
+		//lg.Info("CR update is ignored for the time")
 		return nil
 	}
 
 	r.labels(&pv.ObjectMeta, backstage)
+	if r.OwnsRuntime {
+		if err := controllerutil.SetControllerReference(&backstage, pv, r.Scheme); err != nil {
+			return fmt.Errorf("failed to set owner reference: %s", err)
+		}
+	}
 
 	err = r.Create(ctx, pv)
 	if err != nil {
@@ -95,7 +99,7 @@ func (r *BackstageReconciler) applyPV(ctx context.Context, backstage bs.Backstag
 
 func (r *BackstageReconciler) applyPVC(ctx context.Context, backstage bs.Backstage, ns string) error {
 	// Postgre PersistentVolumeClaim
-	lg := log.FromContext(ctx)
+	//lg := log.FromContext(ctx)
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "persistentVolumeClaim", ns, DefaultLocalDbPVC, pvc)
@@ -111,11 +115,16 @@ func (r *BackstageReconciler) applyPVC(ctx context.Context, backstage bs.Backsta
 			return fmt.Errorf("failed to get PVC, reason: %s", err)
 		}
 	} else {
-		lg.Info("CR update is ignored for the time")
+		//lg.Info("CR update is ignored for the time")
 		return nil
 	}
 
 	r.labels(&pvc.ObjectMeta, backstage)
+	if r.OwnsRuntime {
+		if err := controllerutil.SetControllerReference(&backstage, pvc, r.Scheme); err != nil {
+			return fmt.Errorf("failed to set owner reference: %s", err)
+		}
+	}
 
 	err = r.Create(ctx, pvc)
 	if err != nil {

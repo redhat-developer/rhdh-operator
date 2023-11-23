@@ -33,6 +33,7 @@ import (
 
 	backstageiov1alpha1 "backstage.io/backstage-operator/api/v1alpha1"
 	controller "backstage.io/backstage-operator/controllers"
+	openshift "github.com/openshift/api/route/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -45,6 +46,8 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(backstageiov1alpha1.AddToScheme(scheme))
+
+	utilruntime.Must(openshift.Install(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -52,11 +55,15 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var ownRuntime bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&ownRuntime, "own-runtime", false, "Making Backstage Controller own runtime objects. "+
+		"If 'true' - all runtime objects created by Controller will be syncing with desired state configured by Controller")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -90,8 +97,9 @@ func main() {
 	}
 
 	if err = (&controller.BackstageReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		OwnsRuntime: ownRuntime,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backstage")
 		os.Exit(1)

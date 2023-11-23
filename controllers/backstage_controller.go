@@ -1,18 +1,16 @@
-/*
-Copyright 2023.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+//
+// Copyright (c) 2023 Red Hat, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package controller
 
@@ -22,6 +20,7 @@ import (
 	"fmt"
 
 	bs "backstage.io/backstage-operator/api/v1alpha1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,6 +41,9 @@ const (
 type BackstageReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	// If true, Backstage Controller always sync the state of runtime objects created
+	// otherwise, the can be re-configured independently
+	OwnsRuntime bool
 
 	// Namespace allows to restrict the reconciliation to this particular namespace,
 	// and ignore requests from other namespaces.
@@ -99,7 +101,6 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		err := r.applyLocalDbDeployment(ctx, backstage, req.Namespace)
 		if err != nil {
-
 			//backstage.Status.PostgreState = err.Error()
 			return ctrl.Result{}, err
 		}
@@ -112,9 +113,8 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	}
 
-	if err := r.applyBackstageDeployment(ctx, backstage, req.Namespace); err != nil {
-		// TODO BackstageDepState state
-		//backstage.Status.BackstageState = err.Error()
+	err := r.applyBackstageDeployment(ctx, backstage, req.Namespace)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -126,10 +126,11 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	//TODO: it is just a placeholder for the time
 	r.setRunningStatus(ctx, &backstage, req.Namespace)
-	r.setSyncStatus(ctx, &backstage, req.Namespace)
-	err := r.Status().Update(ctx, &backstage)
+	r.setSyncStatus(&backstage)
+	err = r.Status().Update(ctx, &backstage)
 	if err != nil {
-		log.FromContext(ctx).Error(err, "unable to update backstage.status")
+		return ctrl.Result{}, err
+		//log.FromContext(ctx).Error(err, "unable to update backstage.status")
 	}
 
 	return ctrl.Result{}, nil
@@ -138,9 +139,9 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *BackstageReconciler) readConfigMapOrDefault(ctx context.Context, name string, key string, ns string, def string, object v1.Object) error {
 
 	// ConfigMap name not set, default
-	lg := log.FromContext(ctx)
+	//lg := log.FromContext(ctx)
 
-	lg.V(1).Info("readConfigMapOrDefault CM: ", "name", name)
+	//lg.V(1).Info("readConfigMapOrDefault CM: ", "name", name)
 
 	if name == "" {
 		err := readYaml(def, object)
@@ -155,7 +156,7 @@ func (r *BackstageReconciler) readConfigMapOrDefault(ctx context.Context, name s
 	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &cm); err != nil {
 		return err
 	}
-	lg.V(1).Info("readConfigMapOrDefault CM name found: ", "ConfigMap:", cm)
+	//lg.V(1).Info("readConfigMapOrDefault CM name found: ", "ConfigMap:", cm)
 	val, ok := cm.Data[key]
 	if !ok {
 		// key not found, default
@@ -193,13 +194,23 @@ func (r *BackstageReconciler) setRunningStatus(ctx context.Context, backstage *b
 }
 
 // sets the RuntimeSyncedWithConfig condition
-func (r *BackstageReconciler) setSyncStatus(ctx context.Context, backstage *bs.Backstage, ns string) {
+func (r *BackstageReconciler) setSyncStatus(backstage *bs.Backstage) {
+
+	status := v1.ConditionUnknown
+	reason := "Unknown"
+	message := "Sync in unknown status"
+	if r.OwnsRuntime {
+		status = v1.ConditionTrue
+		reason = "Synced"
+		message = "Backstage syncs runtime"
+	}
+
 	meta.SetStatusCondition(&backstage.Status.Conditions, v1.Condition{
 		Type:               bs.RuntimeConditionSynced,
-		Status:             "Unknown",
+		Status:             status,
 		LastTransitionTime: v1.Time{},
-		Reason:             "Unknown",
-		Message:            "Sync in unknown status",
+		Reason:             reason,
+		Message:            message,
 	})
 }
 
@@ -226,7 +237,7 @@ func (r *BackstageReconciler) labels(meta *v1.ObjectMeta, backstage bs.Backstage
 	}
 	meta.Labels["app.kubernetes.io/name"] = "backstage"
 	meta.Labels["app.kubernetes.io/instance"] = backstage.Name
-	//meta.Labels[BackstageAppLabel] = backstageAppId(backstage)
+	//meta.Labels[BackstageAppLabel] = fmt.Sprintf("backstage-%s", backstage.Name)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -235,7 +246,15 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	//if err := initDefaults(); err != nil {
 	//	return err
 	//}
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&bs.Backstage{}).
-		Complete(r)
+	builder := ctrl.NewControllerManagedBy(mgr).
+		For(&bs.Backstage{})
+
+	if r.OwnsRuntime {
+		builder.Owns(&appsv1.Deployment{}).
+			Owns(&corev1.Service{}).
+			Owns(&corev1.PersistentVolume{}).
+			Owns(&corev1.PersistentVolumeClaim{})
+	}
+
+	return builder.Complete(r)
 }
