@@ -117,7 +117,7 @@ fmt_license:
 
 .PHONY: lint
 lint: golangci-lint ## Run the linter on the codebase
-	$(GOLANGCI_LINT) run
+	$(GOLANGCI_LINT) run ./... --timeout 15m
 
 .PHONY: vet
 vet: ## Run go vet against code.
