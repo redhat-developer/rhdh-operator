@@ -123,7 +123,7 @@ PLATFORM ?= linux/amd64
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: test ## Build docker image with the manager using docker.
-	docker build --platform ${PLATFORM} -t ${IMG} .
+	docker build --platform ${PLATFORM} -t ${IMG} . -f docker/Dockerfile
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager using docker.
@@ -131,7 +131,7 @@ docker-push: ## Push docker image with the manager using docker.
 
 .PHONY: podman-build
 podman-build: test ## Build docker image with the manager using podman.
-	podman build --platform ${PLATFORM} -t ${IMG} .
+	podman build --platform ${PLATFORM} -t ${IMG} . -f docker/Dockerfile
 
 .PHONY: podman-push
 podman-push: ## Push docker image with the manager using podman.
@@ -146,13 +146,13 @@ podman-push: ## Push docker image with the manager using podman.
 PLATFORMS ?= linux/arm64,linux/amd64
 .PHONY: docker-buildx
 docker-buildx: test ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+	# copy existing docker/Dockerfile and insert --platform=${BUILDPLATFORM} into docker/Dockerfile.cross, and preserve the original Dockerfile
+	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' docker/Dockerfile > docker/Dockerfile.cross
 	- docker buildx create --name project-v3-builder
 	docker buildx use project-v3-builder
-	- docker buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- docker buildx build --push --platform=$(PLATFORMS) --tag ${IMG} . -f docker/Dockerfile.cross
 	- docker buildx rm project-v3-builder
-	rm Dockerfile.cross
+	rm docker/Dockerfile.cross
 
 ##@ Deployment
 
@@ -282,6 +282,6 @@ undeploy-olm: ## Un-deploy the operator with OLM
 	-kubectl delete clusterserviceversion backstage-operator.v${VERSION}
 
 .PHONY: catalog-update
-catalog-update: ## Update catalog source in namespace openshift-marketplace 
+catalog-update: ## Update catalog source in namespace openshift-marketplace
 	-kubectl delete catalogsource backstage-operator -n openshift-marketplace
 	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | oc apply -f -
