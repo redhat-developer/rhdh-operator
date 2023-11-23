@@ -19,7 +19,10 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Build
+    - name: Lint
+      run: make lint
+
+    - name: Test
       run: make test
 
   container-image-build:
