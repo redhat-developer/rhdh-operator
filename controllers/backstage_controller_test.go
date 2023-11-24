@@ -171,6 +171,18 @@ var _ = Describe("Backstage controller", func() {
 					"backend auth secret should contain a non-empty 'backend-secret' in its data")
 			}, time.Minute, time.Second).Should(Succeed())
 
+			By("Generating a ConfigMap for default config for dynamic plugins")
+			dynamicPluginsConfigName := fmt.Sprintf("%s-dynamic-plugins", backstageName)
+			Eventually(func(g Gomega) {
+				found := &corev1.ConfigMap{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: dynamicPluginsConfigName}, found)
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				g.Expect(found.Data).To(HaveKey("dynamic-plugins.yaml"))
+				g.Expect(found.Data["dynamic-plugins.yaml"]).To(Not(BeEmpty()),
+					"default ConfigMap for dynamic plugins should contain a non-empty 'dynamic-plugins.yaml' in its data")
+			}, time.Minute, time.Second).Should(Succeed())
+
 			By("Checking if Deployment was successfully created in the reconciliation")
 			found := &appsv1.Deployment{}
 			Eventually(func() error {
@@ -191,6 +203,75 @@ var _ = Describe("Backstage controller", func() {
 			backendAuthAppConfigEnvVar, ok := findEnvVar(found.Spec.Template.Spec.Containers[0].Env, "APP_CONFIG_backend_auth_keys")
 			Expect(ok).To(BeTrue(), "env var APP_CONFIG_backend_auth_keys not found in main container")
 			Expect(backendAuthAppConfigEnvVar.Value).To(Equal(`[{"secret": "$(BACKEND_SECRET)"}]`))
+
+			By("Checking the Volumes in the Backstage Deployment", func() {
+				Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(3))
+
+				_, ok := findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-root")
+				Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-root")
+
+				_, ok = findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-npmrc")
+				Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-npmrc")
+
+				dynamicPluginsConfigVol, ok := findVolume(found.Spec.Template.Spec.Volumes, dynamicPluginsConfigName)
+				Expect(ok).To(BeTrue(), "No volume found with name: %s", dynamicPluginsConfigName)
+				Expect(dynamicPluginsConfigVol.VolumeSource.Secret).To(BeNil())
+				Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
+				Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(dynamicPluginsConfigName))
+			})
+
+			By("Checking the Number of init containers in the Backstage Deployment")
+			Expect(found.Spec.Template.Spec.InitContainers).To(HaveLen(1))
+			initCont := found.Spec.Template.Spec.InitContainers[0]
+
+			By("Checking the Init Container Env Vars in the Backstage Deployment", func() {
+				Expect(initCont.Env).To(HaveLen(1))
+				Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
+				Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
+			})
+
+			By("Checking the Init Container Volume Mounts in the Backstage Deployment", func() {
+				Expect(initCont.VolumeMounts).To(HaveLen(3))
+
+				dpRoot, ok := findVolumeMount(initCont.VolumeMounts, "dynamic-plugins-root")
+				Expect(ok).To(BeTrue(),
+					"No volume mount found with name: dynamic-plugins-root")
+				Expect(dpRoot.MountPath).To(Equal("/dynamic-plugins-root"))
+				Expect(dpRoot.ReadOnly).To(BeFalse())
+				Expect(dpRoot.SubPath).To(BeEmpty())
+
+				dpNpmrc, ok := findVolumeMount(initCont.VolumeMounts, "dynamic-plugins-npmrc")
+				Expect(ok).To(BeTrue(),
+					"No volume mount found with name: dynamic-plugins-npmrc")
+				Expect(dpNpmrc.MountPath).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
+				Expect(dpNpmrc.ReadOnly).To(BeTrue())
+				Expect(dpNpmrc.SubPath).To(Equal(".npmrc"))
+
+				dp, ok := findVolumeMount(initCont.VolumeMounts, dynamicPluginsConfigName)
+				Expect(ok).To(BeTrue(), "No volume mount found with name: %s", dynamicPluginsConfigName)
+				Expect(dp.MountPath).To(Equal("/opt/app-root/src/dynamic-plugins.yaml"))
+				Expect(dp.SubPath).To(Equal("dynamic-plugins.yaml"))
+				Expect(dp.ReadOnly).To(BeTrue())
+			})
+
+			By("Checking the Number of main containers in the Backstage Deployment")
+			Expect(found.Spec.Template.Spec.Containers).To(HaveLen(1))
+			mainCont := found.Spec.Template.Spec.Containers[0]
+
+			By("Checking the main container Args in the Backstage Deployment", func() {
+				Expect(mainCont.Args).To(HaveLen(2))
+				Expect(mainCont.Args[0]).To(Equal("--config"))
+				Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
+			})
+
+			By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
+				Expect(mainCont.VolumeMounts).To(HaveLen(1))
+
+				dpRoot, ok := findVolumeMount(mainCont.VolumeMounts, "dynamic-plugins-root")
+				Expect(ok).To(BeTrue(), "No volume mount found with name: dynamic-plugins-root")
+				Expect(dpRoot.MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
+				Expect(dpRoot.SubPath).To(BeEmpty())
+			})
 
 			By("Checking the latest Status added to the Backstage instance")
 			verifyBackstageInstance(ctx)
@@ -520,7 +601,7 @@ plugins: []
 						dpRoot, ok := findVolumeMount(initCont.VolumeMounts, "dynamic-plugins-root")
 						Expect(ok).To(BeTrue(),
 							"No volume mount found with name: dynamic-plugins-root")
-						Expect(dpRoot.MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
+						Expect(dpRoot.MountPath).To(Equal("/dynamic-plugins-root"))
 						Expect(dpRoot.ReadOnly).To(BeFalse())
 						Expect(dpRoot.SubPath).To(BeEmpty())
 

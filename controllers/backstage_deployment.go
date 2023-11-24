@@ -73,7 +73,7 @@ spec:
       initContainers:
         - command:
           - ./install-dynamic-plugins.sh
-          - dynamic-plugins-root
+          - /dynamic-plugins-root
           env:
           - name: NPM_CONFIG_USERCONFIG
             value: /opt/app-root/src/.npmrc.dynamic-plugins
@@ -81,7 +81,7 @@ spec:
           imagePullPolicy: IfNotPresent
           name: install-dynamic-plugins
           volumeMounts:
-          - mountPath: /opt/app-root/src/dynamic-plugins-root
+          - mountPath: /dynamic-plugins-root
             name: dynamic-plugins-root
           - mountPath: /opt/app-root/src/.npmrc.dynamic-plugins
             name: dynamic-plugins-npmrc
@@ -164,20 +164,25 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				}
 			}
 
-			backendAuthSecretName, err := r.handleBackendAuthSecret(ctx, backstage, ns)
-			if err != nil {
-				return err
-			}
-
-			r.addVolumes(backstage, deployment)
-
 			if backstage.Spec.RawRuntimeConfig.BackstageConfigName == "" {
+				backendAuthSecretName, err := r.handleBackendAuthSecret(ctx, backstage, ns)
+				if err != nil {
+					return err
+				}
+
+				dpConf, err := r.getOrGenerateDynamicPluginsConf(ctx, backstage, ns)
+				if err != nil {
+					return err
+				}
+
+				r.addVolumes(backstage, dpConf, deployment)
+
 				var appConfigFilenamesList []appConfigData
 				appConfigFilenamesList, err = r.extractAppConfigFileNames(ctx, backstage, ns)
 				if err != nil {
 					return err
 				}
-				r.addVolumeMounts(backstage, deployment, appConfigFilenamesList)
+				r.addVolumeMounts(deployment, dpConf, appConfigFilenamesList)
 				r.addContainerArgs(deployment, appConfigFilenamesList)
 				r.addEnvVars(backstage, deployment, backendAuthSecretName)
 			}
@@ -198,6 +203,46 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 		}
 	}
 	return nil
+}
+
+func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (config bs.Config, err error) {
+	if backstage.Spec.DynamicPluginsConfig.Name != "" {
+		return backstage.Spec.DynamicPluginsConfig, nil
+	}
+	//Generate a default ConfigMap for dynamic plugins
+	dpConfigName := fmt.Sprintf("%s-dynamic-plugins", backstage.Name)
+	conf := bs.Config{
+		Name: dpConfigName,
+		Kind: "ConfigMap",
+	}
+	cm := &v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "v1",
+			APIVersion: "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      dpConfigName,
+			Namespace: ns,
+		},
+	}
+	err = r.Get(ctx, types.NamespacedName{Name: dpConfigName, Namespace: ns}, cm)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return bs.Config{}, fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
+		}
+		cm.Data = map[string]string{
+			"dynamic-plugins.yaml": `
+includes:
+- dynamic-plugins.default.yaml
+plugins: []
+`,
+		}
+		err = r.Create(ctx, cm)
+		if err != nil {
+			return bs.Config{}, fmt.Errorf("failed to create config map for dynamic plugins, reason: %s", err)
+		}
+	}
+	return conf, nil
 }
 
 func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backstage bs.Backstage, ns string) (secretName string, err error) {
@@ -246,7 +291,7 @@ func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backs
 	return backendAuthSecretName, nil
 }
 
-func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, deployment *appsv1.Deployment) {
+func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, dynamicPluginsConf bs.Config, deployment *appsv1.Deployment) {
 	for _, appConfig := range backstage.Spec.AppConfigs {
 		var volumeSource v1.VolumeSource
 		switch appConfig.Kind {
@@ -267,35 +312,35 @@ func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, deployment *app
 				VolumeSource: volumeSource,
 			})
 	}
-	if backstage.Spec.DynamicPluginsConfig.Name != "" {
+	if dynamicPluginsConf.Name != "" {
 		var volumeSource v1.VolumeSource
-		switch backstage.Spec.DynamicPluginsConfig.Kind {
+		switch dynamicPluginsConf.Kind {
 		case "ConfigMap":
 			volumeSource.ConfigMap = &v1.ConfigMapVolumeSource{
 				DefaultMode:          pointer.Int32(420),
-				LocalObjectReference: v1.LocalObjectReference{Name: backstage.Spec.DynamicPluginsConfig.Name},
+				LocalObjectReference: v1.LocalObjectReference{Name: dynamicPluginsConf.Name},
 			}
 		case "Secret":
 			volumeSource.Secret = &v1.SecretVolumeSource{
 				DefaultMode: pointer.Int32(420),
-				SecretName:  backstage.Spec.DynamicPluginsConfig.Name,
+				SecretName:  dynamicPluginsConf.Name,
 			}
 		}
 		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes,
 			v1.Volume{
-				Name:         backstage.Spec.DynamicPluginsConfig.Name,
+				Name:         dynamicPluginsConf.Name,
 				VolumeSource: volumeSource,
 			})
 	}
 }
 
-func (r *BackstageReconciler) addVolumeMounts(backstage bs.Backstage, deployment *appsv1.Deployment, appConfigFilenamesList []appConfigData) {
-	if backstage.Spec.DynamicPluginsConfig.Name != "" {
+func (r *BackstageReconciler) addVolumeMounts(deployment *appsv1.Deployment, dynamicPluginsConf bs.Config, appConfigFilenamesList []appConfigData) {
+	if dynamicPluginsConf.Name != "" {
 		for i, c := range deployment.Spec.Template.Spec.InitContainers {
 			if c.Name == _defaultBackstageInitContainerName {
 				deployment.Spec.Template.Spec.InitContainers[i].VolumeMounts = append(deployment.Spec.Template.Spec.InitContainers[i].VolumeMounts,
 					v1.VolumeMount{
-						Name:      backstage.Spec.DynamicPluginsConfig.Name,
+						Name:      dynamicPluginsConf.Name,
 						MountPath: "/opt/app-root/src/dynamic-plugins.yaml",
 						ReadOnly:  true,
 						SubPath:   "dynamic-plugins.yaml",
