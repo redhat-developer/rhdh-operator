@@ -29,6 +29,10 @@ type BackstageSpec struct {
 	AppConfigs []Config `json:"appConfigs,omitempty"`
 
 	// Optional Backend Auth Secret Name. A new one will be generated if not set.
+	// This Secret is used to set an environment variable named 'APP_CONFIG_backend_auth_keys' in the
+	// main container, which takes precedence over any 'backend.auth.keys' field defined
+	// in default or custom application configuration files.
+	// This is required for service-to-service auth and is shared by all backend plugins.
 	BackendAuthSecretRef BackendAuthSecretRef `json:"backendAuthSecretRef,omitempty"`
 
 	// Dynamic Plugins configuration
