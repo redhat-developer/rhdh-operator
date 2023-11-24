@@ -33,6 +33,7 @@ metadata:
   name: my-backstage-config-cm1
 data:
   my-app-config.prod.yaml: |
+    backend:
       database:
         connection:
           password: ${POSTGRESQL_PASSWORD}
