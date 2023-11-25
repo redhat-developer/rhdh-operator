@@ -14,7 +14,15 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Build
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Lint
+      run: make lint
+
+    - name: Test
       run: make test
 
   container-image-build:
@@ -26,6 +34,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
 
       - name: ${{ matrix.engine }}-build
         run: make ${{ matrix.engine }}-build
