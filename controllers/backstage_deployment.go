@@ -159,33 +159,35 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 			r.labels(&deployment.ObjectMeta, backstage)
 
 			if r.OwnsRuntime {
-				if err := controllerutil.SetControllerReference(&backstage, deployment, r.Scheme); err != nil {
+				if err = controllerutil.SetControllerReference(&backstage, deployment, r.Scheme); err != nil {
 					return fmt.Errorf("failed to set owner reference: %s", err)
 				}
 			}
 
-			if backstage.Spec.RawRuntimeConfig.BackstageConfigName == "" {
-				backendAuthSecretName, err := r.handleBackendAuthSecret(ctx, backstage, ns)
-				if err != nil {
-					return err
-				}
-
-				dpConf, err := r.getOrGenerateDynamicPluginsConf(ctx, backstage, ns)
-				if err != nil {
-					return err
-				}
-
-				r.addVolumes(backstage, dpConf, deployment)
-
-				var appConfigFilenamesList []appConfigData
-				appConfigFilenamesList, err = r.extractAppConfigFileNames(ctx, backstage, ns)
-				if err != nil {
-					return err
-				}
-				r.addVolumeMounts(deployment, dpConf, appConfigFilenamesList)
-				r.addContainerArgs(deployment, appConfigFilenamesList)
-				r.addEnvVars(backstage, deployment, backendAuthSecretName)
+			var (
+				backendAuthSecretName  string
+				dpConf                 bs.DynamicPluginsConfigRef
+				appConfigFilenamesList []appConfigData
+			)
+			backendAuthSecretName, err = r.handleBackendAuthSecret(ctx, backstage, ns)
+			if err != nil {
+				return err
 			}
+
+			dpConf, err = r.getOrGenerateDynamicPluginsConf(ctx, backstage, ns)
+			if err != nil {
+				return err
+			}
+
+			r.addVolumes(backstage, dpConf, deployment)
+
+			appConfigFilenamesList, err = r.extractAppConfigFileNames(ctx, backstage, ns)
+			if err != nil {
+				return err
+			}
+			r.addVolumeMounts(deployment, dpConf, appConfigFilenamesList)
+			r.addContainerArgs(deployment, appConfigFilenamesList)
+			r.addEnvVars(backstage, deployment, backendAuthSecretName)
 
 			err = r.Create(ctx, deployment)
 			if err != nil {
