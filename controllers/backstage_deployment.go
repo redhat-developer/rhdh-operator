@@ -205,13 +205,13 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 	return nil
 }
 
-func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (config bs.Config, err error) {
+func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (config bs.DynamicPluginsConfigRef, err error) {
 	if backstage.Spec.DynamicPluginsConfig.Name != "" {
 		return backstage.Spec.DynamicPluginsConfig, nil
 	}
 	//Generate a default ConfigMap for dynamic plugins
 	dpConfigName := fmt.Sprintf("%s-dynamic-plugins", backstage.Name)
-	conf := bs.Config{
+	conf := bs.DynamicPluginsConfigRef{
 		Name: dpConfigName,
 		Kind: "ConfigMap",
 	}
@@ -228,7 +228,7 @@ func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Contex
 	err = r.Get(ctx, types.NamespacedName{Name: dpConfigName, Namespace: ns}, cm)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			return bs.Config{}, fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
+			return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
 		}
 		cm.Data = map[string]string{
 			"dynamic-plugins.yaml": `
@@ -239,7 +239,7 @@ plugins: []
 		}
 		err = r.Create(ctx, cm)
 		if err != nil {
-			return bs.Config{}, fmt.Errorf("failed to create config map for dynamic plugins, reason: %s", err)
+			return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to create config map for dynamic plugins, reason: %s", err)
 		}
 	}
 	return conf, nil
@@ -291,7 +291,7 @@ func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backs
 	return backendAuthSecretName, nil
 }
 
-func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, dynamicPluginsConf bs.Config, deployment *appsv1.Deployment) {
+func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, dynamicPluginsConf bs.DynamicPluginsConfigRef, deployment *appsv1.Deployment) {
 	for _, appConfig := range backstage.Spec.AppConfigs {
 		var volumeSource v1.VolumeSource
 		switch appConfig.Kind {
@@ -334,7 +334,7 @@ func (r *BackstageReconciler) addVolumes(backstage bs.Backstage, dynamicPluginsC
 	}
 }
 
-func (r *BackstageReconciler) addVolumeMounts(deployment *appsv1.Deployment, dynamicPluginsConf bs.Config, appConfigFilenamesList []appConfigData) {
+func (r *BackstageReconciler) addVolumeMounts(deployment *appsv1.Deployment, dynamicPluginsConf bs.DynamicPluginsConfigRef, appConfigFilenamesList []appConfigData) {
 	if dynamicPluginsConf.Name != "" {
 		for i, c := range deployment.Spec.Template.Spec.InitContainers {
 			if c.Name == _defaultBackstageInitContainerName {

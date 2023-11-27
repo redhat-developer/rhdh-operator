@@ -418,7 +418,7 @@ spec:
 
 				BeforeEach(func() {
 					backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-						AppConfigs: []bsv1alphav1.Config{
+						AppConfigs: []bsv1alphav1.AppConfigRef{
 							{
 								Name: "a-non-existing-" + strings.ToLower(kind),
 								Kind: kind,
@@ -510,7 +510,7 @@ plugins: []
 					Expect(err).To(Not(HaveOccurred()))
 
 					backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-						AppConfigs: []bsv1alphav1.Config{
+						AppConfigs: []bsv1alphav1.AppConfigRef{
 							{
 								Name: appConfig1CmName,
 								Kind: "ConfigMap",
@@ -520,7 +520,7 @@ plugins: []
 								Kind: "Secret",
 							},
 						},
-						DynamicPluginsConfig: bsv1alphav1.Config{
+						DynamicPluginsConfig: bsv1alphav1.DynamicPluginsConfigRef{
 							Name: dynamicPluginsConfigName,
 							Kind: dynamicPluginsConfigKind,
 						},

@@ -25,8 +25,15 @@ const (
 
 // BackstageSpec defines the desired state of Backstage
 type BackstageSpec struct {
-	// Backstage application AppConfigs
-	AppConfigs []Config `json:"appConfigs,omitempty"`
+	// References to existing app-configs Config objects.
+	// Each element can be a reference to any ConfigMap or Secret,
+	// and will be mounted inside the main application container under a dedicated directory containing the ConfigMap
+	// or Secret name. Additionally, each file will be passed as a `--config /path/to/secret_or_configmap/key` to the
+	// main container args in the order of the entries defined in the AppConfigs list.
+	// But bear in mind that for a single AppConfig element containing several files,
+	// the order in which those files will be appended to the container args, the main container args cannot be guaranteed.
+	// So if you want to pass multiple app-config files, it is recommended to pass one ConfigMap/Secret per app-config file.
+	AppConfigs []AppConfigRef `json:"appConfigs,omitempty"`
 
 	// Optional Backend Auth Secret Name. A new one will be generated if not set.
 	// This Secret is used to set an environment variable named 'APP_CONFIG_backend_auth_keys' in the
@@ -35,8 +42,10 @@ type BackstageSpec struct {
 	// This is required for service-to-service auth and is shared by all backend plugins.
 	BackendAuthSecretRef BackendAuthSecretRef `json:"backendAuthSecretRef,omitempty"`
 
-	// Dynamic Plugins configuration
-	DynamicPluginsConfig Config `json:"dynamicPluginsConfig,omitempty"`
+	// Reference to an existing configuration object for Dynamic Plugins.
+	// This can be a reference to any ConfigMap or Secret,
+	// but the object must have an existing key named: 'dynamic-plugins.yaml'
+	DynamicPluginsConfig DynamicPluginsConfigRef `json:"dynamicPluginsConfig,omitempty"`
 
 	// Raw Runtime Objects configuration
 	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
@@ -45,8 +54,20 @@ type BackstageSpec struct {
 	SkipLocalDb bool `json:"skipLocalDb,omitempty"`
 }
 
-type Config struct {
+type AppConfigRef struct {
+	// Name of an existing App Config object
 	Name string `json:"name,omitempty"`
+
+	// Type of the existing App Config object, either ConfigMap or Secret
+	//+kubebuilder:validation:Enum=ConfigMap;Secret
+	Kind string `json:"kind,omitempty"`
+}
+
+type DynamicPluginsConfigRef struct {
+	// Name of the Dynamic Plugins config object
+	Name string `json:"name,omitempty"`
+
+	// Type of the Dynamic Plugins config object, either ConfigMap or Secret
 	//+kubebuilder:validation:Enum=ConfigMap;Secret
 	Kind string `json:"kind,omitempty"`
 }

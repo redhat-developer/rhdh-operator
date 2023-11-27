@@ -36,15 +36,29 @@ spec:
             description: BackstageSpec defines the desired state of Backstage
             properties:
               appConfigs:
-                description: Backstage application AppConfigs
+                description: References to existing app-configs Config objects. Each
+                  element can be a reference to any ConfigMap or Secret, and will
+                  be mounted inside the main application container under a dedicated
+                  directory containing the ConfigMap or Secret name. Additionally,
+                  each file will be passed as a `--config /path/to/secret_or_configmap/key`
+                  to the main container args in the order of the entries defined in
+                  the AppConfigs list. But bear in mind that for a single AppConfig
+                  element containing several files, the order in which those files
+                  will be appended to the container args, the main container args
+                  cannot be guaranteed. So if you want to pass multiple app-config
+                  files, it is recommended to pass one ConfigMap/Secret per app-config
+                  file.
                 items:
                   properties:
                     kind:
+                      description: Type of the existing App Config object, either
+                        ConfigMap or Secret
                       enum:
                       - ConfigMap
                       - Secret
                       type: string
                     name:
+                      description: Name of an existing App Config object
                       type: string
                   type: object
                 type: array
@@ -66,14 +80,19 @@ spec:
                     type: string
                 type: object
               dynamicPluginsConfig:
-                description: Dynamic Plugins configuration
+                description: 'Reference to an existing configuration object for Dynamic
+                  Plugins. This can be a reference to any ConfigMap or Secret, but
+                  the object must have an existing key named: ''dynamic-plugins.yaml'''
                 properties:
                   kind:
+                    description: Type of the Dynamic Plugins config object, either
+                      ConfigMap or Secret
                     enum:
                     - ConfigMap
                     - Secret
                     type: string
                   name:
+                    description: Name of the Dynamic Plugins config object
                     type: string
                 type: object
               rawRuntimeConfig:
