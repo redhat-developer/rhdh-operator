@@ -96,24 +96,11 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: fmt
-### fmt: Runs go fmt against code
-fmt:
-  ifneq ($(shell command -v goimports 2> /dev/null),)
-	  find . -not -path '*/\.*' -name '*.go' -exec goimports -w {} \;
-  else
-	  @echo "WARN: goimports is not installed -- formatting using go fmt instead."
-	  @echo "      Please install goimports to ensure file imports are consistent."
-	  go fmt -x ./...
-  endif
+fmt: goimports ## Format the code using goimports
+	find . -not -path '*/\.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
 
-### fmt_license: Ensures the license header is set on all files
-fmt_license:
-  ifneq ($(shell command -v addlicense 2> /dev/null),)
-	  @echo 'addlicense -v -f license_header.txt **/*.go'
-	  addlicense -v -f license_header.txt $$(find . -not -path '*/\.*' -name '*.go')
-  else
-	  $(error addlicense must be installed for this rule: go install github.com/google/addlicense)
-  endif
+fmt_license: addlicense ## Ensure the license header is set on all files
+	$(ADDLICENSE) -v -f license_header.txt $$(find . -not -path '*/\.*' -name '*.go')
 
 .PHONY: lint
 lint: golangci-lint ## Run the linter on the codebase
@@ -209,11 +196,15 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
+GOIMPORTS ?= $(LOCALBIN)/goimports
+ADDLICENSE ?= $(LOCALBIN)/addlicense
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
 CONTROLLER_TOOLS_VERSION ?= v0.10.0
 GOLANGCI_LINT_VERSION ?= v1.49.0
+GOIMPORTS_VERSION ?= v0.15.0
+ADDLICENSE_VERSION ?= v1.1.1
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -235,6 +226,16 @@ $(ENVTEST): $(LOCALBIN)
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+.PHONY: goimports
+goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
+$(GOIMPORTS): $(LOCALBIN)
+	test -s $(LOCALBIN)/goimports || GOBIN=$(LOCALBIN) go install golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
+
+.PHONY: addlicense
+addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
+$(ADDLICENSE): $(LOCALBIN)
+	test -s $(LOCALBIN)/addlicense || GOBIN=$(LOCALBIN) go install github.com/google/addlicense@$(ADDLICENSE_VERSION)
 
 .PHONY: bundle
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
