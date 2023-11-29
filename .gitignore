@@ -10,6 +10,7 @@ bin
 bundle_tmp*
 testbin/*
 Dockerfile.cross
+__debug_bin*
 
 # Test binary, build with `go test -c`
 *.test

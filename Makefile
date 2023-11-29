@@ -301,7 +301,7 @@ release-push: $(CONTAINER_ENGINE)-push bundle-push catalog-push ## Push operator
 .PHONY: deploy-olm
 deploy-olm: ## Deploy the operator with OLM
 	kubectl apply -f config/samples/catalog-operator-group.yaml
-	kubectl apply -f config/samples/catalog-subscription.yaml
+	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | kubectl apply -f -
 
 .PHONY: undeploy-olm
 undeploy-olm: ## Un-deploy the operator with OLM
@@ -312,4 +312,4 @@ undeploy-olm: ## Un-deploy the operator with OLM
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in namespace openshift-marketplace
 	-kubectl delete catalogsource backstage-operator -n openshift-marketplace
-	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | oc apply -f -
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | kubectl apply -f -
