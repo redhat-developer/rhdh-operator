@@ -47,7 +47,7 @@ func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Contex
 
 	//Create default ConfigMap for dynamic plugins
 	var cm v1.ConfigMap
-	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "dynamic-plugins-configmap", ns, defaultDynamicPluginsConfigMap, &cm)
+	_, err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "dynamic-plugins-configmap", ns, defaultDynamicPluginsConfigMap, &cm)
 	if err != nil {
 		return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to read config: %s", err)
 	}

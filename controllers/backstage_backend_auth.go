@@ -24,31 +24,49 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 )
 
+var (
+	_defaultBackendAuthSecretValue    = "pl4s3Ch4ng3M3"
+	defaultBackstageBackendAuthSecret = `
+apiVersion: v1
+kind: Secret
+metadata:
+  name: # placeholder for '<cr-name>-auth'
+data:
+  # A random value will be generated for the backend-secret key
+`
+)
+
 func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backstage bs.Backstage, ns string) (secretName string, err error) {
 	backendAuthSecretName := backstage.Spec.BackendAuthSecretRef.Name
-	if backendAuthSecretName == "" {
-		//Generate a secret if it does not exist
-		backendAuthSecretName = fmt.Sprintf("%s-auth", backstage.Name)
-		sec := &v1.Secret{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "v1",
-				APIVersion: "Secret",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      backendAuthSecretName,
-				Namespace: ns,
-			},
+	if backendAuthSecretName != "" {
+		return backendAuthSecretName, nil
+	}
+
+	//Create default Secret for backend auth
+	var sec v1.Secret
+	var isDefault bool
+	isDefault, err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "backend-auth-secret", ns, defaultBackstageBackendAuthSecret, &sec)
+	if err != nil {
+		return "", fmt.Errorf("failed to read config: %s", err)
+	}
+	//Generate a secret if it does not exist
+	backendAuthSecretName = fmt.Sprintf("%s-auth", backstage.Name)
+	sec.SetName(backendAuthSecretName)
+	err = r.Get(ctx, types.NamespacedName{Name: backendAuthSecretName, Namespace: ns}, &sec)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return "", fmt.Errorf("failed to get secret for backend auth (%q), reason: %s", backendAuthSecretName, err)
 		}
-		err = r.Get(ctx, types.NamespacedName{Name: backendAuthSecretName, Namespace: ns}, sec)
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				return "", fmt.Errorf("failed to get secret for backend auth (%q), reason: %s", backendAuthSecretName, err)
-			}
+		k := backstage.Spec.BackendAuthSecretRef.Key
+		if k == "" {
+			//TODO(rm3l): why kubebuilder default values do not work
+			k = "backend-secret"
+		}
+		if isDefault {
 			// Create a secret with a random value
 			authVal := func(length int) string {
 				bytes := make([]byte, length)
@@ -58,18 +76,13 @@ func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backs
 				}
 				return base64.StdEncoding.EncodeToString(bytes)
 			}(24)
-			k := backstage.Spec.BackendAuthSecretRef.Key
-			if k == "" {
-				//TODO(rm3l): why kubebuilder default values do not work
-				k = "backend-secret"
-			}
 			sec.Data = map[string][]byte{
 				k: []byte(authVal),
 			}
-			err = r.Create(ctx, sec)
-			if err != nil {
-				return "", fmt.Errorf("failed to create secret for backend auth, reason: %s", err)
-			}
+		}
+		err = r.Create(ctx, &sec)
+		if err != nil {
+			return "", fmt.Errorf("failed to create secret for backend auth, reason: %s", err)
 		}
 	}
 	return backendAuthSecretName, nil

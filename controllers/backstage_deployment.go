@@ -28,7 +28,6 @@ import (
 const (
 	_defaultBackstageInitContainerName = "install-dynamic-plugins"
 	_defaultBackstageMainContainerName = "backstage-backend"
-	_defaultBackendAuthSecretValue     = "pl4s3Ch4ng3M3"
 	_containersWorkingDir              = "/opt/app-root/src"
 )
 
@@ -134,7 +133,7 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 	//lg := log.FromContext(ctx)
 
 	deployment := &appsv1.Deployment{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "deploy", ns, DefaultBackstageDeployment, deployment)
+	_, err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "deploy", ns, DefaultBackstageDeployment, deployment)
 	if err != nil {
 		return fmt.Errorf("failed to read config: %s", err)
 	}

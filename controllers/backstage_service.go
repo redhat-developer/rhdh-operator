@@ -50,7 +50,7 @@ func (r *BackstageReconciler) applyBackstageService(ctx context.Context, backsta
 	//lg := log.FromContext(ctx)
 
 	service := &corev1.Service{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "service", ns, DefaultBackstageService, service)
+	_, err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "service", ns, DefaultBackstageService, service)
 	if err != nil {
 		return err
 	}
