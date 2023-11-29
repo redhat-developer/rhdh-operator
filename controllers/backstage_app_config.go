@@ -129,10 +129,6 @@ func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, bac
 				// Bear in mind that iteration order over this map is not guaranteed by Go
 				files = append(files, filename)
 			}
-			for filename := range sec.StringData {
-				// Bear in mind that iteration order over this map is not guaranteed by Go
-				files = append(files, filename)
-			}
 		}
 		result = append(result, appConfigData{
 			ref:   appConfig.Name,
