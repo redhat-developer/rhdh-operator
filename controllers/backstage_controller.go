@@ -134,7 +134,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (r *BackstageReconciler) readConfigMapOrDefault(ctx context.Context, name string, key string, ns string, def string, object v1.Object) error {
+func (r *BackstageReconciler) readConfigMapOrDefault(ctx context.Context, name string, key string, ns string, def string, object v1.Object) (isDefault bool, err error) {
 
 	// ConfigMap name not set, default
 	//lg := log.FromContext(ctx)
@@ -142,34 +142,34 @@ func (r *BackstageReconciler) readConfigMapOrDefault(ctx context.Context, name s
 	//lg.V(1).Info("readConfigMapOrDefault CM: ", "name", name)
 
 	if name == "" {
-		err := readYaml(def, object)
+		err = readYaml(def, object)
 		if err != nil {
-			return err
+			return true, err
 		}
 		object.SetNamespace(ns)
-		return nil
+		return true, nil
 	}
 
 	cm := corev1.ConfigMap{}
-	if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &cm); err != nil {
-		return err
+	if err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &cm); err != nil {
+		return false, err
 	}
 	//lg.V(1).Info("readConfigMapOrDefault CM name found: ", "ConfigMap:", cm)
 	val, ok := cm.Data[key]
 	if !ok {
 		// key not found, default
-		err := readYaml(def, object)
+		err = readYaml(def, object)
 		if err != nil {
-			return err
+			return true, err
 		}
 	} else {
-		err := readYaml(val, object)
+		err = readYaml(val, object)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
 	object.SetNamespace(ns)
-	return nil
+	return !ok, nil
 }
 
 func readYaml(manifest string, object interface{}) error {

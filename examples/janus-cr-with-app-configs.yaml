@@ -1,0 +1,88 @@
+apiVersion: backstage.io/v1alpha1
+kind: Backstage
+metadata:
+  name: my-backstage-app-with-app-config
+spec:
+  appConfigs:
+    - name: "my-backstage-config-cm1"
+      kind: ConfigMap
+    - name: "my-backstage-config-secret1"
+      kind: Secret
+  dynamicPluginsConfig:
+    name: my-dynamic-plugins-config-cm
+    kind: ConfigMap
+  backendAuthSecretRef:
+    name: "my-backstage-backend-auth-secret"
+    key: "my-auth-key"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-backstage-backend-auth-secret
+data:
+  # generated with the command below (from https://backstage.io/docs/auth/service-to-service-auth/#setup):
+  # node -p 'require("crypto").randomBytes(24).toString("base64")'
+  backend-secret: TDRORDFRa2JxaFJhNTBzOGFDc1FWUEJ4ekFtRUw4UEU=
+  my-auth-key: TDRORDFRa2JxaFJhNTBzOGFDc1FWUEJ4ekFtRUw4UEU=
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-backstage-config-cm1
+data:
+  my-app-config.prod.yaml: |
+    backend:
+      database:
+        connection:
+          password: ${POSTGRESQL_PASSWORD}
+          user: ${POSTGRESQL_USER}
+  my-app-config-2.yaml: |
+    # Some comment in this file
+  my-app-config.odo.yaml: |
+    catalog:
+      locations:
+        # [...]
+        - type: url
+          target: https://github.com/rm3l/odo-backstage-golden-path-template/blob/main/template.yaml
+          rules:
+            - allow: [Template]
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-backstage-config-secret1
+data:
+  # auth:
+  #      # see https://backstage.io/docs/auth/ to learn about auth providers
+  #      environment: development
+  #      providers:
+  #        github:
+  #          development:
+  #            clientId: 'xxx'
+  #            clientSecret: 'yyy'
+  my-app-config-1.secret.yaml: YXV0aDoKICAjIHNlZSBodHRwczovL2JhY2tzdGFnZS5pby9kb2NzL2F1dGgvIHRvIGxlYXJuIGFib3V0IGF1dGggcHJvdmlkZXJzCiAgZW52aXJvbm1lbnQ6IGRldmVsb3BtZW50CiAgcHJvdmlkZXJzOgogICAgZ2l0aHViOgogICAgICBkZXZlbG9wbWVudDoKICAgICAgICBjbGllbnRJZDogJ3h4eCcKICAgICAgICBjbGllbnRTZWNyZXQ6ICd5eXknCg==
+  # # a comment
+  my-app-config-2.secret.yaml: IyBhIGNvbW1lbnQK
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-dynamic-plugins-config-cm
+data:
+  dynamic-plugins.yaml: |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins:
+      - package: '@dfatwork-pkgs/scaffolder-backend-module-http-request-wrapped-dynamic@4.0.9-0'
+        integrity: 'sha512-+YYESzHdg1hsk2XN+zrtXPnsQnfbzmWIvcOM0oQLS4hf8F4iGTtOXKjWnZsR/14/khGsPrzy0oq1ytJ1/4ORkQ=='
+      - package: '@dfatwork-pkgs/explore-backend-wrapped-dynamic@0.0.9-next.11'
+        integrity: 'sha512-/qUxjSedxQ0dmYqMWsZ2+OLGeovaaigRRrX1aTOz0GJMwSjOAauUUD1bMs56VPX74qWL1rf3Xr4nViiKo8rlIA=='
+        pluginConfig:
+          proxy:
+            endpoints:
+              /explore-backend-completed:
+                target: 'http://localhost:7017'

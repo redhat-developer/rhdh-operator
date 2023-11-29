@@ -158,7 +158,7 @@ func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backs
 	lg := log.FromContext(ctx)
 
 	statefulSet := &appsv1.StatefulSet{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "statefulset", ns, DefaultLocalDbDeployment, statefulSet)
+	_, err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "statefulset", ns, DefaultLocalDbDeployment, statefulSet)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (r *BackstageReconciler) applyPsqlService(ctx context.Context, backstage bs
 	lg := log.FromContext(ctx)
 
 	service := &corev1.Service{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "service", ns, defaultData, service)
+	_, err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "service", ns, defaultData, service)
 	if err != nil {
 		return err
 	}
