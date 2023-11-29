@@ -60,6 +60,8 @@ spec:
                     name:
                       description: Name of an existing App Config object
                       type: string
+                  required:
+                  - name
                   type: object
                 type: array
               backendAuthSecretRef:
@@ -78,6 +80,8 @@ spec:
                   name:
                     description: Name of the secret to use for the backend auth
                     type: string
+                required:
+                - name
                 type: object
               dynamicPluginsConfig:
                 description: 'Reference to an existing configuration object for Dynamic
@@ -94,6 +98,8 @@ spec:
                   name:
                     description: Name of the Dynamic Plugins config object
                     type: string
+                required:
+                - name
                 type: object
               rawRuntimeConfig:
                 description: Raw Runtime Objects configuration

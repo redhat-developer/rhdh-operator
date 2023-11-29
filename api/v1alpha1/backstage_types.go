@@ -56,25 +56,30 @@ type BackstageSpec struct {
 
 type AppConfigRef struct {
 	// Name of an existing App Config object
-	Name string `json:"name,omitempty"`
+	//+kubebuilder:validation:Required
+	Name string `json:"name"`
 
 	// Type of the existing App Config object, either ConfigMap or Secret
+	//+kubebuilder:validation:Required
 	//+kubebuilder:validation:Enum=ConfigMap;Secret
 	Kind string `json:"kind,omitempty"`
 }
 
 type DynamicPluginsConfigRef struct {
 	// Name of the Dynamic Plugins config object
-	Name string `json:"name,omitempty"`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
 
 	// Type of the Dynamic Plugins config object, either ConfigMap or Secret
+	//+kubebuilder:validation:Required
 	//+kubebuilder:validation:Enum=ConfigMap;Secret
 	Kind string `json:"kind,omitempty"`
 }
 
 type BackendAuthSecretRef struct {
 	// Name of the secret to use for the backend auth
-	Name string `json:"name,omitempty"`
+	//+kubebuilder:validation:Required
+	Name string `json:"name"`
 
 	// Key in the secret to use for the backend auth. Default value is: backend-secret
 	//+kubebuilder:default=backend-secret
