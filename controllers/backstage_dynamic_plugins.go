@@ -22,49 +22,53 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+)
+
+var (
+	defaultDynamicPluginsConfigMap = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: # placeholder for '<cr-name>-dynamic-plugins'
+data:
+  "dynamic-plugins.yaml": |
+    includes:
+    - dynamic-plugins.default.yaml
+    plugins: []
+`
 )
 
 func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (config bs.DynamicPluginsConfigRef, err error) {
 	if backstage.Spec.DynamicPluginsConfig.Name != "" {
 		return backstage.Spec.DynamicPluginsConfig, nil
 	}
-	//Generate a default ConfigMap for dynamic plugins
+
+	//Create default ConfigMap for dynamic plugins
+	var cm v1.ConfigMap
+	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "dynamic-plugins-configmap", ns, defaultDynamicPluginsConfigMap, &cm)
+	if err != nil {
+		return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to read config: %s", err)
+	}
+
 	dpConfigName := fmt.Sprintf("%s-dynamic-plugins", backstage.Name)
-	conf := bs.DynamicPluginsConfigRef{
-		Name: dpConfigName,
-		Kind: "ConfigMap",
-	}
-	cm := &v1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "v1",
-			APIVersion: "ConfigMap",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      dpConfigName,
-			Namespace: ns,
-		},
-	}
-	err = r.Get(ctx, types.NamespacedName{Name: dpConfigName, Namespace: ns}, cm)
+	cm.SetName(dpConfigName)
+	err = r.Get(ctx, types.NamespacedName{Name: dpConfigName, Namespace: ns}, &cm)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
 		}
-		cm.Data = map[string]string{
-			"dynamic-plugins.yaml": `
-includes:
-- dynamic-plugins.default.yaml
-plugins: []
-`,
-		}
-		err = r.Create(ctx, cm)
+		err = r.Create(ctx, &cm)
 		if err != nil {
 			return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to create config map for dynamic plugins, reason: %s", err)
 		}
 	}
-	return conf, nil
+
+	return bs.DynamicPluginsConfigRef{
+		Name: dpConfigName,
+		Kind: "ConfigMap",
+	}, nil
 }
 
 func (r *BackstageReconciler) getDynamicPluginsConfVolume(ctx context.Context, backstage bs.Backstage, ns string) (*v1.Volume, error) {
