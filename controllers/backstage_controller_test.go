@@ -520,7 +520,7 @@ plugins: []
 								Kind: "Secret",
 							},
 						},
-						DynamicPluginsConfig: bsv1alphav1.DynamicPluginsConfigRef{
+						DynamicPluginsConfig: &bsv1alphav1.DynamicPluginsConfigRef{
 							Name: dynamicPluginsConfigName,
 							Kind: dynamicPluginsConfigKind,
 						},
@@ -686,7 +686,7 @@ plugins: []
 				var backstage *bsv1alphav1.Backstage
 				BeforeEach(func() {
 					backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-						BackendAuthSecretRef: bsv1alphav1.BackendAuthSecretRef{
+						BackendAuthSecretRef: &bsv1alphav1.BackendAuthSecretRef{
 							Name: "non-existing-secret",
 							Key:  key,
 						},
@@ -761,7 +761,7 @@ plugins: []
 					err := k8sClient.Create(ctx, backendAuthSecret)
 					Expect(err).To(Not(HaveOccurred()))
 					backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-						BackendAuthSecretRef: bsv1alphav1.BackendAuthSecretRef{
+						BackendAuthSecretRef: &bsv1alphav1.BackendAuthSecretRef{
 							Name: backendAuthSecretName,
 							Key:  key,
 						},

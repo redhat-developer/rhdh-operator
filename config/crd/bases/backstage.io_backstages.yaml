@@ -61,6 +61,7 @@ spec:
                       description: Name of an existing App Config object
                       type: string
                   required:
+                  - kind
                   - name
                   type: object
                 type: array
@@ -99,6 +100,7 @@ spec:
                     description: Name of the Dynamic Plugins config object
                     type: string
                 required:
+                - kind
                 - name
                 type: object
               rawRuntimeConfig:

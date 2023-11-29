@@ -40,12 +40,12 @@ type BackstageSpec struct {
 	// main container, which takes precedence over any 'backend.auth.keys' field defined
 	// in default or custom application configuration files.
 	// This is required for service-to-service auth and is shared by all backend plugins.
-	BackendAuthSecretRef BackendAuthSecretRef `json:"backendAuthSecretRef,omitempty"`
+	BackendAuthSecretRef *BackendAuthSecretRef `json:"backendAuthSecretRef,omitempty"`
 
 	// Reference to an existing configuration object for Dynamic Plugins.
 	// This can be a reference to any ConfigMap or Secret,
 	// but the object must have an existing key named: 'dynamic-plugins.yaml'
-	DynamicPluginsConfig DynamicPluginsConfigRef `json:"dynamicPluginsConfig,omitempty"`
+	DynamicPluginsConfig *DynamicPluginsConfigRef `json:"dynamicPluginsConfig,omitempty"`
 
 	// Raw Runtime Objects configuration
 	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
@@ -62,7 +62,7 @@ type AppConfigRef struct {
 	// Type of the existing App Config object, either ConfigMap or Secret
 	//+kubebuilder:validation:Required
 	//+kubebuilder:validation:Enum=ConfigMap;Secret
-	Kind string `json:"kind,omitempty"`
+	Kind string `json:"kind"`
 }
 
 type DynamicPluginsConfigRef struct {
@@ -73,7 +73,7 @@ type DynamicPluginsConfigRef struct {
 	// Type of the Dynamic Plugins config object, either ConfigMap or Secret
 	//+kubebuilder:validation:Required
 	//+kubebuilder:validation:Enum=ConfigMap;Secret
-	Kind string `json:"kind,omitempty"`
+	Kind string `json:"kind"`
 }
 
 type BackendAuthSecretRef struct {

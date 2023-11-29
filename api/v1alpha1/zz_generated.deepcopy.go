@@ -123,8 +123,16 @@ func (in *BackstageSpec) DeepCopyInto(out *BackstageSpec) {
 		*out = make([]AppConfigRef, len(*in))
 		copy(*out, *in)
 	}
-	out.BackendAuthSecretRef = in.BackendAuthSecretRef
-	out.DynamicPluginsConfig = in.DynamicPluginsConfig
+	if in.BackendAuthSecretRef != nil {
+		in, out := &in.BackendAuthSecretRef, &out.BackendAuthSecretRef
+		*out = new(BackendAuthSecretRef)
+		**out = **in
+	}
+	if in.DynamicPluginsConfig != nil {
+		in, out := &in.DynamicPluginsConfig, &out.DynamicPluginsConfig
+		*out = new(DynamicPluginsConfigRef)
+		**out = **in
+	}
 	out.RawRuntimeConfig = in.RawRuntimeConfig
 }
 
