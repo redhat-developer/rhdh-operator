@@ -26,19 +26,19 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-var (
-	defaultDynamicPluginsConfigMap = `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: # placeholder for '<cr-name>-dynamic-plugins'
-data:
-  "dynamic-plugins.yaml": |
-    includes:
-    - dynamic-plugins.default.yaml
-    plugins: []
-`
-)
+//var (
+//	defaultDynamicPluginsConfigMap = `
+//apiVersion: v1
+//kind: ConfigMap
+//metadata:
+//  name: # placeholder for '<cr-name>-dynamic-plugins'
+//data:
+//  "dynamic-plugins.yaml": |
+//    includes:
+//    - dynamic-plugins.default.yaml
+//    plugins: []
+//`
+//)
 
 func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (config bs.DynamicPluginsConfigRef, err error) {
 	if backstage.Spec.DynamicPluginsConfig != nil {
@@ -47,7 +47,7 @@ func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Contex
 
 	//Create default ConfigMap for dynamic plugins
 	var cm v1.ConfigMap
-	_, err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "dynamic-plugins-configmap", ns, defaultDynamicPluginsConfigMap, &cm)
+	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "dynamic-plugins-configmap.yaml", ns, &cm)
 	if err != nil {
 		return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to read config: %s", err)
 	}

@@ -31,109 +31,109 @@ const (
 	_containersWorkingDir              = "/opt/app-root/src"
 )
 
-var (
-	DefaultBackstageDeployment = fmt.Sprintf(`
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: backstage
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      backstage.io/app:  # placeholder for 'backstage-<cr-name>'
-  template:
-    metadata:
-      labels:
-        backstage.io/app:  # placeholder for 'backstage-<cr-name>'
-    spec:
-#      serviceAccountName: default
-
-      volumes:
-        - ephemeral:
-            volumeClaimTemplate:
-              spec:
-                accessModes:
-                - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: 1Gi
-          name: dynamic-plugins-root
-        - name: dynamic-plugins-npmrc
-          secret:
-            defaultMode: 420
-            optional: true
-            secretName: dynamic-plugins-npmrc
-
-      initContainers:
-        - command:
-          - ./install-dynamic-plugins.sh
-          - /dynamic-plugins-root
-          env:
-          - name: NPM_CONFIG_USERCONFIG
-            value: %[3]s/.npmrc.dynamic-plugins
-          image: 'quay.io/janus-idp/backstage-showcase:next'
-          imagePullPolicy: IfNotPresent
-          name: %[1]s
-          volumeMounts:
-          - mountPath: /dynamic-plugins-root
-            name: dynamic-plugins-root
-          - mountPath: %[3]s/.npmrc.dynamic-plugins
-            name: dynamic-plugins-npmrc
-            readOnly: true
-            subPath: .npmrc
-          workingDir: %[3]s
-
-      containers:
-        - name: %[2]s
-          image: quay.io/janus-idp/backstage-showcase:next
-          imagePullPolicy: IfNotPresent
-          args:
-            - "--config"
-            - "dynamic-plugins-root/app-config.dynamic-plugins.yaml"
-          readinessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /healthcheck
-              port: 7007
-              scheme: HTTP
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            successThreshold: 2
-            timeoutSeconds: 2
-          livenessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /healthcheck
-              port: 7007
-              scheme: HTTP
-            initialDelaySeconds: 60
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 2
-          ports:
-            - name: http
-              containerPort: 7007
-          env:
-            - name: APP_CONFIG_backend_listen_port
-              value: "7007"
-          envFrom:
-            - secretRef:
-                name: postgres-secrets
-#            - secretRef:
-#                name: backstage-secrets
-          volumeMounts:
-            - mountPath: %[3]s/dynamic-plugins-root
-              name: dynamic-plugins-root
-`, _defaultBackstageInitContainerName, _defaultBackstageMainContainerName, _containersWorkingDir)
-)
+//var (
+//	DefaultBackstageDeployment = fmt.Sprintf(`
+//apiVersion: apps/v1
+//kind: Deployment
+//metadata:
+// name: backstage
+//spec:
+// replicas: 1
+// selector:
+//   matchLabels:
+//     backstage.io/app:  # placeholder for 'backstage-<cr-name>'
+// template:
+//   metadata:
+//     labels:
+//       backstage.io/app:  # placeholder for 'backstage-<cr-name>'
+//   spec:
+//#      serviceAccountName: default
+//
+//     volumes:
+//       - ephemeral:
+//           volumeClaimTemplate:
+//             spec:
+//               accessModes:
+//               - ReadWriteOnce
+//               resources:
+//                 requests:
+//                   storage: 1Gi
+//         name: dynamic-plugins-root
+//       - name: dynamic-plugins-npmrc
+//         secret:
+//           defaultMode: 420
+//           optional: true
+//           secretName: dynamic-plugins-npmrc
+//
+//     initContainers:
+//       - command:
+//         - ./install-dynamic-plugins.sh
+//         - /dynamic-plugins-root
+//         env:
+//         - name: NPM_CONFIG_USERCONFIG
+//           value: %[3]s/.npmrc.dynamic-plugins
+//         image: 'quay.io/janus-idp/backstage-showcase:next'
+//         imagePullPolicy: IfNotPresent
+//         name: %[1]s
+//         volumeMounts:
+//         - mountPath: /dynamic-plugins-root
+//           name: dynamic-plugins-root
+//         - mountPath: %[3]s/.npmrc.dynamic-plugins
+//           name: dynamic-plugins-npmrc
+//           readOnly: true
+//           subPath: .npmrc
+//         workingDir: %[3]s
+//
+//     containers:
+//       - name: %[2]s
+//         image: quay.io/janus-idp/backstage-showcase:next
+//         imagePullPolicy: IfNotPresent
+//         args:
+//           - "--config"
+//           - "dynamic-plugins-root/app-config.dynamic-plugins.yaml"
+//         readinessProbe:
+//           failureThreshold: 3
+//           httpGet:
+//             path: /healthcheck
+//             port: 7007
+//             scheme: HTTP
+//           initialDelaySeconds: 30
+//           periodSeconds: 10
+//           successThreshold: 2
+//           timeoutSeconds: 2
+//         livenessProbe:
+//           failureThreshold: 3
+//           httpGet:
+//             path: /healthcheck
+//             port: 7007
+//             scheme: HTTP
+//           initialDelaySeconds: 60
+//           periodSeconds: 10
+//           successThreshold: 1
+//           timeoutSeconds: 2
+//         ports:
+//           - name: http
+//             containerPort: 7007
+//         env:
+//           - name: APP_CONFIG_backend_listen_port
+//             value: "7007"
+//         envFrom:
+//           - secretRef:
+//               name: postgres-secrets
+//#            - secretRef:
+//#                name: backstage-secrets
+//         volumeMounts:
+//           - mountPath: %[3]s/dynamic-plugins-root
+//             name: dynamic-plugins-root
+//`, _defaultBackstageInitContainerName, _defaultBackstageMainContainerName, _containersWorkingDir)
+//)
 
 func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	//lg := log.FromContext(ctx)
 
 	deployment := &appsv1.Deployment{}
-	_, err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "deploy", ns, DefaultBackstageDeployment, deployment)
+	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "deployment.yaml", ns, deployment)
 	if err != nil {
 		return fmt.Errorf("failed to read config: %s", err)
 	}
@@ -179,7 +179,7 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 			}
 
 		} else {
-			return fmt.Errorf("failed to get backstage deployment, reason: %s", err)
+			return fmt.Errorf("failed to get backstage deployment.yaml, reason: %s", err)
 		}
 	} else {
 		//lg.Info("CR update is ignored for the time")

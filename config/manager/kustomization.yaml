@@ -5,4 +5,17 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/rhdh/backstage-operator
-  newTag: v0.0.1
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+- files:
+  - default-config/deployment.yaml
+  - default-config/service.yaml
+  - default-config/db-statefulset.yaml
+  - default-config/db-service.yaml
+  - default-config/db-service-hl.yaml
+  - default-config/backend-auth-secret.yaml
+  - default-config/dynamic-plugins-configmap.yaml
+  name: default-config

@@ -62,8 +62,8 @@ ENV EXTERNAL_SOURCE=.
 # ENV EXTERNAL_SOURCE=$REMOTE_SOURCES/upstream1/app/distgit/containers/rhdh-operator
 #/ Downstream uncomment
 
-ENV HOME=/opt/helm \
-    USER_NAME=helm \
+ENV HOME=/ \
+    USER_NAME=backstage \
     USER_UID=1001
 
 RUN echo "${USER_NAME}:x:${USER_UID}:0:${USER_NAME} user:${HOME}:/sbin/nologin" >> /etc/passwd

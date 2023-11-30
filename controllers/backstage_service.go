@@ -26,23 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var (
-	DefaultBackstageService = `
-apiVersion: v1
-kind: Service
-metadata:
-  name: backstage
-spec:
-  type: NodePort
-  selector:
-    backstage.io/app:  # placeholder for 'backstage-<cr-name>'
-  ports:
-    - name: http
-      port: 80
-      targetPort: http
-`
-)
-
 // selector for deploy.spec.template.spec.meta.label
 // targetPort: http for deploy.spec.template.spec.containers.ports.name=http
 func (r *BackstageReconciler) applyBackstageService(ctx context.Context, backstage bs.Backstage, ns string) error {
@@ -50,7 +33,7 @@ func (r *BackstageReconciler) applyBackstageService(ctx context.Context, backsta
 	//lg := log.FromContext(ctx)
 
 	service := &corev1.Service{}
-	_, err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "service", ns, DefaultBackstageService, service)
+	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "service.yaml", ns, service)
 	if err != nil {
 		return err
 	}

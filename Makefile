@@ -53,6 +53,13 @@ IMG ?= $(IMAGE_TAG_BASE):v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.25.0
 
+# Default Backstage config directory to use
+# it has to be defined as a set of YAML files inside ./config/manager/${CONF_DIR} directory
+# to use other config - add a directory with config and run 'CONF_DIR=<dir-name> make ...'
+# TODO find better place than ./config/manager (but not ./config/overlays) ?
+# TODO it works only for make run, needs supporting make deploy as well https://github.com/janus-idp/operator/issues/47
+CONF_DIR ?= default-config
+
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -111,8 +118,9 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+test: manifests generate fmt vet envtest ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
+	mkdir -p $(LOCALBIN)/default-config && cp config/manager/${CONF_DIR}/* $(LOCALBIN)/default-config
+	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
 ##@ Build
 
@@ -121,8 +129,8 @@ build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+run: manifests generate fmt vet build ## Run a controller from your host.
+	cd $(LOCALBIN) && mkdir -p default-config && cp ../config/manager/${CONF_DIR}/* default-config && ./manager
 
 PLATFORM ?= linux/amd64
 # If you wish built the manager image targeting other platforms you can use the --platform flag.

@@ -26,32 +26,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-var (
-	DefaultLocalDbPV = `
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: postgres-storage
-  namespace: backstage
-  labels:
-    type: local
-spec:
-  capacity:
-    storage: 2Gi
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  hostPath:
-    path: '/mnt/data'
-`
-)
-
 func (r *BackstageReconciler) applyPV(ctx context.Context, backstage bs.Backstage, ns string) error {
 	// Postgre PersistentVolume
 	//lg := log.FromContext(ctx)
 
 	pv := &corev1.PersistentVolume{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "persistentVolume", ns, DefaultLocalDbPV, pv)
+	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "db-pv.yaml", ns, pv)
 	if err != nil {
 		return err
 	}

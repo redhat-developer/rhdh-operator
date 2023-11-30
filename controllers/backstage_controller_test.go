@@ -285,7 +285,7 @@ var _ = Describe("Backstage controller", func() {
 			BeforeEach(func() {
 				backstageConfigMap := buildConfigMap("my-bs-config",
 					map[string]string{
-						"deploy": `
+						"deployment.yaml": `
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -349,7 +349,7 @@ spec:
 
 			BeforeEach(func() {
 				localDbConfigMap := buildConfigMap("my-db-config", map[string]string{
-					"statefulset": `
+					"db-statefulset.yaml": `
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:

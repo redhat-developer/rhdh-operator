@@ -98,5 +98,13 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
+        volumeMounts:
+          - mountPath: /default-config
+            name: default-config
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: default-config
+        configMap:
+          name: default-config
+

@@ -29,15 +29,15 @@ import (
 )
 
 var (
-	_defaultBackendAuthSecretValue    = "pl4s3Ch4ng3M3"
-	defaultBackstageBackendAuthSecret = `
-apiVersion: v1
-kind: Secret
-metadata:
-  name: # placeholder for '<cr-name>-auth'
-data:
-  # A random value will be generated for the backend-secret key
-`
+	_defaultBackendAuthSecretValue = "pl4s3Ch4ng3M3"
+	//	defaultBackstageBackendAuthSecret = `
+	//apiVersion: v1
+	//kind: Secret
+	//metadata:
+	//  name: # placeholder for '<cr-name>-auth'
+	//data:
+	//  # A random value will be generated for the backend-secret key
+	//`
 )
 
 func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backstage bs.Backstage, ns string) (secretName string, err error) {
@@ -47,8 +47,8 @@ func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backs
 
 	//Create default Secret for backend auth
 	var sec v1.Secret
-	var isDefault bool
-	isDefault, err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "backend-auth-secret", ns, defaultBackstageBackendAuthSecret, &sec)
+	//var isDefault bool
+	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "backend-auth-secret.yaml", ns, &sec)
 	if err != nil {
 		return "", fmt.Errorf("failed to read config: %s", err)
 	}
@@ -68,20 +68,22 @@ func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backs
 			//TODO(rm3l): why kubebuilder default values do not work
 			k = "backend-secret"
 		}
-		if isDefault {
-			// Create a secret with a random value
-			authVal := func(length int) string {
-				bytes := make([]byte, length)
-				if _, randErr := rand.Read(bytes); randErr != nil {
-					// Do not fail, but use a fallback value
-					return _defaultBackendAuthSecretValue
-				}
-				return base64.StdEncoding.EncodeToString(bytes)
-			}(24)
-			sec.Data = map[string][]byte{
-				k: []byte(authVal),
+
+		// there should not be any difference between default and not default
+		//		if isDefault {
+		// Create a secret with a random value
+		authVal := func(length int) string {
+			bytes := make([]byte, length)
+			if _, randErr := rand.Read(bytes); randErr != nil {
+				// Do not fail, but use a fallback value
+				return _defaultBackendAuthSecretValue
 			}
+			return base64.StdEncoding.EncodeToString(bytes)
+		}(24)
+		sec.Data = map[string][]byte{
+			k: []byte(authVal),
 		}
+		//		}
 		err = r.Create(ctx, &sec)
 		if err != nil {
 			return "", fmt.Errorf("failed to create secret for backend auth, reason: %s", err)
