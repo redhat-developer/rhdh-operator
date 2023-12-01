@@ -209,7 +209,7 @@ ADDLICENSE ?= $(LOCALBIN)/addlicense
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.10.0
+CONTROLLER_TOOLS_VERSION ?= v0.11.3
 GOLANGCI_LINT_VERSION ?= v1.49.0
 GOIMPORTS_VERSION ?= v0.15.0
 ADDLICENSE_VERSION ?= v1.1.1
@@ -309,15 +309,16 @@ release-push: $(CONTAINER_ENGINE)-push bundle-push catalog-push ## Push operator
 .PHONY: deploy-olm
 deploy-olm: ## Deploy the operator with OLM
 	kubectl apply -f config/samples/catalog-operator-group.yaml
-	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | kubectl apply -f -
+	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | sed "s/{{DEFAULT_OLM_NAMESPACE}}/$(subst /,\/,$(DEFAULT_OLM_NAMESPACE))/g" | kubectl apply -f -
 
 .PHONY: undeploy-olm
 undeploy-olm: ## Un-deploy the operator with OLM
 	-kubectl delete subscriptions.operators.coreos.com backstage-operator
 	-kubectl delete operatorgroup backstage-operator-group
-	-kubectl delete clusterserviceversion backstage-operator.v${VERSION}
+	-kubectl delete clusterserviceversion backstage-operator.v$(VERSION)
 
+DEFAULT_OLM_NAMESPACE ?= openshift-marketplace
 .PHONY: catalog-update
-catalog-update: ## Update catalog source in namespace openshift-marketplace
-	-kubectl delete catalogsource backstage-operator -n openshift-marketplace
-	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | kubectl apply -f -
+catalog-update: ## Update catalog source in the default namespace for catalogsource
+	-kubectl delete catalogsource backstage-operator -n $(DEFAULT_OLM_NAMESPACE)
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | kubectl apply -n $(DEFAULT_OLM_NAMESPACE) -f -

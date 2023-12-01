@@ -15,6 +15,9 @@ spec:
         janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
     spec:
+      persistentVolumeClaimRetentionPolicy:
+        whenDeleted: Retain
+        whenScaled: Retain
       containers:
         - env:
             - name: POSTGRESQL_PORT_NUMBER

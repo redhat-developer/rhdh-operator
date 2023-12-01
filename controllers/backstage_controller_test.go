@@ -22,7 +22,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	bsv1alphav1 "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	bsv1alpha1 "janus-idp.io/backstage-operator/api/v1alpha1"
 )
 
 var _ = Describe("Backstage controller", func() {
@@ -55,9 +56,10 @@ var _ = Describe("Backstage controller", func() {
 		Expect(err).To(Not(HaveOccurred()))
 
 		backstageReconciler = &BackstageReconciler{
-			Client:    k8sClient,
-			Scheme:    k8sClient.Scheme(),
-			Namespace: ns,
+			Client:      k8sClient,
+			Scheme:      k8sClient.Scheme(),
+			Namespace:   ns,
+			OwnsRuntime: true,
 		}
 	})
 
@@ -73,8 +75,8 @@ var _ = Describe("Backstage controller", func() {
 		})
 	})
 
-	buildBackstageCR := func(spec bsv1alphav1.BackstageSpec) *bsv1alphav1.Backstage {
-		return &bsv1alphav1.Backstage{
+	buildBackstageCR := func(spec bsv1alpha1.BackstageSpec) *bsv1alpha1.Backstage {
+		return &bsv1alpha1.Backstage{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      backstageName,
 				Namespace: ns,
@@ -113,7 +115,7 @@ var _ = Describe("Backstage controller", func() {
 
 	verifyBackstageInstance := func(ctx context.Context) {
 		Eventually(func(g Gomega) {
-			var backstage bsv1alphav1.Backstage
+			var backstage bsv1alpha1.Backstage
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
 			g.Expect(err).NotTo(HaveOccurred())
 			//TODO the status is under construction
@@ -140,9 +142,9 @@ var _ = Describe("Backstage controller", func() {
 	}
 
 	When("creating default CR with no spec", func() {
-		var backstage *bsv1alphav1.Backstage
+		var backstage *bsv1alpha1.Backstage
 		BeforeEach(func() {
-			backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{})
+			backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{})
 			err := k8sClient.Create(ctx, backstage)
 			Expect(err).To(Not(HaveOccurred()))
 		})
@@ -150,7 +152,7 @@ var _ = Describe("Backstage controller", func() {
 		It("should successfully reconcile a custom resource for default Backstage", func() {
 			By("Checking if the custom resource was successfully created")
 			Eventually(func() error {
-				found := &bsv1alphav1.Backstage{}
+				found := &bsv1alpha1.Backstage{}
 				return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
@@ -280,7 +282,7 @@ var _ = Describe("Backstage controller", func() {
 
 	Context("specifying runtime configs", func() {
 		When("creating CR with runtime config for Backstage deployment", func() {
-			var backstage *bsv1alphav1.Backstage
+			var backstage *bsv1alpha1.Backstage
 
 			BeforeEach(func() {
 				backstageConfigMap := buildConfigMap("my-bs-config",
@@ -310,8 +312,8 @@ spec:
 				err := k8sClient.Create(ctx, backstageConfigMap)
 				Expect(err).To(Not(HaveOccurred()))
 
-				backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-					RawRuntimeConfig: bsv1alphav1.RuntimeConfig{
+				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+					RawRuntimeConfig: bsv1alpha1.RuntimeConfig{
 						BackstageConfigName: backstageConfigMap.Name,
 					},
 				})
@@ -323,7 +325,7 @@ spec:
 			It("should create the resources", func() {
 				By("Checking if the custom resource was successfully created")
 				Eventually(func() error {
-					found := &bsv1alphav1.Backstage{}
+					found := &bsv1alpha1.Backstage{}
 					return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 				}, time.Minute, time.Second).Should(Succeed())
 
@@ -345,7 +347,7 @@ spec:
 		})
 
 		When("creating CR with runtime config for the database", func() {
-			var backstage *bsv1alphav1.Backstage
+			var backstage *bsv1alpha1.Backstage
 
 			BeforeEach(func() {
 				localDbConfigMap := buildConfigMap("my-db-config", map[string]string{
@@ -372,8 +374,8 @@ spec:
 				err := k8sClient.Create(ctx, localDbConfigMap)
 				Expect(err).To(Not(HaveOccurred()))
 
-				backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-					RawRuntimeConfig: bsv1alphav1.RuntimeConfig{
+				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+					RawRuntimeConfig: bsv1alpha1.RuntimeConfig{
 						LocalDbConfigName: localDbConfigMap.Name,
 					},
 				})
@@ -385,7 +387,7 @@ spec:
 			It("should create the resources", func() {
 				By("Checking if the custom resource was successfully created")
 				Eventually(func() error {
-					found := &bsv1alphav1.Backstage{}
+					found := &bsv1alpha1.Backstage{}
 					return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 				}, time.Minute, time.Second).Should(Succeed())
 
@@ -402,6 +404,16 @@ spec:
 					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
 					g.Expect(err).ShouldNot(HaveOccurred())
 					g.Expect(found.Spec.Replicas).Should(HaveValue(BeEquivalentTo(3)))
+					// Make sure the ownerrefs are correctly set based on backstage CR
+					ownerRefs := found.GetOwnerReferences()
+					backstageCreated := &bsv1alpha1.Backstage{}
+					err = k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, backstageCreated)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					g.Expect(ownerRefs).Should(HaveLen(1))
+					g.Expect(ownerRefs[0].APIVersion).Should(Equal(bsv1alpha1.GroupVersion.String()))
+					g.Expect(ownerRefs[0].Kind).Should(Equal("Backstage"))
+					g.Expect(ownerRefs[0].Name).Should(Equal(backstage.Name))
+					g.Expect(ownerRefs[0].UID).Should(Equal(backstageCreated.UID))
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
@@ -414,11 +426,11 @@ spec:
 		for _, kind := range []string{"ConfigMap", "Secret"} {
 			kind := kind
 			When(fmt.Sprintf("referencing non-existing %s as app-config", kind), func() {
-				var backstage *bsv1alphav1.Backstage
+				var backstage *bsv1alpha1.Backstage
 
 				BeforeEach(func() {
-					backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-						AppConfigs: []bsv1alphav1.AppConfigRef{
+					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+						AppConfigs: []bsv1alpha1.AppConfigRef{
 							{
 								Name: "a-non-existing-" + strings.ToLower(kind),
 								Kind: kind,
@@ -432,7 +444,7 @@ spec:
 				It("should fail to reconcile", func() {
 					By("Checking if the custom resource was successfully created")
 					Eventually(func() error {
-						found := &bsv1alphav1.Backstage{}
+						found := &bsv1alpha1.Backstage{}
 						return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 					}, time.Minute, time.Second).Should(Succeed())
 
@@ -460,7 +472,7 @@ spec:
 					dynamicPluginsConfigName = "my-dynamic-plugins-config"
 				)
 
-				var backstage *bsv1alphav1.Backstage
+				var backstage *bsv1alpha1.Backstage
 
 				BeforeEach(func() {
 					appConfig1Cm := buildConfigMap(appConfig1CmName, map[string]string{
@@ -509,8 +521,8 @@ plugins: []
 					err = k8sClient.Create(ctx, dynamicPluginsObject)
 					Expect(err).To(Not(HaveOccurred()))
 
-					backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-						AppConfigs: []bsv1alphav1.AppConfigRef{
+					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+						AppConfigs: []bsv1alpha1.AppConfigRef{
 							{
 								Name: appConfig1CmName,
 								Kind: "ConfigMap",
@@ -520,7 +532,7 @@ plugins: []
 								Kind: "Secret",
 							},
 						},
-						DynamicPluginsConfig: &bsv1alphav1.DynamicPluginsConfigRef{
+						DynamicPluginsConfig: &bsv1alpha1.DynamicPluginsConfigRef{
 							Name: dynamicPluginsConfigName,
 							Kind: dynamicPluginsConfigKind,
 						},
@@ -532,7 +544,7 @@ plugins: []
 				It("should reconcile", func() {
 					By("Checking if the custom resource was successfully created")
 					Eventually(func() error {
-						found := &bsv1alphav1.Backstage{}
+						found := &bsv1alpha1.Backstage{}
 						return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 					}, time.Minute, time.Second).Should(Succeed())
 
@@ -683,10 +695,10 @@ plugins: []
 		for _, key := range []string{"", "some-key"} {
 			key := key
 			When("creating CR with a non existing backend secret ref and key="+key, func() {
-				var backstage *bsv1alphav1.Backstage
+				var backstage *bsv1alpha1.Backstage
 				BeforeEach(func() {
-					backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-						BackendAuthSecretRef: &bsv1alphav1.BackendAuthSecretRef{
+					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+						BackendAuthSecretRef: &bsv1alpha1.BackendAuthSecretRef{
 							Name: "non-existing-secret",
 							Key:  key,
 						},
@@ -698,7 +710,7 @@ plugins: []
 				It("should reconcile", func() {
 					By("Checking if the custom resource was successfully created")
 					Eventually(func() error {
-						found := &bsv1alphav1.Backstage{}
+						found := &bsv1alpha1.Backstage{}
 						return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 					}, time.Minute, time.Second).Should(Succeed())
 
@@ -750,7 +762,7 @@ plugins: []
 
 			When("creating CR with an existing backend secret ref and key="+key, func() {
 				const backendAuthSecretName = "my-backend-auth-secret"
-				var backstage *bsv1alphav1.Backstage
+				var backstage *bsv1alpha1.Backstage
 
 				BeforeEach(func() {
 					d := make(map[string][]byte)
@@ -760,8 +772,8 @@ plugins: []
 					backendAuthSecret := buildSecret(backendAuthSecretName, d)
 					err := k8sClient.Create(ctx, backendAuthSecret)
 					Expect(err).To(Not(HaveOccurred()))
-					backstage = buildBackstageCR(bsv1alphav1.BackstageSpec{
-						BackendAuthSecretRef: &bsv1alphav1.BackendAuthSecretRef{
+					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+						BackendAuthSecretRef: &bsv1alpha1.BackendAuthSecretRef{
 							Name: backendAuthSecretName,
 							Key:  key,
 						},
@@ -773,7 +785,7 @@ plugins: []
 				It("should reconcile", func() {
 					By("Checking if the custom resource was successfully created")
 					Eventually(func() error {
-						found := &bsv1alphav1.Backstage{}
+						found := &bsv1alpha1.Backstage{}
 						return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 					}, time.Minute, time.Second).Should(Succeed())
 

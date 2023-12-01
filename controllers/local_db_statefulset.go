@@ -19,12 +19,14 @@ import (
 	"context"
 	"fmt"
 
-	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 )
 
 //var (
@@ -153,6 +155,8 @@ import (
 //`
 //)
 
+const ownerRefFmt = "failed to set owner reference: %s"
+
 func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	lg := log.FromContext(ctx)
@@ -163,17 +167,34 @@ func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backs
 		return err
 	}
 
-	//deployment.Namespace = ns
 	err = r.Get(ctx, types.NamespacedName{Name: statefulSet.Name, Namespace: ns}, statefulSet)
 	if err != nil {
 		if errors.IsNotFound(err) {
 
 		} else {
-			return fmt.Errorf("failed to get deployment, reason: %s", err)
+			return fmt.Errorf(ownerRefFmt, err)
 		}
 	} else {
 		lg.Info("CR update is ignored for the time")
 		return nil
+	}
+
+	if r.OwnsRuntime {
+		// Set the ownerreferences for the statefulset so that when the backstage CR is deleted,
+		// the statefulset is automatically deleted
+		// Note that the PVCs associated with the statefulset are not deleted automatically
+		// to prevent data loss. However OpenShift v4.14 and Kubernetes v1.27 introduced an optional
+		// parameter persistentVolumeClaimRetentionPolicy in the statefulset spec:
+		// spec:
+		//   persistentVolumeClaimRetentionPolicy:
+		//     whenDeleted: Delete
+		//     whenScaled: Retain
+		// This will allow the PVCs to get automatically deleted when the statefulset is deleted if
+		// the StatefulSetAutoDeletePVC feature gate is enabled on the API server.
+		// For more information, see https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+		if err := controllerutil.SetControllerReference(&backstage, statefulSet, r.Scheme); err != nil {
+			return fmt.Errorf(ownerRefFmt, err)
+		}
 	}
 
 	r.labels(&statefulSet.ObjectMeta, backstage)
@@ -183,7 +204,7 @@ func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backs
 
 	err = r.Create(ctx, statefulSet)
 	if err != nil {
-		return fmt.Errorf("failed to create deplyment, reason: %s", err)
+		return fmt.Errorf("failed to create statefulset, reason: %s", err)
 	}
 
 	return nil
@@ -224,6 +245,13 @@ func (r *BackstageReconciler) applyPsqlService(ctx context.Context, backstage bs
 		lg.Info("CR update is ignored for the time")
 		return nil
 	}
+
+	if r.OwnsRuntime {
+		if err := controllerutil.SetControllerReference(&backstage, service, r.Scheme); err != nil {
+			return fmt.Errorf(ownerRefFmt, err)
+		}
+	}
+
 	err = r.Create(ctx, service)
 	if err != nil {
 		return fmt.Errorf("failed to create service, reason: %s", err)

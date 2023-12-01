@@ -61,7 +61,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&ownRuntime, "own-runtime", false, "Making Backstage Controller own runtime objects. "+
+	flag.BoolVar(&ownRuntime, "own-runtime", true, "Making Backstage Controller own runtime objects. "+
 		"If 'true' - all runtime objects created by Controller will be syncing with desired state configured by Controller")
 
 	opts := zap.Options{
