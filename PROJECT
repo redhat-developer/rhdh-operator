@@ -1,18 +1,18 @@
-domain: backstage.io
+domain: janus-idp.io
 layout:
 - go.kubebuilder.io/v3
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: backstage-operator
-repo: backstage.io/backstage-operator
+repo: janus-idp.io/backstage-operator
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: backstage.io
+  domain: janus-idp.io
   kind: Backstage
-  path: backstage.io/backstage-operator/api/v1alpha1
+  path: janus-idp.io/backstage-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

@@ -21,7 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
-	bs "backstage.io/backstage-operator/api/v1alpha1"
+	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	BackstageAppLabel = "backstage.io/app"
+	BackstageAppLabel = "janus-idp.io/app"
 )
 
 // BackstageReconciler reconciles a Backstage object
@@ -53,9 +53,9 @@ type BackstageReconciler struct {
 	Namespace string
 }
 
-//+kubebuilder:rbac:groups=backstage.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=backstage.io,resources=backstages/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=backstage.io,resources=backstages/finalizers,verbs=update
+//+kubebuilder:rbac:groups=janus-idp.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=janus-idp.io,resources=backstages/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=janus-idp.io,resources=backstages/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=configmaps;persistentvolumes;persistentvolumeclaims;services,verbs=get;watch;create;update;list;delete
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;watch;create;update;list;delete
 //+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;watch;create;update;list;delete

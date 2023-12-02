@@ -5,7 +5,7 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "backstage.io/v1alpha1",
+          "apiVersion": "janus-idp.io/v1alpha1",
           "kind": "Backstage",
           "metadata": {
             "labels": {
@@ -32,7 +32,7 @@ spec:
     - description: Backstage is the Schema for the backstages API
       displayName: Backstage
       kind: Backstage
-      name: backstages.backstage.io
+      name: backstages.janus-idp.io
       version: v1alpha1
   description: Operator to deploy Backstage on Kubernetes
   displayName: Janus-IDP Backstage Operator
@@ -80,7 +80,7 @@ spec:
           - update
           - watch
         - apiGroups:
-          - backstage.io
+          - janus-idp.io
           resources:
           - backstages
           verbs:
@@ -92,13 +92,13 @@ spec:
           - update
           - watch
         - apiGroups:
-          - backstage.io
+          - janus-idp.io
           resources:
           - backstages/finalizers
           verbs:
           - update
         - apiGroups:
-          - backstage.io
+          - janus-idp.io
           resources:
           - backstages/status
           verbs:
@@ -117,17 +117,17 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: backstage-operator-controller-manager
+        serviceAccountName: backstage-controller-manager
       deployments:
       - label:
           app.kubernetes.io/component: manager
           app.kubernetes.io/created-by: backstage-operator
           app.kubernetes.io/instance: controller-manager
           app.kubernetes.io/managed-by: kustomize
-          app.kubernetes.io/name: deployment.yaml
+          app.kubernetes.io/name: deployment
           app.kubernetes.io/part-of: backstage-operator
           control-plane: controller-manager
-        name: backstage-operator-controller-manager
+        name: backstage-controller-manager
         spec:
           replicas: 1
           selector:
@@ -213,10 +213,17 @@ spec:
                   capabilities:
                     drop:
                     - ALL
+                volumeMounts:
+                - mountPath: /default-config
+                  name: default-config
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: backstage-operator-controller-manager
+              serviceAccountName: backstage-controller-manager
               terminationGracePeriodSeconds: 10
+              volumes:
+              - configMap:
+                  name: backstage-default-config
+                name: default-config
       permissions:
       - rules:
         - apiGroups:
@@ -250,7 +257,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: backstage-operator-controller-manager
+        serviceAccountName: backstage-controller-manager
     strategy: deployment
   installModes:
   - supported: false

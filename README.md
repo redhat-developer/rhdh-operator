@@ -2,7 +2,7 @@
 Operator for deploying Backstage for Janus-IDP.
 
 ## Description
-Implementing https://backstage.io/docs/deployment/k8s/ procedure
+Implementing https://janus-idp.io/docs/deployment/k8s/ procedure
 At first stage CR update does not affect Backstage Objects, just installation (same as Helm)
 TODO: Do we need to continuosly sync the states? Which way if so: from CR to Objects or back or (somehow) back and forth?
 

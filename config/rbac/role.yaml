@@ -42,7 +42,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - backstage.io
+  - janus-idp.io
   resources:
   - backstages
   verbs:
@@ -54,13 +54,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - backstage.io
+  - janus-idp.io
   resources:
   - backstages/finalizers
   verbs:
   - update
 - apiGroups:
-  - backstage.io
+  - janus-idp.io
   resources:
   - backstages/status
   verbs:

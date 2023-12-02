@@ -20,9 +20,9 @@ import (
 	"strings"
 	"time"
 
-	bsv1alphav1 "backstage.io/backstage-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	bsv1alphav1 "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
