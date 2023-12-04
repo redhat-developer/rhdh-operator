@@ -20,6 +20,7 @@ import (
 
 	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -128,6 +129,22 @@ const (
 //`, _defaultBackstageInitContainerName, _defaultBackstageMainContainerName, _containersWorkingDir)
 //)
 
+// ContainerVisitor is called with each container
+type ContainerVisitor func(container *v1.Container)
+
+// visitContainers invokes the visitor function for every container in the given pod template spec
+func visitContainers(podTemplateSpec *v1.PodTemplateSpec, visitor ContainerVisitor) {
+	for i := range podTemplateSpec.Spec.InitContainers {
+		visitor(&podTemplateSpec.Spec.InitContainers[i])
+	}
+	for i := range podTemplateSpec.Spec.Containers {
+		visitor(&podTemplateSpec.Spec.Containers[i])
+	}
+	for i := range podTemplateSpec.Spec.EphemeralContainers {
+		visitor((*v1.Container)(&podTemplateSpec.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+	}
+}
+
 func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	//lg := log.FromContext(ctx)
@@ -171,6 +188,22 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 			err = r.addEnvVars(ctx, backstage, ns, deployment)
 			if err != nil {
 				return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
+			}
+
+			if backstage.Spec.Backstage != nil {
+				deployment.Spec.Replicas = backstage.Spec.Backstage.Replicas
+
+				if backstage.Spec.Backstage.Image != nil {
+					visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
+						container.Image = *backstage.Spec.Backstage.Image
+					})
+				}
+
+				if backstage.Spec.Backstage.ImagePullSecret != nil {
+					deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{
+						Name: *backstage.Spec.Backstage.ImagePullSecret,
+					})
+				}
 			}
 
 			err = r.Create(ctx, deployment)
