@@ -250,5 +250,52 @@ func (r *BackstageReconciler) addContainerArgs(ctx context.Context, backstage bs
 }
 
 func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	return r.addBackendAuthEnvVar(ctx, backstage, ns, deployment)
+	err := r.addBackendAuthEnvVar(ctx, backstage, ns, deployment)
+	if err != nil {
+		return err
+	}
+	if backstage.Spec.Backstage == nil {
+		return nil
+	}
+
+	for _, env := range backstage.Spec.Backstage.Env {
+		visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
+			container.Env = append(container.Env, v1.EnvVar{
+				Name:  env.Name,
+				Value: env.Value,
+			})
+		})
+	}
+
+	for _, envFrom := range backstage.Spec.Backstage.EnvFrom {
+		var (
+			name   string
+			cmSrc  *v1.ConfigMapEnvSource
+			secSrc *v1.SecretEnvSource
+		)
+		switch {
+		case envFrom.ConfigMapRef != nil:
+			name = envFrom.ConfigMapRef.Name
+			cmSrc = &v1.ConfigMapEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: name,
+				},
+			}
+		case envFrom.SecretRef != nil:
+			name = envFrom.SecretRef.Name
+			secSrc = &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: name,
+				},
+			}
+		}
+		visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
+			container.EnvFrom = append(container.EnvFrom, v1.EnvFromSource{
+				ConfigMapRef: cmSrc,
+				SecretRef:    secSrc,
+			})
+		})
+	}
+
+	return nil
 }
