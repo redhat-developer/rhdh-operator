@@ -25,55 +25,72 @@ const (
 
 // BackstageSpec defines the desired state of Backstage
 type BackstageSpec struct {
-	// References to existing app-configs Config objects.
-	// Each element can be a reference to any ConfigMap or Secret,
-	// and will be mounted inside the main application container under a dedicated directory containing the ConfigMap
-	// or Secret name. Additionally, each file will be passed as a `--config /path/to/secret_or_configmap/key` to the
-	// main container args in the order of the entries defined in the AppConfigs list.
-	// But bear in mind that for a single AppConfig element containing several files,
-	// the order in which those files will be appended to the container args, the main container args cannot be guaranteed.
-	// So if you want to pass multiple app-config files, it is recommended to pass one ConfigMap/Secret per app-config file.
-	AppConfigs []AppConfigRef `json:"appConfigs,omitempty"`
+	// Configuration for Backstage. Optional.
+	Backstage *BackstageSpecBackstage `json:"backstage,omitempty"`
 
-	// Optional Backend Auth Secret Name. A new one will be generated if not set.
+	// Configuration for the local database. Optional.
+	Postgresql *BackstageSpecPostgresql `json:"postgresql,omitempty"`
+
+	// Raw Runtime Objects configuration. For Advanced scenarios.
+	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
+}
+
+type BackstageSpecBackstage struct {
+
+	// Optional Reference to a Secret to use for Backend Auth. A new one will be generated if not set.
 	// This Secret is used to set an environment variable named 'APP_CONFIG_backend_auth_keys' in the
 	// main container, which takes precedence over any 'backend.auth.keys' field defined
 	// in default or custom application configuration files.
 	// This is required for service-to-service auth and is shared by all backend plugins.
+	//+optional
 	BackendAuthSecretRef *BackendAuthSecretRef `json:"backendAuthSecretRef,omitempty"`
+
+	// References to existing app-configs Config objects, that will be mounted as files in the specified mount path.
+	// Each element can be a reference to any ConfigMap or Secret,
+	// and will be mounted inside the main application container under a dedicated directory containing the ConfigMap
+	// or Secret name (relative to the specified mount path).
+	// Additionally, each file will be passed as a `--config /path/to/secret_or_configmap/key` to the
+	// main container args in the order of the entries defined in the AppConfigs list.
+	// But bear in mind that for a single AppConfig element containing several files,
+	// the order in which those files will be appended to the container args, the main container args cannot be guaranteed.
+	// So if you want to pass multiple app-config files, it is recommended to pass one ConfigMap/Secret per app-config file.
+	//+optional
+	AppConfig *AppConfig `json:"appConfig,omitempty"`
 
 	// Reference to an existing configuration object for Dynamic Plugins.
 	// This can be a reference to any ConfigMap or Secret,
 	// but the object must have an existing key named: 'dynamic-plugins.yaml'
-	DynamicPluginsConfig *DynamicPluginsConfigRef `json:"dynamicPluginsConfig,omitempty"`
+	//+optional
+	DynamicPluginsConfig *DynamicPluginsConfig `json:"dynamicPlugins,omitempty"`
 
-	// Raw Runtime Objects configuration
-	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
+	// References to existing Config objects to use as extra config files.
+	// They will be mounted as files in the specified mount path.
+	// Each element can be a reference to any ConfigMap or Secret.
+	//+optional
+	ExtraConfig *ExtraConfig `json:"extraConfig,omitempty"`
 
-	//+kubebuilder:default=false
-	SkipLocalDb bool `json:"skipLocalDb,omitempty"`
-}
+	// Environment variables to inject into all the Backstage containers.
+	// Bear in mind not to put sensitive data here. Use EnvFrom instead.
+	//+optional
+	Env []Env `json:"env,omitempty"`
 
-type AppConfigRef struct {
-	// Name of an existing App Config object
-	//+kubebuilder:validation:Required
-	Name string `json:"name"`
+	// Environment variables to inject into all the Backstage containers, as references to existing ConfigMap or Secret objects.
+	//+optional
+	EnvFrom []EnvFrom `json:"envFrom,omitempty"`
 
-	// Type of the existing App Config object, either ConfigMap or Secret
-	//+kubebuilder:validation:Required
-	//+kubebuilder:validation:Enum=ConfigMap;Secret
-	Kind string `json:"kind"`
-}
+	// Number of desired replicas to set in the Backstage Deployment.
+	// Defaults to 1.
+	//+optional
+	//+kubebuilder:default=1
+	Replicas *int32 `json:"replicas,omitempty"`
 
-type DynamicPluginsConfigRef struct {
-	// Name of the Dynamic Plugins config object
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+	// Image to use in all containers (including Init Containers)
+	//+optional
+	Image *string `json:"image,omitempty"`
 
-	// Type of the Dynamic Plugins config object, either ConfigMap or Secret
-	//+kubebuilder:validation:Required
-	//+kubebuilder:validation:Enum=ConfigMap;Secret
-	Kind string `json:"kind"`
+	// Image Pull Secret to use in all containers (including Init Containers)
+	//+optional
+	ImagePullSecret *string `json:"imagePullSecret,omitempty"`
 }
 
 type BackendAuthSecretRef struct {
@@ -82,8 +99,99 @@ type BackendAuthSecretRef struct {
 	Name string `json:"name"`
 
 	// Key in the secret to use for the backend auth. Default value is: backend-secret
+	// +optional
 	//+kubebuilder:default=backend-secret
 	Key string `json:"key,omitempty"`
+}
+
+type AppConfig struct {
+	// Mount path for all app-config files listed in the Items field
+	// +optional
+	// +kubebuilder:default=/opt/app-root/src
+	MountPath string `json:"mountPath,omitempty"`
+
+	// List of references to app-config Config objects.
+	// +optional
+	Items []AppConfigItem `json:"items,omitempty"`
+}
+
+type AppConfigItem struct {
+	// ConfigMap containing one or more app-config files
+	// +optional
+	ConfigMapRef *Ref `json:"configMapRef,omitempty"`
+
+	// Secret containing one or more app-config files
+	// +optional
+	SecretRef *Ref `json:"secretRef,omitempty"`
+}
+
+type ExtraConfig struct {
+	// Mount path for all extra configuration files listed in the Items field
+	// +optional
+	// +kubebuilder:default=/opt/app-root/src
+	MountPath string `json:"mountPath,omitempty"`
+
+	// List of references to extra config Config objects.
+	// +optional
+	Items []ExtraConfigItem `json:"items,omitempty"`
+}
+
+type ExtraConfigItem struct {
+	// ConfigMap containing one or more extra config files
+	// +optional
+	ConfigMapRef *Ref `json:"configMapRef,omitempty"`
+
+	// Secret containing one or more extra config files
+	// +optional
+	SecretRef *Ref `json:"secretRef,omitempty"`
+}
+
+type DynamicPluginsConfig struct {
+	// ConfigMap containing the dynamic plugins' configuration. It needs to have a key named: "dynamic-plugins.yaml".
+	// ConfigMapRef will be used if both ConfigMapRef and SecretRef are provided.
+	// +optional
+	ConfigMapRef *Ref `json:"configMapRef,omitempty"`
+
+	// Secret containing the dynamic plugins' configuration. It needs to have a key named: "dynamic-plugins.yaml".
+	// ConfigMapRef will be used if both ConfigMapRef and SecretRef are provided.
+	// +optional
+	SecretRef *Ref `json:"secretRef,omitempty"`
+}
+
+type Ref struct {
+	// Name of the object referenced.
+	//+kubebuilder:validation:Required
+	Name string `json:"name"`
+}
+
+type Env struct {
+	// Name of the environment variable
+	//+kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Value of the environment variable
+	//+kubebuilder:validation:Required
+	Value string `json:"value"`
+}
+
+type EnvFrom struct {
+	// ConfigMap containing the environment variables to inject
+	// +optional
+	ConfigMapRef *Ref `json:"configMapRef,omitempty"`
+
+	// Secret containing the environment variables to inject
+	// +optional
+	SecretRef *Ref `json:"secretRef,omitempty"`
+}
+
+type BackstageSpecPostgresql struct {
+	// Control the creation of a local PostgreSQL DB. Set to false if using for example an external Database for Backstage.
+	// To use an external Database, you can provide your own app-config file (see the AppConfig field) containing references
+	// to the Database connection information, which might be supplied as environment variables (see the Env field) or
+	// extra-configuration files (see the ExtraConfig field in the BackstageSpecBackstage structure).
+	// +optional
+	//+kubebuilder:default=true
+	Enabled *bool `json:"disabled,omitempty"`
 }
 
 type RuntimeConfig struct {
