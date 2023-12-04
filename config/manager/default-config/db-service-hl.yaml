@@ -4,7 +4,7 @@ metadata:
   name: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
 spec:
   selector:
-    backstage.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+    janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
   clusterIP: None
   ports:
     - port: 5432

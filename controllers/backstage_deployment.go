@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	bs "backstage.io/backstage-operator/api/v1alpha1"
+	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,11 +41,11 @@ const (
 // replicas: 1
 // selector:
 //   matchLabels:
-//     backstage.io/app:  # placeholder for 'backstage-<cr-name>'
+//     janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
 // template:
 //   metadata:
 //     labels:
-//       backstage.io/app:  # placeholder for 'backstage-<cr-name>'
+//       janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
 //   spec:
 //#      serviceAccountName: default
 //

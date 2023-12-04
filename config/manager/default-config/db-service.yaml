@@ -4,6 +4,6 @@ metadata:
   name: backstage-psql # placeholder for 'backstage-psql-<cr-name>' .NOTE: For the time it is static and linked to Secret-> postgres-secrets -> OSTGRES_HOST
 spec:
   selector:
-    backstage.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+    janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
   ports:
     - port: 5432

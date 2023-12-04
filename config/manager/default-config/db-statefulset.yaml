@@ -7,12 +7,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      backstage.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+      janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
   serviceName: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
   template:
     metadata:
       labels:
-        backstage.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+        janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
     spec:
       containers:

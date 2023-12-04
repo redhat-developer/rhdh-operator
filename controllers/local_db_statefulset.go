@@ -19,7 +19,7 @@ import (
 	"context"
 	"fmt"
 
-	bs "backstage.io/backstage-operator/api/v1alpha1"
+	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,12 +37,12 @@ import (
 //  replicas: 1
 //  selector:
 //    matchLabels:
-//      backstage.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+//      janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
 //  serviceName: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
 //  template:
 //    metadata:
 //      labels:
-//        backstage.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+//        janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
 //      name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
 //    spec:
 //      containers:
@@ -136,7 +136,7 @@ import (
 //  name: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
 //spec:
 //  selector:
-//      backstage.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+//      janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
 //  ports:
 //    - port: 5432
 //`
@@ -146,7 +146,7 @@ import (
 //  name: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
 //spec:
 //  selector:
-//      backstage.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+//      janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
 //  clusterIP: None
 //  ports:
 //    - port: 5432

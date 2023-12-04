@@ -13,7 +13,7 @@ spec:
     - description: Backstage is the Schema for the backstages API
       displayName: Backstage
       kind: Backstage
-      name: backstages.backstage.io
+      name: backstages.janus-idp.io
       version: v1alpha1
   description: Operator to deploy Backstage on Kubernetes
   displayName: Janus-IDP Backstage Operator

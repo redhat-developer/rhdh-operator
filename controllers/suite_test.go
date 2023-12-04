@@ -30,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	backstageiov1alpha1 "backstage.io/backstage-operator/api/v1alpha1"
+	backstageiov1alpha1 "janus-idp.io/backstage-operator/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

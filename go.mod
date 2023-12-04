@@ -1,4 +1,4 @@
-module backstage.io/backstage-operator
+module janus-idp.io/backstage-operator
 
 go 1.19
 

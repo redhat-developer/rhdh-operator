@@ -12,7 +12,7 @@ metadata:
   name: backstage-viewer-role
 rules:
 - apiGroups:
-  - backstage.io
+  - janus-idp.io
   resources:
   - backstages
   verbs:
@@ -20,7 +20,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - backstage.io
+  - janus-idp.io
   resources:
   - backstages/status
   verbs:
