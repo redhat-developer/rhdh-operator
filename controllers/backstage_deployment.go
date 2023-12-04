@@ -234,6 +234,7 @@ func (r *BackstageReconciler) addVolumes(ctx context.Context, backstage bs.Backs
 	}
 
 	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.appConfigsToVolumes(backstage)...)
+	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.extraConfigsToVolumes(backstage)...)
 	return nil
 }
 
@@ -242,7 +243,11 @@ func (r *BackstageReconciler) addVolumeMounts(ctx context.Context, backstage bs.
 	if err != nil {
 		return err
 	}
-	return r.addAppConfigsVolumeMounts(ctx, backstage, ns, deployment)
+	err = r.addAppConfigsVolumeMounts(ctx, backstage, ns, deployment)
+	if err != nil {
+		return err
+	}
+	return r.addExtraConfigsVolumeMounts(ctx, backstage, ns, deployment)
 }
 
 func (r *BackstageReconciler) addContainerArgs(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {

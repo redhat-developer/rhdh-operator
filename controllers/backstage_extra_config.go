@@ -25,27 +25,22 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-type appConfigData struct {
-	ref   string
-	files []string
-}
-
-func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (result []v1.Volume) {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.AppConfig == nil {
+func (r *BackstageReconciler) extraConfigsToVolumes(backstage bs.Backstage) (result []v1.Volume) {
+	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.ExtraConfig == nil {
 		return nil
 	}
-	for _, appConfig := range backstage.Spec.Backstage.AppConfig.Items {
+	for _, extraConfig := range backstage.Spec.Backstage.ExtraConfig.Items {
 		var volumeSource v1.VolumeSource
 		var name string
 		switch {
-		case appConfig.ConfigMapRef != nil:
-			name = appConfig.ConfigMapRef.Name
+		case extraConfig.ConfigMapRef != nil:
+			name = extraConfig.ConfigMapRef.Name
 			volumeSource.ConfigMap = &v1.ConfigMapVolumeSource{
 				DefaultMode:          pointer.Int32(420),
 				LocalObjectReference: v1.LocalObjectReference{Name: name},
 			}
-		case appConfig.SecretRef != nil:
-			name = appConfig.SecretRef.Name
+		case extraConfig.SecretRef != nil:
+			name = extraConfig.SecretRef.Name
 			volumeSource.Secret = &v1.SecretVolumeSource{
 				DefaultMode: pointer.Int32(420),
 				SecretName:  name,
@@ -62,12 +57,12 @@ func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (resul
 	return result
 }
 
-func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.AppConfig == nil {
+func (r *BackstageReconciler) addExtraConfigsVolumeMounts(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
+	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.ExtraConfig == nil {
 		return nil
 	}
 
-	appConfigFilenamesList, err := r.extractAppConfigFileNames(ctx, backstage, ns)
+	appConfigFilenamesList, err := r.extractExtraConfigFileNames(ctx, backstage, ns)
 	if err != nil {
 		return err
 	}
@@ -79,7 +74,7 @@ func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, bac
 					deployment.Spec.Template.Spec.Containers[i].VolumeMounts = append(deployment.Spec.Template.Spec.Containers[i].VolumeMounts,
 						v1.VolumeMount{
 							Name:      appConfigFilenames.ref,
-							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Backstage.AppConfig.MountPath, f),
+							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Backstage.ExtraConfig.MountPath, f),
 							SubPath:   f,
 						})
 				}
@@ -90,41 +85,15 @@ func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, bac
 	return nil
 }
 
-func (r *BackstageReconciler) addAppConfigsContainerArgs(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.AppConfig == nil {
-		return nil
-	}
-
-	appConfigFilenamesList, err := r.extractAppConfigFileNames(ctx, backstage, ns)
-	if err != nil {
-		return err
-	}
-
-	for i, c := range deployment.Spec.Template.Spec.Containers {
-		if c.Name == _defaultBackstageMainContainerName {
-			for _, appConfigFilenames := range appConfigFilenamesList {
-				// Args
-				for _, fileName := range appConfigFilenames.files {
-					appConfigPath := fmt.Sprintf("%s/%s", backstage.Spec.Backstage.AppConfig.MountPath, fileName)
-					deployment.Spec.Template.Spec.Containers[i].Args =
-						append(deployment.Spec.Template.Spec.Containers[i].Args, "--config", appConfigPath)
-				}
-			}
-			break
-		}
-	}
-	return nil
-}
-
-// extractAppConfigFileNames returns a mapping of app-config object name and the list of files in it.
-// We intentionally do not return a Map, to preserve the iteration order of the AppConfigs in the Custom Resource,
+// extractExtraConfigFileNames returns a mapping of extra-config object name and the list of files in it.
+// We intentionally do not return a Map, to preserve the iteration order of the ExtraConfigs in the Custom Resource,
 // even though we can't guarantee the iteration order of the files listed inside each ConfigMap or Secret.
-func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, backstage bs.Backstage, ns string) (result []appConfigData, err error) {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.AppConfig == nil {
+func (r *BackstageReconciler) extractExtraConfigFileNames(ctx context.Context, backstage bs.Backstage, ns string) (result []appConfigData, err error) {
+	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.ExtraConfig == nil {
 		return nil, nil
 	}
 
-	for _, appConfig := range backstage.Spec.Backstage.AppConfig.Items {
+	for _, appConfig := range backstage.Spec.Backstage.ExtraConfig.Items {
 		var files []string
 		var name string
 		switch {
