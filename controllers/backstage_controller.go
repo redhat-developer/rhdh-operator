@@ -56,7 +56,7 @@ type BackstageReconciler struct {
 //+kubebuilder:rbac:groups=janus-idp.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=janus-idp.io,resources=backstages/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=janus-idp.io,resources=backstages/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=configmaps;persistentvolumes;persistentvolumeclaims;services,verbs=get;watch;create;update;list;delete
+//+kubebuilder:rbac:groups="",resources=configmaps;secrets;persistentvolumes;persistentvolumeclaims;services,verbs=get;watch;create;update;list;delete
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;watch;create;update;list;delete
 //+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;watch;create;update;list;delete
 
@@ -101,7 +101,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		err := r.applyLocalDbStatefulSet(ctx, backstage, req.Namespace)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply Database Deployment: %w", err)
+			return ctrl.Result{}, fmt.Errorf("failed to apply Database StatefulSet: %w", err)
 		}
 
 		err = r.applyLocalDbServices(ctx, backstage, req.Namespace)

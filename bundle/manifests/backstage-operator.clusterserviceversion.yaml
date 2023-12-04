@@ -49,6 +49,7 @@ spec:
           - configmaps
           - persistentvolumeclaims
           - persistentvolumes
+          - secrets
           - services
           verbs:
           - create
