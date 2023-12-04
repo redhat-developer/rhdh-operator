@@ -3,17 +3,38 @@ kind: Backstage
 metadata:
   name: my-backstage-app-with-app-config
 spec:
-  appConfigs:
-    - name: "my-backstage-config-cm1"
-      kind: ConfigMap
-    - name: "my-backstage-config-secret1"
-      kind: Secret
-  dynamicPluginsConfig:
-    name: my-dynamic-plugins-config-cm
-    kind: ConfigMap
-  backendAuthSecretRef:
-    name: "my-backstage-backend-auth-secret"
-    key: "my-auth-key"
+  backstage:
+    appConfig:
+      #mountPath:  /opt/app-root/src
+      items:
+        - configMapRef:
+            name: "my-backstage-config-cm1"
+        - secretRef:
+            name: "my-backstage-config-secret1"
+    dynamicPlugins:
+      configMapRef:
+        name: my-dynamic-plugins-config-cm
+    env:
+      - name: MY_ENV_VAR_1
+        value: my-value-1
+      - name: MY_ENV_VAR_2
+        value: my-value-2
+    envFrom:
+      - configMapRef:
+          name: my-env-cm-1
+      - secretRef:
+          name: my-env-secret1
+    backendAuthSecretRef:
+      name: "my-backstage-backend-auth-secret"
+      key: "my-auth-key"
+    replicas: 2
+    extraConfig:
+      mountPath: /tmp/my-extra-files
+      items:
+        - configMapRef:
+            name: "my-backstage-extra-config-cm1"
+        - secretRef:
+            name: "my-backstage-extra-config-secret1"
 
 ---
 apiVersion: v1
@@ -54,18 +75,19 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: my-backstage-config-secret1
-data:
-  # auth:
-  #      # see https://janus-idp.io/docs/auth/ to learn about auth providers
-  #      environment: development
-  #      providers:
-  #        github:
-  #          development:
-  #            clientId: 'xxx'
-  #            clientSecret: 'yyy'
-  my-app-config-1.secret.yaml: YXV0aDoKICAjIHNlZSBodHRwczovL2JhY2tzdGFnZS5pby9kb2NzL2F1dGgvIHRvIGxlYXJuIGFib3V0IGF1dGggcHJvdmlkZXJzCiAgZW52aXJvbm1lbnQ6IGRldmVsb3BtZW50CiAgcHJvdmlkZXJzOgogICAgZ2l0aHViOgogICAgICBkZXZlbG9wbWVudDoKICAgICAgICBjbGllbnRJZDogJ3h4eCcKICAgICAgICBjbGllbnRTZWNyZXQ6ICd5eXknCg==
+stringData:
+  my-app-config-1.secret.yaml: |
+    auth:
+      # see https://backstage.io/docs/auth/ to learn about auth providers
+      environment: development
+      providers:
+        github:
+          development:
+            clientId: '${MY_ENV_VAR_1}'
+            clientSecret: '${MY_ENV_VAR_2}'
   # # a comment
-  my-app-config-2.secret.yaml: IyBhIGNvbW1lbnQK
+  my-app-config-2.secret.yaml: |
+    # a comment
 
 ---
 apiVersion: v1
@@ -86,3 +108,57 @@ data:
             endpoints:
               /explore-backend-completed:
                 target: 'http://localhost:7017'
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-env-cm-1
+data:
+  CM_ENV1: "cm env 1"
+  CM_ENV2: "cm env 2"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-env-secret1
+stringData:
+  SEC_ENV1: "secret env 1"
+  SEC_ENV2: "secret env 2"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-backstage-extra-config-cm1
+data:
+  cm_file1.txt: |
+    # From ConfigMap
+    Lorem Ipsum
+    Dolor Sit Amet
+  cm_file2.properties: |
+    conf.x=y
+    conf.y=z
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-backstage-extra-config-secret1
+stringData:
+  secret_file1.txt: |
+    # From Secret
+    Lorem Ipsum
+    Dolor Sit Amet
+  secret_file2.properties: |
+    sec.a=b
+    sec.b=c
+  secrets.prod.yaml: |
+    appId: 1
+    webhookUrl: https://smee.io/foo
+    clientId: someGithubAppClientId
+    clientSecret: someGithubAppClientSecret
+    webhookSecret: someWebhookSecret
+    privateKey: |
+      SomeRsaPrivateKey
