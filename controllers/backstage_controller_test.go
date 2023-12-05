@@ -1187,27 +1187,40 @@ plugins: []
 					g.Expect(err).To(Not(HaveOccurred()))
 				}, time.Minute, time.Second).Should(Succeed())
 
-				visitContainers(&found.Spec.Template, func(container *corev1.Container) {
-					By(fmt.Sprintf("Checking Env in the Backstage Deployment - container: %q", container.Name), func() {
-						Expect(len(container.Env)).To(BeNumerically(">=", 2),
-							"Expected at least 2 items in Env for container %q, fot %d", container.Name, len(container.Env))
-						envVar, ok := findEnvVar(container.Env, "MY_ENV_VAR_1")
-						Expect(ok).To(BeTrue(), "No env var with name MY_ENV_VAR_1 in init container")
-						Expect(envVar.Value).Should(Equal("value 10"))
-						envVar, ok = findEnvVar(container.Env, "MY_ENV_VAR_2")
-						Expect(ok).To(BeTrue(), "No env var with name MY_ENV_VAR_2 in init container")
-						Expect(envVar.Value).Should(Equal("value 20"))
-					})
-					By(fmt.Sprintf("Checking EnvFrom in the Backstage Deployment - container: %q", container.Name), func() {
-						Expect(len(container.EnvFrom)).To(BeNumerically(">=", 2),
-							"Expected at least 2 items in EnvFrom for container %q, fot %d", container.Name, len(container.EnvFrom))
-						envVar, ok := findEnvVarFrom(container.EnvFrom, envConfig1CmName)
-						Expect(ok).To(BeTrue(), "No ConfigMap-backed envFrom in init container: %s", envConfig1CmName)
-						Expect(envVar.ConfigMapRef).ShouldNot(BeNil())
-						envVar, ok = findEnvVarFrom(container.EnvFrom, envConfig2SecretName)
-						Expect(ok).To(BeTrue(), "No ConfigMap-backed envFrom in init container: %s", envConfig2SecretName)
-						Expect(envVar.SecretRef).ShouldNot(BeNil())
-					})
+				mainCont := found.Spec.Template.Spec.Containers[0]
+				By(fmt.Sprintf("Checking Env in the Backstage Deployment - container: %q", mainCont.Name), func() {
+					Expect(len(mainCont.Env)).To(BeNumerically(">=", 2),
+						"Expected at least 2 items in Env for container %q, fot %d", mainCont.Name, len(mainCont.Env))
+					envVar, ok := findEnvVar(mainCont.Env, "MY_ENV_VAR_1")
+					Expect(ok).To(BeTrue(), "No env var with name MY_ENV_VAR_1 in init container")
+					Expect(envVar.Value).Should(Equal("value 10"))
+					envVar, ok = findEnvVar(mainCont.Env, "MY_ENV_VAR_2")
+					Expect(ok).To(BeTrue(), "No env var with name MY_ENV_VAR_2 in init container")
+					Expect(envVar.Value).Should(Equal("value 20"))
+				})
+				By(fmt.Sprintf("Checking EnvFrom in the Backstage Deployment - container: %q", mainCont.Name), func() {
+					Expect(len(mainCont.EnvFrom)).To(BeNumerically(">=", 2),
+						"Expected at least 2 items in EnvFrom for container %q, fot %d", mainCont.Name, len(mainCont.EnvFrom))
+					envVar, ok := findEnvVarFrom(mainCont.EnvFrom, envConfig1CmName)
+					Expect(ok).To(BeTrue(), "No ConfigMap-backed envFrom in init container: %s", envConfig1CmName)
+					Expect(envVar.ConfigMapRef).ShouldNot(BeNil())
+					envVar, ok = findEnvVarFrom(mainCont.EnvFrom, envConfig2SecretName)
+					Expect(ok).To(BeTrue(), "No Secret-backed envFrom in init container: %s", envConfig2SecretName)
+					Expect(envVar.SecretRef).ShouldNot(BeNil())
+				})
+
+				initCont := found.Spec.Template.Spec.InitContainers[0]
+				By("not injecting Env set in CR into the Backstage Deployment Init Container", func() {
+					_, ok := findEnvVar(initCont.Env, "MY_ENV_VAR_1")
+					Expect(ok).To(BeFalse(), "Env var with name MY_ENV_VAR_1 should not be injected into init container")
+					_, ok = findEnvVar(initCont.Env, "MY_ENV_VAR_2")
+					Expect(ok).To(BeFalse(), "Env var with name MY_ENV_VAR_2 should not be injected into  init container")
+				})
+				By("not injecting EnvFrom set in CR into the Backstage Deployment Init Container", func() {
+					_, ok := findEnvVarFrom(initCont.EnvFrom, envConfig1CmName)
+					Expect(ok).To(BeFalse(), "ConfigMap-backed envFrom should not be added to init container: %s", envConfig1CmName)
+					_, ok = findEnvVarFrom(initCont.EnvFrom, envConfig2SecretName)
+					Expect(ok).To(BeFalse(), "Secret-backed envFrom should not be added to init container: %s", envConfig2SecretName)
 				})
 
 				By("Checking the latest Status added to the Backstage instance")

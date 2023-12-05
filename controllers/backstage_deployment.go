@@ -264,12 +264,12 @@ func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backs
 	}
 
 	for _, env := range backstage.Spec.Application.Env {
-		visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
-			container.Env = append(container.Env, v1.EnvVar{
+		for i := range deployment.Spec.Template.Spec.Containers {
+			deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env, v1.EnvVar{
 				Name:  env.Name,
 				Value: env.Value,
 			})
-		})
+		}
 	}
 
 	for _, envFrom := range backstage.Spec.Application.EnvFrom {
@@ -294,12 +294,13 @@ func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backs
 				},
 			}
 		}
-		visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
-			container.EnvFrom = append(container.EnvFrom, v1.EnvFromSource{
-				ConfigMapRef: cmSrc,
-				SecretRef:    secSrc,
-			})
-		})
+		for i := range deployment.Spec.Template.Spec.Containers {
+			deployment.Spec.Template.Spec.Containers[i].EnvFrom = append(deployment.Spec.Template.Spec.Containers[i].EnvFrom,
+				v1.EnvFromSource{
+					ConfigMapRef: cmSrc,
+					SecretRef:    secSrc,
+				})
+		}
 	}
 
 	return nil

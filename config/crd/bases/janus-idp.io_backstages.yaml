@@ -135,7 +135,7 @@ spec:
                         type: object
                     type: object
                   env:
-                    description: Environment variables to inject into all the Backstage
+                    description: Environment variables to inject into the application
                       containers. Bear in mind not to put sensitive data here. Use
                       EnvFrom instead.
                     items:
@@ -152,7 +152,7 @@ spec:
                       type: object
                     type: array
                   envFrom:
-                    description: Environment variables to inject into all the Backstage
+                    description: Environment variables to inject into the application
                       containers, as references to existing ConfigMap or Secret objects.
                     items:
                       properties:

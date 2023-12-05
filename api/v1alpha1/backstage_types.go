@@ -69,12 +69,12 @@ type Application struct {
 	//+optional
 	ExtraConfig *ExtraConfig `json:"extraConfig,omitempty"`
 
-	// Environment variables to inject into all the Backstage containers.
+	// Environment variables to inject into the application containers.
 	// Bear in mind not to put sensitive data here. Use EnvFrom instead.
 	//+optional
 	Env []Env `json:"env,omitempty"`
 
-	// Environment variables to inject into all the Backstage containers, as references to existing ConfigMap or Secret objects.
+	// Environment variables to inject into the application containers, as references to existing ConfigMap or Secret objects.
 	//+optional
 	EnvFrom []EnvFrom `json:"envFrom,omitempty"`
 
