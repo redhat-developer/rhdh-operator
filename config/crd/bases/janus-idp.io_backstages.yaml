@@ -233,7 +233,7 @@ spec:
               postgresql:
                 description: Configuration for the local database. Optional.
                 properties:
-                  disabled:
+                  enabled:
                     default: true
                     description: Control the creation of a local PostgreSQL DB. Set
                       to false if using for example an external Database for Backstage.

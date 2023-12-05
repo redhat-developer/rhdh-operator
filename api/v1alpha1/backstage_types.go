@@ -191,7 +191,7 @@ type Postgresql struct {
 	// extra-configuration files (see the ExtraConfig field in the Application structure).
 	// +optional
 	//+kubebuilder:default=true
-	Enabled *bool `json:"disabled,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 type RuntimeConfig struct {
