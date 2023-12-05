@@ -66,7 +66,7 @@ func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Contex
 	}
 
 	return bs.DynamicPluginsConfig{
-		ConfigMapRef: &bs.Ref{
+		ConfigMapRef: &bs.ObjectRef{
 			Name: dpConfigName,
 		},
 	}, nil

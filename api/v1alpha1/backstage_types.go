@@ -118,11 +118,11 @@ type AppConfig struct {
 type AppConfigItem struct {
 	// ConfigMap containing one or more app-config files
 	// +optional
-	ConfigMapRef *Ref `json:"configMapRef,omitempty"`
+	ConfigMapRef *ObjectRef `json:"configMapRef,omitempty"`
 
 	// Secret containing one or more app-config files
 	// +optional
-	SecretRef *Ref `json:"secretRef,omitempty"`
+	SecretRef *ObjectRef `json:"secretRef,omitempty"`
 }
 
 type ExtraConfig struct {
@@ -139,26 +139,26 @@ type ExtraConfig struct {
 type ExtraConfigItem struct {
 	// ConfigMap containing one or more extra config files
 	// +optional
-	ConfigMapRef *Ref `json:"configMapRef,omitempty"`
+	ConfigMapRef *ObjectRef `json:"configMapRef,omitempty"`
 
 	// Secret containing one or more extra config files
 	// +optional
-	SecretRef *Ref `json:"secretRef,omitempty"`
+	SecretRef *ObjectRef `json:"secretRef,omitempty"`
 }
 
 type DynamicPluginsConfig struct {
 	// ConfigMap containing the dynamic plugins' configuration. It needs to have a key named: "dynamic-plugins.yaml".
 	// ConfigMapRef will be used if both ConfigMapRef and SecretRef are provided.
 	// +optional
-	ConfigMapRef *Ref `json:"configMapRef,omitempty"`
+	ConfigMapRef *ObjectRef `json:"configMapRef,omitempty"`
 
 	// Secret containing the dynamic plugins' configuration. It needs to have a key named: "dynamic-plugins.yaml".
 	// ConfigMapRef will be used if both ConfigMapRef and SecretRef are provided.
 	// +optional
-	SecretRef *Ref `json:"secretRef,omitempty"`
+	SecretRef *ObjectRef `json:"secretRef,omitempty"`
 }
 
-type Ref struct {
+type ObjectRef struct {
 	// Name of the object referenced.
 	//+kubebuilder:validation:Required
 	Name string `json:"name"`
@@ -177,11 +177,11 @@ type Env struct {
 type EnvFrom struct {
 	// ConfigMap containing the environment variables to inject
 	// +optional
-	ConfigMapRef *Ref `json:"configMapRef,omitempty"`
+	ConfigMapRef *ObjectRef `json:"configMapRef,omitempty"`
 
 	// Secret containing the environment variables to inject
 	// +optional
-	SecretRef *Ref `json:"secretRef,omitempty"`
+	SecretRef *ObjectRef `json:"secretRef,omitempty"`
 }
 
 type Postgresql struct {

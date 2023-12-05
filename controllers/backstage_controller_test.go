@@ -469,11 +469,11 @@ spec:
 					switch kind {
 					case "ConfigMap":
 						item = bsv1alpha1.AppConfigItem{
-							ConfigMapRef: &bsv1alpha1.Ref{Name: name},
+							ConfigMapRef: &bsv1alpha1.ObjectRef{Name: name},
 						}
 					case "Secret":
 						item = bsv1alpha1.AppConfigItem{
-							SecretRef: &bsv1alpha1.Ref{Name: name},
+							SecretRef: &bsv1alpha1.ObjectRef{Name: name},
 						}
 					}
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
@@ -548,12 +548,12 @@ spec:
 
 							var (
 								dynamicPluginsObject client.Object
-								cmRef                *bsv1alpha1.Ref
-								secRef               *bsv1alpha1.Ref
+								cmRef                *bsv1alpha1.ObjectRef
+								secRef               *bsv1alpha1.ObjectRef
 							)
 							switch dynamicPluginsConfigKind {
 							case "ConfigMap":
-								cmRef = &bsv1alpha1.Ref{
+								cmRef = &bsv1alpha1.ObjectRef{
 									Name: dynamicPluginsConfigName,
 								}
 								dynamicPluginsObject = buildConfigMap(dynamicPluginsConfigName, map[string]string{
@@ -564,7 +564,7 @@ plugins: []
 `,
 								})
 							case "Secret":
-								secRef = &bsv1alpha1.Ref{
+								secRef = &bsv1alpha1.ObjectRef{
 									Name: dynamicPluginsConfigName,
 								}
 								dynamicPluginsObject = buildSecret(dynamicPluginsConfigName, map[string][]byte{
@@ -586,10 +586,10 @@ plugins: []
 										MountPath: mountPath,
 										Items: []bsv1alpha1.AppConfigItem{
 											{
-												ConfigMapRef: &bsv1alpha1.Ref{Name: appConfig1CmName},
+												ConfigMapRef: &bsv1alpha1.ObjectRef{Name: appConfig1CmName},
 											},
 											{
-												SecretRef: &bsv1alpha1.Ref{Name: appConfig2SecretName},
+												SecretRef: &bsv1alpha1.ObjectRef{Name: appConfig2SecretName},
 											},
 										},
 									},
@@ -938,11 +938,11 @@ plugins: []
 					switch kind {
 					case "ConfigMap":
 						item = bsv1alpha1.ExtraConfigItem{
-							ConfigMapRef: &bsv1alpha1.Ref{Name: name},
+							ConfigMapRef: &bsv1alpha1.ObjectRef{Name: name},
 						}
 					case "Secret":
 						item = bsv1alpha1.ExtraConfigItem{
-							SecretRef: &bsv1alpha1.Ref{Name: name},
+							SecretRef: &bsv1alpha1.ObjectRef{Name: name},
 						}
 					}
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
@@ -1017,10 +1017,10 @@ plugins: []
 								MountPath: mountPath,
 								Items: []bsv1alpha1.ExtraConfigItem{
 									{
-										ConfigMapRef: &bsv1alpha1.Ref{Name: extraConfig1CmName},
+										ConfigMapRef: &bsv1alpha1.ObjectRef{Name: extraConfig1CmName},
 									},
 									{
-										SecretRef: &bsv1alpha1.Ref{Name: extraConfig2SecretName},
+										SecretRef: &bsv1alpha1.ObjectRef{Name: extraConfig2SecretName},
 									},
 								},
 							},
@@ -1154,10 +1154,10 @@ plugins: []
 						},
 						EnvFrom: []bsv1alpha1.EnvFrom{
 							{
-								ConfigMapRef: &bsv1alpha1.Ref{Name: envConfig1CmName},
+								ConfigMapRef: &bsv1alpha1.ObjectRef{Name: envConfig1CmName},
 							},
 							{
-								SecretRef: &bsv1alpha1.Ref{Name: envConfig2SecretName},
+								SecretRef: &bsv1alpha1.ObjectRef{Name: envConfig2SecretName},
 							},
 						},
 					},
