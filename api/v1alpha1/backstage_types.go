@@ -26,16 +26,16 @@ const (
 // BackstageSpec defines the desired state of Backstage
 type BackstageSpec struct {
 	// Configuration for Backstage. Optional.
-	Backstage *BackstageSpecBackstage `json:"backstage,omitempty"`
+	Application *Application `json:"backstage,omitempty"`
 
 	// Configuration for the local database. Optional.
-	Postgresql *BackstageSpecPostgresql `json:"postgresql,omitempty"`
+	Postgresql *Postgresql `json:"postgresql,omitempty"`
 
 	// Raw Runtime Objects configuration. For Advanced scenarios.
 	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
 }
 
-type BackstageSpecBackstage struct {
+type Application struct {
 
 	// Optional Reference to a Secret to use for Backend Auth. A new one will be generated if not set.
 	// This Secret is used to set an environment variable named 'APP_CONFIG_backend_auth_keys' in the
@@ -184,11 +184,11 @@ type EnvFrom struct {
 	SecretRef *Ref `json:"secretRef,omitempty"`
 }
 
-type BackstageSpecPostgresql struct {
+type Postgresql struct {
 	// Control the creation of a local PostgreSQL DB. Set to false if using for example an external Database for Backstage.
 	// To use an external Database, you can provide your own app-config file (see the AppConfig field) containing references
 	// to the Database connection information, which might be supplied as environment variables (see the Env field) or
-	// extra-configuration files (see the ExtraConfig field in the BackstageSpecBackstage structure).
+	// extra-configuration files (see the ExtraConfig field in the Application structure).
 	// +optional
 	//+kubebuilder:default=true
 	Enabled *bool `json:"disabled,omitempty"`

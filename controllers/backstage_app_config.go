@@ -31,10 +31,10 @@ type appConfigData struct {
 }
 
 func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (result []v1.Volume) {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.AppConfig == nil {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
 		return nil
 	}
-	for _, appConfig := range backstage.Spec.Backstage.AppConfig.Items {
+	for _, appConfig := range backstage.Spec.Application.AppConfig.Items {
 		var volumeSource v1.VolumeSource
 		var name string
 		switch {
@@ -63,7 +63,7 @@ func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (resul
 }
 
 func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.AppConfig == nil {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
 		return nil
 	}
 
@@ -79,7 +79,7 @@ func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, bac
 					deployment.Spec.Template.Spec.Containers[i].VolumeMounts = append(deployment.Spec.Template.Spec.Containers[i].VolumeMounts,
 						v1.VolumeMount{
 							Name:      appConfigFilenames.ref,
-							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Backstage.AppConfig.MountPath, f),
+							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Application.AppConfig.MountPath, f),
 							SubPath:   f,
 						})
 				}
@@ -91,7 +91,7 @@ func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, bac
 }
 
 func (r *BackstageReconciler) addAppConfigsContainerArgs(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.AppConfig == nil {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
 		return nil
 	}
 
@@ -105,7 +105,7 @@ func (r *BackstageReconciler) addAppConfigsContainerArgs(ctx context.Context, ba
 			for _, appConfigFilenames := range appConfigFilenamesList {
 				// Args
 				for _, fileName := range appConfigFilenames.files {
-					appConfigPath := fmt.Sprintf("%s/%s", backstage.Spec.Backstage.AppConfig.MountPath, fileName)
+					appConfigPath := fmt.Sprintf("%s/%s", backstage.Spec.Application.AppConfig.MountPath, fileName)
 					deployment.Spec.Template.Spec.Containers[i].Args =
 						append(deployment.Spec.Template.Spec.Containers[i].Args, "--config", appConfigPath)
 				}
@@ -120,11 +120,11 @@ func (r *BackstageReconciler) addAppConfigsContainerArgs(ctx context.Context, ba
 // We intentionally do not return a Map, to preserve the iteration order of the AppConfigs in the Custom Resource,
 // even though we can't guarantee the iteration order of the files listed inside each ConfigMap or Secret.
 func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, backstage bs.Backstage, ns string) (result []appConfigData, err error) {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.AppConfig == nil {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
 		return nil, nil
 	}
 
-	for _, appConfig := range backstage.Spec.Backstage.AppConfig.Items {
+	for _, appConfig := range backstage.Spec.Application.AppConfig.Items {
 		var files []string
 		var name string
 		switch {

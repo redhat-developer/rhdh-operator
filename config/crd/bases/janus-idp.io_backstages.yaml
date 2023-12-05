@@ -241,8 +241,7 @@ spec:
                       file (see the AppConfig field) containing references to the
                       Database connection information, which might be supplied as
                       environment variables (see the Env field) or extra-configuration
-                      files (see the ExtraConfig field in the BackstageSpecBackstage
-                      structure).
+                      files (see the ExtraConfig field in the Application structure).
                     type: boolean
                 type: object
               rawRuntimeConfig:

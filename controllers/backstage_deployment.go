@@ -190,18 +190,18 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
 			}
 
-			if backstage.Spec.Backstage != nil {
-				deployment.Spec.Replicas = backstage.Spec.Backstage.Replicas
+			if backstage.Spec.Application != nil {
+				deployment.Spec.Replicas = backstage.Spec.Application.Replicas
 
-				if backstage.Spec.Backstage.Image != nil {
+				if backstage.Spec.Application.Image != nil {
 					visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
-						container.Image = *backstage.Spec.Backstage.Image
+						container.Image = *backstage.Spec.Application.Image
 					})
 				}
 
-				if backstage.Spec.Backstage.ImagePullSecret != nil {
+				if backstage.Spec.Application.ImagePullSecret != nil {
 					deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{
-						Name: *backstage.Spec.Backstage.ImagePullSecret,
+						Name: *backstage.Spec.Application.ImagePullSecret,
 					})
 				}
 			}
@@ -259,11 +259,11 @@ func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backs
 	if err != nil {
 		return err
 	}
-	if backstage.Spec.Backstage == nil {
+	if backstage.Spec.Application == nil {
 		return nil
 	}
 
-	for _, env := range backstage.Spec.Backstage.Env {
+	for _, env := range backstage.Spec.Application.Env {
 		visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
 			container.Env = append(container.Env, v1.EnvVar{
 				Name:  env.Name,
@@ -272,7 +272,7 @@ func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backs
 		})
 	}
 
-	for _, envFrom := range backstage.Spec.Backstage.EnvFrom {
+	for _, envFrom := range backstage.Spec.Application.EnvFrom {
 		var (
 			name   string
 			cmSrc  *v1.ConfigMapEnvSource

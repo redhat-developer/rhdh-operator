@@ -26,10 +26,10 @@ import (
 )
 
 func (r *BackstageReconciler) extraConfigsToVolumes(backstage bs.Backstage) (result []v1.Volume) {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.ExtraConfig == nil {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraConfig == nil {
 		return nil
 	}
-	for _, extraConfig := range backstage.Spec.Backstage.ExtraConfig.Items {
+	for _, extraConfig := range backstage.Spec.Application.ExtraConfig.Items {
 		var volumeSource v1.VolumeSource
 		var name string
 		switch {
@@ -58,7 +58,7 @@ func (r *BackstageReconciler) extraConfigsToVolumes(backstage bs.Backstage) (res
 }
 
 func (r *BackstageReconciler) addExtraConfigsVolumeMounts(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.ExtraConfig == nil {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraConfig == nil {
 		return nil
 	}
 
@@ -74,7 +74,7 @@ func (r *BackstageReconciler) addExtraConfigsVolumeMounts(ctx context.Context, b
 					deployment.Spec.Template.Spec.Containers[i].VolumeMounts = append(deployment.Spec.Template.Spec.Containers[i].VolumeMounts,
 						v1.VolumeMount{
 							Name:      appConfigFilenames.ref,
-							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Backstage.ExtraConfig.MountPath, f),
+							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Application.ExtraConfig.MountPath, f),
 							SubPath:   f,
 						})
 				}
@@ -89,11 +89,11 @@ func (r *BackstageReconciler) addExtraConfigsVolumeMounts(ctx context.Context, b
 // We intentionally do not return a Map, to preserve the iteration order of the ExtraConfigs in the Custom Resource,
 // even though we can't guarantee the iteration order of the files listed inside each ConfigMap or Secret.
 func (r *BackstageReconciler) extractExtraConfigFileNames(ctx context.Context, backstage bs.Backstage, ns string) (result []appConfigData, err error) {
-	if backstage.Spec.Backstage == nil || backstage.Spec.Backstage.ExtraConfig == nil {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraConfig == nil {
 		return nil, nil
 	}
 
-	for _, appConfig := range backstage.Spec.Backstage.ExtraConfig.Items {
+	for _, appConfig := range backstage.Spec.Application.ExtraConfig.Items {
 		var files []string
 		var name string
 		switch {

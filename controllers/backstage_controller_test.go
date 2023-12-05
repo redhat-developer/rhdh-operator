@@ -477,7 +477,7 @@ spec:
 						}
 					}
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-						Backstage: &bsv1alpha1.BackstageSpecBackstage{
+						Application: &bsv1alpha1.Application{
 							AppConfig: &bsv1alpha1.AppConfig{
 								Items: []bsv1alpha1.AppConfigItem{item},
 							},
@@ -581,7 +581,7 @@ plugins: []
 							Expect(err).To(Not(HaveOccurred()))
 
 							backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-								Backstage: &bsv1alpha1.BackstageSpecBackstage{
+								Application: &bsv1alpha1.Application{
 									AppConfig: &bsv1alpha1.AppConfig{
 										MountPath: mountPath,
 										Items: []bsv1alpha1.AppConfigItem{
@@ -784,7 +784,7 @@ plugins: []
 				var backstage *bsv1alpha1.Backstage
 				BeforeEach(func() {
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-						Backstage: &bsv1alpha1.BackstageSpecBackstage{
+						Application: &bsv1alpha1.Application{
 							BackendAuthSecretRef: &bsv1alpha1.BackendAuthSecretRef{
 								Name: "non-existing-secret",
 								Key:  key,
@@ -861,7 +861,7 @@ plugins: []
 					err := k8sClient.Create(ctx, backendAuthSecret)
 					Expect(err).To(Not(HaveOccurred()))
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-						Backstage: &bsv1alpha1.BackstageSpecBackstage{
+						Application: &bsv1alpha1.Application{
 							BackendAuthSecretRef: &bsv1alpha1.BackendAuthSecretRef{
 								Name: backendAuthSecretName,
 								Key:  key,
@@ -946,7 +946,7 @@ plugins: []
 						}
 					}
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-						Backstage: &bsv1alpha1.BackstageSpecBackstage{
+						Application: &bsv1alpha1.Application{
 							ExtraConfig: &bsv1alpha1.ExtraConfig{
 								Items: []bsv1alpha1.ExtraConfigItem{item},
 							},
@@ -1012,7 +1012,7 @@ plugins: []
 					Expect(err).To(Not(HaveOccurred()))
 
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-						Backstage: &bsv1alpha1.BackstageSpecBackstage{
+						Application: &bsv1alpha1.Application{
 							ExtraConfig: &bsv1alpha1.ExtraConfig{
 								MountPath: mountPath,
 								Items: []bsv1alpha1.ExtraConfigItem{
@@ -1147,7 +1147,7 @@ plugins: []
 				Expect(err).To(Not(HaveOccurred()))
 
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-					Backstage: &bsv1alpha1.BackstageSpecBackstage{
+					Application: &bsv1alpha1.Application{
 						Env: []bsv1alpha1.Env{
 							{Name: "MY_ENV_VAR_1", Value: "value 10"},
 							{Name: "MY_ENV_VAR_2", Value: "value 20"},
@@ -1223,7 +1223,7 @@ plugins: []
 
 		BeforeEach(func() {
 			backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-				Backstage: &bsv1alpha1.BackstageSpecBackstage{
+				Application: &bsv1alpha1.Application{
 					Image: &imageName,
 				},
 			})
@@ -1270,7 +1270,7 @@ plugins: []
 
 		BeforeEach(func() {
 			backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-				Backstage: &bsv1alpha1.BackstageSpecBackstage{
+				Application: &bsv1alpha1.Application{
 					ImagePullSecret: &imagePullSecretName,
 				},
 			})
@@ -1319,7 +1319,7 @@ plugins: []
 
 		BeforeEach(func() {
 			backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-				Backstage: &bsv1alpha1.BackstageSpecBackstage{
+				Application: &bsv1alpha1.Application{
 					Replicas: &nbReplicas,
 				},
 			})
@@ -1363,7 +1363,7 @@ plugins: []
 			var backstage *bsv1alpha1.Backstage
 			BeforeEach(func() {
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-					Postgresql: &bsv1alpha1.BackstageSpecPostgresql{
+					Postgresql: &bsv1alpha1.Postgresql{
 						Enabled: pointer.Bool(false),
 					},
 				})

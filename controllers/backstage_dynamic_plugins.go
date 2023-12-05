@@ -41,8 +41,8 @@ import (
 //)
 
 func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (config bs.DynamicPluginsConfig, err error) {
-	if backstage.Spec.Backstage != nil && backstage.Spec.Backstage.DynamicPluginsConfig != nil {
-		return *backstage.Spec.Backstage.DynamicPluginsConfig, nil
+	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfig != nil {
+		return *backstage.Spec.Application.DynamicPluginsConfig, nil
 	}
 
 	//Create default ConfigMap for dynamic plugins
