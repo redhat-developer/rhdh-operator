@@ -51,7 +51,7 @@ RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH=
 
 # NOTE: ubi-micro is not be FIPS compliant, if openssl is not installed
 #@follow_tag(registry.redhat.io/ubi9/ubi-micro:9.2)
-FROM ubi9/ubi-micro:9.2-15.1696515526
+FROM registry.access.redhat.com/ubi9/ubi-micro:9.2-15.1696515526
 # Upstream sources
 # Downstream comment
 # ENV EXTERNAL_SOURCE=.
@@ -62,8 +62,8 @@ FROM ubi9/ubi-micro:9.2-15.1696515526
 ENV EXTERNAL_SOURCE=$REMOTE_SOURCES/upstream1/app/distgit/containers/rhdh-operator
 #/ Downstream uncomment
 
-ENV HOME=/opt/helm \
-    USER_NAME=helm \
+ENV HOME=/ \
+    USER_NAME=backstage \
     USER_UID=1001
 
 RUN echo "${USER_NAME}:x:${USER_UID}:0:${USER_NAME} user:${HOME}:/sbin/nologin" >> /etc/passwd
