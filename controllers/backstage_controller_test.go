@@ -1376,9 +1376,7 @@ plugins: []
 			var backstage *bsv1alpha1.Backstage
 			BeforeEach(func() {
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-					Postgresql: &bsv1alpha1.Postgresql{
-						Enabled: pointer.Bool(false),
-					},
+					SkipLocalDb: pointer.Bool(true),
 				})
 				err := k8sClient.Create(ctx, backstage)
 				Expect(err).To(Not(HaveOccurred()))
