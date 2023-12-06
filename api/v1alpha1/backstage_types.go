@@ -49,7 +49,7 @@ type Application struct {
 	// in default or custom application configuration files.
 	// This is required for service-to-service auth and is shared by all backend plugins.
 	//+optional
-	BackendAuthSecretRef *BackendAuthSecretRef `json:"backendAuthSecretRef,omitempty"`
+	BackendAuthSecretKeyRef *BackendAuthSecretKeyRef `json:"backendAuthSecretKeyRef,omitempty"`
 
 	// References to existing app-configs Config objects, that will be mounted as files in the specified mount path.
 	// Each element can be a reference to any ConfigMap or Secret,
@@ -99,7 +99,7 @@ type Application struct {
 	ImagePullSecret *string `json:"imagePullSecret,omitempty"`
 }
 
-type BackendAuthSecretRef struct {
+type BackendAuthSecretKeyRef struct {
 	// Name of the secret to use for the backend auth
 	//+kubebuilder:validation:Required
 	Name string `json:"name"`

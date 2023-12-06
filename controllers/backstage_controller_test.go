@@ -684,7 +684,7 @@ plugins: []
 				BeforeEach(func() {
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 						Application: &bsv1alpha1.Application{
-							BackendAuthSecretRef: &bsv1alpha1.BackendAuthSecretRef{
+							BackendAuthSecretKeyRef: &bsv1alpha1.BackendAuthSecretKeyRef{
 								Name: "non-existing-secret",
 								Key:  key,
 							},
@@ -761,7 +761,7 @@ plugins: []
 					Expect(err).To(Not(HaveOccurred()))
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 						Application: &bsv1alpha1.Application{
-							BackendAuthSecretRef: &bsv1alpha1.BackendAuthSecretRef{
+							BackendAuthSecretKeyRef: &bsv1alpha1.BackendAuthSecretKeyRef{
 								Name: backendAuthSecretName,
 								Key:  key,
 							},

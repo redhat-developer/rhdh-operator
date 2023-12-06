@@ -71,7 +71,7 @@ spec:
                           the ConfigMapRefs field
                         type: string
                     type: object
-                  backendAuthSecretRef:
+                  backendAuthSecretKeyRef:
                     description: Optional Reference to a Secret to use for Backend
                       Auth. A new one will be generated if not set. This Secret is
                       used to set an environment variable named 'APP_CONFIG_backend_auth_keys'

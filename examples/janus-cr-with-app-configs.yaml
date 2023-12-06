@@ -20,7 +20,7 @@ spec:
           name: my-env-cm-1
       - secretRef:
           name: my-env-secret1
-    backendAuthSecretRef:
+    backendAuthSecretKeyRef:
       name: "my-backstage-backend-auth-secret"
       key: "my-auth-key"
     replicas: 2
