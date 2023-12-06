@@ -457,7 +457,7 @@ spec:
 	})
 
 	Context("App Configs", func() {
-		When(fmt.Sprintf("referencing non-existing ConfigMap as app-config"), func() {
+		When("referencing non-existing ConfigMap as app-config", func() {
 			var backstage *bsv1alpha1.Backstage
 
 			BeforeEach(func() {
