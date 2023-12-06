@@ -54,7 +54,7 @@ spec:
                       files, it is recommended to pass one ConfigMap/Secret per app-config
                       file.
                     properties:
-                      configMapNames:
+                      configMapRefs:
                         description: Names of ConfigMaps storing the app-config files.
                           Will be mounted as files under the MountPath specified.
                           Bear in mind not to put sensitive data in those ConfigMaps.
@@ -68,7 +68,7 @@ spec:
                       mountPath:
                         default: /opt/app-root/src
                         description: Mount path for all app-config files listed in
-                          the ConfigMapNames field
+                          the ConfigMapRefs field
                         type: string
                     type: object
                   backendAuthSecretRef:

@@ -34,16 +34,16 @@ func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (resul
 	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
 		return nil
 	}
-	for _, cmName := range backstage.Spec.Application.AppConfig.ConfigMapNames {
+	for _, cmRef := range backstage.Spec.Application.AppConfig.ConfigMapRefs {
 		volumeSource := v1.VolumeSource{
 			ConfigMap: &v1.ConfigMapVolumeSource{
 				DefaultMode:          pointer.Int32(420),
-				LocalObjectReference: v1.LocalObjectReference{Name: cmName},
+				LocalObjectReference: v1.LocalObjectReference{Name: cmRef},
 			},
 		}
 		result = append(result,
 			v1.Volume{
-				Name:         cmName,
+				Name:         cmRef,
 				VolumeSource: volumeSource,
 			},
 		)
@@ -114,9 +114,9 @@ func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, bac
 		return nil, nil
 	}
 
-	for _, cmName := range backstage.Spec.Application.AppConfig.ConfigMapNames {
+	for _, cmRef := range backstage.Spec.Application.AppConfig.ConfigMapRefs {
 		cm := v1.ConfigMap{}
-		if err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: ns}, &cm); err != nil {
+		if err = r.Get(ctx, types.NamespacedName{Name: cmRef, Namespace: ns}, &cm); err != nil {
 			return nil, err
 		}
 		var files []string
@@ -129,7 +129,7 @@ func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, bac
 			files = append(files, filename)
 		}
 		result = append(result, appConfigData{
-			ref:   cmName,
+			ref:   cmRef,
 			files: files,
 		})
 	}

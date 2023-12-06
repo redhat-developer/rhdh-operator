@@ -464,7 +464,7 @@ spec:
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 					Application: &bsv1alpha1.Application{
 						AppConfig: &bsv1alpha1.AppConfig{
-							ConfigMapNames: []string{"a-non-existing-cm"},
+							ConfigMapRefs: []string{"a-non-existing-cm"},
 						},
 					},
 				})
@@ -529,8 +529,8 @@ plugins: []
 						backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 							Application: &bsv1alpha1.Application{
 								AppConfig: &bsv1alpha1.AppConfig{
-									MountPath:      mountPath,
-									ConfigMapNames: []string{appConfig1CmName},
+									MountPath:     mountPath,
+									ConfigMapRefs: []string{appConfig1CmName},
 								},
 								DynamicPluginsConfigMapRef: dynamicPluginsConfigName,
 							},
