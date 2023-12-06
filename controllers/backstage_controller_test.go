@@ -458,56 +458,41 @@ spec:
 	})
 
 	Context("App Configs", func() {
-		for _, kind := range []string{"ConfigMap", "Secret"} {
-			kind := kind
-			When(fmt.Sprintf("referencing non-existing %s as app-config", kind), func() {
-				var backstage *bsv1alpha1.Backstage
+		When(fmt.Sprintf("referencing non-existing ConfigMap as app-config"), func() {
+			var backstage *bsv1alpha1.Backstage
 
-				BeforeEach(func() {
-					var item bsv1alpha1.AppConfigItem
-					name := "a-non-existing-" + strings.ToLower(kind)
-					switch kind {
-					case "ConfigMap":
-						item = bsv1alpha1.AppConfigItem{
-							ConfigMapRef: &bsv1alpha1.ObjectRef{Name: name},
-						}
-					case "Secret":
-						item = bsv1alpha1.AppConfigItem{
-							SecretRef: &bsv1alpha1.ObjectRef{Name: name},
-						}
-					}
-					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-						Application: &bsv1alpha1.Application{
-							AppConfig: &bsv1alpha1.AppConfig{
-								Items: []bsv1alpha1.AppConfigItem{item},
-							},
+			BeforeEach(func() {
+				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+					Application: &bsv1alpha1.Application{
+						AppConfig: &bsv1alpha1.AppConfig{
+							ConfigMapNames: []string{"a-non-existing-cm"},
 						},
-					})
-					err := k8sClient.Create(ctx, backstage)
-					Expect(err).To(Not(HaveOccurred()))
+					},
 				})
-
-				It("should fail to reconcile", func() {
-					By("Checking if the custom resource was successfully created")
-					Eventually(func() error {
-						found := &bsv1alpha1.Backstage{}
-						return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
-					}, time.Minute, time.Second).Should(Succeed())
-
-					By("Not reconciling the custom resource created")
-					_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
-						NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
-					})
-					Expect(err).To(HaveOccurred())
-
-					By("Not creating a Backstage Deployment")
-					Consistently(func() error {
-						// TODO to get name from default
-						return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, &appsv1.Deployment{})
-					}, 5*time.Second, time.Second).Should(Not(Succeed()))
-				})
+				err := k8sClient.Create(ctx, backstage)
+				Expect(err).To(Not(HaveOccurred()))
 			})
-		}
+
+			It("should fail to reconcile", func() {
+				By("Checking if the custom resource was successfully created")
+				Eventually(func() error {
+					found := &bsv1alpha1.Backstage{}
+					return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
+				}, time.Minute, time.Second).Should(Succeed())
+
+				By("Not reconciling the custom resource created")
+				_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+				})
+				Expect(err).To(HaveOccurred())
+
+				By("Not creating a Backstage Deployment")
+				Consistently(func() error {
+					// TODO to get name from default
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, &appsv1.Deployment{})
+				}, 5*time.Second, time.Second).Should(Not(Succeed()))
+			})
+		})
 
 		for _, mountPath := range []string{"", "/some/path/for/app-config"} {
 			mountPath := mountPath
@@ -517,7 +502,6 @@ spec:
 					func() {
 						const (
 							appConfig1CmName         = "my-app-config-1-cm"
-							appConfig2SecretName     = "my-app-config-2-secret"
 							dynamicPluginsConfigName = "my-dynamic-plugins-config"
 						)
 
@@ -533,17 +517,6 @@ spec:
 `,
 							})
 							err := k8sClient.Create(ctx, appConfig1Cm)
-							Expect(err).To(Not(HaveOccurred()))
-
-							appConfig2Secret := buildSecret(appConfig2SecretName, map[string][]byte{
-								"my-app-config-21.yaml": []byte(`
-# my-app-config-21.yaml
-`),
-								"my-app-config-22.yaml": []byte(`
-# my-app-config-22.yaml
-`),
-							})
-							err = k8sClient.Create(ctx, appConfig2Secret)
 							Expect(err).To(Not(HaveOccurred()))
 
 							var (
@@ -583,15 +556,8 @@ plugins: []
 							backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 								Application: &bsv1alpha1.Application{
 									AppConfig: &bsv1alpha1.AppConfig{
-										MountPath: mountPath,
-										Items: []bsv1alpha1.AppConfigItem{
-											{
-												ConfigMapRef: &bsv1alpha1.ObjectRef{Name: appConfig1CmName},
-											},
-											{
-												SecretRef: &bsv1alpha1.ObjectRef{Name: appConfig2SecretName},
-											},
-										},
+										MountPath:      mountPath,
+										ConfigMapNames: []string{appConfig1CmName},
 									},
 									DynamicPluginsConfig: &bsv1alpha1.DynamicPluginsConfig{
 										ConfigMapRef: cmRef,
@@ -625,7 +591,7 @@ plugins: []
 							}, time.Minute, time.Second).Should(Succeed())
 
 							By("Checking the Volumes in the Backstage Deployment", func() {
-								Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(5))
+								Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(4))
 
 								_, ok := findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-root")
 								Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-root")
@@ -638,12 +604,6 @@ plugins: []
 								Expect(appConfig1CmVol.VolumeSource.Secret).To(BeNil())
 								Expect(appConfig1CmVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
 								Expect(appConfig1CmVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(appConfig1CmName))
-
-								appConfig2SecretVol, ok := findVolume(found.Spec.Template.Spec.Volumes, appConfig2SecretName)
-								Expect(ok).To(BeTrue(), "No volume found with name: %s", appConfig2SecretName)
-								Expect(appConfig2SecretVol.VolumeSource.ConfigMap).To(BeNil())
-								Expect(appConfig2SecretVol.VolumeSource.Secret.DefaultMode).To(HaveValue(Equal(int32(420))))
-								Expect(appConfig2SecretVol.VolumeSource.Secret.SecretName).To(Equal(appConfig2SecretName))
 
 								dynamicPluginsConfigVol, ok := findVolume(found.Spec.Template.Spec.Volumes, dynamicPluginsConfigName)
 								Expect(ok).To(BeTrue(), "No volume found with name: %s", dynamicPluginsConfigName)
@@ -703,9 +663,9 @@ plugins: []
 							}
 
 							By("Checking the main container Args in the Backstage Deployment", func() {
-								Expect(mainCont.Args).To(HaveLen(10))
+								Expect(mainCont.Args).To(HaveLen(6))
 								Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
-								for i := 0; i <= 8; i += 2 {
+								for i := 0; i <= 4; i += 2 {
 									Expect(mainCont.Args[i]).To(Equal("--config"))
 								}
 								//TODO(rm3l): the order of the rest of the --config args should be the same as the order in
@@ -720,19 +680,10 @@ plugins: []
 									Equal(expectedMountPath+"/my-app-config-12.yaml"),
 								))
 								Expect(mainCont.Args[3]).To(Not(Equal(mainCont.Args[5])))
-								Expect(mainCont.Args[7]).To(SatisfyAny(
-									Equal(expectedMountPath+"/my-app-config-21.yaml"),
-									Equal(expectedMountPath+"/my-app-config-22.yaml"),
-								))
-								Expect(mainCont.Args[9]).To(SatisfyAny(
-									Equal(expectedMountPath+"/my-app-config-21.yaml"),
-									Equal(expectedMountPath+"/my-app-config-22.yaml"),
-								))
-								Expect(mainCont.Args[7]).To(Not(Equal(mainCont.Args[9])))
 							})
 
 							By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
-								Expect(mainCont.VolumeMounts).To(HaveLen(5))
+								Expect(mainCont.VolumeMounts).To(HaveLen(3))
 
 								dpRoot := findVolumeMounts(mainCont.VolumeMounts, "dynamic-plugins-root")
 								Expect(dpRoot).To(HaveLen(1), "No volume mount found with name: dynamic-plugins-root")
@@ -751,20 +702,6 @@ plugins: []
 										SatisfyAny(
 											Equal("my-app-config-11.yaml"),
 											Equal("my-app-config-12.yaml")))
-								}
-
-								appConfig2SecretMounts := findVolumeMounts(mainCont.VolumeMounts, appConfig2SecretName)
-								Expect(appConfig2SecretMounts).To(HaveLen(2), "No volume mounts found with name: %s", appConfig2SecretName)
-								Expect(appConfig2SecretMounts[0].MountPath).ToNot(Equal(appConfig2SecretMounts[1].MountPath))
-								for i := 0; i <= 1; i++ {
-									Expect(appConfig2SecretMounts[i].MountPath).To(
-										SatisfyAny(
-											Equal(expectedMountPath+"/my-app-config-21.yaml"),
-											Equal(expectedMountPath+"/my-app-config-22.yaml")))
-									Expect(appConfig2SecretMounts[i].SubPath).To(
-										SatisfyAny(
-											Equal("my-app-config-21.yaml"),
-											Equal("my-app-config-22.yaml")))
 								}
 							})
 

@@ -111,14 +111,17 @@ type BackendAuthSecretRef struct {
 }
 
 type AppConfig struct {
-	// Mount path for all app-config files listed in the Items field
+	// Mount path for all app-config files listed in the ConfigMapNames field
 	// +optional
 	// +kubebuilder:default=/opt/app-root/src
 	MountPath string `json:"mountPath,omitempty"`
 
-	// List of references to app-config Config objects.
+	// Names of ConfigMaps storing the app-config files. Will be mounted as files under the MountPath specified.
+	// Bear in mind not to put sensitive data in those ConfigMaps. Instead, your app-config content can reference
+	// environment variables (which you can set with the Env or EnvFrom fields) and/or include extra files (see the ExtraConfig field).
+	// More details on https://backstage.io/docs/conf/writing/.
 	// +optional
-	Items []AppConfigItem `json:"items,omitempty"`
+	ConfigMapNames []string `json:"configMapNames,omitempty"`
 }
 
 type AppConfigItem struct {

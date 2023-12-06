@@ -54,36 +54,21 @@ spec:
                       files, it is recommended to pass one ConfigMap/Secret per app-config
                       file.
                     properties:
-                      items:
-                        description: List of references to app-config Config objects.
+                      configMapNames:
+                        description: Names of ConfigMaps storing the app-config files.
+                          Will be mounted as files under the MountPath specified.
+                          Bear in mind not to put sensitive data in those ConfigMaps.
+                          Instead, your app-config content can reference environment
+                          variables (which you can set with the Env or EnvFrom fields)
+                          and/or include extra files (see the ExtraConfig field).
+                          More details on https://backstage.io/docs/conf/writing/.
                         items:
-                          properties:
-                            configMapRef:
-                              description: ConfigMap containing one or more app-config
-                                files
-                              properties:
-                                name:
-                                  description: Name of the object referenced.
-                                  type: string
-                              required:
-                              - name
-                              type: object
-                            secretRef:
-                              description: Secret containing one or more app-config
-                                files
-                              properties:
-                                name:
-                                  description: Name of the object referenced.
-                                  type: string
-                              required:
-                              - name
-                              type: object
-                          type: object
+                          type: string
                         type: array
                       mountPath:
                         default: /opt/app-root/src
                         description: Mount path for all app-config files listed in
-                          the Items field
+                          the ConfigMapNames field
                         type: string
                     type: object
                   backendAuthSecretRef:

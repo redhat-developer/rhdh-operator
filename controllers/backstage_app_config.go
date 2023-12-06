@@ -34,26 +34,16 @@ func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (resul
 	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
 		return nil
 	}
-	for _, appConfig := range backstage.Spec.Application.AppConfig.Items {
-		var volumeSource v1.VolumeSource
-		var name string
-		switch {
-		case appConfig.ConfigMapRef != nil:
-			name = appConfig.ConfigMapRef.Name
-			volumeSource.ConfigMap = &v1.ConfigMapVolumeSource{
+	for _, cmName := range backstage.Spec.Application.AppConfig.ConfigMapNames {
+		volumeSource := v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
 				DefaultMode:          pointer.Int32(420),
-				LocalObjectReference: v1.LocalObjectReference{Name: name},
-			}
-		case appConfig.SecretRef != nil:
-			name = appConfig.SecretRef.Name
-			volumeSource.Secret = &v1.SecretVolumeSource{
-				DefaultMode: pointer.Int32(420),
-				SecretName:  name,
-			}
+				LocalObjectReference: v1.LocalObjectReference{Name: cmName},
+			},
 		}
 		result = append(result,
 			v1.Volume{
-				Name:         name,
+				Name:         cmName,
 				VolumeSource: volumeSource,
 			},
 		)
@@ -124,37 +114,22 @@ func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, bac
 		return nil, nil
 	}
 
-	for _, appConfig := range backstage.Spec.Application.AppConfig.Items {
+	for _, cmName := range backstage.Spec.Application.AppConfig.ConfigMapNames {
+		cm := v1.ConfigMap{}
+		if err = r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: ns}, &cm); err != nil {
+			return nil, err
+		}
 		var files []string
-		var name string
-		switch {
-		case appConfig.ConfigMapRef != nil:
-			name = appConfig.ConfigMapRef.Name
-			cm := v1.ConfigMap{}
-			if err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &cm); err != nil {
-				return nil, err
-			}
-			for filename := range cm.Data {
-				// Bear in mind that iteration order over this map is not guaranteed by Go
-				files = append(files, filename)
-			}
-			for filename := range cm.BinaryData {
-				// Bear in mind that iteration order over this map is not guaranteed by Go
-				files = append(files, filename)
-			}
-		case appConfig.SecretRef != nil:
-			name = appConfig.SecretRef.Name
-			sec := v1.Secret{}
-			if err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &sec); err != nil {
-				return nil, err
-			}
-			for filename := range sec.Data {
-				// Bear in mind that iteration order over this map is not guaranteed by Go
-				files = append(files, filename)
-			}
+		for filename := range cm.Data {
+			// Bear in mind that iteration order over this map is not guaranteed by Go
+			files = append(files, filename)
+		}
+		for filename := range cm.BinaryData {
+			// Bear in mind that iteration order over this map is not guaranteed by Go
+			files = append(files, filename)
 		}
 		result = append(result, appConfigData{
-			ref:   name,
+			ref:   cmName,
 			files: files,
 		})
 	}
