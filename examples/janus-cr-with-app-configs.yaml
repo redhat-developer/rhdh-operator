@@ -9,9 +9,7 @@ spec:
       configMapNames:
         - "my-backstage-config-cm1"
         - "my-backstage-config-cm2"
-    dynamicPlugins:
-      configMapRef:
-        name: my-dynamic-plugins-config-cm
+    dynamicPluginsConfigMapRef: "my-dynamic-plugins-config-cm"
     env:
       - name: MY_ENV_VAR_1
         value: my-value-1

@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	bsv1alpha1 "janus-idp.io/backstage-operator/api/v1alpha1"
@@ -496,221 +495,184 @@ spec:
 
 		for _, mountPath := range []string{"", "/some/path/for/app-config"} {
 			mountPath := mountPath
-			for _, dynamicPluginsConfigKind := range []string{"ConfigMap", "Secret"} {
-				dynamicPluginsConfigKind := dynamicPluginsConfigKind
-				When(fmt.Sprintf("referencing ConfigMaps and Secrets for app-configs (mountPath=%q) and dynamic plugins config as %s", mountPath, dynamicPluginsConfigKind),
-					func() {
-						const (
-							appConfig1CmName         = "my-app-config-1-cm"
-							dynamicPluginsConfigName = "my-dynamic-plugins-config"
-						)
+			When(fmt.Sprintf("referencing ConfigMaps and Secrets for app-configs (mountPath=%q) and dynamic plugins config as ConfigMap", mountPath),
+				func() {
+					const (
+						appConfig1CmName         = "my-app-config-1-cm"
+						dynamicPluginsConfigName = "my-dynamic-plugins-config"
+					)
 
-						var backstage *bsv1alpha1.Backstage
+					var backstage *bsv1alpha1.Backstage
 
-						BeforeEach(func() {
-							appConfig1Cm := buildConfigMap(appConfig1CmName, map[string]string{
-								"my-app-config-11.yaml": `
+					BeforeEach(func() {
+						appConfig1Cm := buildConfigMap(appConfig1CmName, map[string]string{
+							"my-app-config-11.yaml": `
 # my-app-config-11.yaml
 `,
-								"my-app-config-12.yaml": `
+							"my-app-config-12.yaml": `
 # my-app-config-12.yaml
 `,
-							})
-							err := k8sClient.Create(ctx, appConfig1Cm)
-							Expect(err).To(Not(HaveOccurred()))
+						})
+						err := k8sClient.Create(ctx, appConfig1Cm)
+						Expect(err).To(Not(HaveOccurred()))
 
-							var (
-								dynamicPluginsObject client.Object
-								cmRef                *bsv1alpha1.ObjectRef
-								secRef               *bsv1alpha1.ObjectRef
-							)
-							switch dynamicPluginsConfigKind {
-							case "ConfigMap":
-								cmRef = &bsv1alpha1.ObjectRef{
-									Name: dynamicPluginsConfigName,
-								}
-								dynamicPluginsObject = buildConfigMap(dynamicPluginsConfigName, map[string]string{
-									"dynamic-plugins.yaml": `
+						dynamicPluginsCm := buildConfigMap(dynamicPluginsConfigName, map[string]string{
+							"dynamic-plugins.yaml": `
 # dynamic-plugins.yaml (configmap)
 includes: [dynamic-plugins.default.yaml]
 plugins: []
 `,
-								})
-							case "Secret":
-								secRef = &bsv1alpha1.ObjectRef{
-									Name: dynamicPluginsConfigName,
-								}
-								dynamicPluginsObject = buildSecret(dynamicPluginsConfigName, map[string][]byte{
-									"dynamic-plugins.yaml": []byte(`
-# dynamic-plugins.yaml (secret)
-includes: [dynamic-plugins.default.yaml]
-plugins: []
-`),
-								})
-							default:
-								Fail(fmt.Sprintf("unsupported kind for dynamic plugins object: %q", dynamicPluginsConfigKind))
-							}
-							err = k8sClient.Create(ctx, dynamicPluginsObject)
-							Expect(err).To(Not(HaveOccurred()))
+						})
+						err = k8sClient.Create(ctx, dynamicPluginsCm)
+						Expect(err).To(Not(HaveOccurred()))
 
-							backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-								Application: &bsv1alpha1.Application{
-									AppConfig: &bsv1alpha1.AppConfig{
-										MountPath:      mountPath,
-										ConfigMapNames: []string{appConfig1CmName},
-									},
-									DynamicPluginsConfig: &bsv1alpha1.DynamicPluginsConfig{
-										ConfigMapRef: cmRef,
-										SecretRef:    secRef,
-									},
+						backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+							Application: &bsv1alpha1.Application{
+								AppConfig: &bsv1alpha1.AppConfig{
+									MountPath:      mountPath,
+									ConfigMapNames: []string{appConfig1CmName},
 								},
-							})
-							err = k8sClient.Create(ctx, backstage)
-							Expect(err).To(Not(HaveOccurred()))
+								DynamicPluginsConfigMapRef: dynamicPluginsConfigName,
+							},
 						})
-
-						It("should reconcile", func() {
-							By("Checking if the custom resource was successfully created")
-							Eventually(func() error {
-								found := &bsv1alpha1.Backstage{}
-								return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
-							}, time.Minute, time.Second).Should(Succeed())
-
-							By("Reconciling the custom resource created")
-							_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
-								NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
-							})
-							Expect(err).To(Not(HaveOccurred()))
-
-							By("Checking that the Deployment was successfully created in the reconciliation")
-							found := &appsv1.Deployment{}
-							Eventually(func(g Gomega) {
-								// TODO to get name from default
-								err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
-								g.Expect(err).To(Not(HaveOccurred()))
-							}, time.Minute, time.Second).Should(Succeed())
-
-							By("Checking the Volumes in the Backstage Deployment", func() {
-								Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(4))
-
-								_, ok := findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-root")
-								Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-root")
-
-								_, ok = findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-npmrc")
-								Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-npmrc")
-
-								appConfig1CmVol, ok := findVolume(found.Spec.Template.Spec.Volumes, appConfig1CmName)
-								Expect(ok).To(BeTrue(), "No volume found with name: %s", appConfig1CmName)
-								Expect(appConfig1CmVol.VolumeSource.Secret).To(BeNil())
-								Expect(appConfig1CmVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
-								Expect(appConfig1CmVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(appConfig1CmName))
-
-								dynamicPluginsConfigVol, ok := findVolume(found.Spec.Template.Spec.Volumes, dynamicPluginsConfigName)
-								Expect(ok).To(BeTrue(), "No volume found with name: %s", dynamicPluginsConfigName)
-								switch dynamicPluginsConfigKind {
-								case "ConfigMap":
-									Expect(dynamicPluginsConfigVol.VolumeSource.Secret).To(BeNil())
-									Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
-									Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(dynamicPluginsConfigName))
-								case "Secret":
-									Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap).To(BeNil())
-									Expect(dynamicPluginsConfigVol.VolumeSource.Secret.DefaultMode).To(HaveValue(Equal(int32(420))))
-									Expect(dynamicPluginsConfigVol.VolumeSource.Secret.SecretName).To(Equal(dynamicPluginsConfigName))
-								}
-							})
-
-							By("Checking the Number of init containers in the Backstage Deployment")
-							Expect(found.Spec.Template.Spec.InitContainers).To(HaveLen(1))
-							initCont := found.Spec.Template.Spec.InitContainers[0]
-
-							By("Checking the Init Container Env Vars in the Backstage Deployment", func() {
-								Expect(initCont.Env).To(HaveLen(1))
-								Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
-								Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
-							})
-
-							By("Checking the Init Container Volume Mounts in the Backstage Deployment", func() {
-								Expect(initCont.VolumeMounts).To(HaveLen(3))
-
-								dpRoot := findVolumeMounts(initCont.VolumeMounts, "dynamic-plugins-root")
-								Expect(dpRoot).To(HaveLen(1),
-									"No volume mount found with name: dynamic-plugins-root")
-								Expect(dpRoot[0].MountPath).To(Equal("/dynamic-plugins-root"))
-								Expect(dpRoot[0].ReadOnly).To(BeFalse())
-								Expect(dpRoot[0].SubPath).To(BeEmpty())
-
-								dpNpmrc := findVolumeMounts(initCont.VolumeMounts, "dynamic-plugins-npmrc")
-								Expect(dpNpmrc).To(HaveLen(1),
-									"No volume mount found with name: dynamic-plugins-npmrc")
-								Expect(dpNpmrc[0].MountPath).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
-								Expect(dpNpmrc[0].ReadOnly).To(BeTrue())
-								Expect(dpNpmrc[0].SubPath).To(Equal(".npmrc"))
-
-								dp := findVolumeMounts(initCont.VolumeMounts, dynamicPluginsConfigName)
-								Expect(dp).To(HaveLen(1), "No volume mount found with name: %s", dynamicPluginsConfigName)
-								Expect(dp[0].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins.yaml"))
-								Expect(dp[0].SubPath).To(Equal("dynamic-plugins.yaml"))
-								Expect(dp[0].ReadOnly).To(BeTrue())
-							})
-
-							By("Checking the Number of main containers in the Backstage Deployment")
-							Expect(found.Spec.Template.Spec.Containers).To(HaveLen(1))
-							mainCont := found.Spec.Template.Spec.Containers[0]
-
-							expectedMountPath := mountPath
-							if expectedMountPath == "" {
-								expectedMountPath = "/opt/app-root/src"
-							}
-
-							By("Checking the main container Args in the Backstage Deployment", func() {
-								Expect(mainCont.Args).To(HaveLen(6))
-								Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
-								for i := 0; i <= 4; i += 2 {
-									Expect(mainCont.Args[i]).To(Equal("--config"))
-								}
-								//TODO(rm3l): the order of the rest of the --config args should be the same as the order in
-								// which the keys are listed in the ConfigMap/Secrets
-								// But as this is returned as a map, Go does not provide any guarantee on the iteration order.
-								Expect(mainCont.Args[3]).To(SatisfyAny(
-									Equal(expectedMountPath+"/my-app-config-11.yaml"),
-									Equal(expectedMountPath+"/my-app-config-12.yaml"),
-								))
-								Expect(mainCont.Args[5]).To(SatisfyAny(
-									Equal(expectedMountPath+"/my-app-config-11.yaml"),
-									Equal(expectedMountPath+"/my-app-config-12.yaml"),
-								))
-								Expect(mainCont.Args[3]).To(Not(Equal(mainCont.Args[5])))
-							})
-
-							By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
-								Expect(mainCont.VolumeMounts).To(HaveLen(3))
-
-								dpRoot := findVolumeMounts(mainCont.VolumeMounts, "dynamic-plugins-root")
-								Expect(dpRoot).To(HaveLen(1), "No volume mount found with name: dynamic-plugins-root")
-								Expect(dpRoot[0].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
-								Expect(dpRoot[0].SubPath).To(BeEmpty())
-
-								appConfig1CmMounts := findVolumeMounts(mainCont.VolumeMounts, appConfig1CmName)
-								Expect(appConfig1CmMounts).To(HaveLen(2), "No volume mounts found with name: %s", appConfig1CmName)
-								Expect(appConfig1CmMounts[0].MountPath).ToNot(Equal(appConfig1CmMounts[1].MountPath))
-								for i := 0; i <= 1; i++ {
-									Expect(appConfig1CmMounts[i].MountPath).To(
-										SatisfyAny(
-											Equal(expectedMountPath+"/my-app-config-11.yaml"),
-											Equal(expectedMountPath+"/my-app-config-12.yaml")))
-									Expect(appConfig1CmMounts[i].SubPath).To(
-										SatisfyAny(
-											Equal("my-app-config-11.yaml"),
-											Equal("my-app-config-12.yaml")))
-								}
-							})
-
-							By("Checking the latest Status added to the Backstage instance")
-							verifyBackstageInstance(ctx)
-
-						})
+						err = k8sClient.Create(ctx, backstage)
+						Expect(err).To(Not(HaveOccurred()))
 					})
-			}
+
+					It("should reconcile", func() {
+						By("Checking if the custom resource was successfully created")
+						Eventually(func() error {
+							found := &bsv1alpha1.Backstage{}
+							return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
+						}, time.Minute, time.Second).Should(Succeed())
+
+						By("Reconciling the custom resource created")
+						_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
+							NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+						})
+						Expect(err).To(Not(HaveOccurred()))
+
+						By("Checking that the Deployment was successfully created in the reconciliation")
+						found := &appsv1.Deployment{}
+						Eventually(func(g Gomega) {
+							// TODO to get name from default
+							err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
+							g.Expect(err).To(Not(HaveOccurred()))
+						}, time.Minute, time.Second).Should(Succeed())
+
+						By("Checking the Volumes in the Backstage Deployment", func() {
+							Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(4))
+
+							_, ok := findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-root")
+							Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-root")
+
+							_, ok = findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-npmrc")
+							Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-npmrc")
+
+							appConfig1CmVol, ok := findVolume(found.Spec.Template.Spec.Volumes, appConfig1CmName)
+							Expect(ok).To(BeTrue(), "No volume found with name: %s", appConfig1CmName)
+							Expect(appConfig1CmVol.VolumeSource.Secret).To(BeNil())
+							Expect(appConfig1CmVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
+							Expect(appConfig1CmVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(appConfig1CmName))
+
+							dynamicPluginsConfigVol, ok := findVolume(found.Spec.Template.Spec.Volumes, dynamicPluginsConfigName)
+							Expect(ok).To(BeTrue(), "No volume found with name: %s", dynamicPluginsConfigName)
+							Expect(dynamicPluginsConfigVol.VolumeSource.Secret).To(BeNil())
+							Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
+							Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(dynamicPluginsConfigName))
+						})
+
+						By("Checking the Number of init containers in the Backstage Deployment")
+						Expect(found.Spec.Template.Spec.InitContainers).To(HaveLen(1))
+						initCont := found.Spec.Template.Spec.InitContainers[0]
+
+						By("Checking the Init Container Env Vars in the Backstage Deployment", func() {
+							Expect(initCont.Env).To(HaveLen(1))
+							Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
+							Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
+						})
+
+						By("Checking the Init Container Volume Mounts in the Backstage Deployment", func() {
+							Expect(initCont.VolumeMounts).To(HaveLen(3))
+
+							dpRoot := findVolumeMounts(initCont.VolumeMounts, "dynamic-plugins-root")
+							Expect(dpRoot).To(HaveLen(1),
+								"No volume mount found with name: dynamic-plugins-root")
+							Expect(dpRoot[0].MountPath).To(Equal("/dynamic-plugins-root"))
+							Expect(dpRoot[0].ReadOnly).To(BeFalse())
+							Expect(dpRoot[0].SubPath).To(BeEmpty())
+
+							dpNpmrc := findVolumeMounts(initCont.VolumeMounts, "dynamic-plugins-npmrc")
+							Expect(dpNpmrc).To(HaveLen(1),
+								"No volume mount found with name: dynamic-plugins-npmrc")
+							Expect(dpNpmrc[0].MountPath).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
+							Expect(dpNpmrc[0].ReadOnly).To(BeTrue())
+							Expect(dpNpmrc[0].SubPath).To(Equal(".npmrc"))
+
+							dp := findVolumeMounts(initCont.VolumeMounts, dynamicPluginsConfigName)
+							Expect(dp).To(HaveLen(1), "No volume mount found with name: %s", dynamicPluginsConfigName)
+							Expect(dp[0].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins.yaml"))
+							Expect(dp[0].SubPath).To(Equal("dynamic-plugins.yaml"))
+							Expect(dp[0].ReadOnly).To(BeTrue())
+						})
+
+						By("Checking the Number of main containers in the Backstage Deployment")
+						Expect(found.Spec.Template.Spec.Containers).To(HaveLen(1))
+						mainCont := found.Spec.Template.Spec.Containers[0]
+
+						expectedMountPath := mountPath
+						if expectedMountPath == "" {
+							expectedMountPath = "/opt/app-root/src"
+						}
+
+						By("Checking the main container Args in the Backstage Deployment", func() {
+							Expect(mainCont.Args).To(HaveLen(6))
+							Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
+							for i := 0; i <= 4; i += 2 {
+								Expect(mainCont.Args[i]).To(Equal("--config"))
+							}
+							//TODO(rm3l): the order of the rest of the --config args should be the same as the order in
+							// which the keys are listed in the ConfigMap/Secrets
+							// But as this is returned as a map, Go does not provide any guarantee on the iteration order.
+							Expect(mainCont.Args[3]).To(SatisfyAny(
+								Equal(expectedMountPath+"/my-app-config-11.yaml"),
+								Equal(expectedMountPath+"/my-app-config-12.yaml"),
+							))
+							Expect(mainCont.Args[5]).To(SatisfyAny(
+								Equal(expectedMountPath+"/my-app-config-11.yaml"),
+								Equal(expectedMountPath+"/my-app-config-12.yaml"),
+							))
+							Expect(mainCont.Args[3]).To(Not(Equal(mainCont.Args[5])))
+						})
+
+						By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
+							Expect(mainCont.VolumeMounts).To(HaveLen(3))
+
+							dpRoot := findVolumeMounts(mainCont.VolumeMounts, "dynamic-plugins-root")
+							Expect(dpRoot).To(HaveLen(1), "No volume mount found with name: dynamic-plugins-root")
+							Expect(dpRoot[0].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
+							Expect(dpRoot[0].SubPath).To(BeEmpty())
+
+							appConfig1CmMounts := findVolumeMounts(mainCont.VolumeMounts, appConfig1CmName)
+							Expect(appConfig1CmMounts).To(HaveLen(2), "No volume mounts found with name: %s", appConfig1CmName)
+							Expect(appConfig1CmMounts[0].MountPath).ToNot(Equal(appConfig1CmMounts[1].MountPath))
+							for i := 0; i <= 1; i++ {
+								Expect(appConfig1CmMounts[i].MountPath).To(
+									SatisfyAny(
+										Equal(expectedMountPath+"/my-app-config-11.yaml"),
+										Equal(expectedMountPath+"/my-app-config-12.yaml")))
+								Expect(appConfig1CmMounts[i].SubPath).To(
+									SatisfyAny(
+										Equal("my-app-config-11.yaml"),
+										Equal("my-app-config-12.yaml")))
+							}
+						})
+
+						By("Checking the latest Status added to the Backstage instance")
+						verifyBackstageInstance(ctx)
+
+					})
+				})
 		}
 	})
 

@@ -84,11 +84,6 @@ func (in *Application) DeepCopyInto(out *Application) {
 		*out = new(AppConfig)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.DynamicPluginsConfig != nil {
-		in, out := &in.DynamicPluginsConfig, &out.DynamicPluginsConfig
-		*out = new(DynamicPluginsConfig)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.ExtraConfig != nil {
 		in, out := &in.ExtraConfig, &out.ExtraConfig
 		*out = new(ExtraConfig)

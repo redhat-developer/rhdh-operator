@@ -63,11 +63,11 @@ type Application struct {
 	//+optional
 	AppConfig *AppConfig `json:"appConfig,omitempty"`
 
-	// Reference to an existing configuration object for Dynamic Plugins.
-	// This can be a reference to any ConfigMap or Secret,
-	// but the object must have an existing key named: 'dynamic-plugins.yaml'
+	// Reference to an existing ConfigMap for Dynamic Plugins.
+	// A new one will be generated with the default config if not set.
+	// The ConfigMap object must have an existing key named: 'dynamic-plugins.yaml'.
 	//+optional
-	DynamicPluginsConfig *DynamicPluginsConfig `json:"dynamicPlugins,omitempty"`
+	DynamicPluginsConfigMapRef string `json:"dynamicPluginsConfigMapRef,omitempty"`
 
 	// References to existing Config objects to use as extra config files.
 	// They will be mounted as files in the specified mount path.

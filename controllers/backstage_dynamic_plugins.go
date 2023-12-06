@@ -40,16 +40,16 @@ import (
 //`
 //)
 
-func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (config bs.DynamicPluginsConfig, err error) {
-	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfig != nil {
-		return *backstage.Spec.Application.DynamicPluginsConfig, nil
+func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (configMap string, err error) {
+	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapRef != "" {
+		return backstage.Spec.Application.DynamicPluginsConfigMapRef, nil
 	}
 
 	//Create default ConfigMap for dynamic plugins
 	var cm v1.ConfigMap
 	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "dynamic-plugins-configmap.yaml", ns, &cm)
 	if err != nil {
-		return bs.DynamicPluginsConfig{}, fmt.Errorf("failed to read config: %s", err)
+		return "", fmt.Errorf("failed to read config: %s", err)
 	}
 
 	dpConfigName := fmt.Sprintf("%s-dynamic-plugins", backstage.Name)
@@ -57,19 +57,15 @@ func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Contex
 	err = r.Get(ctx, types.NamespacedName{Name: dpConfigName, Namespace: ns}, &cm)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			return bs.DynamicPluginsConfig{}, fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
+			return "", fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
 		}
 		err = r.Create(ctx, &cm)
 		if err != nil {
-			return bs.DynamicPluginsConfig{}, fmt.Errorf("failed to create config map for dynamic plugins, reason: %s", err)
+			return "", fmt.Errorf("failed to create config map for dynamic plugins, reason: %s", err)
 		}
 	}
 
-	return bs.DynamicPluginsConfig{
-		ConfigMapRef: &bs.ObjectRef{
-			Name: dpConfigName,
-		},
-	}, nil
+	return dpConfigName, nil
 }
 
 func (r *BackstageReconciler) getDynamicPluginsConfVolume(ctx context.Context, backstage bs.Backstage, ns string) (*v1.Volume, error) {
@@ -78,30 +74,18 @@ func (r *BackstageReconciler) getDynamicPluginsConfVolume(ctx context.Context, b
 		return nil, err
 	}
 
-	if dpConf.ConfigMapRef == nil && dpConf.SecretRef == nil {
+	if dpConf == "" {
 		return nil, nil
 	}
 
-	var volumeSource v1.VolumeSource
-	var name string
-	switch {
-	case dpConf.ConfigMapRef != nil:
-		name = dpConf.ConfigMapRef.Name
-		volumeSource.ConfigMap = &v1.ConfigMapVolumeSource{
-			DefaultMode:          pointer.Int32(420),
-			LocalObjectReference: v1.LocalObjectReference{Name: name},
-		}
-	case dpConf.SecretRef != nil:
-		name = dpConf.SecretRef.Name
-		volumeSource.Secret = &v1.SecretVolumeSource{
-			DefaultMode: pointer.Int32(420),
-			SecretName:  name,
-		}
-	}
-
 	return &v1.Volume{
-		Name:         name,
-		VolumeSource: volumeSource,
+		Name: dpConf,
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				DefaultMode:          pointer.Int32(420),
+				LocalObjectReference: v1.LocalObjectReference{Name: dpConf},
+			},
+		},
 	}, nil
 }
 
@@ -111,23 +95,15 @@ func (r *BackstageReconciler) addDynamicPluginsConfVolumeMount(ctx context.Conte
 		return err
 	}
 
-	if dpConf.ConfigMapRef == nil && dpConf.SecretRef == nil {
+	if dpConf == "" {
 		return nil
-	}
-
-	var name string
-	switch {
-	case dpConf.ConfigMapRef != nil:
-		name = dpConf.ConfigMapRef.Name
-	case dpConf.SecretRef != nil:
-		name = dpConf.SecretRef.Name
 	}
 
 	for i, c := range deployment.Spec.Template.Spec.InitContainers {
 		if c.Name == _defaultBackstageInitContainerName {
 			deployment.Spec.Template.Spec.InitContainers[i].VolumeMounts = append(deployment.Spec.Template.Spec.InitContainers[i].VolumeMounts,
 				v1.VolumeMount{
-					Name:      name,
+					Name:      dpConf,
 					MountPath: fmt.Sprintf("%s/dynamic-plugins.yaml", _containersWorkingDir),
 					ReadOnly:  true,
 					SubPath:   "dynamic-plugins.yaml",

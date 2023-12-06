@@ -91,34 +91,11 @@ spec:
                     required:
                     - name
                     type: object
-                  dynamicPlugins:
-                    description: 'Reference to an existing configuration object for
-                      Dynamic Plugins. This can be a reference to any ConfigMap or
-                      Secret, but the object must have an existing key named: ''dynamic-plugins.yaml'''
-                    properties:
-                      configMapRef:
-                        description: 'ConfigMap containing the dynamic plugins'' configuration.
-                          It needs to have a key named: "dynamic-plugins.yaml". ConfigMapRef
-                          will be used if both ConfigMapRef and SecretRef are provided.'
-                        properties:
-                          name:
-                            description: Name of the object referenced.
-                            type: string
-                        required:
-                        - name
-                        type: object
-                      secretRef:
-                        description: 'Secret containing the dynamic plugins'' configuration.
-                          It needs to have a key named: "dynamic-plugins.yaml". ConfigMapRef
-                          will be used if both ConfigMapRef and SecretRef are provided.'
-                        properties:
-                          name:
-                            description: Name of the object referenced.
-                            type: string
-                        required:
-                        - name
-                        type: object
-                    type: object
+                  dynamicPluginsConfigMapRef:
+                    description: 'Reference to an existing ConfigMap for Dynamic Plugins.
+                      A new one will be generated with the default config if not set.
+                      The ConfigMap object must have an existing key named: ''dynamic-plugins.yaml''.'
+                    type: string
                   env:
                     description: Environment variables to inject into the application
                       containers. Bear in mind not to put sensitive data here. Use
