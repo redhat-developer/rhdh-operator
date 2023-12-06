@@ -1047,16 +1047,16 @@ plugins: []
 
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 					Application: &bsv1alpha1.Application{
-						Env: []bsv1alpha1.Env{
+						Env: []corev1.EnvVar{
 							{Name: "MY_ENV_VAR_1", Value: "value 10"},
 							{Name: "MY_ENV_VAR_2", Value: "value 20"},
 						},
-						EnvFrom: []bsv1alpha1.EnvFrom{
+						EnvFrom: []corev1.EnvFromSource{
 							{
-								ConfigMapRef: &bsv1alpha1.ObjectRef{Name: envConfig1CmName},
+								ConfigMapRef: &corev1.ConfigMapEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: envConfig1CmName}},
 							},
 							{
-								SecretRef: &bsv1alpha1.ObjectRef{Name: envConfig2SecretName},
+								SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: envConfig2SecretName}},
 							},
 						},
 					},

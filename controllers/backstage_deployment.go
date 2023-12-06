@@ -263,44 +263,9 @@ func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backs
 		return nil
 	}
 
-	for _, env := range backstage.Spec.Application.Env {
-		for i := range deployment.Spec.Template.Spec.Containers {
-			deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env, v1.EnvVar{
-				Name:  env.Name,
-				Value: env.Value,
-			})
-		}
-	}
-
-	for _, envFrom := range backstage.Spec.Application.EnvFrom {
-		var (
-			name   string
-			cmSrc  *v1.ConfigMapEnvSource
-			secSrc *v1.SecretEnvSource
-		)
-		switch {
-		case envFrom.ConfigMapRef != nil:
-			name = envFrom.ConfigMapRef.Name
-			cmSrc = &v1.ConfigMapEnvSource{
-				LocalObjectReference: v1.LocalObjectReference{
-					Name: name,
-				},
-			}
-		case envFrom.SecretRef != nil:
-			name = envFrom.SecretRef.Name
-			secSrc = &v1.SecretEnvSource{
-				LocalObjectReference: v1.LocalObjectReference{
-					Name: name,
-				},
-			}
-		}
-		for i := range deployment.Spec.Template.Spec.Containers {
-			deployment.Spec.Template.Spec.Containers[i].EnvFrom = append(deployment.Spec.Template.Spec.Containers[i].EnvFrom,
-				v1.EnvFromSource{
-					ConfigMapRef: cmSrc,
-					SecretRef:    secSrc,
-				})
-		}
+	for i := range deployment.Spec.Template.Spec.Containers {
+		deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env, backstage.Spec.Application.Env...)
+		deployment.Spec.Template.Spec.Containers[i].EnvFrom = append(deployment.Spec.Template.Spec.Containers[i].EnvFrom, backstage.Spec.Application.EnvFrom...)
 	}
 
 	return nil

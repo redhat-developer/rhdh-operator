@@ -15,10 +15,16 @@ spec:
         value: my-value-1
       - name: MY_ENV_VAR_2
         value: my-value-2
+      - name: MY_ENV_VAR1_FROM_CM1
+        valueFrom:
+          configMapKeyRef:
+            name: my-env-cm-1
+            key: CM_ENV1
     envFrom:
       - configMapRef:
           name: my-env-cm-1
-      - secretRef:
+      - prefix: MY_ENV_SECRET1_
+        secretRef:
           name: my-env-secret1
     backendAuthSecretKeyRef:
       name: "my-backstage-backend-auth-secret"

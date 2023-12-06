@@ -15,6 +15,7 @@
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -78,11 +79,11 @@ type Application struct {
 	// Environment variables to inject into the application containers.
 	// Bear in mind not to put sensitive data here. Use EnvFrom instead.
 	//+optional
-	Env []Env `json:"env,omitempty"`
+	Env []v1.EnvVar `json:"env,omitempty"`
 
 	// Environment variables to inject into the application containers, as references to existing ConfigMap or Secret objects.
 	//+optional
-	EnvFrom []EnvFrom `json:"envFrom,omitempty"`
+	EnvFrom []v1.EnvFromSource `json:"envFrom,omitempty"`
 
 	// Number of desired replicas to set in the Backstage Deployment.
 	// Defaults to 1.
