@@ -167,6 +167,8 @@ func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backs
 		return err
 	}
 
+	// need to patch the Name before get for correct search
+	statefulSet.Name = fmt.Sprintf("backstage-psql-%s", backstage.Name)
 	err = r.Get(ctx, types.NamespacedName{Name: statefulSet.Name, Namespace: ns}, statefulSet)
 	if err != nil {
 		if errors.IsNotFound(err) {
