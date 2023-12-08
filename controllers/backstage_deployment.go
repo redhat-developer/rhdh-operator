@@ -199,9 +199,9 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 					})
 				}
 
-				if backstage.Spec.Application.ImagePullSecret != nil {
+				for _, imagePullSecret := range backstage.Spec.Application.ImagePullSecrets {
 					deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{
-						Name: *backstage.Spec.Application.ImagePullSecret,
+						Name: imagePullSecret,
 					})
 				}
 			}
@@ -234,7 +234,7 @@ func (r *BackstageReconciler) addVolumes(ctx context.Context, backstage bs.Backs
 	}
 
 	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.appConfigsToVolumes(backstage)...)
-	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.extraConfigsToVolumes(backstage)...)
+	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.extraFilesToVolumes(backstage)...)
 	return nil
 }
 
@@ -247,7 +247,7 @@ func (r *BackstageReconciler) addVolumeMounts(ctx context.Context, backstage bs.
 	if err != nil {
 		return err
 	}
-	return r.addExtraConfigsVolumeMounts(ctx, backstage, ns, deployment)
+	return r.addExtraFilesVolumeMounts(ctx, backstage, ns, deployment)
 }
 
 func (r *BackstageReconciler) addContainerArgs(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
@@ -263,10 +263,7 @@ func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backs
 		return nil
 	}
 
-	for i := range deployment.Spec.Template.Spec.Containers {
-		deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env, backstage.Spec.Application.Env...)
-		deployment.Spec.Template.Spec.Containers[i].EnvFrom = append(deployment.Spec.Template.Spec.Containers[i].EnvFrom, backstage.Spec.Application.EnvFrom...)
-	}
+	r.addExtraEnvs(backstage, deployment)
 
 	return nil
 }

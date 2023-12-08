@@ -35,35 +35,46 @@ spec:
           spec:
             description: BackstageSpec defines the desired state of Backstage
             properties:
-              backstage:
+              application:
                 description: Configuration for Backstage. Optional.
                 properties:
                   appConfig:
-                    description: References to existing app-configs Config objects,
+                    description: References to existing app-configs ConfigMap objects,
                       that will be mounted as files in the specified mount path. Each
                       element can be a reference to any ConfigMap or Secret, and will
-                      be mounted inside the main application container under a dedicated
-                      directory containing the ConfigMap or Secret name (relative
-                      to the specified mount path). Additionally, each file will be
-                      passed as a `--config /path/to/secret_or_configmap/key` to the
-                      main container args in the order of the entries defined in the
-                      AppConfigs list. But bear in mind that for a single AppConfig
-                      element containing several files, the order in which those files
-                      will be appended to the container args, the main container args
-                      cannot be guaranteed. So if you want to pass multiple app-config
-                      files, it is recommended to pass one ConfigMap/Secret per app-config
-                      file.
+                      be mounted inside the main application container under a specified
+                      mount directory. Additionally, each file will be passed as a
+                      `--config /mount/path/to/configmap/key` to the main container
+                      args in the order of the entries defined in the AppConfigs list.
+                      But bear in mind that for a single ConfigMap element containing
+                      several filenames, the order in which those files will be appended
+                      to the main container args cannot be guaranteed. So if you want
+                      to pass multiple app-config files, it is recommended to pass
+                      one ConfigMap per app-config file.
                     properties:
-                      configMapRefs:
-                        description: Names of ConfigMaps storing the app-config files.
+                      configMaps:
+                        description: List of ConfigMaps storing the app-config files.
                           Will be mounted as files under the MountPath specified.
-                          Bear in mind not to put sensitive data in those ConfigMaps.
-                          Instead, your app-config content can reference environment
-                          variables (which you can set with the Env or EnvFrom fields)
-                          and/or include extra files (see the ExtraConfig field).
+                          For each item in this array, if a key is not specified,
+                          it means that all keys in the ConfigMap will be mounted
+                          as files. Otherwise, only the specified key will be mounted
+                          as a file. Bear in mind not to put sensitive data in those
+                          ConfigMaps. Instead, your app-config content can reference
+                          environment variables (which you can set with the ExtraEnvs
+                          field) and/or include extra files (see the ExtraFiles field).
                           More details on https://backstage.io/docs/conf/writing/.
                         items:
-                          type: string
+                          properties:
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
+                          type: object
                         type: array
                       mountPath:
                         default: /opt/app-root/src
@@ -71,214 +82,114 @@ spec:
                           the ConfigMapRefs field
                         type: string
                     type: object
-                  backendAuthSecretKeyRef:
+                  backendAuthSecret:
                     description: Optional Reference to a Secret to use for Backend
                       Auth. A new one will be generated if not set. This Secret is
                       used to set an environment variable named 'APP_CONFIG_backend_auth_keys'
                       in the main container, which takes precedence over any 'backend.auth.keys'
                       field defined in default or custom application configuration
                       files. This is required for service-to-service auth and is shared
-                      by all backend plugins.
+                      by all backend plugins. Default value for the key in the secret
+                      is 'backend-secret.
                     properties:
                       key:
-                        default: backend-secret
-                        description: 'Key in the secret to use for the backend auth.
-                          Default value is: backend-secret'
+                        description: Key in the object
                         type: string
                       name:
-                        description: Name of the secret to use for the backend auth
+                        description: Name of the object We support only ConfigMaps
+                          and Secrets.
                         type: string
                     required:
                     - name
                     type: object
-                  dynamicPluginsConfigMapRef:
+                  dynamicPluginsConfigMapName:
                     description: 'Reference to an existing ConfigMap for Dynamic Plugins.
                       A new one will be generated with the default config if not set.
                       The ConfigMap object must have an existing key named: ''dynamic-plugins.yaml''.'
                     type: string
-                  env:
-                    description: Environment variables to inject into the application
-                      containers. Bear in mind not to put sensitive data here. Use
-                      EnvFrom instead.
-                    items:
-                      description: EnvVar represents an environment variable present
-                        in a Container.
-                      properties:
-                        name:
-                          description: Name of the environment variable. Must be a
-                            C_IDENTIFIER.
-                          type: string
-                        value:
-                          description: 'Variable references $(VAR_NAME) are expanded
-                            using the previously defined environment variables in
-                            the container and any service environment variables. If
-                            a variable cannot be resolved, the reference in the input
-                            string will be unchanged. Double $$ are reduced to a single
-                            $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-                            "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-                            Escaped references will never be expanded, regardless
-                            of whether the variable exists or not. Defaults to "".'
-                          type: string
-                        valueFrom:
-                          description: Source for the environment variable's value.
-                            Cannot be used if value is not empty.
+                  extraEnvs:
+                    description: Extra environment variables
+                    properties:
+                      configMaps:
+                        description: List of references to ConfigMaps objects to inject
+                          as additional environment variables. For each item in this
+                          array, if a key is not specified, it means that all keys
+                          in the ConfigMap will be injected as additional environment
+                          variables. Otherwise, only the specified key will be injected
+                          as an additional environment variable.
+                        items:
                           properties:
-                            configMapKeyRef:
-                              description: Selects a key of a ConfigMap.
-                              properties:
-                                key:
-                                  description: The key to select.
-                                  type: string
-                                name:
-                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind,
-                                    uid?'
-                                  type: string
-                                optional:
-                                  description: Specify whether the ConfigMap or its
-                                    key must be defined
-                                  type: boolean
-                              required:
-                              - key
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            fieldRef:
-                              description: 'Selects a field of the pod: supports metadata.name,
-                                metadata.namespace, `metadata.labels[''<KEY>'']`,
-                                `metadata.annotations[''<KEY>'']`, spec.nodeName,
-                                spec.serviceAccountName, status.hostIP, status.podIP,
-                                status.podIPs.'
-                              properties:
-                                apiVersion:
-                                  description: Version of the schema the FieldPath
-                                    is written in terms of, defaults to "v1".
-                                  type: string
-                                fieldPath:
-                                  description: Path of the field to select in the
-                                    specified API version.
-                                  type: string
-                              required:
-                              - fieldPath
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            resourceFieldRef:
-                              description: 'Selects a resource of the container: only
-                                resources limits and requests (limits.cpu, limits.memory,
-                                limits.ephemeral-storage, requests.cpu, requests.memory
-                                and requests.ephemeral-storage) are currently supported.'
-                              properties:
-                                containerName:
-                                  description: 'Container name: required for volumes,
-                                    optional for env vars'
-                                  type: string
-                                divisor:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  description: Specifies the output format of the
-                                    exposed resources, defaults to "1"
-                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                  x-kubernetes-int-or-string: true
-                                resource:
-                                  description: 'Required: resource to select'
-                                  type: string
-                              required:
-                              - resource
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            secretKeyRef:
-                              description: Selects a key of a secret in the pod's
-                                namespace
-                              properties:
-                                key:
-                                  description: The key of the secret to select from.  Must
-                                    be a valid secret key.
-                                  type: string
-                                name:
-                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind,
-                                    uid?'
-                                  type: string
-                                optional:
-                                  description: Specify whether the Secret or its key
-                                    must be defined
-                                  type: boolean
-                              required:
-                              - key
-                              type: object
-                              x-kubernetes-map-type: atomic
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
                           type: object
-                      required:
-                      - name
-                      type: object
-                    type: array
-                  envFrom:
-                    description: Environment variables to inject into the application
-                      containers, as references to existing ConfigMap or Secret objects.
-                    items:
-                      description: EnvFromSource represents the source of a set of
-                        ConfigMaps
-                      properties:
-                        configMapRef:
-                          description: The ConfigMap to select from
+                        type: array
+                      envs:
+                        description: List of name and value pairs to add as environment
+                          variables.
+                        items:
                           properties:
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: Name of the environment variable
                               type: string
-                            optional:
-                              description: Specify whether the ConfigMap must be defined
-                              type: boolean
+                            value:
+                              description: Value of the environment variable
+                              type: string
+                          required:
+                          - name
+                          - value
                           type: object
-                          x-kubernetes-map-type: atomic
-                        prefix:
-                          description: An optional identifier to prepend to each key
-                            in the ConfigMap. Must be a C_IDENTIFIER.
-                          type: string
-                        secretRef:
-                          description: The Secret to select from
+                        type: array
+                      secrets:
+                        description: List of references to Secrets objects to inject
+                          as additional environment variables. For each item in this
+                          array, if a key is not specified, it means that all keys
+                          in the Secret will be injected as additional environment
+                          variables. Otherwise, only the specified key will be injected
+                          as environment variable.
+                        items:
                           properties:
-                            name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                            key:
+                              description: Key in the object
                               type: string
-                            optional:
-                              description: Specify whether the Secret must be defined
-                              type: boolean
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
                           type: object
-                          x-kubernetes-map-type: atomic
-                      type: object
-                    type: array
-                  extraConfig:
+                        type: array
+                    type: object
+                  extraFiles:
                     description: References to existing Config objects to use as extra
                       config files. They will be mounted as files in the specified
                       mount path. Each element can be a reference to any ConfigMap
                       or Secret.
                     properties:
-                      items:
-                        description: List of references to extra config Config objects.
+                      configMaps:
+                        description: List of references to ConfigMaps objects mounted
+                          as extra files under the MountPath specified. For each item
+                          in this array, if a key is not specified, it means that
+                          all keys in the ConfigMap will be mounted as files. Otherwise,
+                          only the specified key will be mounted as a file.
                         items:
                           properties:
-                            configMapRef:
-                              description: ConfigMap containing one or more extra
-                                config files
-                              properties:
-                                name:
-                                  description: Name of the object referenced.
-                                  type: string
-                              required:
-                              - name
-                              type: object
-                            secretRef:
-                              description: Secret containing one or more extra config
-                                files
-                              properties:
-                                name:
-                                  description: Name of the object referenced.
-                                  type: string
-                              required:
-                              - name
-                              type: object
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
                           type: object
                         type: array
                       mountPath:
@@ -286,14 +197,35 @@ spec:
                         description: Mount path for all extra configuration files
                           listed in the Items field
                         type: string
+                      secrets:
+                        description: List of references to Secrets objects mounted
+                          as extra files under the MountPath specified. For each item
+                          in this array, if a key is not specified, it means that
+                          all keys in the Secret will be mounted as files. Otherwise,
+                          only the specified key will be mounted as a file.
+                        items:
+                          properties:
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
                     type: object
                   image:
                     description: Image to use in all containers (including Init Containers)
                     type: string
-                  imagePullSecret:
-                    description: Image Pull Secret to use in all containers (including
+                  imagePullSecrets:
+                    description: Image Pull Secrets to use in all containers (including
                       Init Containers)
-                    type: string
+                    items:
+                      type: string
+                    type: array
                   replicas:
                     default: 1
                     description: Number of desired replicas to set in the Backstage
@@ -321,7 +253,7 @@ spec:
                   (see the AppConfig field in the Application structure) containing
                   references to the Database connection information, which might be
                   supplied as environment variables (see the Env field) or extra-configuration
-                  files (see the ExtraConfig field in the Application structure).
+                  files (see the ExtraFiles field in the Application structure).
                 type: boolean
             type: object
           status:

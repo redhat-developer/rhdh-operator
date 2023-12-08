@@ -25,31 +25,33 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-func (r *BackstageReconciler) extraConfigsToVolumes(backstage bs.Backstage) (result []v1.Volume) {
-	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraConfig == nil {
+func (r *BackstageReconciler) extraFilesToVolumes(backstage bs.Backstage) (result []v1.Volume) {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraFiles == nil {
 		return nil
 	}
-	for _, extraConfig := range backstage.Spec.Application.ExtraConfig.Items {
-		var volumeSource v1.VolumeSource
-		var name string
-		switch {
-		case extraConfig.ConfigMapRef != nil:
-			name = extraConfig.ConfigMapRef.Name
-			volumeSource.ConfigMap = &v1.ConfigMapVolumeSource{
-				DefaultMode:          pointer.Int32(420),
-				LocalObjectReference: v1.LocalObjectReference{Name: name},
-			}
-		case extraConfig.SecretRef != nil:
-			name = extraConfig.SecretRef.Name
-			volumeSource.Secret = &v1.SecretVolumeSource{
-				DefaultMode: pointer.Int32(420),
-				SecretName:  name,
-			}
-		}
+	for _, cmExtraFile := range backstage.Spec.Application.ExtraFiles.ConfigMaps {
 		result = append(result,
 			v1.Volume{
-				Name:         name,
-				VolumeSource: volumeSource,
+				Name: cmExtraFile.Name,
+				VolumeSource: v1.VolumeSource{
+					ConfigMap: &v1.ConfigMapVolumeSource{
+						DefaultMode:          pointer.Int32(420),
+						LocalObjectReference: v1.LocalObjectReference{Name: cmExtraFile.Name},
+					},
+				},
+			},
+		)
+	}
+	for _, secExtraFile := range backstage.Spec.Application.ExtraFiles.Secrets {
+		result = append(result,
+			v1.Volume{
+				Name: secExtraFile.Name,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						DefaultMode: pointer.Int32(420),
+						SecretName:  secExtraFile.Name,
+					},
+				},
 			},
 		)
 	}
@@ -57,12 +59,12 @@ func (r *BackstageReconciler) extraConfigsToVolumes(backstage bs.Backstage) (res
 	return result
 }
 
-func (r *BackstageReconciler) addExtraConfigsVolumeMounts(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraConfig == nil {
+func (r *BackstageReconciler) addExtraFilesVolumeMounts(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraFiles == nil {
 		return nil
 	}
 
-	appConfigFilenamesList, err := r.extractExtraConfigFileNames(ctx, backstage, ns)
+	appConfigFilenamesList, err := r.extractExtraFileNames(ctx, backstage, ns)
 	if err != nil {
 		return err
 	}
@@ -74,7 +76,7 @@ func (r *BackstageReconciler) addExtraConfigsVolumeMounts(ctx context.Context, b
 					deployment.Spec.Template.Spec.Containers[i].VolumeMounts = append(deployment.Spec.Template.Spec.Containers[i].VolumeMounts,
 						v1.VolumeMount{
 							Name:      appConfigFilenames.ref,
-							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Application.ExtraConfig.MountPath, f),
+							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Application.ExtraFiles.MountPath, f),
 							SubPath:   f,
 						})
 				}
@@ -85,22 +87,22 @@ func (r *BackstageReconciler) addExtraConfigsVolumeMounts(ctx context.Context, b
 	return nil
 }
 
-// extractExtraConfigFileNames returns a mapping of extra-config object name and the list of files in it.
+// extractExtraFileNames returns a mapping of extra-config object name and the list of files in it.
 // We intentionally do not return a Map, to preserve the iteration order of the ExtraConfigs in the Custom Resource,
 // even though we can't guarantee the iteration order of the files listed inside each ConfigMap or Secret.
-func (r *BackstageReconciler) extractExtraConfigFileNames(ctx context.Context, backstage bs.Backstage, ns string) (result []appConfigData, err error) {
-	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraConfig == nil {
+func (r *BackstageReconciler) extractExtraFileNames(ctx context.Context, backstage bs.Backstage, ns string) (result []appConfigData, err error) {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.ExtraFiles == nil {
 		return nil, nil
 	}
 
-	for _, appConfig := range backstage.Spec.Application.ExtraConfig.Items {
+	for _, cmExtraFile := range backstage.Spec.Application.ExtraFiles.ConfigMaps {
 		var files []string
-		var name string
-		switch {
-		case appConfig.ConfigMapRef != nil:
-			name = appConfig.ConfigMapRef.Name
+		if cmExtraFile.Key != "" {
+			// Limit to that file only
+			files = append(files, cmExtraFile.Key)
+		} else {
 			cm := v1.ConfigMap{}
-			if err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &cm); err != nil {
+			if err = r.Get(ctx, types.NamespacedName{Name: cmExtraFile.Name, Namespace: ns}, &cm); err != nil {
 				return nil, err
 			}
 			for filename := range cm.Data {
@@ -111,10 +113,21 @@ func (r *BackstageReconciler) extractExtraConfigFileNames(ctx context.Context, b
 				// Bear in mind that iteration order over this map is not guaranteed by Go
 				files = append(files, filename)
 			}
-		case appConfig.SecretRef != nil:
-			name = appConfig.SecretRef.Name
+		}
+		result = append(result, appConfigData{
+			ref:   cmExtraFile.Name,
+			files: files,
+		})
+	}
+
+	for _, secExtraFile := range backstage.Spec.Application.ExtraFiles.Secrets {
+		var files []string
+		if secExtraFile.Key != "" {
+			// Limit to that file only
+			files = append(files, secExtraFile.Key)
+		} else {
 			sec := v1.Secret{}
-			if err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, &sec); err != nil {
+			if err = r.Get(ctx, types.NamespacedName{Name: secExtraFile.Name, Namespace: ns}, &sec); err != nil {
 				return nil, err
 			}
 			for filename := range sec.Data {
@@ -123,7 +136,7 @@ func (r *BackstageReconciler) extractExtraConfigFileNames(ctx context.Context, b
 			}
 		}
 		result = append(result, appConfigData{
-			ref:   name,
+			ref:   secExtraFile.Name,
 			files: files,
 		})
 	}

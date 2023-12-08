@@ -464,7 +464,9 @@ spec:
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 					Application: &bsv1alpha1.Application{
 						AppConfig: &bsv1alpha1.AppConfig{
-							ConfigMapRefs: []string{"a-non-existing-cm"},
+							ConfigMaps: []bsv1alpha1.ObjectKeyRef{
+								{Name: "a-non-existing-cm"},
+							},
 						},
 					},
 				})
@@ -529,10 +531,12 @@ plugins: []
 						backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 							Application: &bsv1alpha1.Application{
 								AppConfig: &bsv1alpha1.AppConfig{
-									MountPath:     mountPath,
-									ConfigMapRefs: []string{appConfig1CmName},
+									MountPath: mountPath,
+									ConfigMaps: []bsv1alpha1.ObjectKeyRef{
+										{Name: appConfig1CmName},
+									},
 								},
-								DynamicPluginsConfigMapRef: dynamicPluginsConfigName,
+								DynamicPluginsConfigMapName: dynamicPluginsConfigName,
 							},
 						})
 						err = k8sClient.Create(ctx, backstage)
@@ -684,7 +688,7 @@ plugins: []
 				BeforeEach(func() {
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 						Application: &bsv1alpha1.Application{
-							BackendAuthSecretKeyRef: &bsv1alpha1.BackendAuthSecretKeyRef{
+							BackendAuthSecret: &bsv1alpha1.ObjectKeyRef{
 								Name: "non-existing-secret",
 								Key:  key,
 							},
@@ -761,7 +765,7 @@ plugins: []
 					Expect(err).To(Not(HaveOccurred()))
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 						Application: &bsv1alpha1.Application{
-							BackendAuthSecretKeyRef: &bsv1alpha1.BackendAuthSecretKeyRef{
+							BackendAuthSecret: &bsv1alpha1.ObjectKeyRef{
 								Name: backendAuthSecretName,
 								Key:  key,
 							},
@@ -825,29 +829,29 @@ plugins: []
 		}
 	})
 
-	Context("Extra Configs", func() {
+	Context("Extra Files", func() {
 		for _, kind := range []string{"ConfigMap", "Secret"} {
 			kind := kind
-			When(fmt.Sprintf("referencing non-existing %s as extra-config", kind), func() {
+			When(fmt.Sprintf("referencing non-existing %s as extra-file", kind), func() {
 				var backstage *bsv1alpha1.Backstage
 
 				BeforeEach(func() {
-					var item bsv1alpha1.ExtraConfigItem
+					var (
+						cmExtraFiles  []bsv1alpha1.ObjectKeyRef
+						secExtraFiles []bsv1alpha1.ObjectKeyRef
+					)
 					name := "a-non-existing-" + strings.ToLower(kind)
 					switch kind {
 					case "ConfigMap":
-						item = bsv1alpha1.ExtraConfigItem{
-							ConfigMapRef: &bsv1alpha1.ObjectRef{Name: name},
-						}
+						cmExtraFiles = append(cmExtraFiles, bsv1alpha1.ObjectKeyRef{Name: name})
 					case "Secret":
-						item = bsv1alpha1.ExtraConfigItem{
-							SecretRef: &bsv1alpha1.ObjectRef{Name: name},
-						}
+						secExtraFiles = append(secExtraFiles, bsv1alpha1.ObjectKeyRef{Name: name})
 					}
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 						Application: &bsv1alpha1.Application{
-							ExtraConfig: &bsv1alpha1.ExtraConfig{
-								Items: []bsv1alpha1.ExtraConfigItem{item},
+							ExtraFiles: &bsv1alpha1.ExtraFiles{
+								ConfigMaps: cmExtraFiles,
+								Secrets:    secExtraFiles,
 							},
 						},
 					})
@@ -912,15 +916,13 @@ plugins: []
 
 					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 						Application: &bsv1alpha1.Application{
-							ExtraConfig: &bsv1alpha1.ExtraConfig{
+							ExtraFiles: &bsv1alpha1.ExtraFiles{
 								MountPath: mountPath,
-								Items: []bsv1alpha1.ExtraConfigItem{
-									{
-										ConfigMapRef: &bsv1alpha1.ObjectRef{Name: extraConfig1CmName},
-									},
-									{
-										SecretRef: &bsv1alpha1.ObjectRef{Name: extraConfig2SecretName},
-									},
+								ConfigMaps: []bsv1alpha1.ObjectKeyRef{
+									{Name: extraConfig1CmName},
+								},
+								Secrets: []bsv1alpha1.ObjectKeyRef{
+									{Name: extraConfig2SecretName},
 								},
 							},
 						},
@@ -1047,16 +1049,16 @@ plugins: []
 
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 					Application: &bsv1alpha1.Application{
-						Env: []corev1.EnvVar{
-							{Name: "MY_ENV_VAR_1", Value: "value 10"},
-							{Name: "MY_ENV_VAR_2", Value: "value 20"},
-						},
-						EnvFrom: []corev1.EnvFromSource{
-							{
-								ConfigMapRef: &corev1.ConfigMapEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: envConfig1CmName}},
+						ExtraEnvs: &bsv1alpha1.ExtraEnvs{
+							Envs: []bsv1alpha1.Env{
+								{Name: "MY_ENV_VAR_1", Value: "value 10"},
+								{Name: "MY_ENV_VAR_2", Value: "value 20"},
 							},
-							{
-								SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: envConfig2SecretName}},
+							ConfigMaps: []bsv1alpha1.ObjectKeyRef{
+								{Name: envConfig1CmName},
+							},
+							Secrets: []bsv1alpha1.ObjectKeyRef{
+								{Name: envConfig2SecretName},
 							},
 						},
 					},
@@ -1175,15 +1177,18 @@ plugins: []
 		})
 	})
 
-	When("setting image pull secret", func() {
-		var imagePullSecretName = "some-image-pull-secret"
+	When("setting image pull secrets", func() {
+		const (
+			ips1 = "some-image-pull-secret-1"
+			ips2 = "some-image-pull-secret-2"
+		)
 
 		var backstage *bsv1alpha1.Backstage
 
 		BeforeEach(func() {
 			backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 				Application: &bsv1alpha1.Application{
-					ImagePullSecret: &imagePullSecretName,
+					ImagePullSecrets: []string{ips1, ips2},
 				},
 			})
 			err := k8sClient.Create(ctx, backstage)
@@ -1216,7 +1221,7 @@ plugins: []
 				for _, v := range found.Spec.Template.Spec.ImagePullSecrets {
 					list = append(list, v.Name)
 				}
-				Expect(list).Should(ContainElement(imagePullSecretName))
+				Expect(list).Should(HaveExactElements(ips1, ips2))
 			})
 
 			By("Checking the latest Status added to the Backstage instance")

@@ -3,40 +3,38 @@ kind: Backstage
 metadata:
   name: my-backstage-app-with-app-config
 spec:
-  backstage:
+  skipLocalDb: false
+  application:
     appConfig:
       #mountPath:  /opt/app-root/src
-      configMapRefs:
-        - "my-backstage-config-cm1"
-        - "my-backstage-config-cm2"
-    dynamicPluginsConfigMapRef: "my-dynamic-plugins-config-cm"
-    env:
-      - name: MY_ENV_VAR_1
-        value: my-value-1
-      - name: MY_ENV_VAR_2
-        value: my-value-2
-      - name: MY_ENV_VAR1_FROM_CM1
-        valueFrom:
-          configMapKeyRef:
-            name: my-env-cm-1
-            key: CM_ENV1
-    envFrom:
-      - configMapRef:
-          name: my-env-cm-1
-      - prefix: MY_ENV_SECRET1_
-        secretRef:
-          name: my-env-secret1
-    backendAuthSecretKeyRef:
+      configMaps:
+        - name: "my-backstage-config-cm1"
+        - name: "my-backstage-config-cm2"
+    dynamicPluginsConfigMapName: "my-dynamic-plugins-config-cm"
+    extraEnvs:
+      envs:
+        - name: MY_ENV_VAR_1
+          value: my-value-1
+        - name: MY_ENV_VAR_2
+          value: my-value-2
+      configMaps:
+        - name: my-env-cm-1
+        - name: my-env-cm-11
+          key: CM_ENV11
+      secrets:
+        - name: my-env-secret1
+        - name: my-env-secret11
+          key: SEC_ENV11
+    backendAuthSecret:
       name: "my-backstage-backend-auth-secret"
       key: "my-auth-key"
     replicas: 2
-    extraConfig:
+    extraFiles:
       mountPath: /tmp/my-extra-files
-      items:
-        - configMapRef:
-            name: "my-backstage-extra-config-cm1"
-        - secretRef:
-            name: "my-backstage-extra-config-secret1"
+      configMaps:
+        - name: "my-backstage-extra-config-cm1"
+      secrets:
+        - name: "my-backstage-extra-config-secret1"
 
 ---
 apiVersion: v1
@@ -121,12 +119,30 @@ data:
 
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-env-cm-11
+data:
+  CM_ENV11: "cm env 11"
+  CM_ENV12: "cm env 12"
+
+---
+apiVersion: v1
 kind: Secret
 metadata:
   name: my-env-secret1
 stringData:
   SEC_ENV1: "secret env 1"
   SEC_ENV2: "secret env 2"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-env-secret11
+stringData:
+  SEC_ENV11: "secret env 11"
+  SEC_ENV12: "secret env 12"
 
 ---
 apiVersion: v1

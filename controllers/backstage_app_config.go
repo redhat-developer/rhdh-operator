@@ -34,16 +34,16 @@ func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (resul
 	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
 		return nil
 	}
-	for _, cmRef := range backstage.Spec.Application.AppConfig.ConfigMapRefs {
+	for _, cm := range backstage.Spec.Application.AppConfig.ConfigMaps {
 		volumeSource := v1.VolumeSource{
 			ConfigMap: &v1.ConfigMapVolumeSource{
 				DefaultMode:          pointer.Int32(420),
-				LocalObjectReference: v1.LocalObjectReference{Name: cmRef},
+				LocalObjectReference: v1.LocalObjectReference{Name: cm.Name},
 			},
 		}
 		result = append(result,
 			v1.Volume{
-				Name:         cmRef,
+				Name:         cm.Name,
 				VolumeSource: volumeSource,
 			},
 		)
@@ -114,22 +114,28 @@ func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, bac
 		return nil, nil
 	}
 
-	for _, cmRef := range backstage.Spec.Application.AppConfig.ConfigMapRefs {
-		cm := v1.ConfigMap{}
-		if err = r.Get(ctx, types.NamespacedName{Name: cmRef, Namespace: ns}, &cm); err != nil {
-			return nil, err
-		}
+	for _, cmRef := range backstage.Spec.Application.AppConfig.ConfigMaps {
 		var files []string
-		for filename := range cm.Data {
-			// Bear in mind that iteration order over this map is not guaranteed by Go
-			files = append(files, filename)
-		}
-		for filename := range cm.BinaryData {
-			// Bear in mind that iteration order over this map is not guaranteed by Go
-			files = append(files, filename)
+		if cmRef.Key != "" {
+			// Limit to that file only
+			files = append(files, cmRef.Key)
+		} else {
+			// All keys
+			cm := v1.ConfigMap{}
+			if err = r.Get(ctx, types.NamespacedName{Name: cmRef.Name, Namespace: ns}, &cm); err != nil {
+				return nil, err
+			}
+			for filename := range cm.Data {
+				// Bear in mind that iteration order over this map is not guaranteed by Go
+				files = append(files, filename)
+			}
+			for filename := range cm.BinaryData {
+				// Bear in mind that iteration order over this map is not guaranteed by Go
+				files = append(files, filename)
+			}
 		}
 		result = append(result, appConfigData{
-			ref:   cmRef,
+			ref:   cmRef.Name,
 			files: files,
 		})
 	}

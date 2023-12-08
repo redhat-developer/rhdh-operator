@@ -41,8 +41,8 @@ var (
 )
 
 func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backstage bs.Backstage, ns string) (secretName string, err error) {
-	if backstage.Spec.Application != nil && backstage.Spec.Application.BackendAuthSecretKeyRef != nil {
-		return backstage.Spec.Application.BackendAuthSecretKeyRef.Name, nil
+	if backstage.Spec.Application != nil && backstage.Spec.Application.BackendAuthSecret != nil {
+		return backstage.Spec.Application.BackendAuthSecret.Name, nil
 	}
 
 	//Create default Secret for backend auth
@@ -96,8 +96,8 @@ func (r *BackstageReconciler) addBackendAuthEnvVar(ctx context.Context, backstag
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == _defaultBackstageMainContainerName {
 			var k string
-			if backstage.Spec.Application != nil && backstage.Spec.Application.BackendAuthSecretKeyRef != nil {
-				k = backstage.Spec.Application.BackendAuthSecretKeyRef.Key
+			if backstage.Spec.Application != nil && backstage.Spec.Application.BackendAuthSecret != nil {
+				k = backstage.Spec.Application.BackendAuthSecret.Key
 			}
 			if k == "" {
 				//TODO(rm3l): why kubebuilder default values do not work
