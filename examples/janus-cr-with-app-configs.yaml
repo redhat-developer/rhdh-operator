@@ -10,6 +10,7 @@ spec:
       configMaps:
         - name: "my-backstage-config-cm1"
         - name: "my-backstage-config-cm2"
+          key: "app-config1-cm2.gh.yaml"
     dynamicPluginsConfigMapName: "my-dynamic-plugins-config-cm"
     extraEnvs:
       envs:

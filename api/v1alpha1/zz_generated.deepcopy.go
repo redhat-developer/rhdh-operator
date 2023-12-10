@@ -54,11 +54,6 @@ func (in *Application) DeepCopyInto(out *Application) {
 		*out = new(AppConfig)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.BackendAuthSecret != nil {
-		in, out := &in.BackendAuthSecret, &out.BackendAuthSecret
-		*out = new(ObjectKeyRef)
-		**out = **in
-	}
 	if in.ExtraFiles != nil {
 		in, out := &in.ExtraFiles, &out.ExtraFiles
 		*out = new(ExtraFiles)

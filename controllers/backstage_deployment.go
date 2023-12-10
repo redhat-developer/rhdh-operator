@@ -233,7 +233,12 @@ func (r *BackstageReconciler) addVolumes(ctx context.Context, backstage bs.Backs
 		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, *dpConfVol)
 	}
 
-	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.appConfigsToVolumes(backstage)...)
+	backendAuthAppConfig, err := r.getBackendAuthAppConfig(ctx, backstage, ns)
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.appConfigsToVolumes(backstage, backendAuthAppConfig)...)
 	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.extraFilesToVolumes(backstage)...)
 	return nil
 }
@@ -243,7 +248,11 @@ func (r *BackstageReconciler) addVolumeMounts(ctx context.Context, backstage bs.
 	if err != nil {
 		return err
 	}
-	err = r.addAppConfigsVolumeMounts(ctx, backstage, ns, deployment)
+	backendAuthAppConfig, err := r.getBackendAuthAppConfig(ctx, backstage, ns)
+	if err != nil {
+		return err
+	}
+	err = r.addAppConfigsVolumeMounts(ctx, backstage, ns, deployment, backendAuthAppConfig)
 	if err != nil {
 		return err
 	}
@@ -251,7 +260,11 @@ func (r *BackstageReconciler) addVolumeMounts(ctx context.Context, backstage bs.
 }
 
 func (r *BackstageReconciler) addContainerArgs(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	return r.addAppConfigsContainerArgs(ctx, backstage, ns, deployment)
+	backendAuthAppConfig, err := r.getBackendAuthAppConfig(ctx, backstage, ns)
+	if err != nil {
+		return err
+	}
+	return r.addAppConfigsContainerArgs(ctx, backstage, ns, deployment, backendAuthAppConfig)
 }
 
 func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {

@@ -30,11 +30,16 @@ type appConfigData struct {
 	files []string
 }
 
-func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (result []v1.Volume) {
-	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
-		return nil
+func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage, backendAuthAppConfig *bs.ObjectKeyRef) (result []v1.Volume) {
+	var cms []bs.ObjectKeyRef
+	if backendAuthAppConfig != nil {
+		cms = append(cms, *backendAuthAppConfig)
 	}
-	for _, cm := range backstage.Spec.Application.AppConfig.ConfigMaps {
+	if backstage.Spec.Application != nil && backstage.Spec.Application.AppConfig != nil {
+		cms = append(cms, backstage.Spec.Application.AppConfig.ConfigMaps...)
+	}
+
+	for _, cm := range cms {
 		volumeSource := v1.VolumeSource{
 			ConfigMap: &v1.ConfigMapVolumeSource{
 				DefaultMode:          pointer.Int32(420),
@@ -52,12 +57,26 @@ func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage) (resul
 	return result
 }
 
-func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
-		return nil
+func (r *BackstageReconciler) addAppConfigsVolumeMounts(
+	ctx context.Context,
+	backstage bs.Backstage,
+	ns string,
+	deployment *appsv1.Deployment,
+	backendAuthAppConfig *bs.ObjectKeyRef,
+) error {
+	var (
+		mountPath = _containersWorkingDir
+		cms       []bs.ObjectKeyRef
+	)
+	if backendAuthAppConfig != nil {
+		cms = append(cms, *backendAuthAppConfig)
+	}
+	if backstage.Spec.Application != nil && backstage.Spec.Application.AppConfig != nil {
+		cms = append(cms, backstage.Spec.Application.AppConfig.ConfigMaps...)
+		mountPath = backstage.Spec.Application.AppConfig.MountPath
 	}
 
-	appConfigFilenamesList, err := r.extractAppConfigFileNames(ctx, backstage, ns)
+	appConfigFilenamesList, err := r.extractAppConfigFileNames(ctx, ns, cms)
 	if err != nil {
 		return err
 	}
@@ -69,7 +88,7 @@ func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, bac
 					deployment.Spec.Template.Spec.Containers[i].VolumeMounts = append(deployment.Spec.Template.Spec.Containers[i].VolumeMounts,
 						v1.VolumeMount{
 							Name:      appConfigFilenames.ref,
-							MountPath: fmt.Sprintf("%s/%s", backstage.Spec.Application.AppConfig.MountPath, f),
+							MountPath: fmt.Sprintf("%s/%s", mountPath, f),
 							SubPath:   f,
 						})
 				}
@@ -80,12 +99,26 @@ func (r *BackstageReconciler) addAppConfigsVolumeMounts(ctx context.Context, bac
 	return nil
 }
 
-func (r *BackstageReconciler) addAppConfigsContainerArgs(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
-		return nil
+func (r *BackstageReconciler) addAppConfigsContainerArgs(
+	ctx context.Context,
+	backstage bs.Backstage,
+	ns string,
+	deployment *appsv1.Deployment,
+	backendAuthAppConfig *bs.ObjectKeyRef,
+) error {
+	var (
+		mountPath = _containersWorkingDir
+		cms       []bs.ObjectKeyRef
+	)
+	if backendAuthAppConfig != nil {
+		cms = append(cms, *backendAuthAppConfig)
+	}
+	if backstage.Spec.Application != nil && backstage.Spec.Application.AppConfig != nil {
+		cms = append(cms, backstage.Spec.Application.AppConfig.ConfigMaps...)
+		mountPath = backstage.Spec.Application.AppConfig.MountPath
 	}
 
-	appConfigFilenamesList, err := r.extractAppConfigFileNames(ctx, backstage, ns)
+	appConfigFilenamesList, err := r.extractAppConfigFileNames(ctx, ns, cms)
 	if err != nil {
 		return err
 	}
@@ -95,7 +128,7 @@ func (r *BackstageReconciler) addAppConfigsContainerArgs(ctx context.Context, ba
 			for _, appConfigFilenames := range appConfigFilenamesList {
 				// Args
 				for _, fileName := range appConfigFilenames.files {
-					appConfigPath := fmt.Sprintf("%s/%s", backstage.Spec.Application.AppConfig.MountPath, fileName)
+					appConfigPath := fmt.Sprintf("%s/%s", mountPath, fileName)
 					deployment.Spec.Template.Spec.Containers[i].Args =
 						append(deployment.Spec.Template.Spec.Containers[i].Args, "--config", appConfigPath)
 				}
@@ -109,12 +142,8 @@ func (r *BackstageReconciler) addAppConfigsContainerArgs(ctx context.Context, ba
 // extractAppConfigFileNames returns a mapping of app-config object name and the list of files in it.
 // We intentionally do not return a Map, to preserve the iteration order of the AppConfigs in the Custom Resource,
 // even though we can't guarantee the iteration order of the files listed inside each ConfigMap or Secret.
-func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, backstage bs.Backstage, ns string) (result []appConfigData, err error) {
-	if backstage.Spec.Application == nil || backstage.Spec.Application.AppConfig == nil {
-		return nil, nil
-	}
-
-	for _, cmRef := range backstage.Spec.Application.AppConfig.ConfigMaps {
+func (r *BackstageReconciler) extractAppConfigFileNames(ctx context.Context, ns string, cms []bs.ObjectKeyRef) (result []appConfigData, err error) {
+	for _, cmRef := range cms {
 		var files []string
 		if cmRef.Key != "" {
 			// Limit to that file only

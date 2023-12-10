@@ -30,39 +30,49 @@ import (
 
 var (
 	_defaultBackendAuthSecretValue = "pl4s3Ch4ng3M3"
-	//	defaultBackstageBackendAuthSecret = `
-	//apiVersion: v1
-	//kind: Secret
-	//metadata:
-	//  name: # placeholder for '<cr-name>-auth'
-	//data:
-	//  # A random value will be generated for the backend-secret key
-	//`
+	_backendSecretKey              = "backend-secret"
 )
 
-func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backstage bs.Backstage, ns string) (secretName string, err error) {
-	if backstage.Spec.Application != nil && backstage.Spec.Application.BackendAuthSecret != nil {
-		return backstage.Spec.Application.BackendAuthSecret.Name, nil
+func (r *BackstageReconciler) getBackendAuthAppConfig(
+	ctx context.Context,
+	backstage bs.Backstage,
+	ns string,
+) (backendAuthAppConfig *bs.ObjectKeyRef, err error) {
+	if backstage.Spec.Application != nil && backstage.Spec.Application.AppConfig != nil {
+		// Users are expected to provide their own app-configs with the right backend auth secret
+		return nil, nil
 	}
 
-	//Create default Secret for backend auth
-	var sec v1.Secret
-	//var isDefault bool
-	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "backend-auth-secret.yaml", ns, &sec)
+	var cm v1.ConfigMap
+	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "backend-auth-configmap.yaml", ns, &cm)
 	if err != nil {
-		return "", fmt.Errorf("failed to read config: %s", err)
+		return nil, fmt.Errorf("failed to read config: %s", err)
 	}
-	//Generate a secret if it does not exist
-	backendAuthSecretName := fmt.Sprintf("%s-auth", backstage.Name)
-	sec.SetName(backendAuthSecretName)
-	err = r.Get(ctx, types.NamespacedName{Name: backendAuthSecretName, Namespace: ns}, &sec)
+	// Create ConfigMap
+	backendAuthCmName := fmt.Sprintf("%s-auth", backstage.Name)
+	cm.SetName(backendAuthCmName)
+	err = r.Get(ctx, types.NamespacedName{Name: backendAuthCmName, Namespace: ns}, &cm)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			return "", fmt.Errorf("failed to get secret for backend auth (%q), reason: %s", backendAuthSecretName, err)
+			return nil, fmt.Errorf("failed to get ConfigMap for backend auth (%q), reason: %s", backendAuthCmName, err)
 		}
-		// there should not be any difference between default and not default
-		//		if isDefault {
-		// Create a secret with a random value
+		err = r.Create(ctx, &cm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ConfigMap for backend auth, reason: %s", err)
+		}
+	}
+
+	var sec v1.Secret
+	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "backend-auth-secret.yaml", ns, &sec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config: %s", err)
+	}
+	sec.SetName(backendAuthCmName)
+	err = r.Get(ctx, types.NamespacedName{Name: backendAuthCmName, Namespace: ns}, &sec)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get Secret for backend auth (%q), reason: %s", backendAuthCmName, err)
+		}
 		authVal := func(length int) string {
 			bytes := make([]byte, length)
 			if _, randErr := rand.Read(bytes); randErr != nil {
@@ -71,57 +81,57 @@ func (r *BackstageReconciler) handleBackendAuthSecret(ctx context.Context, backs
 			}
 			return base64.StdEncoding.EncodeToString(bytes)
 		}(24)
-		sec.Data = map[string][]byte{
-			"backend-secret": []byte(authVal),
+		sec.StringData = map[string]string{
+			_backendSecretKey: authVal,
 		}
-		//		}
 		err = r.Create(ctx, &sec)
 		if err != nil {
-			return "", fmt.Errorf("failed to create secret for backend auth, reason: %s", err)
+			return nil, fmt.Errorf("failed to create Secret for backend auth, reason: %s", err)
 		}
 	}
-	return backendAuthSecretName, nil
+
+	return &bs.ObjectKeyRef{Name: backendAuthCmName}, nil
 }
 
 func (r *BackstageReconciler) addBackendAuthEnvVar(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	backendAuthSecretName, err := r.handleBackendAuthSecret(ctx, backstage, ns)
+	backendAuthAppConfig, err := r.getBackendAuthAppConfig(ctx, backstage, ns)
 	if err != nil {
 		return err
 	}
-
-	if backendAuthSecretName == "" {
+	if backendAuthAppConfig == nil {
 		return nil
+	}
+
+	hasEnvVar := func(c v1.Container, name string) bool {
+		for _, envVar := range c.Env {
+			if envVar.Name == name {
+				return true
+			}
+		}
+		return false
 	}
 
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name == _defaultBackstageMainContainerName {
-			var k string
-			if backstage.Spec.Application != nil && backstage.Spec.Application.BackendAuthSecret != nil {
-				k = backstage.Spec.Application.BackendAuthSecret.Key
-			}
-			if k == "" {
-				//TODO(rm3l): why kubebuilder default values do not work
-				k = "backend-secret"
-			}
-			deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env,
-				v1.EnvVar{
-					Name: "BACKEND_SECRET",
-					ValueFrom: &v1.EnvVarSource{
-						SecretKeyRef: &v1.SecretKeySelector{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: backendAuthSecretName,
+			if !hasEnvVar(c, "BACKEND_SECRET") {
+				deployment.Spec.Template.Spec.Containers[i].Env = append(deployment.Spec.Template.Spec.Containers[i].Env,
+					v1.EnvVar{
+						Name: "BACKEND_SECRET",
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{
+									// Secret has the same name as the backend auth ConfigMap
+									Name: backendAuthAppConfig.Name,
+								},
+								Key:      _backendSecretKey,
+								Optional: pointer.Bool(false),
 							},
-							Key:      k,
-							Optional: pointer.Bool(false),
 						},
-					},
-				},
-				v1.EnvVar{
-					Name:  "APP_CONFIG_backend_auth_keys",
-					Value: `[{"secret": "$(BACKEND_SECRET)"}]`,
-				})
+					})
+			}
 			break
 		}
 	}
+
 	return nil
 }

@@ -53,14 +53,14 @@ type Application struct {
 	// +optional
 	AppConfig *AppConfig `json:"appConfig,omitempty"`
 
-	// Optional Reference to a Secret to use for Backend Auth. A new one will be generated if not set.
-	// This Secret is used to set an environment variable named 'APP_CONFIG_backend_auth_keys' in the
-	// main container, which takes precedence over any 'backend.auth.keys' field defined
-	// in default or custom application configuration files.
-	// This is required for service-to-service auth and is shared by all backend plugins.
-	// Default value for the key in the secret is 'backend-secret.
-	// +optional
-	BackendAuthSecret *ObjectKeyRef `json:"backendAuthSecret,omitempty"`
+	//// Optional Reference to a Secret to use for Backend Auth. A new one will be generated if not set.
+	//// This Secret is used to set an environment variable named 'APP_CONFIG_backend_auth_keys' in the
+	//// main container, which takes precedence over any 'backend.auth.keys' field defined
+	//// in default or custom application configuration files.
+	//// This is required for service-to-service auth and is shared by all backend plugins.
+	//// Default value for the key in the secret is 'backend-secret.
+	//// +optional
+	//BackendAuthSecret *ObjectKeyRef `json:"backendAuthSecret,omitempty"`
 
 	// Reference to an existing ConfigMap for Dynamic Plugins.
 	// A new one will be generated with the default config if not set.
