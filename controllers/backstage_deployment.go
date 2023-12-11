@@ -268,15 +268,6 @@ func (r *BackstageReconciler) addContainerArgs(ctx context.Context, backstage bs
 }
 
 func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	err := r.addBackendAuthEnvVar(ctx, backstage, ns, deployment)
-	if err != nil {
-		return err
-	}
-	if backstage.Spec.Application == nil {
-		return nil
-	}
-
 	r.addExtraEnvs(backstage, deployment)
-
 	return nil
 }

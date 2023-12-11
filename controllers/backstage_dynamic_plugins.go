@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 //var (
@@ -58,6 +59,14 @@ func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Contex
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return "", fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
+		}
+		setBackstageAppLabel(&cm.ObjectMeta.Labels, backstage)
+		r.labels(&cm.ObjectMeta, backstage)
+
+		if r.OwnsRuntime {
+			if err = controllerutil.SetControllerReference(&backstage, &cm, r.Scheme); err != nil {
+				return "", fmt.Errorf("failed to set owner reference: %s", err)
+			}
 		}
 		err = r.Create(ctx, &cm)
 		if err != nil {

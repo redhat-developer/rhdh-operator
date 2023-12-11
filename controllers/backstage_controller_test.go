@@ -195,16 +195,15 @@ var _ = Describe("Backstage controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 			}, time.Minute, time.Second).Should(Succeed())
 
-			By("Generating a value for backend auth secret key")
-			Eventually(func(g Gomega) {
-				found := &corev1.Secret{}
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName + "-auth"}, found)
-				g.Expect(err).ShouldNot(HaveOccurred())
-
-				g.Expect(found.Data).To(HaveKey("backend-secret"))
-				g.Expect(found.Data["backend-secret"]).To(Not(BeEmpty()),
-					"backend auth secret should contain a non-empty 'backend-secret' in its data")
-			}, time.Minute, time.Second).Should(Succeed())
+			backendAuthConfigName := fmt.Sprintf("%s-auth-app-config", backstageName)
+			By("Creating a ConfigMap for default backend auth key", func() {
+				Eventually(func(g Gomega) {
+					found := &corev1.ConfigMap{}
+					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backendAuthConfigName}, found)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					g.Expect(found.Data).ToNot(BeEmpty(), "backend auth secret should contain non-empty data")
+				}, time.Minute, time.Second).Should(Succeed())
+			})
 
 			By("Generating a ConfigMap for default config for dynamic plugins")
 			dynamicPluginsConfigName := fmt.Sprintf("%s-dynamic-plugins", backstageName)
@@ -228,22 +227,8 @@ var _ = Describe("Backstage controller", func() {
 			By("checking the number of replicas")
 			Expect(found.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
 
-			By("Checking that the Deployment is configured with a random backend auth secret")
-			backendSecretEnvVar, ok := findEnvVar(found.Spec.Template.Spec.Containers[0].Env, "BACKEND_SECRET")
-			Expect(ok).To(BeTrue(), "env var BACKEND_SECRET not found in main container")
-			Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Name).To(
-				Not(BeEmpty()), "'name' for backend auth secret ref should not be empty")
-			Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Key).To(
-				Equal("backend-secret"), "Unexpected secret key ref for backend secret")
-			Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Optional).To(HaveValue(BeFalse()),
-				"'optional' for backend auth secret ref should be 'false'")
-
-			backendAuthAppConfigEnvVar, ok := findEnvVar(found.Spec.Template.Spec.Containers[0].Env, "APP_CONFIG_backend_auth_keys")
-			Expect(ok).To(BeTrue(), "env var APP_CONFIG_backend_auth_keys not found in main container")
-			Expect(backendAuthAppConfigEnvVar.Value).To(Equal(`[{"secret": "$(BACKEND_SECRET)"}]`))
-
 			By("Checking the Volumes in the Backstage Deployment", func() {
-				Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(3))
+				Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(4))
 
 				_, ok := findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-root")
 				Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-root")
@@ -256,6 +241,12 @@ var _ = Describe("Backstage controller", func() {
 				Expect(dynamicPluginsConfigVol.VolumeSource.Secret).To(BeNil())
 				Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
 				Expect(dynamicPluginsConfigVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(dynamicPluginsConfigName))
+
+				backendAuthAppConfigVol, ok := findVolume(found.Spec.Template.Spec.Volumes, backendAuthConfigName)
+				Expect(ok).To(BeTrue(), "No volume found with name: %s", backendAuthConfigName)
+				Expect(backendAuthAppConfigVol.VolumeSource.Secret).To(BeNil())
+				Expect(backendAuthAppConfigVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
+				Expect(backendAuthAppConfigVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(backendAuthConfigName))
 			})
 
 			By("Checking the Number of init containers in the Backstage Deployment")
@@ -295,18 +286,25 @@ var _ = Describe("Backstage controller", func() {
 			mainCont := found.Spec.Template.Spec.Containers[0]
 
 			By("Checking the main container Args in the Backstage Deployment", func() {
-				Expect(mainCont.Args).To(HaveLen(2))
+				Expect(mainCont.Args).To(HaveLen(4))
 				Expect(mainCont.Args[0]).To(Equal("--config"))
 				Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
+				Expect(mainCont.Args[2]).To(Equal("--config"))
+				Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/app-config.backend-auth.default.yaml"))
 			})
 
 			By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
-				Expect(mainCont.VolumeMounts).To(HaveLen(1))
+				Expect(mainCont.VolumeMounts).To(HaveLen(2))
 
 				dpRoot := findVolumeMounts(mainCont.VolumeMounts, "dynamic-plugins-root")
 				Expect(dpRoot).To(HaveLen(1), "No volume mount found with name: dynamic-plugins-root")
 				Expect(dpRoot[0].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
 				Expect(dpRoot[0].SubPath).To(BeEmpty())
+
+				bsAuth := findVolumeMounts(mainCont.VolumeMounts, backendAuthConfigName)
+				Expect(bsAuth).To(HaveLen(1), "No volume mount found with name: %s", backendAuthConfigName)
+				Expect(bsAuth[0].MountPath).To(Equal("/opt/app-root/src/app-config.backend-auth.default.yaml"))
+				Expect(bsAuth[0].SubPath).To(Equal("app-config.backend-auth.default.yaml"))
 			})
 
 			By("Checking the latest Status added to the Backstage instance")
@@ -702,155 +700,6 @@ plugins: []
 						})
 					})
 			}
-		}
-	})
-
-	Context("Backend Auth Secret", func() {
-		for _, key := range []string{"", "some-key"} {
-			key := key
-			When("creating CR with a non existing backend secret ref and key="+key, func() {
-				var backstage *bsv1alpha1.Backstage
-				BeforeEach(func() {
-					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-						Application: &bsv1alpha1.Application{
-							BackendAuthSecret: &bsv1alpha1.ObjectKeyRef{
-								Name: "non-existing-secret",
-								Key:  key,
-							},
-						},
-					})
-					err := k8sClient.Create(ctx, backstage)
-					Expect(err).To(Not(HaveOccurred()))
-				})
-
-				It("should reconcile", func() {
-					By("Checking if the custom resource was successfully created")
-					Eventually(func() error {
-						found := &bsv1alpha1.Backstage{}
-						return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
-					}, time.Minute, time.Second).Should(Succeed())
-
-					By("Reconciling the custom resource created")
-					_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
-						NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
-					})
-					Expect(err).To(Not(HaveOccurred()))
-
-					By("Not generating a value for backend auth secret key")
-					Consistently(func(g Gomega) {
-						found := &corev1.Secret{}
-						err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName + "-auth"}, found)
-						g.Expect(err).Should(HaveOccurred())
-						g.Expect(errors.IsNotFound(err)).To(BeTrue(),
-							fmt.Sprintf("error must be a not-found error, but is %v", err))
-					}, 5*time.Second, time.Second).Should(Succeed())
-
-					By("Checking that the Deployment was successfully created in the reconciliation")
-					found := &appsv1.Deployment{}
-					Eventually(func() error {
-						// TODO to get name from default
-						return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
-					}, time.Minute, time.Second).Should(Succeed())
-
-					By("Checking that the Deployment is configured with the specified secret", func() {
-						expectedKey := key
-						if key == "" {
-							expectedKey = "backend-secret"
-						}
-						backendSecretEnvVar, ok := findEnvVar(found.Spec.Template.Spec.Containers[0].Env, "BACKEND_SECRET")
-						Expect(ok).To(BeTrue(), "env var BACKEND_SECRET not found in main container")
-						Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Name).To(
-							Equal("non-existing-secret"), "'name' for backend auth secret ref should not be empty")
-						Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Key).To(
-							Equal(expectedKey), "Unexpected secret key ref for backend secret")
-						Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Optional).To(HaveValue(BeFalse()),
-							"'optional' for backend auth secret ref should be 'false'")
-
-						backendAuthAppConfigEnvVar, ok := findEnvVar(found.Spec.Template.Spec.Containers[0].Env, "APP_CONFIG_backend_auth_keys")
-						Expect(ok).To(BeTrue(), "env var APP_CONFIG_backend_auth_keys not found in main container")
-						Expect(backendAuthAppConfigEnvVar.Value).To(Equal(`[{"secret": "$(BACKEND_SECRET)"}]`))
-					})
-
-					By("Checking the latest Status added to the Backstage instance")
-					verifyBackstageInstance(ctx)
-				})
-			})
-
-			When("creating CR with an existing backend secret ref and key="+key, func() {
-				const backendAuthSecretName = "my-backend-auth-secret"
-				var backstage *bsv1alpha1.Backstage
-
-				BeforeEach(func() {
-					d := make(map[string][]byte)
-					if key != "" {
-						d[key] = []byte("lorem-ipsum-dolor-sit-amet")
-					}
-					backendAuthSecret := buildSecret(backendAuthSecretName, d)
-					err := k8sClient.Create(ctx, backendAuthSecret)
-					Expect(err).To(Not(HaveOccurred()))
-					backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-						Application: &bsv1alpha1.Application{
-							BackendAuthSecret: &bsv1alpha1.ObjectKeyRef{
-								Name: backendAuthSecretName,
-								Key:  key,
-							},
-						},
-					})
-					err = k8sClient.Create(ctx, backstage)
-					Expect(err).To(Not(HaveOccurred()))
-				})
-
-				It("should reconcile", func() {
-					By("Checking if the custom resource was successfully created")
-					Eventually(func() error {
-						found := &bsv1alpha1.Backstage{}
-						return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
-					}, time.Minute, time.Second).Should(Succeed())
-
-					By("Reconciling the custom resource created")
-					_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
-						NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
-					})
-					Expect(err).To(Not(HaveOccurred()))
-
-					By("Not generating a value for backend auth secret key")
-					Consistently(func(g Gomega) {
-						found := &corev1.Secret{}
-						err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName + "-auth"}, found)
-						g.Expect(err).Should(HaveOccurred())
-						g.Expect(errors.IsNotFound(err)).To(BeTrue(),
-							fmt.Sprintf("error must be a not-found error, but is %v", err))
-					}, 5*time.Second, time.Second).Should(Succeed())
-
-					By("Checking that the Deployment was successfully created in the reconciliation")
-					found := &appsv1.Deployment{}
-					Eventually(func() error {
-						// TODO to get name from default
-						return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
-					}, time.Minute, time.Second).Should(Succeed())
-
-					By("Checking that the Deployment is configured with the specified secret", func() {
-						expectedKey := key
-						if key == "" {
-							expectedKey = "backend-secret"
-						}
-						backendSecretEnvVar, ok := findEnvVar(found.Spec.Template.Spec.Containers[0].Env, "BACKEND_SECRET")
-						Expect(ok).To(BeTrue(), "env var BACKEND_SECRET not found in main container")
-						Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Name).To(Equal(backendAuthSecretName))
-						Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Key).To(
-							Equal(expectedKey), "Unexpected secret key ref for backend secret")
-						Expect(backendSecretEnvVar.ValueFrom.SecretKeyRef.Optional).To(HaveValue(BeFalse()),
-							"'optional' for backend auth secret ref should be 'false'")
-
-						backendAuthAppConfigEnvVar, ok := findEnvVar(found.Spec.Template.Spec.Containers[0].Env, "APP_CONFIG_backend_auth_keys")
-						Expect(ok).To(BeTrue(), "env var APP_CONFIG_backend_auth_keys not found in main container")
-						Expect(backendAuthAppConfigEnvVar.Value).To(Equal(`[{"secret": "$(BACKEND_SECRET)"}]`))
-					})
-
-					By("Checking the latest Status added to the Backstage instance")
-					verifyBackstageInstance(ctx)
-				})
-			})
 		}
 	})
 

@@ -17,6 +17,6 @@ configMapGenerator:
   - default-config/db-statefulset.yaml
   - default-config/db-service.yaml
   - default-config/db-service-hl.yaml
-  - default-config/backend-auth-secret.yaml
+  - default-config/backend-auth-configmap.yaml
   - default-config/dynamic-plugins-configmap.yaml
   name: default-config
