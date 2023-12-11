@@ -5,17 +5,25 @@ metadata:
 spec:
   skipLocalDb: false
   application:
+    replicas: 2
     appConfig:
       #mountPath:  /opt/app-root/src
       configMaps:
+        - name: "my-backstage-config-backend-auth"
         - name: "my-backstage-config-cm1"
         - name: "my-backstage-config-cm2"
           key: "app-config1-cm2.gh.yaml"
     dynamicPluginsConfigMapName: "my-dynamic-plugins-config-cm"
+    extraFiles:
+      mountPath: /tmp/my-extra-files
+      configMaps:
+        - name: "my-backstage-extra-files-cm1"
+      secrets:
+        - name: "my-backstage-extra-files-secret1"
     extraEnvs:
       envs:
-        - name: MY_ENV_VAR_1
-          value: my-value-1
+        - name: GITHUB_ORG
+          value: 'my-gh-org'
         - name: MY_ENV_VAR_2
           value: my-value-2
       configMaps:
@@ -23,30 +31,31 @@ spec:
         - name: my-env-cm-11
           key: CM_ENV11
       secrets:
-        - name: my-env-secret1
-        - name: my-env-secret11
-          key: SEC_ENV11
-    backendAuthSecret:
-      name: "my-backstage-backend-auth-secret"
-      key: "my-auth-key"
-    replicas: 2
-    extraFiles:
-      mountPath: /tmp/my-extra-files
-      configMaps:
-        - name: "my-backstage-extra-config-cm1"
-      secrets:
-        - name: "my-backstage-extra-config-secret1"
+        - name: "my-backstage-backend-auth-secret"
+          key: BACKEND_SECRET
+        - name: my-gh-auth-secret
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-backstage-config-backend-auth
+data:
+  "app-config.backend-auth.yaml": |
+    backend:
+      auth:
+        keys:
+          - secret: "${BACKEND_SECRET}"
 
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: my-backstage-backend-auth-secret
-data:
+stringData:
   # generated with the command below (from https://janus-idp.io/docs/auth/service-to-service-auth/#setup):
   # node -p 'require("crypto").randomBytes(24).toString("base64")'
-  backend-secret: TDRORDFRa2JxaFJhNTBzOGFDc1FWUEJ4ekFtRUw4UEU=
-  my-auth-key: TDRORDFRa2JxaFJhNTBzOGFDc1FWUEJ4ekFtRUw4UEU=
+  BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK"
 
 ---
 apiVersion: v1
@@ -65,7 +74,6 @@ data:
   app-config3-cm1.odo.yaml: |
     catalog:
       locations:
-        # [...]
         - type: url
           target: https://github.com/ododev/odo-backstage-software-template/blob/main/template.yaml
           rules:
@@ -84,8 +92,8 @@ data:
       providers:
         github:
           development:
-            clientId: '${MY_ENV_VAR_1}'
-            clientSecret: '${MY_ENV_VAR_2}'
+            clientId: '${GH_CLIENT_ID}'
+            clientSecret: '${GH_CLIENT_SECRET}'
   app-config2-cm2.yaml: |
     # a comment
 
@@ -99,6 +107,20 @@ data:
     includes:
       - dynamic-plugins.default.yaml
     plugins:
+      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
+        disabled: false
+        pluginConfig:
+          catalog:
+            providers:
+              github:
+                myorg:
+                  organization: '${GITHUB_ORG}'
+                  schedule:
+                    # supports cron, ISO duration, "human duration" (used below)
+                    frequency: { minutes: 30}
+                    # supports ISO duration, "human duration (used below)
+                    timeout: { minutes: 3}
+                    initialDelay: { seconds: 15}
       - package: '@dfatwork-pkgs/scaffolder-backend-module-http-request-wrapped-dynamic@4.0.9-0'
         integrity: 'sha512-+YYESzHdg1hsk2XN+zrtXPnsQnfbzmWIvcOM0oQLS4hf8F4iGTtOXKjWnZsR/14/khGsPrzy0oq1ytJ1/4ORkQ=='
       - package: '@dfatwork-pkgs/explore-backend-wrapped-dynamic@0.0.9-next.11'
@@ -131,25 +153,16 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: my-env-secret1
+  name: my-gh-auth-secret
 stringData:
-  SEC_ENV1: "secret env 1"
-  SEC_ENV2: "secret env 2"
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: my-env-secret11
-stringData:
-  SEC_ENV11: "secret env 11"
-  SEC_ENV12: "secret env 12"
+  GH_CLIENT_ID: "my GH client ID"
+  GH_CLIENT_SECRET: "my GH client secret"
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: my-backstage-extra-config-cm1
+  name: my-backstage-extra-files-cm1
 data:
   cm_file1.txt: |
     # From ConfigMap
@@ -163,7 +176,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: my-backstage-extra-config-secret1
+  name: my-backstage-extra-files-secret1
 stringData:
   secret_file1.txt: |
     # From Secret
