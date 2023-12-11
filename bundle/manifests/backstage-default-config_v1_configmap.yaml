@@ -1,12 +1,17 @@
 apiVersion: v1
 data:
-  backend-auth-secret.yaml: |
+  backend-auth-configmap.yaml: |
     apiVersion: v1
-    kind: Secret
+    kind: ConfigMap
     metadata:
-      name: # placeholder for '<cr-name>-auth'
+      name: # placeholder for '<cr-name>-backend-auth'
     data:
-    # A random value will be generated for the backend-secret key
+      "app-config.backend-auth.default.yaml": |
+        backend:
+          auth:
+            keys:
+              # This is a default value, which you should change by providing your own app-config
+              - secret: "pl4s3Ch4ng3M3"
   db-service-hl.yaml: |-
     apiVersion: v1
     kind: Service
