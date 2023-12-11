@@ -9,34 +9,23 @@ spec:
       - rhdh-pull-secret
     appConfig:
       configMaps:
-        - name: app-config-rhdh-auth
-        - name: app-config-rhdh-gh
+        - name: app-config-rhdh
     dynamicPluginsConfigMapName: dynamic-plugins-rhdh
     extraEnvs:
       secrets:
-        - name: backend-auth-rhdh
-          key: BACKEND_SECRET
-        - name: gh-auth-rhdh
+        - name: secrets-rhdh
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: app-config-rhdh-auth
+  name: app-config-rhdh
 data:
-  "app-config-rhdh-auth.yaml": |
+  "app-config-rhdh.yaml": |
     backend:
       auth:
         keys:
           - secret: "${BACKEND_SECRET}"
-
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: app-config-rhdh-gh
-data:
-  "app-config-rhdh-gh.yaml": |
     auth:
       # see https://backstage.io/docs/auth/ to learn about auth providers
       environment: development
@@ -50,11 +39,14 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: backend-auth-rhdh
+  name: secrets-rhdh
 stringData:
   # generated with the command below (from https://janus-idp.io/docs/auth/service-to-service-auth/#setup):
   # node -p 'require("crypto").randomBytes(24).toString("base64")'
   BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK" # notsecret
+  GH_ORG: "my-gh-org"
+  GH_CLIENT_ID: "my GH client ID"
+  GH_CLIENT_SECRET: "my GH client secret"
 
 ---
 apiVersion: v1
@@ -73,20 +65,10 @@ data:
             providers:
               github:
                 myorg:
-                  organization: '${GITHUB_ORG}'
+                  organization: '${GH_ORG}'
                   schedule:
                     # supports cron, ISO duration, "human duration" (used below)
                     frequency: { minutes: 30}
                     # supports ISO duration, "human duration (used below)
                     timeout: { minutes: 3}
                     initialDelay: { seconds: 15}
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gh-auth-rhdh
-stringData:
-  GITHUB_ORG: "my-gh-org"
-  GH_CLIENT_ID: "my GH client ID"
-  GH_CLIENT_SECRET: "my GH client secret"
