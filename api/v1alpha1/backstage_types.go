@@ -31,14 +31,14 @@ type BackstageSpec struct {
 	// Raw Runtime Objects configuration. For Advanced scenarios.
 	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
 
-	// Control the creation of a local PostgreSQL DB. Set to true if using for example an external Database for Backstage.
+	// Control the creation of a local PostgreSQL DB. Set to false if using for example an external Database for Backstage.
 	// To use an external Database, you can provide your own app-config file (see the AppConfig field in the Application structure)
 	// containing references to the Database connection information,
-	// which might be supplied as environment variables (see the Env field) or extra-configuration files
+	// which might be supplied as environment variables (see the ExtraEnvs field) or extra-configuration files
 	// (see the ExtraFiles field in the Application structure).
 	// +optional
-	//+kubebuilder:default=false
-	SkipLocalDb bool `json:"skipLocalDb,omitempty"`
+	//+kubebuilder:default=true
+	EnableLocalDb *bool `json:"enableLocalDb,omitempty"`
 }
 
 type Application struct {

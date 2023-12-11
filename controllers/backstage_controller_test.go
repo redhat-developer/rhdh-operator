@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	bsv1alpha1 "janus-idp.io/backstage-operator/api/v1alpha1"
@@ -1252,7 +1253,7 @@ plugins: []
 			var backstage *bsv1alpha1.Backstage
 			BeforeEach(func() {
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-					SkipLocalDb: true,
+					EnableLocalDb: pointer.Bool(false),
 				})
 				err := k8sClient.Create(ctx, backstage)
 				Expect(err).To(Not(HaveOccurred()))
