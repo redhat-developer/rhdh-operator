@@ -38,7 +38,7 @@ type BackstageSpec struct {
 	// (see the ExtraFiles field in the Application structure).
 	// +optional
 	//+kubebuilder:default=false
-	SkipLocalDb *bool `json:"skipLocalDb,omitempty"`
+	SkipLocalDb bool `json:"skipLocalDb,omitempty"`
 }
 
 type Application struct {

@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -91,7 +90,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, fmt.Errorf("failed to load backstage deployment from the cluster: %w", err)
 	}
 
-	if !pointer.BoolDeref(backstage.Spec.SkipLocalDb, false) {
+	if !backstage.Spec.SkipLocalDb {
 
 		/* We use default strogeclass currently, and no PV is needed in that case.
 		If we decide later on to support user provided storageclass we can enable pv creation.
