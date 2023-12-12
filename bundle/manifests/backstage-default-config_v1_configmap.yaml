@@ -142,7 +142,7 @@ data:
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: backstage
+      name:  # placeholder for 'backstage-<cr-name>'
     spec:
       replicas: 1
       selector:
@@ -217,7 +217,7 @@ data:
                 successThreshold: 1
                 timeoutSeconds: 2
               ports:
-                - name: http
+                - name: backend
                   containerPort: 7007
               env:
                 - name: APP_CONFIG_backend_listen_port
@@ -240,19 +240,34 @@ data:
         includes:
           - dynamic-plugins.default.yaml
         plugins: []
+  route.yaml: |-
+    apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name:  # placeholder for 'backstage-<cr-name>'
+    spec:
+      port:
+        targetPort: http-backend
+      path: /
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+      to:
+        kind: Service
+        name:  # placeholder for 'backstage-<cr-name>'
   service.yaml: |-
     apiVersion: v1
     kind: Service
     metadata:
-      name: backstage
+      name:  # placeholder for 'backstage-<cr-name>'
     spec:
-      type: NodePort
+      type: ClusterIP
       selector:
         janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
       ports:
-        - name: http
+        - name: http-backend
           port: 80
-          targetPort: http
+          targetPort: backend
 kind: ConfigMap
 metadata:
   name: backstage-default-config

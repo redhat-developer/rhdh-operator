@@ -221,7 +221,7 @@ var _ = Describe("Backstage controller", func() {
 			found := &appsv1.Deployment{}
 			Eventually(func() error {
 				// TODO to get name from default
-				return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
+				return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("checking the number of replicas")
@@ -370,7 +370,7 @@ spec:
 				By("Checking if Deployment was successfully created in the reconciliation")
 				Eventually(func() error {
 					found := &appsv1.Deployment{}
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "bs1-deployment"}, found)
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
@@ -488,7 +488,7 @@ spec:
 				By("Not creating a Backstage Deployment")
 				Consistently(func() error {
 					// TODO to get name from default
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, &appsv1.Deployment{})
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, &appsv1.Deployment{})
 				}, 5*time.Second, time.Second).Should(Not(Succeed()))
 			})
 		})
@@ -563,7 +563,7 @@ plugins: []
 							found := &appsv1.Deployment{}
 							Eventually(func(g Gomega) {
 								// TODO to get name from default
-								err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
+								err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
 								g.Expect(err).To(Not(HaveOccurred()))
 							}, time.Minute, time.Second).Should(Succeed())
 
@@ -749,7 +749,7 @@ plugins: []
 					By("Not creating a Backstage Deployment")
 					Consistently(func() error {
 						// TODO to get name from default
-						return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, &appsv1.Deployment{})
+						return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, &appsv1.Deployment{})
 					}, 5*time.Second, time.Second).Should(Not(Succeed()))
 				})
 			})
@@ -848,7 +848,7 @@ plugins: []
 					found := &appsv1.Deployment{}
 					Eventually(func(g Gomega) {
 						// TODO to get name from default
-						err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
+						err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
 						g.Expect(err).To(Not(HaveOccurred()))
 					}, time.Minute, time.Second).Should(Succeed())
 
@@ -1024,7 +1024,7 @@ plugins: []
 				found := &appsv1.Deployment{}
 				Eventually(func(g Gomega) {
 					// TODO to get name from default
-					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
+					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
 					g.Expect(err).To(Not(HaveOccurred()))
 				}, time.Minute, time.Second).Should(Succeed())
 
@@ -1134,7 +1134,7 @@ plugins: []
 			found := &appsv1.Deployment{}
 			Eventually(func(g Gomega) {
 				// TODO to get name from default
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
@@ -1185,7 +1185,7 @@ plugins: []
 			found := &appsv1.Deployment{}
 			Eventually(func(g Gomega) {
 				// TODO to get name from default
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
@@ -1234,7 +1234,7 @@ plugins: []
 			found := &appsv1.Deployment{}
 			Eventually(func(g Gomega) {
 				// TODO to get name from default
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, found)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
@@ -1284,7 +1284,7 @@ plugins: []
 				By("Checking if Deployment was successfully created in the reconciliation")
 				Eventually(func() error {
 					// TODO to get name from default
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "backstage"}, &appsv1.Deployment{})
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, &appsv1.Deployment{})
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
