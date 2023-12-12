@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: # placeholder for '<cr-name>-backend-auth'
+data:
+  "app-config.backend-auth.default.yaml": |
+    backend:
+      auth:
+        keys:
+          # This is a default value, which you should change by providing your own app-config
+          - secret: "pl4s3Ch4ng3M3"

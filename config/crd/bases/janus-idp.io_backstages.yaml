@@ -35,76 +35,196 @@ spec:
           spec:
             description: BackstageSpec defines the desired state of Backstage
             properties:
-              appConfigs:
-                description: References to existing app-configs Config objects. Each
-                  element can be a reference to any ConfigMap or Secret, and will
-                  be mounted inside the main application container under a dedicated
-                  directory containing the ConfigMap or Secret name. Additionally,
-                  each file will be passed as a `--config /path/to/secret_or_configmap/key`
-                  to the main container args in the order of the entries defined in
-                  the AppConfigs list. But bear in mind that for a single AppConfig
-                  element containing several files, the order in which those files
-                  will be appended to the container args, the main container args
-                  cannot be guaranteed. So if you want to pass multiple app-config
-                  files, it is recommended to pass one ConfigMap/Secret per app-config
-                  file.
-                items:
-                  properties:
-                    kind:
-                      description: Type of the existing App Config object, either
-                        ConfigMap or Secret
-                      enum:
-                      - ConfigMap
-                      - Secret
-                      type: string
-                    name:
-                      description: Name of an existing App Config object
-                      type: string
-                  required:
-                  - kind
-                  - name
-                  type: object
-                type: array
-              backendAuthSecretRef:
-                description: Optional Backend Auth Secret Name. A new one will be
-                  generated if not set. This Secret is used to set an environment
-                  variable named 'APP_CONFIG_backend_auth_keys' in the main container,
-                  which takes precedence over any 'backend.auth.keys' field defined
-                  in default or custom application configuration files. This is required
-                  for service-to-service auth and is shared by all backend plugins.
+              application:
+                description: Configuration for Backstage. Optional.
                 properties:
-                  key:
-                    default: backend-secret
-                    description: 'Key in the secret to use for the backend auth. Default
-                      value is: backend-secret'
+                  appConfig:
+                    description: References to existing app-configs ConfigMap objects,
+                      that will be mounted as files in the specified mount path. Each
+                      element can be a reference to any ConfigMap or Secret, and will
+                      be mounted inside the main application container under a specified
+                      mount directory. Additionally, each file will be passed as a
+                      `--config /mount/path/to/configmap/key` to the main container
+                      args in the order of the entries defined in the AppConfigs list.
+                      But bear in mind that for a single ConfigMap element containing
+                      several filenames, the order in which those files will be appended
+                      to the main container args cannot be guaranteed. So if you want
+                      to pass multiple app-config files, it is recommended to pass
+                      one ConfigMap per app-config file.
+                    properties:
+                      configMaps:
+                        description: List of ConfigMaps storing the app-config files.
+                          Will be mounted as files under the MountPath specified.
+                          For each item in this array, if a key is not specified,
+                          it means that all keys in the ConfigMap will be mounted
+                          as files. Otherwise, only the specified key will be mounted
+                          as a file. Bear in mind not to put sensitive data in those
+                          ConfigMaps. Instead, your app-config content can reference
+                          environment variables (which you can set with the ExtraEnvs
+                          field) and/or include extra files (see the ExtraFiles field).
+                          More details on https://backstage.io/docs/conf/writing/.
+                        items:
+                          properties:
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                      mountPath:
+                        default: /opt/app-root/src
+                        description: Mount path for all app-config files listed in
+                          the ConfigMapRefs field
+                        type: string
+                    type: object
+                  dynamicPluginsConfigMapName:
+                    description: 'Reference to an existing ConfigMap for Dynamic Plugins.
+                      A new one will be generated with the default config if not set.
+                      The ConfigMap object must have an existing key named: ''dynamic-plugins.yaml''.'
                     type: string
-                  name:
-                    description: Name of the secret to use for the backend auth
+                  extraEnvs:
+                    description: Extra environment variables
+                    properties:
+                      configMaps:
+                        description: List of references to ConfigMaps objects to inject
+                          as additional environment variables. For each item in this
+                          array, if a key is not specified, it means that all keys
+                          in the ConfigMap will be injected as additional environment
+                          variables. Otherwise, only the specified key will be injected
+                          as an additional environment variable.
+                        items:
+                          properties:
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                      envs:
+                        description: List of name and value pairs to add as environment
+                          variables.
+                        items:
+                          properties:
+                            name:
+                              description: Name of the environment variable
+                              type: string
+                            value:
+                              description: Value of the environment variable
+                              type: string
+                          required:
+                          - name
+                          - value
+                          type: object
+                        type: array
+                      secrets:
+                        description: List of references to Secrets objects to inject
+                          as additional environment variables. For each item in this
+                          array, if a key is not specified, it means that all keys
+                          in the Secret will be injected as additional environment
+                          variables. Otherwise, only the specified key will be injected
+                          as environment variable.
+                        items:
+                          properties:
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                    type: object
+                  extraFiles:
+                    description: References to existing Config objects to use as extra
+                      config files. They will be mounted as files in the specified
+                      mount path. Each element can be a reference to any ConfigMap
+                      or Secret.
+                    properties:
+                      configMaps:
+                        description: List of references to ConfigMaps objects mounted
+                          as extra files under the MountPath specified. For each item
+                          in this array, if a key is not specified, it means that
+                          all keys in the ConfigMap will be mounted as files. Otherwise,
+                          only the specified key will be mounted as a file.
+                        items:
+                          properties:
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                      mountPath:
+                        default: /opt/app-root/src
+                        description: Mount path for all extra configuration files
+                          listed in the Items field
+                        type: string
+                      secrets:
+                        description: List of references to Secrets objects mounted
+                          as extra files under the MountPath specified. For each item
+                          in this array, if a key is not specified, it means that
+                          all keys in the Secret will be mounted as files. Otherwise,
+                          only the specified key will be mounted as a file.
+                        items:
+                          properties:
+                            key:
+                              description: Key in the object
+                              type: string
+                            name:
+                              description: Name of the object We support only ConfigMaps
+                                and Secrets.
+                              type: string
+                          required:
+                          - name
+                          type: object
+                        type: array
+                    type: object
+                  image:
+                    description: Image to use in all containers (including Init Containers)
                     type: string
-                required:
-                - name
+                  imagePullSecrets:
+                    description: Image Pull Secrets to use in all containers (including
+                      Init Containers)
+                    items:
+                      type: string
+                    type: array
+                  replicas:
+                    default: 1
+                    description: Number of desired replicas to set in the Backstage
+                      Deployment. Defaults to 1.
+                    format: int32
+                    type: integer
                 type: object
-              dynamicPluginsConfig:
-                description: 'Reference to an existing configuration object for Dynamic
-                  Plugins. This can be a reference to any ConfigMap or Secret, but
-                  the object must have an existing key named: ''dynamic-plugins.yaml'''
-                properties:
-                  kind:
-                    description: Type of the Dynamic Plugins config object, either
-                      ConfigMap or Secret
-                    enum:
-                    - ConfigMap
-                    - Secret
-                    type: string
-                  name:
-                    description: Name of the Dynamic Plugins config object
-                    type: string
-                required:
-                - kind
-                - name
-                type: object
+              enableLocalDb:
+                default: true
+                description: Control the creation of a local PostgreSQL DB. Set to
+                  false if using for example an external Database for Backstage. To
+                  use an external Database, you can provide your own app-config file
+                  (see the AppConfig field in the Application structure) containing
+                  references to the Database connection information, which might be
+                  supplied as environment variables (see the ExtraEnvs field) or extra-configuration
+                  files (see the ExtraFiles field in the Application structure).
+                type: boolean
               rawRuntimeConfig:
-                description: Raw Runtime Objects configuration
+                description: Raw Runtime Objects configuration. For Advanced scenarios.
                 properties:
                   backstageConfig:
                     description: Name of ConfigMap containing Backstage runtime objects
@@ -115,9 +235,6 @@ spec:
                       runtime objects configuration
                     type: string
                 type: object
-              skipLocalDb:
-                default: false
-                type: boolean
             type: object
           status:
             description: BackstageStatus defines the observed state of Backstage

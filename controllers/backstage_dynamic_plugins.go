@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 //var (
@@ -40,16 +41,16 @@ import (
 //`
 //)
 
-func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (config bs.DynamicPluginsConfigRef, err error) {
-	if backstage.Spec.DynamicPluginsConfig != nil {
-		return *backstage.Spec.DynamicPluginsConfig, nil
+func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Context, backstage bs.Backstage, ns string) (configMap string, err error) {
+	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+		return backstage.Spec.Application.DynamicPluginsConfigMapName, nil
 	}
 
 	//Create default ConfigMap for dynamic plugins
 	var cm v1.ConfigMap
 	err = r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "dynamic-plugins-configmap.yaml", ns, &cm)
 	if err != nil {
-		return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to read config: %s", err)
+		return "", fmt.Errorf("failed to read config: %s", err)
 	}
 
 	dpConfigName := fmt.Sprintf("%s-dynamic-plugins", backstage.Name)
@@ -57,18 +58,23 @@ func (r *BackstageReconciler) getOrGenerateDynamicPluginsConf(ctx context.Contex
 	err = r.Get(ctx, types.NamespacedName{Name: dpConfigName, Namespace: ns}, &cm)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
+			return "", fmt.Errorf("failed to get config map for dynamic plugins (%q), reason: %s", dpConfigName, err)
+		}
+		setBackstageAppLabel(&cm.ObjectMeta.Labels, backstage)
+		r.labels(&cm.ObjectMeta, backstage)
+
+		if r.OwnsRuntime {
+			if err = controllerutil.SetControllerReference(&backstage, &cm, r.Scheme); err != nil {
+				return "", fmt.Errorf("failed to set owner reference: %s", err)
+			}
 		}
 		err = r.Create(ctx, &cm)
 		if err != nil {
-			return bs.DynamicPluginsConfigRef{}, fmt.Errorf("failed to create config map for dynamic plugins, reason: %s", err)
+			return "", fmt.Errorf("failed to create config map for dynamic plugins, reason: %s", err)
 		}
 	}
 
-	return bs.DynamicPluginsConfigRef{
-		Name: dpConfigName,
-		Kind: "ConfigMap",
-	}, nil
+	return dpConfigName, nil
 }
 
 func (r *BackstageReconciler) getDynamicPluginsConfVolume(ctx context.Context, backstage bs.Backstage, ns string) (*v1.Volume, error) {
@@ -77,27 +83,18 @@ func (r *BackstageReconciler) getDynamicPluginsConfVolume(ctx context.Context, b
 		return nil, err
 	}
 
-	if dpConf.Name == "" {
+	if dpConf == "" {
 		return nil, nil
 	}
 
-	var volumeSource v1.VolumeSource
-	switch dpConf.Kind {
-	case "ConfigMap":
-		volumeSource.ConfigMap = &v1.ConfigMapVolumeSource{
-			DefaultMode:          pointer.Int32(420),
-			LocalObjectReference: v1.LocalObjectReference{Name: dpConf.Name},
-		}
-	case "Secret":
-		volumeSource.Secret = &v1.SecretVolumeSource{
-			DefaultMode: pointer.Int32(420),
-			SecretName:  dpConf.Name,
-		}
-	}
-
 	return &v1.Volume{
-		Name:         dpConf.Name,
-		VolumeSource: volumeSource,
+		Name: dpConf,
+		VolumeSource: v1.VolumeSource{
+			ConfigMap: &v1.ConfigMapVolumeSource{
+				DefaultMode:          pointer.Int32(420),
+				LocalObjectReference: v1.LocalObjectReference{Name: dpConf},
+			},
+		},
 	}, nil
 }
 
@@ -107,7 +104,7 @@ func (r *BackstageReconciler) addDynamicPluginsConfVolumeMount(ctx context.Conte
 		return err
 	}
 
-	if dpConf.Name == "" {
+	if dpConf == "" {
 		return nil
 	}
 
@@ -115,7 +112,7 @@ func (r *BackstageReconciler) addDynamicPluginsConfVolumeMount(ctx context.Conte
 		if c.Name == _defaultBackstageInitContainerName {
 			deployment.Spec.Template.Spec.InitContainers[i].VolumeMounts = append(deployment.Spec.Template.Spec.InitContainers[i].VolumeMounts,
 				v1.VolumeMount{
-					Name:      dpConf.Name,
+					Name:      dpConf,
 					MountPath: fmt.Sprintf("%s/dynamic-plugins.yaml", _containersWorkingDir),
 					ReadOnly:  true,
 					SubPath:   "dynamic-plugins.yaml",

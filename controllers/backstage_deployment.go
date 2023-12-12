@@ -20,6 +20,7 @@ import (
 
 	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -128,6 +129,22 @@ const (
 //`, _defaultBackstageInitContainerName, _defaultBackstageMainContainerName, _containersWorkingDir)
 //)
 
+// ContainerVisitor is called with each container
+type ContainerVisitor func(container *v1.Container)
+
+// visitContainers invokes the visitor function for every container in the given pod template spec
+func visitContainers(podTemplateSpec *v1.PodTemplateSpec, visitor ContainerVisitor) {
+	for i := range podTemplateSpec.Spec.InitContainers {
+		visitor(&podTemplateSpec.Spec.InitContainers[i])
+	}
+	for i := range podTemplateSpec.Spec.Containers {
+		visitor(&podTemplateSpec.Spec.Containers[i])
+	}
+	for i := range podTemplateSpec.Spec.EphemeralContainers {
+		visitor((*v1.Container)(&podTemplateSpec.Spec.EphemeralContainers[i].EphemeralContainerCommon))
+	}
+}
+
 func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
 
 	//lg := log.FromContext(ctx)
@@ -173,6 +190,22 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
 			}
 
+			if backstage.Spec.Application != nil {
+				deployment.Spec.Replicas = backstage.Spec.Application.Replicas
+
+				if backstage.Spec.Application.Image != nil {
+					visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
+						container.Image = *backstage.Spec.Application.Image
+					})
+				}
+
+				for _, imagePullSecret := range backstage.Spec.Application.ImagePullSecrets {
+					deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{
+						Name: imagePullSecret,
+					})
+				}
+			}
+
 			err = r.Create(ctx, deployment)
 			if err != nil {
 				return fmt.Errorf("failed to create backstage deployment, reason: %s", err)
@@ -200,7 +233,13 @@ func (r *BackstageReconciler) addVolumes(ctx context.Context, backstage bs.Backs
 		deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, *dpConfVol)
 	}
 
-	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.appConfigsToVolumes(backstage)...)
+	backendAuthAppConfig, err := r.getBackendAuthAppConfig(ctx, backstage, ns)
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.appConfigsToVolumes(backstage, backendAuthAppConfig)...)
+	deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, r.extraFilesToVolumes(backstage)...)
 	return nil
 }
 
@@ -209,13 +248,26 @@ func (r *BackstageReconciler) addVolumeMounts(ctx context.Context, backstage bs.
 	if err != nil {
 		return err
 	}
-	return r.addAppConfigsVolumeMounts(ctx, backstage, ns, deployment)
+	backendAuthAppConfig, err := r.getBackendAuthAppConfig(ctx, backstage, ns)
+	if err != nil {
+		return err
+	}
+	err = r.addAppConfigsVolumeMounts(ctx, backstage, ns, deployment, backendAuthAppConfig)
+	if err != nil {
+		return err
+	}
+	return r.addExtraFilesVolumeMounts(ctx, backstage, ns, deployment)
 }
 
 func (r *BackstageReconciler) addContainerArgs(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	return r.addAppConfigsContainerArgs(ctx, backstage, ns, deployment)
+	backendAuthAppConfig, err := r.getBackendAuthAppConfig(ctx, backstage, ns)
+	if err != nil {
+		return err
+	}
+	return r.addAppConfigsContainerArgs(ctx, backstage, ns, deployment, backendAuthAppConfig)
 }
 
 func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
-	return r.addBackendAuthEnvVar(ctx, backstage, ns, deployment)
+	r.addExtraEnvs(backstage, deployment)
+	return nil
 }
