@@ -20,49 +20,45 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	openshift "github.com/openshift/api/route/v1"
 	bs "janus-idp.io/backstage-operator/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// selector for deploy.spec.template.spec.meta.label
-// targetPort: http for deploy.spec.template.spec.containers.ports.name=http
-func (r *BackstageReconciler) applyBackstageService(ctx context.Context, backstage bs.Backstage, ns string) error {
-
-	//lg := log.FromContext(ctx)
-
-	service := &corev1.Service{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "service.yaml", ns, service)
+func (r *BackstageReconciler) applyBackstageRoute(ctx context.Context, backstage bs.Backstage, ns string) error {
+	route := &openshift.Route{}
+	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "route.yaml", ns, route)
 	if err != nil {
 		return err
 	}
 
-	service.Name = fmt.Sprintf("backstage-%s", backstage.Name)
-	setBackstageAppLabel(&service.Spec.Selector, backstage)
+	// Override the route and service names
+	name := fmt.Sprintf("backstage-%s", backstage.Name)
+	route.Name = name
+	route.Spec.To.Name = name
 
-	err = r.Get(ctx, types.NamespacedName{Name: service.Name, Namespace: ns}, service)
+	err = r.Get(ctx, types.NamespacedName{Name: route.Name, Namespace: ns}, route)
 	if err != nil {
-		if errors.IsNotFound(err) {
-		} else {
-			return fmt.Errorf("failed to get backstage service, reason: %s", err)
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to get backstage route, reason: %s", err)
 		}
 	} else {
 		//lg.Info("CR update is ignored for the time")
 		return nil
 	}
 
-	r.labels(&service.ObjectMeta, backstage)
+	r.labels(&route.ObjectMeta, backstage)
 
 	if r.OwnsRuntime {
-		if err := controllerutil.SetControllerReference(&backstage, service, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(&backstage, route, r.Scheme); err != nil {
 			return fmt.Errorf("failed to set owner reference: %s", err)
 		}
 	}
 
-	err = r.Create(ctx, service)
+	err = r.Create(ctx, route)
 	if err != nil {
-		return fmt.Errorf("failed to create backstage service, reason: %s", err)
+		return fmt.Errorf("failed to create backstage route, reason: %s", err)
 	}
 	return nil
 }

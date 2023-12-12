@@ -14,6 +14,7 @@ configMapGenerator:
 - files:
   - default-config/deployment.yaml
   - default-config/service.yaml
+  - default-config/route.yaml
   - default-config/db-statefulset.yaml
   - default-config/db-service.yaml
   - default-config/db-service-hl.yaml

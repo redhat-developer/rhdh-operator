@@ -1,0 +1,14 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name:  # placeholder for 'backstage-<cr-name>'
+spec:
+  port:
+    targetPort: http-backend
+  path: /
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name:  # placeholder for 'backstage-<cr-name>'

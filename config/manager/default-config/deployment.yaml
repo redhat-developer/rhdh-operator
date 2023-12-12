@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backstage
+  name:  # placeholder for 'backstage-<cr-name>'
 spec:
   replicas: 1
   selector:
@@ -76,7 +76,7 @@ spec:
             successThreshold: 1
             timeoutSeconds: 2
           ports:
-            - name: http
+            - name: backend
               containerPort: 7007
           env:
             - name: APP_CONFIG_backend_listen_port
