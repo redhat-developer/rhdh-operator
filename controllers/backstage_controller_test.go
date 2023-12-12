@@ -166,6 +166,30 @@ var _ = Describe("Backstage controller", func() {
 		})
 	}
 
+	findStatefulSetDBSecretName := func(statefulSet *appsv1.StatefulSet) string {
+		for i, c := range statefulSet.Spec.Template.Spec.Containers {
+			if c.Name == _defaultPsqlMainContainerName {
+				for _, from := range statefulSet.Spec.Template.Spec.Containers[i].EnvFrom {
+					return from.SecretRef.Name
+				}
+				break
+			}
+		}
+		return ""
+	}
+
+	findDeploymentDBSecretName := func(deployment *appsv1.Deployment) string {
+		for i, c := range deployment.Spec.Template.Spec.Containers {
+			if c.Name == _defaultBackstageMainContainerName {
+				for _, from := range deployment.Spec.Template.Spec.Containers[i].EnvFrom {
+					return from.SecretRef.Name
+				}
+				break
+			}
+		}
+		return ""
+	}
+
 	When("creating default CR with no spec", func() {
 		var backstage *bsv1alpha1.Backstage
 		BeforeEach(func() {
@@ -187,12 +211,21 @@ var _ = Describe("Backstage controller", func() {
 			})
 			Expect(err).To(Not(HaveOccurred()))
 
+			By("creating a secret for accessing the Database")
+			Eventually(func(g Gomega) {
+				found := &corev1.Secret{}
+				name := fmt.Sprintf("backstage-psql-secret-%s", backstage.Name)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
+				g.Expect(err).ShouldNot(HaveOccurred())
+			}, time.Minute, time.Second).Should(Succeed())
+
 			By("creating a StatefulSet for the Database")
 			Eventually(func(g Gomega) {
 				found := &appsv1.StatefulSet{}
 				name := fmt.Sprintf("backstage-psql-%s", backstage.Name)
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
 				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(findStatefulSetDBSecretName(found)).Should(Equal(fmt.Sprintf("backstage-psql-secret-%s", backstage.Name)))
 			}, time.Minute, time.Second).Should(Succeed())
 
 			backendAuthConfigName := fmt.Sprintf("%s-auth-app-config", backstageName)
@@ -306,6 +339,9 @@ var _ = Describe("Backstage controller", func() {
 				Expect(bsAuth[0].MountPath).To(Equal("/opt/app-root/src/app-config.backend-auth.default.yaml"))
 				Expect(bsAuth[0].SubPath).To(Equal("app-config.backend-auth.default.yaml"))
 			})
+
+			By("Checking the db secret used by the Backstage Deployment")
+			Expect(findDeploymentDBSecretName(found)).Should(Equal(fmt.Sprintf("backstage-psql-secret-%s", backstage.Name)))
 
 			By("Checking the latest Status added to the Backstage instance")
 			verifyBackstageInstance(ctx)

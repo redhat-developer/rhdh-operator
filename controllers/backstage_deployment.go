@@ -186,7 +186,7 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				return fmt.Errorf("failed to add container args to Backstage deployment, reason: %s", err)
 			}
 
-			err = r.addEnvVars(ctx, backstage, ns, deployment)
+			err = r.addEnvVars(backstage, ns, deployment)
 			if err != nil {
 				return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
 			}
@@ -206,6 +206,8 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 					})
 				}
 			}
+
+			r.updatePsqlSecretRef(backstage, deployment)
 
 			err = r.Create(ctx, deployment)
 			if err != nil {
@@ -268,7 +270,22 @@ func (r *BackstageReconciler) addContainerArgs(ctx context.Context, backstage bs
 	return r.addAppConfigsContainerArgs(ctx, backstage, ns, deployment, backendAuthAppConfig)
 }
 
-func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
+func (r *BackstageReconciler) addEnvVars(backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
 	r.addExtraEnvs(backstage, deployment)
 	return nil
+}
+
+func (r *BackstageReconciler) updatePsqlSecretRef(backstage bs.Backstage, deployment *appsv1.Deployment) {
+	for i, c := range deployment.Spec.Template.Spec.Containers {
+		if c.Name == _defaultBackstageMainContainerName {
+			for k, from := range deployment.Spec.Template.Spec.Containers[i].EnvFrom {
+				if from.SecretRef.Name == postGresSecret {
+					from.SecretRef.Name = getDefaultPsqlSecretName(&backstage)
+					deployment.Spec.Template.Spec.Containers[i].EnvFrom[k] = from
+					break
+				}
+			}
+			break
+		}
+	}
 }

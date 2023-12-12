@@ -83,7 +83,7 @@ spec:
               value: "7007"
           envFrom:
             - secretRef:
-                name: postgres-secrets
+                name: "{POSTGRESQL_SECRET}"  # will be replaced with 'backstage-psql-secrets-<cr-name>'  
           #            - secretRef:
           #                name: backstage-secrets
           volumeMounts:
