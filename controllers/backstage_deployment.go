@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -207,8 +208,10 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				}
 			}
 
-			r.updatePsqlSecretRef(backstage, deployment)
-
+			err = r.validateAndUpdatePsqlSecretRef(backstage, deployment)
+			if err != nil {
+				return fmt.Errorf("failed to validate database secret, reason: %s", err)
+			}
 			err = r.Create(ctx, deployment)
 			if err != nil {
 				return fmt.Errorf("failed to create backstage deployment, reason: %s", err)
@@ -275,17 +278,27 @@ func (r *BackstageReconciler) addEnvVars(backstage bs.Backstage, ns string, depl
 	return nil
 }
 
-func (r *BackstageReconciler) updatePsqlSecretRef(backstage bs.Backstage, deployment *appsv1.Deployment) {
+func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backstage, deployment *appsv1.Deployment) error {
+	if backstage.Spec.ExistingDbSecret == nil && !pointer.BoolDeref(backstage.Spec.EnableLocalDb, true) {
+		return fmt.Errorf("existingDbSerect is required if enableLocalDb is false")
+	}
 	for i, c := range deployment.Spec.Template.Spec.Containers {
-		if c.Name == _defaultBackstageMainContainerName {
-			for k, from := range deployment.Spec.Template.Spec.Containers[i].EnvFrom {
-				if from.SecretRef.Name == postGresSecret {
-					from.SecretRef.Name = getDefaultPsqlSecretName(&backstage)
-					deployment.Spec.Template.Spec.Containers[i].EnvFrom[k] = from
-					break
-				}
+		if c.Name != _defaultBackstageMainContainerName {
+			continue
+		}
+		for k, from := range deployment.Spec.Template.Spec.Containers[i].EnvFrom {
+			if from.SecretRef.Name != postGresSecret {
+				continue
 			}
+			if backstage.Spec.ExistingDbSecret == nil {
+				from.SecretRef.Name = getDefaultPsqlSecretName(&backstage)
+			} else {
+				from.SecretRef.Name = backstage.Spec.ExistingDbSecret.Name
+			}
+			deployment.Spec.Template.Spec.Containers[i].EnvFrom[k] = from
 			break
 		}
 	}
+
+	return nil
 }

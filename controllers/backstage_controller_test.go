@@ -1286,16 +1286,16 @@ plugins: []
 		// Other cases covered in the tests above
 
 		When("disabling PostgreSQL in the CR", func() {
-			var backstage *bsv1alpha1.Backstage
-			BeforeEach(func() {
-				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
+			It("should successfully reconcile a custom resource for default Backstage with existing secret", func() {
+				backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
 					EnableLocalDb: pointer.Bool(false),
+					ExistingDbSecret: &bsv1alpha1.ObjectKeyRef{
+						Name: "existing-secret",
+					},
 				})
 				err := k8sClient.Create(ctx, backstage)
 				Expect(err).To(Not(HaveOccurred()))
-			})
 
-			It("should successfully reconcile a custom resource for default Backstage", func() {
 				By("Checking if the custom resource was successfully created")
 				Eventually(func() error {
 					found := &bsv1alpha1.Backstage{}
@@ -1303,7 +1303,7 @@ plugins: []
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Reconciling the custom resource created")
-				_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
+				_, err = backstageReconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 				})
 				Expect(err).To(Not(HaveOccurred()))
@@ -1326,6 +1326,26 @@ plugins: []
 				By("Checking the latest Status added to the Backstage instance")
 				verifyBackstageInstance(ctx)
 			})
+		})
+		It("should fail to reconcile a custom resource for default Backstage without existing secret", func() {
+			backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
+				EnableLocalDb: pointer.Bool(false),
+			})
+			err := k8sClient.Create(ctx, backstage)
+			Expect(err).To(Not(HaveOccurred()))
+
+			By("Checking if the custom resource was successfully created")
+			Eventually(func() error {
+				found := &bsv1alpha1.Backstage{}
+				return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Reconciling the custom resource created")
+			_, err = backstageReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+			})
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("existingDbSerect is required if enableLocalDb is false"))
 		})
 	})
 })
