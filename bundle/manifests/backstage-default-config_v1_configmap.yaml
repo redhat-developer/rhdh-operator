@@ -23,7 +23,7 @@ data:
       "POSTGRES_USER": "postgres"
       "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4" # default value, change to your own value
       "POSTGRES_HOST": "" # set to your Postgres DB host. If the local DB is deployed, set to 'backstage-psql-<cr-name>'
-  db-service-hl.yaml: |-
+  db-service-hl.yaml: |
     apiVersion: v1
     kind: Service
     metadata:
@@ -81,7 +81,7 @@ data:
     \     partition: 0\n    type: RollingUpdate\n  volumeClaimTemplates:\n    - apiVersion:
     v1\n      kind: PersistentVolumeClaim\n      metadata:\n        name: data\n      spec:\n
     \       accessModes:\n          - ReadWriteOnce\n        resources:\n          requests:\n
-    \           storage: 1Gi"
+    \           storage: 1Gi\n"
   deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name:  # placeholder
     for 'backstage-<cr-name>'\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n
     \     janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'\n  template:\n

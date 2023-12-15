@@ -1288,9 +1288,11 @@ plugins: []
 		When("disabling PostgreSQL in the CR", func() {
 			It("should successfully reconcile a custom resource for default Backstage with existing secret", func() {
 				backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
-					EnableLocalDb: pointer.Bool(false),
-					ExistingDbSecret: &bsv1alpha1.ObjectKeyRef{
-						Name: "existing-secret",
+					DatabaseConfig: bsv1alpha1.DatabaseConfig{
+						EnableLocalDb: pointer.Bool(false),
+						AuthSecret: &bsv1alpha1.ObjectKeyRef{
+							Name: "existing-secret",
+						},
 					},
 				})
 				err := k8sClient.Create(ctx, backstage)
@@ -1329,7 +1331,9 @@ plugins: []
 		})
 		It("should fail to reconcile a custom resource for default Backstage without existing secret", func() {
 			backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
-				EnableLocalDb: pointer.Bool(false),
+				DatabaseConfig: bsv1alpha1.DatabaseConfig{
+					EnableLocalDb: pointer.Bool(false),
+				},
 			})
 			err := k8sClient.Create(ctx, backstage)
 			Expect(err).To(Not(HaveOccurred()))

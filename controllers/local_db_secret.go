@@ -97,12 +97,12 @@ func getSecretNameForGeneration(statefulSet *appsv1.StatefulSet, backstage *bs.B
 		}
 		for k, from := range statefulSet.Spec.Template.Spec.Containers[i].EnvFrom {
 			if from.SecretRef.Name == postGresSecret {
-				if backstage.Spec.ExistingDbSecret == nil {
+				if backstage.Spec.DatabaseConfig.AuthSecret == nil {
 					from.SecretRef.Name = getDefaultPsqlSecretName(backstage)
 					statefulSet.Spec.Template.Spec.Containers[i].EnvFrom[k] = from
 					return from.SecretRef.Name
 				} else {
-					from.SecretRef.Name = backstage.Spec.ExistingDbSecret.Name
+					from.SecretRef.Name = backstage.Spec.DatabaseConfig.AuthSecret.Name
 					statefulSet.Spec.Template.Spec.Containers[i].EnvFrom[k] = from
 					break
 				}

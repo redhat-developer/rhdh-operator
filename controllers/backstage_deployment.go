@@ -279,7 +279,7 @@ func (r *BackstageReconciler) addEnvVars(backstage bs.Backstage, ns string, depl
 }
 
 func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backstage, deployment *appsv1.Deployment) error {
-	if backstage.Spec.ExistingDbSecret == nil && !pointer.BoolDeref(backstage.Spec.EnableLocalDb, true) {
+	if backstage.Spec.DatabaseConfig.AuthSecret == nil && !pointer.BoolDeref(backstage.Spec.DatabaseConfig.EnableLocalDb, true) {
 		return fmt.Errorf("existingDbSerect is required if enableLocalDb is false")
 	}
 	for i, c := range deployment.Spec.Template.Spec.Containers {
@@ -290,10 +290,10 @@ func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backst
 			if from.SecretRef.Name != postGresSecret {
 				continue
 			}
-			if backstage.Spec.ExistingDbSecret == nil {
+			if backstage.Spec.DatabaseConfig.AuthSecret == nil {
 				from.SecretRef.Name = getDefaultPsqlSecretName(&backstage)
 			} else {
-				from.SecretRef.Name = backstage.Spec.ExistingDbSecret.Name
+				from.SecretRef.Name = backstage.Spec.DatabaseConfig.AuthSecret.Name
 			}
 			deployment.Spec.Template.Spec.Containers[i].EnvFrom[k] = from
 			break
