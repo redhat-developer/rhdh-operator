@@ -213,11 +213,11 @@ spec:
                     format: int32
                     type: integer
                 type: object
-              databaseConfig:
+              database:
                 description: Configuration for database access. Optional.
                 properties:
-                  authSecret:
-                    description: 'Reference to a secret for database authentication.
+                  authSecretName:
+                    description: 'Name of the secret for database authentication.
                       Required for external database access. Optional for a local
                       database (EnableLocalDb=true) and if absent a secret will be
                       auto generated. The secret shall include information used for
@@ -226,17 +226,7 @@ spec:
                       "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4" "POSTGRES_HOST":
                       "backstage-psql-bs1"  # For local database, set to "backstage-psql-<CR
                       name>".'
-                    properties:
-                      key:
-                        description: Key in the object
-                        type: string
-                      name:
-                        description: Name of the object We support only ConfigMaps
-                          and Secrets.
-                        type: string
-                    required:
-                    - name
-                    type: object
+                    type: string
                   enableLocalDb:
                     default: true
                     description: Control the creation of a local PostgreSQL DB. Set

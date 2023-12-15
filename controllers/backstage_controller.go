@@ -94,7 +94,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, fmt.Errorf("failed to load backstage deployment from the cluster: %w", err)
 	}
 
-	if pointer.BoolDeref(backstage.Spec.DatabaseConfig.EnableLocalDb, true) {
+	if pointer.BoolDeref(backstage.Spec.Database.EnableLocalDb, true) {
 
 		/* We use default strogeclass currently, and no PV is needed in that case.
 		If we decide later on to support user provided storageclass we can enable pv creation.
