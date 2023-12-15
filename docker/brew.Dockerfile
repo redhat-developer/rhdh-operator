@@ -78,20 +78,3 @@ WORKDIR ${HOME}
 ENTRYPOINT ["/manager"]
 
 # append Brew metadata here
-ENV SUMMARY="Red Hat Developer Hub operator" \
-    DESCRIPTION="Red Hat Developer Hub operator" \
-    PRODNAME="rhdh" \
-    COMPNAME="operator"
-
-LABEL summary="$SUMMARY" \
-      description="$DESCRIPTION" \
-      io.k8s.description="$DESCRIPTION" \
-      io.k8s.display-name="$DESCRIPTION" \
-      io.openshift.tags="$PRODNAME,$COMPNAME" \
-      com.redhat.component="$PRODNAME-$COMPNAME-container" \
-      name="$PRODNAME/$PRODNAME-rhel9-$COMPNAME" \
-      version="${CI_X_VERSION}.${CI_Y_VERSION}" \
-      license="EPLv2" \
-      maintainer="Nick Boldt <nboldt@redhat.com>, Tom Coufal <tcoufal@redhat.com>, Christophe Fargette <jfargett@redhat.com>" \
-      io.openshift.expose-services="" \
-      usage=""
