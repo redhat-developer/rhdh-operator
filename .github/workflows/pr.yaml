@@ -30,6 +30,8 @@ jobs:
 
     strategy:
       matrix:
+        # See ../Makefile for value of single arch PLATFORM used with targets docker-build and podman-build
+        # NOTE: to build multiple arches, see ../Makefile and use target docker-buildx with PLATFORMS
         engine: [docker, podman]
 
     steps:
