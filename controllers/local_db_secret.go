@@ -18,6 +18,7 @@ package controller
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -62,7 +63,7 @@ func (r *BackstageReconciler) handlePsqlSecret(ctx context.Context, statefulSet 
 				// Do not fail, but use a fallback value
 				return _defaultPostGresSecretValue
 			}
-			return string(bytes)
+			return base64.StdEncoding.EncodeToString(bytes) // Encode the password to prevent special characters
 		}(24)
 		sec.StringData["POSTGRES_PASSWORD"] = val
 		sec.StringData["POSTGRESQL_ADMIN_PASSWORD"] = val
