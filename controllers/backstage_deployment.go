@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -186,7 +187,7 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				return fmt.Errorf("failed to add container args to Backstage deployment, reason: %s", err)
 			}
 
-			err = r.addEnvVars(ctx, backstage, ns, deployment)
+			err = r.addEnvVars(backstage, ns, deployment)
 			if err != nil {
 				return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
 			}
@@ -207,6 +208,10 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 				}
 			}
 
+			err = r.validateAndUpdatePsqlSecretRef(backstage, deployment)
+			if err != nil {
+				return fmt.Errorf("failed to validate database secret, reason: %s", err)
+			}
 			err = r.Create(ctx, deployment)
 			if err != nil {
 				return fmt.Errorf("failed to create backstage deployment, reason: %s", err)
@@ -268,7 +273,32 @@ func (r *BackstageReconciler) addContainerArgs(ctx context.Context, backstage bs
 	return r.addAppConfigsContainerArgs(ctx, backstage, ns, deployment, backendAuthAppConfig)
 }
 
-func (r *BackstageReconciler) addEnvVars(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
+func (r *BackstageReconciler) addEnvVars(backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
 	r.addExtraEnvs(backstage, deployment)
+	return nil
+}
+
+func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backstage, deployment *appsv1.Deployment) error {
+	if len(backstage.Spec.Database.AuthSecretName) == 0 && !pointer.BoolDeref(backstage.Spec.Database.EnableLocalDb, true) {
+		return fmt.Errorf("existingDbSerect is required if enableLocalDb is false")
+	}
+	for i, c := range deployment.Spec.Template.Spec.Containers {
+		if c.Name != _defaultBackstageMainContainerName {
+			continue
+		}
+		for k, from := range deployment.Spec.Template.Spec.Containers[i].EnvFrom {
+			if from.SecretRef.Name != postGresSecret {
+				continue
+			}
+			if len(backstage.Spec.Database.AuthSecretName) == 0 {
+				from.SecretRef.Name = getDefaultPsqlSecretName(&backstage)
+			} else {
+				from.SecretRef.Name = backstage.Spec.Database.AuthSecretName
+			}
+			deployment.Spec.Template.Spec.Containers[i].EnvFrom[k] = from
+			break
+		}
+	}
+
 	return nil
 }

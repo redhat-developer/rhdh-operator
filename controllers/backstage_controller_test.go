@@ -166,6 +166,30 @@ var _ = Describe("Backstage controller", func() {
 		})
 	}
 
+	findStatefulSetDBSecretName := func(statefulSet *appsv1.StatefulSet) string {
+		for i, c := range statefulSet.Spec.Template.Spec.Containers {
+			if c.Name == _defaultPsqlMainContainerName {
+				for _, from := range statefulSet.Spec.Template.Spec.Containers[i].EnvFrom {
+					return from.SecretRef.Name
+				}
+				break
+			}
+		}
+		return ""
+	}
+
+	findDeploymentDBSecretName := func(deployment *appsv1.Deployment) string {
+		for i, c := range deployment.Spec.Template.Spec.Containers {
+			if c.Name == _defaultBackstageMainContainerName {
+				for _, from := range deployment.Spec.Template.Spec.Containers[i].EnvFrom {
+					return from.SecretRef.Name
+				}
+				break
+			}
+		}
+		return ""
+	}
+
 	When("creating default CR with no spec", func() {
 		var backstage *bsv1alpha1.Backstage
 		BeforeEach(func() {
@@ -187,12 +211,21 @@ var _ = Describe("Backstage controller", func() {
 			})
 			Expect(err).To(Not(HaveOccurred()))
 
+			By("creating a secret for accessing the Database")
+			Eventually(func(g Gomega) {
+				found := &corev1.Secret{}
+				name := fmt.Sprintf("backstage-psql-secret-%s", backstage.Name)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
+				g.Expect(err).ShouldNot(HaveOccurred())
+			}, time.Minute, time.Second).Should(Succeed())
+
 			By("creating a StatefulSet for the Database")
 			Eventually(func(g Gomega) {
 				found := &appsv1.StatefulSet{}
 				name := fmt.Sprintf("backstage-psql-%s", backstage.Name)
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
 				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(findStatefulSetDBSecretName(found)).Should(Equal(fmt.Sprintf("backstage-psql-secret-%s", backstage.Name)))
 			}, time.Minute, time.Second).Should(Succeed())
 
 			backendAuthConfigName := fmt.Sprintf("%s-auth-app-config", backstageName)
@@ -306,6 +339,9 @@ var _ = Describe("Backstage controller", func() {
 				Expect(bsAuth[0].MountPath).To(Equal("/opt/app-root/src/app-config.backend-auth.default.yaml"))
 				Expect(bsAuth[0].SubPath).To(Equal("app-config.backend-auth.default.yaml"))
 			})
+
+			By("Checking the db secret used by the Backstage Deployment")
+			Expect(findDeploymentDBSecretName(found)).Should(Equal(fmt.Sprintf("backstage-psql-secret-%s", backstage.Name)))
 
 			By("Checking the latest Status added to the Backstage instance")
 			verifyBackstageInstance(ctx)
@@ -1250,16 +1286,16 @@ plugins: []
 		// Other cases covered in the tests above
 
 		When("disabling PostgreSQL in the CR", func() {
-			var backstage *bsv1alpha1.Backstage
-			BeforeEach(func() {
-				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-					EnableLocalDb: pointer.Bool(false),
+			It("should successfully reconcile a custom resource for default Backstage with existing secret", func() {
+				backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
+					Database: bsv1alpha1.Database{
+						EnableLocalDb:  pointer.Bool(false),
+						AuthSecretName: "existing-secret",
+					},
 				})
 				err := k8sClient.Create(ctx, backstage)
 				Expect(err).To(Not(HaveOccurred()))
-			})
 
-			It("should successfully reconcile a custom resource for default Backstage", func() {
 				By("Checking if the custom resource was successfully created")
 				Eventually(func() error {
 					found := &bsv1alpha1.Backstage{}
@@ -1267,7 +1303,7 @@ plugins: []
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Reconciling the custom resource created")
-				_, err := backstageReconciler.Reconcile(ctx, reconcile.Request{
+				_, err = backstageReconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 				})
 				Expect(err).To(Not(HaveOccurred()))
@@ -1290,6 +1326,28 @@ plugins: []
 				By("Checking the latest Status added to the Backstage instance")
 				verifyBackstageInstance(ctx)
 			})
+		})
+		It("should fail to reconcile a custom resource for default Backstage without existing secret", func() {
+			backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
+				Database: bsv1alpha1.Database{
+					EnableLocalDb: pointer.Bool(false),
+				},
+			})
+			err := k8sClient.Create(ctx, backstage)
+			Expect(err).To(Not(HaveOccurred()))
+
+			By("Checking if the custom resource was successfully created")
+			Eventually(func() error {
+				found := &bsv1alpha1.Backstage{}
+				return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Reconciling the custom resource created")
+			_, err = backstageReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+			})
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("existingDbSerect is required if enableLocalDb is false"))
 		})
 	})
 })

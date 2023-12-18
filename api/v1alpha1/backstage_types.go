@@ -31,14 +31,26 @@ type BackstageSpec struct {
 	// Raw Runtime Objects configuration. For Advanced scenarios.
 	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
 
+	// Configuration for database access. Optional.
+	Database Database `json:"database,omitempty"`
+}
+
+type Database struct {
 	// Control the creation of a local PostgreSQL DB. Set to false if using for example an external Database for Backstage.
-	// To use an external Database, you can provide your own app-config file (see the AppConfig field in the Application structure)
-	// containing references to the Database connection information,
-	// which might be supplied as environment variables (see the ExtraEnvs field) or extra-configuration files
-	// (see the ExtraFiles field in the Application structure).
 	// +optional
 	//+kubebuilder:default=true
 	EnableLocalDb *bool `json:"enableLocalDb,omitempty"`
+
+	// Name of the secret for database authentication. Required for external database access.
+	// Optional for a local database (EnableLocalDb=true) and if absent a secret will be auto generated.
+	// The secret shall include information used for the database access.
+	// An example for PostgreSQL DB access:
+	// "POSTGRES_PASSWORD": "rl4s3Fh4ng3M4"
+	// "POSTGRES_PORT": "5432"
+	// "POSTGRES_USER": "postgres"
+	// "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4"
+	// "POSTGRES_HOST": "backstage-psql-bs1"  # For local database, set to "backstage-psql-<CR name>".
+	AuthSecretName string `json:"authSecretName,omitempty"`
 }
 
 type Application struct {

@@ -213,16 +213,26 @@ spec:
                     format: int32
                     type: integer
                 type: object
-              enableLocalDb:
-                default: true
-                description: Control the creation of a local PostgreSQL DB. Set to
-                  false if using for example an external Database for Backstage. To
-                  use an external Database, you can provide your own app-config file
-                  (see the AppConfig field in the Application structure) containing
-                  references to the Database connection information, which might be
-                  supplied as environment variables (see the ExtraEnvs field) or extra-configuration
-                  files (see the ExtraFiles field in the Application structure).
-                type: boolean
+              database:
+                description: Configuration for database access. Optional.
+                properties:
+                  authSecretName:
+                    description: 'Name of the secret for database authentication.
+                      Required for external database access. Optional for a local
+                      database (EnableLocalDb=true) and if absent a secret will be
+                      auto generated. The secret shall include information used for
+                      the database access. An example for PostgreSQL DB access: "POSTGRES_PASSWORD":
+                      "rl4s3Fh4ng3M4" "POSTGRES_PORT": "5432" "POSTGRES_USER": "postgres"
+                      "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4" "POSTGRES_HOST":
+                      "backstage-psql-bs1"  # For local database, set to "backstage-psql-<CR
+                      name>".'
+                    type: string
+                  enableLocalDb:
+                    default: true
+                    description: Control the creation of a local PostgreSQL DB. Set
+                      to false if using for example an external Database for Backstage.
+                    type: boolean
+                type: object
               rawRuntimeConfig:
                 description: Raw Runtime Objects configuration. For Advanced scenarios.
                 properties:
