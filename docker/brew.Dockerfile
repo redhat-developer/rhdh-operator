@@ -54,12 +54,12 @@ RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH=
 FROM registry.access.redhat.com/ubi9/ubi-micro:9.2-15.1696515526
 # Upstream sources
 # Downstream comment
-# ENV EXTERNAL_SOURCE=.
+# ENV CONTAINER_SOURCE=/workspace
 #/ Downstream comment
 
 # Downstream sources
 # Downstream uncomment
-ENV EXTERNAL_SOURCE=$REMOTE_SOURCES/upstream1/app/distgit/containers/rhdh-operator
+ENV CONTAINER_SOURCE=$REMOTE_SOURCES_DIR
 #/ Downstream uncomment
 
 ENV HOME=/ \
@@ -69,7 +69,7 @@ ENV HOME=/ \
 RUN echo "${USER_NAME}:x:${USER_UID}:0:${USER_NAME} user:${HOME}:/sbin/nologin" >> /etc/passwd
 
 # Copy manager binary
-COPY --from=builder /workspace/manager .
+COPY --from=builder $CONTAINER_SOURCE/manager .
 
 USER ${USER_UID}
 
