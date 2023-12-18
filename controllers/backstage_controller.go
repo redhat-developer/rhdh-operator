@@ -62,7 +62,7 @@ type BackstageReconciler struct {
 //+kubebuilder:rbac:groups="",resources=configmaps;secrets;persistentvolumes;persistentvolumeclaims;services,verbs=get;watch;create;update;list;delete
 //+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;watch;create;update;list;delete
 //+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;watch;create;update;list;delete
-//+kubebuilder:rbac:groups="route.openshift.io",resources=routes,verbs=get;watch;create;update;list;delete
+//+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
