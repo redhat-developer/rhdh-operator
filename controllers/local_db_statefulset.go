@@ -150,7 +150,8 @@ func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backs
 	// need to patch the Name before get for correct search
 	statefulSet.Name = fmt.Sprintf("backstage-psql-%s", backstage.Name)
 
-	err = r.Get(ctx, types.NamespacedName{Name: statefulSet.Name, Namespace: ns}, statefulSet)
+	found := &appsv1.StatefulSet{}
+	err = r.Get(ctx, types.NamespacedName{Name: statefulSet.Name, Namespace: ns}, found)
 	if err != nil {
 		if errors.IsNotFound(err) {
 
@@ -188,6 +189,9 @@ func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backs
 	if err = r.patchLocalDbStatefulSetObj(statefulSet, backstage); err != nil {
 		return err
 	}
+
+	r.setDefaultStatefulSetImage(statefulSet)
+
 	_, err = r.handlePsqlSecret(ctx, statefulSet, &backstage)
 	if err != nil {
 		return err
@@ -210,4 +214,12 @@ func (r *BackstageReconciler) patchLocalDbStatefulSetObj(statefulSet *appsv1.Sta
 	setBackstageLocalDbLabel(&statefulSet.Spec.Selector.MatchLabels, name)
 
 	return nil
+}
+
+func (r *BackstageReconciler) setDefaultStatefulSetImage(statefulSet *appsv1.StatefulSet) {
+	for i, c := range statefulSet.Spec.Template.Spec.Containers {
+		if len(c.Image) == 0 || c.Image == fmt.Sprintf("{%s}", bs.EnvPostGresImage) {
+			statefulSet.Spec.Template.Spec.Containers[i].Image = r.PsqlImage
+		}
+	}
 }

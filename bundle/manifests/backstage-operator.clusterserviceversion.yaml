@@ -21,8 +21,8 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-12-18T21:01:24Z"
-    operators.operatorframework.io/builder: operator-sdk-v1.32.0
+    createdAt: "2023-12-20T02:05:49Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: backstage-operator.v0.0.1
   namespace: placeholder
@@ -164,6 +164,9 @@ spec:
                         operator: In
                         values:
                         - amd64
+                        - arm64
+                        - ppc64le
+                        - s390x
                       - key: kubernetes.io/os
                         operator: In
                         values:
@@ -198,6 +201,11 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
+                env:
+                - name: POSTGRESQL_IMAGE
+                  value: quay.io/fedora/postgresql-15:latest
+                - name: BACKSTAGE_IMAGE
+                  value: quay.io/janus-idp/backstage-showcase:next
                 image: quay.io/rhdh/backstage-operator:v0.0.1
                 livenessProbe:
                   httpGet:
