@@ -56,9 +56,57 @@ func (r *BackstageReconciler) applyBackstageRoute(ctx context.Context, backstage
 		}
 	}
 
+	r.applyRouteParamsFromCR(route, backstage)
+
 	err = r.Create(ctx, route)
 	if err != nil {
 		return fmt.Errorf("failed to create backstage route, reason: %s", err)
 	}
 	return nil
+}
+
+func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, backstage bs.Backstage) {
+	if backstage.Spec.Application == nil || backstage.Spec.Application.Route == nil {
+		return // Nothing to override
+	}
+	routeCfg := backstage.Spec.Application.Route
+	if len(routeCfg.Host) > 0 {
+		route.Spec.Host = routeCfg.Host
+	}
+	if len(routeCfg.Subdomain) > 0 {
+		route.Spec.Subdomain = routeCfg.Subdomain
+	}
+	if routeCfg.TLS == nil {
+		return
+	}
+	if route.Spec.TLS == nil {
+		route.Spec.TLS = &openshift.TLSConfig{
+			Termination:                   openshift.TLSTerminationEdge,
+			InsecureEdgeTerminationPolicy: openshift.InsecureEdgeTerminationPolicyRedirect,
+			Certificate:                   routeCfg.TLS.Certificate,
+			Key:                           routeCfg.TLS.Key,
+			CACertificate:                 routeCfg.TLS.CACertificate,
+			ExternalCertificate: &openshift.LocalObjectReference{
+				Name: routeCfg.TLS.ExternalCertificateSecretName,
+			},
+		}
+		return
+	}
+	if len(routeCfg.TLS.Certificate) > 0 {
+		route.Spec.TLS.Certificate = routeCfg.TLS.Certificate
+	}
+	if len(routeCfg.TLS.Key) > 0 {
+		route.Spec.TLS.Key = routeCfg.TLS.Key
+	}
+	if len(routeCfg.TLS.Certificate) > 0 {
+		route.Spec.TLS.Certificate = routeCfg.TLS.Certificate
+	}
+	if len(routeCfg.TLS.CACertificate) > 0 {
+		route.Spec.TLS.CACertificate = routeCfg.TLS.CACertificate
+	}
+	if len(routeCfg.TLS.ExternalCertificateSecretName) > 0 {
+		route.Spec.TLS.ExternalCertificate = &openshift.LocalObjectReference{
+			Name: routeCfg.TLS.ExternalCertificateSecretName,
+		}
+	}
 }

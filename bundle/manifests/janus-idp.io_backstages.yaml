@@ -211,6 +211,51 @@ spec:
                       Deployment. Defaults to 1.
                     format: int32
                     type: integer
+                  route:
+                    description: Route configuration. Used for OpenShift only.
+                    properties:
+                      host:
+                        description: host is an alias/DNS that points to the service.
+                          Optional. If not specified a route name will typically be
+                          automatically chosen.  Must follow DNS952 subdomain conventions.
+                        maxLength: 253
+                        pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                        type: string
+                      subdomain:
+                        description: 'subdomain is a DNS subdomain that is requested
+                          within the ingress controller''s domain (as a subdomain).
+                          Example: subdomain `frontend` automatically receives the
+                          router subdomain `apps.mycluster.com` to have a full hostname
+                          `frontend.apps.mycluster.com`.'
+                        maxLength: 253
+                        pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                        type: string
+                      tls:
+                        description: The tls field provides the ability to configure
+                          certificates for the route.
+                        properties:
+                          caCertificate:
+                            description: caCertificate provides the cert authority
+                              certificate contents
+                            type: string
+                          certificate:
+                            description: certificate provides certificate contents.
+                              This should be a single serving certificate, not a certificate
+                              chain. Do not include a CA certificate.
+                            type: string
+                          externalCertificateSecretName:
+                            description: ExternalCertificateSecretName provides certificate
+                              contents as a secret reference. This should be a single
+                              serving certificate, not a certificate chain. Do not
+                              include a CA certificate. The secret referenced should
+                              be present in the same namespace as that of the Route.
+                              Forbidden when `certificate` is set.
+                            type: string
+                          key:
+                            description: key provides key file contents
+                            type: string
+                        type: object
+                    type: object
                 type: object
               database:
                 description: Configuration for database access. Optional.

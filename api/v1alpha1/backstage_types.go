@@ -94,6 +94,9 @@ type Application struct {
 	// Image Pull Secrets to use in all containers (including Init Containers)
 	// +optional
 	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
+	// Route configuration. Used for OpenShift only.
+	Route *Route `json:"route,omitempty"`
 }
 
 type AppConfig struct {
@@ -203,6 +206,51 @@ type BackstageList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Backstage `json:"items"`
+}
+
+// Route specifies configuration parameters for OpenShift Route for Backstage.
+// Only a secured edge route is supported for Backstage.
+type Route struct {
+	// host is an alias/DNS that points to the service. Optional.
+	// If not specified a route name will typically be automatically
+	// chosen.  Must follow DNS952 subdomain conventions.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
+	Host string `json:"host,omitempty" protobuf:"bytes,1,opt,name=host"`
+
+	// subdomain is a DNS subdomain that is requested within the ingress controller's
+	// domain (as a subdomain).
+	// Example: subdomain `frontend` automatically receives the router subdomain
+	// `apps.mycluster.com` to have a full hostname `frontend.apps.mycluster.com`.
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
+	Subdomain string `json:"subdomain,omitempty"`
+
+	// The tls field provides the ability to configure certificates for the route.
+	// +optional
+	TLS *TLS `json:"tls,omitempty"`
+}
+
+type TLS struct {
+	// certificate provides certificate contents. This should be a single serving certificate, not a certificate
+	// chain. Do not include a CA certificate.
+	Certificate string `json:"certificate,omitempty"`
+
+	// ExternalCertificateSecretName provides certificate contents as a secret reference.
+	// This should be a single serving certificate, not a certificate
+	// chain. Do not include a CA certificate. The secret referenced should
+	// be present in the same namespace as that of the Route.
+	// Forbidden when `certificate` is set.
+	// +optional
+	ExternalCertificateSecretName string `json:"externalCertificateSecretName,omitempty"`
+
+	// key provides key file contents
+	Key string `json:"key,omitempty"`
+
+	// caCertificate provides the cert authority certificate contents
+	CACertificate string `json:"caCertificate,omitempty"`
 }
 
 func init() {
