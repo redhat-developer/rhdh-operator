@@ -156,6 +156,8 @@ func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, back
 		return fmt.Errorf("failed to read config: %s", err)
 	}
 
+	r.setDefaultDeploymentImage(deployment)
+
 	foundDeployment := &appsv1.Deployment{}
 	deployment.Name = fmt.Sprintf("backstage-%s", backstage.Name)
 	err = r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: ns}, foundDeployment)
@@ -301,4 +303,12 @@ func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backst
 	}
 
 	return nil
+}
+
+func (r *BackstageReconciler) setDefaultDeploymentImage(deployment *appsv1.Deployment) {
+	visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
+		if len(container.Image) == 0 || container.Image == fmt.Sprintf("{%s}", bs.EnvBackstageImage) {
+			container.Image = r.BackstageImage
+		}
+	})
 }

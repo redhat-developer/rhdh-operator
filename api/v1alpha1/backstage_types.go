@@ -21,6 +21,8 @@ import (
 const (
 	RuntimeConditionRunning string = "RuntimeRunning"
 	RuntimeConditionSynced  string = "RuntimeSyncedWithConfig"
+	EnvPostGresImage        string = "RELATED_IMAGE_postgresql"
+	EnvBackstageImage       string = "RELATED_IMAGE_backstage"
 )
 
 // BackstageSpec defines the desired state of Backstage

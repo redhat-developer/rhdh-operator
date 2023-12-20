@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/go-logr/logr"
 	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -54,6 +55,10 @@ type BackstageReconciler struct {
 	Namespace string
 
 	IsOpenShift bool
+
+	PsqlImage string
+
+	BackstageImage string
 }
 
 //+kubebuilder:rbac:groups=janus-idp.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
@@ -260,11 +265,18 @@ func (r *BackstageReconciler) labels(meta *v1.ObjectMeta, backstage bs.Backstage
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager, log logr.Logger) error {
 
-	//if err := initDefaults(); err != nil {
-	//	return err
-	//}
+	if len(r.PsqlImage) == 0 {
+		r.PsqlImage = "quay.io/fedora/postgresql-15:latest"
+		log.Info("Enviroment variable is not set, default is used", bs.EnvPostGresImage, r.PsqlImage)
+	}
+
+	if len(r.BackstageImage) == 0 {
+		r.BackstageImage = "quay.io/janus-idp/backstage-showcase:next"
+		log.Info("Enviroment variable is not set, default is used", bs.EnvBackstageImage, r.BackstageImage)
+	}
+
 	builder := ctrl.NewControllerManagedBy(mgr).
 		For(&bs.Backstage{})
 

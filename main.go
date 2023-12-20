@@ -104,11 +104,13 @@ func main() {
 	}
 
 	if err = (&controller.BackstageReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		OwnsRuntime: ownRuntime,
-		IsOpenShift: isOpenShift,
-	}).SetupWithManager(mgr); err != nil {
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		OwnsRuntime:    ownRuntime,
+		IsOpenShift:    isOpenShift,
+		PsqlImage:      os.Getenv(backstageiov1alpha1.EnvPostGresImage),
+		BackstageImage: os.Getenv(backstageiov1alpha1.EnvBackstageImage),
+	}).SetupWithManager(mgr, setupLog); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backstage")
 		os.Exit(1)
 	}
@@ -123,7 +125,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager with parameters: ", "own-runtime", ownRuntime, "env.LOCALBIN", os.Getenv("LOCALBIN"), "isOpenShift", isOpenShift)
+	setupLog.Info("starting manager with parameters: ",
+		"own-runtime", ownRuntime,
+		"env.LOCALBIN", os.Getenv("LOCALBIN"),
+		"isOpenShift", isOpenShift,
+		backstageiov1alpha1.EnvPostGresImage, os.Getenv(backstageiov1alpha1.EnvPostGresImage),
+		backstageiov1alpha1.EnvBackstageImage, os.Getenv(backstageiov1alpha1.EnvBackstageImage),
+	)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

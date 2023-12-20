@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -150,7 +151,8 @@ func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backs
 	// need to patch the Name before get for correct search
 	statefulSet.Name = fmt.Sprintf("backstage-psql-%s", backstage.Name)
 
-	err = r.Get(ctx, types.NamespacedName{Name: statefulSet.Name, Namespace: ns}, statefulSet)
+	found := &appsv1.StatefulSet{}
+	err = r.Get(ctx, types.NamespacedName{Name: statefulSet.Name, Namespace: ns}, found)
 	if err != nil {
 		if errors.IsNotFound(err) {
 
@@ -188,6 +190,9 @@ func (r *BackstageReconciler) applyLocalDbStatefulSet(ctx context.Context, backs
 	if err = r.patchLocalDbStatefulSetObj(statefulSet, backstage); err != nil {
 		return err
 	}
+
+	r.setDefaultStatefulSetImage(statefulSet)
+
 	_, err = r.handlePsqlSecret(ctx, statefulSet, &backstage)
 	if err != nil {
 		return err
@@ -210,4 +215,12 @@ func (r *BackstageReconciler) patchLocalDbStatefulSetObj(statefulSet *appsv1.Sta
 	setBackstageLocalDbLabel(&statefulSet.Spec.Selector.MatchLabels, name)
 
 	return nil
+}
+
+func (r *BackstageReconciler) setDefaultStatefulSetImage(statefulSet *appsv1.StatefulSet) {
+	visitContainers(&statefulSet.Spec.Template, func(container *v1.Container) {
+		if len(container.Image) == 0 || container.Image == fmt.Sprintf("{%s}", bs.EnvPostGresImage) {
+			container.Image = r.PsqlImage
+		}
+	})
 }
