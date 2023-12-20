@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -217,9 +218,9 @@ func (r *BackstageReconciler) patchLocalDbStatefulSetObj(statefulSet *appsv1.Sta
 }
 
 func (r *BackstageReconciler) setDefaultStatefulSetImage(statefulSet *appsv1.StatefulSet) {
-	for i, c := range statefulSet.Spec.Template.Spec.Containers {
-		if len(c.Image) == 0 || c.Image == fmt.Sprintf("{%s}", bs.EnvPostGresImage) {
-			statefulSet.Spec.Template.Spec.Containers[i].Image = r.PsqlImage
+	visitContainers(&statefulSet.Spec.Template, func(container *v1.Container) {
+		if len(container.Image) == 0 || container.Image == fmt.Sprintf("{%s}", bs.EnvPostGresImage) {
+			container.Image = r.PsqlImage
 		}
-	}
+	})
 }

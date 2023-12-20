@@ -306,14 +306,9 @@ func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backst
 }
 
 func (r *BackstageReconciler) setDefaultDeploymentImage(deployment *appsv1.Deployment) {
-	for i, c := range deployment.Spec.Template.Spec.InitContainers {
-		if len(c.Image) == 0 || c.Image == fmt.Sprintf("{%s}", bs.EnvBackstageImage) {
-			deployment.Spec.Template.Spec.InitContainers[i].Image = r.BackstageImage
+	visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
+		if len(container.Image) == 0 || container.Image == fmt.Sprintf("{%s}", bs.EnvBackstageImage) {
+			container.Image = r.BackstageImage
 		}
-	}
-	for i, c := range deployment.Spec.Template.Spec.Containers {
-		if len(c.Image) == 0 || c.Image == fmt.Sprintf("{%s}", bs.EnvBackstageImage) {
-			deployment.Spec.Template.Spec.Containers[i].Image = r.BackstageImage
-		}
-	}
+	})
 }
