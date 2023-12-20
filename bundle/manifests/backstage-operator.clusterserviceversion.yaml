@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-12-20T02:05:49Z"
+    createdAt: "2023-12-20T13:27:15Z"
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: backstage-operator.v0.0.1
@@ -202,9 +202,9 @@ spec:
                 command:
                 - /manager
                 env:
-                - name: POSTGRESQL_IMAGE
+                - name: RELATED_IMAGE_postgresql
                   value: quay.io/fedora/postgresql-15:latest
-                - name: BACKSTAGE_IMAGE
+                - name: RELATED_IMAGE_backstage
                   value: quay.io/janus-idp/backstage-showcase:next
                 image: quay.io/rhdh/backstage-operator:v0.0.1
                 livenessProbe:
@@ -304,4 +304,9 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
+  relatedImages:
+  - image: quay.io/fedora/postgresql-15:latest
+    name: postgresql
+  - image: quay.io/janus-idp/backstage-showcase:next
+    name: backstage
   version: 0.0.1

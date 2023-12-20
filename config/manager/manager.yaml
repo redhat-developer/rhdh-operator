@@ -71,9 +71,9 @@ spec:
         args:
         - --leader-elect
         env:
-        - name: POSTGRESQL_IMAGE
+        - name: RELATED_IMAGE_postgresql
           value: quay.io/fedora/postgresql-15:latest
-        - name: BACKSTAGE_IMAGE
+        - name: RELATED_IMAGE_backstage
           value: quay.io/janus-idp/backstage-showcase:next
         image: controller:latest
         name: manager
