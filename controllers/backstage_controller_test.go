@@ -60,8 +60,8 @@ var _ = Describe("Backstage controller", func() {
 			Scheme:         k8sClient.Scheme(),
 			Namespace:      ns,
 			OwnsRuntime:    true,
-			PsqlImage:      "quay.io/fedora/postgresql-15:latest",
-			BackstageImage: "quay.io/janus-idp/backstage-showcase:next",
+			PsqlImage:      "test-postgresql-15:latest",
+			BackstageImage: "test-backstage-showcase:next",
 		}
 	})
 
