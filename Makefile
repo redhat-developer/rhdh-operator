@@ -108,6 +108,7 @@ fmt: goimports ## Format the code using goimports
 
 fmt_license: addlicense ## Ensure the license header is set on all files
 	$(ADDLICENSE) -v -f license_header.txt $$(find . -not -path '*/\.*' -name '*.go')
+	$(ADDLICENSE) -v -f license_header.txt $$(find . -name '*ockerfile')
 
 .PHONY: lint
 lint: golangci-lint ## Run the linter on the codebase
@@ -252,7 +253,8 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
 	operator-sdk bundle validate ./bundle
-	cat docker/license_header.txt bundle.Dockerfile > docker/bundle.Dockerfile; rm -f bundle.Dockerfile
+	mv -f bundle.Dockerfile docker/bundle.Dockerfile
+	$(MAKE) fmt_license
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
