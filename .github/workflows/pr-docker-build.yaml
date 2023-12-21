@@ -42,6 +42,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
 
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+
       - name: Get the last commit short SHA of the PR
         run: |
           SHORT_SHA=$(git rev-parse --short ${{ github.event.pull_request.head.sha }})
@@ -88,9 +93,9 @@ jobs:
 
       - name: Build and Push operator-catalog image
         run: |
-          set -e ;\
-          OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-          curl -sSLo /tmp/opm https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/$${OS}-$${ARCH}-opm ;\
+          set -ex
+          OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH)
+          curl -sSLo /tmp/opm https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/$${OS}-$${ARCH}-opm
           chmod +x /tmp/opm
           export QUAY_USERNAME=${{ secrets.JANUS_QUAY_USERNAME }}
           export QUAY_PASSWORD=${{ secrets.JANUS_QUAY_PASSWORD }}
