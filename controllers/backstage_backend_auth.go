@@ -30,8 +30,7 @@ func (r *BackstageReconciler) getBackendAuthAppConfig(
 	backstage bs.Backstage,
 	ns string,
 ) (backendAuthAppConfig *bs.ObjectKeyRef, err error) {
-	if backstage.Spec.Application != nil &&
-		(backstage.Spec.Application.AppConfig != nil || backstage.Spec.Application.ExtraFiles != nil || backstage.Spec.Application.ExtraEnvs != nil) {
+	if hasUserDefinedAppConfig(backstage) {
 		// Users are expected to fill their app-config(s) with their own backend auth key
 		return nil, nil
 	}
@@ -64,4 +63,14 @@ func (r *BackstageReconciler) getBackendAuthAppConfig(
 	}
 
 	return &bs.ObjectKeyRef{Name: backendAuthCmName}, nil
+}
+
+func hasUserDefinedAppConfig(backstage bs.Backstage) bool {
+	if backstage.Spec.Application == nil {
+		return false
+	}
+	if backstage.Spec.Application.AppConfig == nil {
+		return false
+	}
+	return len(backstage.Spec.Application.AppConfig.ConfigMaps) != 0
 }

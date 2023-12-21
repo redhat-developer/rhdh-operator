@@ -890,8 +890,24 @@ plugins: []
 						g.Expect(err).To(Not(HaveOccurred()))
 					}, time.Minute, time.Second).Should(Succeed())
 
+					backendAuthConfigName := fmt.Sprintf("%s-auth-app-config", backstageName)
+					By("Creating a ConfigMap for default backend auth key", func() {
+						Eventually(func(g Gomega) {
+							found := &corev1.ConfigMap{}
+							err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backendAuthConfigName}, found)
+							g.Expect(err).ShouldNot(HaveOccurred())
+							g.Expect(found.Data).ToNot(BeEmpty(), "backend auth secret should contain non-empty data")
+						}, time.Minute, time.Second).Should(Succeed())
+					})
+
 					By("Checking the Volumes in the Backstage Deployment", func() {
-						Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(7))
+						Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(8))
+
+						backendAuthAppConfigVol, ok := findVolume(found.Spec.Template.Spec.Volumes, backendAuthConfigName)
+						Expect(ok).To(BeTrue(), "No volume found with name: %s", backendAuthConfigName)
+						Expect(backendAuthAppConfigVol.VolumeSource.Secret).To(BeNil())
+						Expect(backendAuthAppConfigVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
+						Expect(backendAuthAppConfigVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(backendAuthConfigName))
 
 						extraConfig1CmVol, ok := findVolume(found.Spec.Template.Spec.Volumes, extraConfig1CmNameAll)
 						Expect(ok).To(BeTrue(), "No volume found with name: %s", extraConfig1CmNameAll)
@@ -930,12 +946,17 @@ plugins: []
 					mainCont := found.Spec.Template.Spec.Containers[0]
 
 					By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
-						Expect(mainCont.VolumeMounts).To(HaveLen(7))
+						Expect(mainCont.VolumeMounts).To(HaveLen(8))
 
 						expectedMountPath := mountPath
 						if expectedMountPath == "" {
 							expectedMountPath = "/opt/app-root/src"
 						}
+
+						bsAuth := findVolumeMounts(mainCont.VolumeMounts, backendAuthConfigName)
+						Expect(bsAuth).To(HaveLen(1), "No volume mount found with name: %s", backendAuthConfigName)
+						Expect(bsAuth[0].MountPath).To(Equal("/opt/app-root/src/app-config.backend-auth.default.yaml"))
+						Expect(bsAuth[0].SubPath).To(Equal("app-config.backend-auth.default.yaml"))
 
 						extraConfig1CmMounts := findVolumeMounts(mainCont.VolumeMounts, extraConfig1CmNameAll)
 						Expect(extraConfig1CmMounts).To(HaveLen(2), "No volume mounts found with name: %s", extraConfig1CmNameAll)
