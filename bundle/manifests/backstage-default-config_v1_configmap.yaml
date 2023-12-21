@@ -44,80 +44,203 @@ data:
         janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       ports:
         - port: 5432
-  db-statefulset.yaml: "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name:
-    backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'\nspec:\n  podManagementPolicy:
-    OrderedReady\n  replicas: 1\n  selector:\n    matchLabels:\n      janus-idp.io/app:
-    backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'\n  serviceName:
-    backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'\n  template:\n
-    \   metadata:\n      labels:\n        janus-idp.io/app: backstage-psql-cr1 # placeholder
-    for 'backstage-psql-<cr-name>'\n      name: backstage-db-cr1 # placeholder for
-    'backstage-psql-<cr-name>'\n    spec:\n      persistentVolumeClaimRetentionPolicy:\n
-    \       whenDeleted: Retain\n        whenScaled: Retain\n      containers:\n        -
-    env:\n            - name: POSTGRESQL_PORT_NUMBER\n              value: \"5432\"\n
-    \           - name: POSTGRESQL_VOLUME_DIR\n              value: /var/lib/pgsql/data\n
-    \           - name: PGDATA\n              value: /var/lib/pgsql/data/userdata\n
-    \         envFrom:\n            - secretRef:\n                name: \"{POSTGRESQL_SECRET}\"
-    \ # will be replaced with 'backstage-psql-secrets-<cr-name>'  \n          image:
-    \"{RELATED_IMAGE_postgresql}\" # will be replaced with the actual image\n          imagePullPolicy:
-    IfNotPresent\n          securityContext:\n            runAsNonRoot: true\n            allowPrivilegeEscalation:
-    false\n            seccompProfile:\n              type: RuntimeDefault\n            capabilities:\n
-    \             drop:\n                - ALL\n          livenessProbe:\n            exec:\n
-    \             command:\n                - /bin/sh\n                - -c\n                -
-    exec pg_isready -U ${POSTGRES_USER} -h 127.0.0.1 -p 5432\n            failureThreshold:
-    6\n            initialDelaySeconds: 30\n            periodSeconds: 10\n            successThreshold:
-    1\n            timeoutSeconds: 5\n          name: postgresql\n          ports:\n
-    \           - containerPort: 5432\n              name: tcp-postgresql\n              protocol:
-    TCP\n          readinessProbe:\n            exec:\n              command:\n                -
-    /bin/sh\n                - -c\n                - -e\n                - |\n                  exec
-    pg_isready -U ${POSTGRES_USER} -h 127.0.0.1 -p 5432\n            failureThreshold:
-    6\n            initialDelaySeconds: 5\n            periodSeconds: 10\n            successThreshold:
-    1\n            timeoutSeconds: 5\n          resources:\n            requests:\n
-    \             cpu: 250m\n              memory: 256Mi\n            limits:\n              memory:
-    1024Mi\n          volumeMounts:\n            - mountPath: /dev/shm\n              name:
-    dshm\n            - mountPath: /var/lib/pgsql/data\n              name: data\n
-    \     restartPolicy: Always\n      securityContext: {}\n      serviceAccount:
-    default\n      serviceAccountName: default\n      volumes:\n        - emptyDir:\n
-    \           medium: Memory\n          name: dshm\n  updateStrategy:\n    rollingUpdate:\n
-    \     partition: 0\n    type: RollingUpdate\n  volumeClaimTemplates:\n    - apiVersion:
-    v1\n      kind: PersistentVolumeClaim\n      metadata:\n        name: data\n      spec:\n
-    \       accessModes:\n          - ReadWriteOnce\n        resources:\n          requests:\n
-    \           storage: 1Gi\n"
-  deployment.yaml: "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name:  # placeholder
-    for 'backstage-<cr-name>'\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n
-    \     janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'\n  template:\n
-    \   metadata:\n      labels:\n        janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'\n
-    \   spec:\n      #      serviceAccountName: default\n      volumes:\n        -
-    ephemeral:\n            volumeClaimTemplate:\n              spec:\n                accessModes:\n
-    \                 - ReadWriteOnce\n                resources:\n                  requests:\n
-    \                   storage: 1Gi\n          name: dynamic-plugins-root\n        -
-    name: dynamic-plugins-npmrc\n          secret:\n            defaultMode: 420\n
-    \           optional: true\n            secretName: dynamic-plugins-npmrc\n\n
-    \     initContainers:\n        - command:\n            - ./install-dynamic-plugins.sh\n
-    \           - /dynamic-plugins-root\n          env:\n            - name: NPM_CONFIG_USERCONFIG\n
-    \             value: /opt/app-root/src/.npmrc.dynamic-plugins\n          image:
-    \"{RELATED_IMAGE_backstage}\" # will be replaced with the actual image quay.io/janus-idp/backstage-showcase:next\n
-    \         imagePullPolicy: IfNotPresent\n          name: install-dynamic-plugins\n
-    \         volumeMounts:\n            - mountPath: /dynamic-plugins-root\n              name:
-    dynamic-plugins-root\n            - mountPath: /opt/app-root/src/.npmrc.dynamic-plugins\n
-    \             name: dynamic-plugins-npmrc\n              readOnly: true\n              subPath:
-    .npmrc\n          workingDir: /opt/app-root/src\n\n      containers:\n        -
-    name: backstage-backend\n          image: \"{RELATED_IMAGE_backstage}\" # will
-    be replaced with the actual image quay.io/janus-idp/backstage-showcase:next\n
-    \         imagePullPolicy: IfNotPresent\n          args:\n            - \"--config\"\n
-    \           - \"dynamic-plugins-root/app-config.dynamic-plugins.yaml\"\n          readinessProbe:\n
-    \           failureThreshold: 3\n            httpGet:\n              path: /healthcheck\n
-    \             port: 7007\n              scheme: HTTP\n            initialDelaySeconds:
-    30\n            periodSeconds: 10\n            successThreshold: 2\n            timeoutSeconds:
-    2\n          livenessProbe:\n            failureThreshold: 3\n            httpGet:\n
-    \             path: /healthcheck\n              port: 7007\n              scheme:
-    HTTP\n            initialDelaySeconds: 60\n            periodSeconds: 10\n            successThreshold:
-    1\n            timeoutSeconds: 2\n          ports:\n            - name: backend\n
-    \             containerPort: 7007\n          env:\n            - name: APP_CONFIG_backend_listen_port\n
-    \             value: \"7007\"\n          envFrom:\n            - secretRef:\n
-    \               name: \"{POSTGRESQL_SECRET}\"  # will be replaced with 'backstage-psql-secrets-<cr-name>'
-    \ \n          #            - secretRef:\n          #                name: backstage-secrets\n
-    \         volumeMounts:\n            - mountPath: /opt/app-root/src/dynamic-plugins-root\n
-    \             name: dynamic-plugins-root"
+  db-statefulset.yaml: |
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+    spec:
+      podManagementPolicy: OrderedReady
+      replicas: 1
+      selector:
+        matchLabels:
+          janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+      serviceName: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
+      template:
+        metadata:
+          labels:
+            janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+          name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
+        spec:
+          persistentVolumeClaimRetentionPolicy:
+            whenDeleted: Retain
+            whenScaled: Retain
+          containers:
+            - env:
+                - name: POSTGRESQL_PORT_NUMBER
+                  value: "5432"
+                - name: POSTGRESQL_VOLUME_DIR
+                  value: /var/lib/pgsql/data
+                - name: PGDATA
+                  value: /var/lib/pgsql/data/userdata
+              envFrom:
+                - secretRef:
+                    name: <POSTGRESQL_SECRET>  # will be replaced with 'backstage-psql-secrets-<cr-name>'
+              image: <RELATED_IMAGE_postgresql> # will be replaced with the actual image
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                seccompProfile:
+                  type: RuntimeDefault
+                capabilities:
+                  drop:
+                    - ALL
+              livenessProbe:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - exec pg_isready -U ${POSTGRES_USER} -h 127.0.0.1 -p 5432
+                failureThreshold: 6
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 5
+              name: postgresql
+              ports:
+                - containerPort: 5432
+                  name: tcp-postgresql
+                  protocol: TCP
+              readinessProbe:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - -e
+                    - |
+                      exec pg_isready -U ${POSTGRES_USER} -h 127.0.0.1 -p 5432
+                failureThreshold: 6
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 5
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  memory: 1024Mi
+              volumeMounts:
+                - mountPath: /dev/shm
+                  name: dshm
+                - mountPath: /var/lib/pgsql/data
+                  name: data
+          restartPolicy: Always
+          securityContext: {}
+          serviceAccount: default
+          serviceAccountName: default
+          volumes:
+            - emptyDir:
+                medium: Memory
+              name: dshm
+      updateStrategy:
+        rollingUpdate:
+          partition: 0
+        type: RollingUpdate
+      volumeClaimTemplates:
+        - apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+  deployment.yaml: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name:  # placeholder for 'backstage-<cr-name>'
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
+      template:
+        metadata:
+          labels:
+            janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
+        spec:
+          #      serviceAccountName: default
+          volumes:
+            - ephemeral:
+                volumeClaimTemplate:
+                  spec:
+                    accessModes:
+                      - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: 1Gi
+              name: dynamic-plugins-root
+            - name: dynamic-plugins-npmrc
+              secret:
+                defaultMode: 420
+                optional: true
+                secretName: dynamic-plugins-npmrc
+
+          initContainers:
+            - command:
+                - ./install-dynamic-plugins.sh
+                - /dynamic-plugins-root
+              env:
+                - name: NPM_CONFIG_USERCONFIG
+                  value: /opt/app-root/src/.npmrc.dynamic-plugins
+              image: <RELATED_IMAGE_backstage> # will be replaced with the actual image quay.io/janus-idp/backstage-showcase:next
+              imagePullPolicy: IfNotPresent
+              name: install-dynamic-plugins
+              volumeMounts:
+                - mountPath: /dynamic-plugins-root
+                  name: dynamic-plugins-root
+                - mountPath: /opt/app-root/src/.npmrc.dynamic-plugins
+                  name: dynamic-plugins-npmrc
+                  readOnly: true
+                  subPath: .npmrc
+              workingDir: /opt/app-root/src
+
+          containers:
+            - name: backstage-backend
+              image: <RELATED_IMAGE_backstage> # will be replaced with the actual image quay.io/janus-idp/backstage-showcase:next
+              imagePullPolicy: IfNotPresent
+              args:
+                - "--config"
+                - "dynamic-plugins-root/app-config.dynamic-plugins.yaml"
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthcheck
+                  port: 7007
+                  scheme: HTTP
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                successThreshold: 2
+                timeoutSeconds: 2
+              livenessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthcheck
+                  port: 7007
+                  scheme: HTTP
+                initialDelaySeconds: 60
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 2
+              ports:
+                - name: backend
+                  containerPort: 7007
+              env:
+                - name: APP_CONFIG_backend_listen_port
+                  value: "7007"
+              envFrom:
+                - secretRef:
+                    name: <POSTGRESQL_SECRET>  # will be replaced with 'backstage-psql-secrets-<cr-name>'
+              #            - secretRef:
+              #                name: backstage-secrets
+              volumeMounts:
+                - mountPath: /opt/app-root/src/dynamic-plugins-root
+                  name: dynamic-plugins-root
   dynamic-plugins-configmap.yaml: |-
     apiVersion: v1
     kind: ConfigMap

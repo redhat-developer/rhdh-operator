@@ -219,7 +219,7 @@ func (r *BackstageReconciler) patchLocalDbStatefulSetObj(statefulSet *appsv1.Sta
 
 func (r *BackstageReconciler) setDefaultStatefulSetImage(statefulSet *appsv1.StatefulSet) {
 	visitContainers(&statefulSet.Spec.Template, func(container *v1.Container) {
-		if len(container.Image) == 0 || container.Image == fmt.Sprintf("{%s}", bs.EnvPostGresImage) {
+		if len(container.Image) == 0 || container.Image == fmt.Sprintf("<%s>", bs.EnvPostGresImage) {
 			container.Image = r.PsqlImage
 		}
 	})
