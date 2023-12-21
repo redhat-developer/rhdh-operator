@@ -214,25 +214,30 @@ spec:
                   route:
                     description: Route configuration. Used for OpenShift only.
                     properties:
+                      enabled:
+                        default: true
+                        description: Control the creation of a Route on OpenShift.
+                        type: boolean
                       host:
-                        description: host is an alias/DNS that points to the service.
-                          Optional. If not specified a route name will typically be
-                          automatically chosen.  Must follow DNS952 subdomain conventions.
+                        description: Host is an alias/DNS that points to the service.
+                          Optional. Ignored if Enabled is false. If not specified
+                          a route name will typically be automatically chosen.  Must
+                          follow DNS952 subdomain conventions.
                         maxLength: 253
                         pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
                         type: string
                       subdomain:
-                        description: 'subdomain is a DNS subdomain that is requested
+                        description: 'Subdomain is a DNS subdomain that is requested
                           within the ingress controller''s domain (as a subdomain).
-                          Example: subdomain `frontend` automatically receives the
-                          router subdomain `apps.mycluster.com` to have a full hostname
-                          `frontend.apps.mycluster.com`.'
+                          Ignored if Enabled is false. Example: subdomain `frontend`
+                          automatically receives the router subdomain `apps.mycluster.com`
+                          to have a full hostname `frontend.apps.mycluster.com`.'
                         maxLength: 253
                         pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
                         type: string
                       tls:
                         description: The tls field provides the ability to configure
-                          certificates for the route.
+                          certificates for the route. Ignored if Enabled is false.
                         properties:
                           caCertificate:
                             description: caCertificate provides the cert authority

@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	openshift "github.com/openshift/api/route/v1"
@@ -27,6 +28,10 @@ import (
 )
 
 func (r *BackstageReconciler) applyBackstageRoute(ctx context.Context, backstage bs.Backstage, ns string) error {
+	if !shouldCreateRoute(backstage) {
+		return nil
+	}
+
 	route := &openshift.Route{}
 	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "route.yaml", ns, route)
 	if err != nil {
@@ -109,4 +114,14 @@ func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, bac
 			Name: routeCfg.TLS.ExternalCertificateSecretName,
 		}
 	}
+}
+
+func shouldCreateRoute(backstage bs.Backstage) bool {
+	if backstage.Spec.Application == nil {
+		return true
+	}
+	if backstage.Spec.Application.Route == nil {
+		return true
+	}
+	return pointer.BoolDeref(backstage.Spec.Application.Route.Enabled, true)
 }

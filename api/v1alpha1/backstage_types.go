@@ -213,7 +213,13 @@ type BackstageList struct {
 // Route specifies configuration parameters for OpenShift Route for Backstage.
 // Only a secured edge route is supported for Backstage.
 type Route struct {
-	// host is an alias/DNS that points to the service. Optional.
+	// Control the creation of a Route on OpenShift.
+	// +optional
+	//+kubebuilder:default=true
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Host is an alias/DNS that points to the service. Optional.
+	// Ignored if Enabled is false.
 	// If not specified a route name will typically be automatically
 	// chosen.  Must follow DNS952 subdomain conventions.
 	// +optional
@@ -221,8 +227,9 @@ type Route struct {
 	// +kubebuilder:validation:Pattern=`^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$`
 	Host string `json:"host,omitempty" protobuf:"bytes,1,opt,name=host"`
 
-	// subdomain is a DNS subdomain that is requested within the ingress controller's
+	// Subdomain is a DNS subdomain that is requested within the ingress controller's
 	// domain (as a subdomain).
+	// Ignored if Enabled is false.
 	// Example: subdomain `frontend` automatically receives the router subdomain
 	// `apps.mycluster.com` to have a full hostname `frontend.apps.mycluster.com`.
 	// +optional
@@ -231,6 +238,7 @@ type Route struct {
 	Subdomain string `json:"subdomain,omitempty"`
 
 	// The tls field provides the ability to configure certificates for the route.
+	// Ignored if Enabled is false.
 	// +optional
 	TLS *TLS `json:"tls,omitempty"`
 }

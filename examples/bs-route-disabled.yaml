@@ -1,0 +1,9 @@
+apiVersion: janus-idp.io/v1alpha1
+kind: Backstage
+metadata:
+  name: bs-route-disabled
+spec:
+  application:
+    route:
+      enabled: false
+      subdomain: test-bs-route-disabled
