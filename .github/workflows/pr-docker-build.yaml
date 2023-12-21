@@ -126,5 +126,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'The images are available at:<br/><ol><li>https://quay.io/janus/operator:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>`!'
+              body: 'PR images are available:<br/><ol><li>https://quay.io/janus/operator:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
             })
