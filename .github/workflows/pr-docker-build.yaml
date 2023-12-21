@@ -98,11 +98,11 @@ jobs:
           curl -sSLo /tmp/opm https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/$${OS}-$${ARCH}-opm
           chmod +x /tmp/opm
           export QUAY_USERNAME=${{ secrets.JANUS_QUAY_USERNAME }}
-          export QUAY_PASSWORD=${{ secrets.JANUS_QUAY_PASSWORD }}
+          export QUAY_TOKEN=${{ secrets.JANUS_QUAY_TOKEN }}
           echo "${QUAY_TOKEN}" | docker login -u="${QUAY_USER}" --password-stdin ${{ env.REGISTRY }}
           # TODO use janus-idp/operator* images instead of janus/operator*; switch to organization-level secrets
           # export QUAY_USERNAME=${{ secrets.QUAY_USERNAME }}
-          # export QUAY_PASSWORD=${{ secrets.QUAY_PASSWORD }}
+          # export QUAY_TOKEN=${{ secrets.QUAY_TOKEN }}
           /tmp/opm index add --container-tool docker --mode semver --tag operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
             --bundles quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
           docker buildx imagetools create \
