@@ -1,0 +1,113 @@
+# Copyright 2023 The Janus IDP Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: PR Build operator, bundle, and catalog images
+
+on:
+  pull_request_target:
+    paths-ignore:
+      - 'docs/**'
+      - 'showcase-docs/**'
+      - '.changeset/**'
+    branches-ignore:
+      - 'changeset-release/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: quay.io
+
+jobs:
+  pr-docker-build:
+    name: PR Docker Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+      - name: Get the last commit short SHA of the PR
+        run: |
+          SHORT_SHA=$(git rev-parse --short ${{ github.event.pull_request.head.sha }})
+          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+
+      - name: Build and Push operator image
+        uses: ./.github/actions/docker-build
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+          # TODO use janus-idp/operator* images instead of janus/operator*
+          # imageName: ${{ github.repository }}
+	  imageName: janus/operator
+          imageTags: |
+            type=ref,prefix=pr-,event=pr
+            type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
+          # to autodelete PR image tags, set an expiry date
+          imageLabels: quay.expires-after=14d
+          push: true
+          dockerfile: docker/Dockerfile
+
+      - name: Build and Push operator-bundle image
+        uses: ./.github/actions/docker-build
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+          # TODO use janus-idp/operator* images instead of janus/operator*
+          # imageName: ${{ github.repository }}-bundle
+	  imageName: janus/operator-bundle
+          imageTags: |
+            type=ref,prefix=pr-,event=pr
+            type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
+	    
+          # to autodelete PR image tags, set an expiry date
+          imageLabels: quay.expires-after=14d
+          push: true
+          dockerfile: docker/bundle.Dockerfile
+
+      - name: Build and Push operator-catalog image
+        run: |
+          set -e ;\
+          OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+          curl -sSLo /tmp/opm https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/$${OS}-$${ARCH}-opm ;\
+          chmod +x /tmp/opm
+          # TODO use janus-idp/operator* images instead of janus/operator*
+          /tmp/opm index add --container-tool docker --mode semver --tag operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
+	    --bundles quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
+          docker buildx imagetools create \
+            --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }} \
+	    --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
+            operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
+      - name: Comment the image pull link
+        uses: actions/github-script@v6
+        with:
+          # TODO use janus-idp/operator* images instead of janus/operator*
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: 'The images are available at:<br/><ol><li>https://quay.io/janus/operator:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>`!'
+            })
