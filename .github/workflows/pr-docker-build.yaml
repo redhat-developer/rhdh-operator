@@ -66,7 +66,6 @@ jobs:
           imageTags: |
             type=ref,prefix=pr-,event=pr
             type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
-          # to autodelete PR image tags, set an expiry date
           imageLabels: quay.expires-after=14d
           push: true
           dockerfile: docker/Dockerfile
@@ -89,7 +88,6 @@ jobs:
           imageTags: |
             type=ref,prefix=pr-,event=pr
             type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
-          # to autodelete PR image tags, set an expiry date
           imageLabels: quay.expires-after=14d
           push: true
           dockerfile: docker/bundle.Dockerfile
@@ -116,7 +114,6 @@ jobs:
           imageTags: |
             type=ref,prefix=pr-,event=pr
             type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
-          # to autodelete PR image tags, set an expiry date
           imageLabels: quay.expires-after=14d
           push: true
           dockerfile: index.Dockerfile

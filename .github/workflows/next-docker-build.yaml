@@ -64,15 +64,14 @@ jobs:
           imageTags: |
             type=raw,value=next
             type=sha,prefix=next-
-          # to autodelete PR image tags, set an expiry date
           imageLabels: quay.expires-after=14d
           push: true
           dockerfile: docker/Dockerfile
 
       - name: Adjust operator image and tag in CSV
         run: |
-          sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/janus/operator:pr-${{ env.SHORT_SHA }}#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
-          echo "Operator in CSV changed to: quay.io/janus/operator:pr-${{ env.SHORT_SHA }}"
+          sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/janus/operator:next-${{ env.SHORT_SHA }}#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
+          echo "Operator in CSV changed to: quay.io/janus/operator:next-${{ env.SHORT_SHA }}"
       - name: Build and Push operator-bundle image
         uses: ./.github/actions/docker-build
         with:
@@ -87,7 +86,6 @@ jobs:
           imageTags: |
             type=raw,value=next
             type=sha,prefix=next-
-          # to autodelete PR image tags, set an expiry date
           imageLabels: quay.expires-after=14d
           push: true
           dockerfile: docker/bundle.Dockerfile
@@ -98,8 +96,8 @@ jobs:
           OS=$(go env GOOS) && ARCH=$(go env GOARCH) && \
           curl -sSLo /tmp/opm https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/${OS}-${ARCH}-opm && chmod +x /tmp/opm
           /tmp/opm index add --container-tool docker --mode semver \
-            --tag operator-catalog:pr-${{ env.SHORT_SHA }} \
-            --bundles quay.io/janus/operator-bundle:pr-${{ env.SHORT_SHA }} --generate
+            --tag operator-catalog:next-${{ env.SHORT_SHA }} \
+            --bundles quay.io/janus/operator-bundle:next-${{ env.SHORT_SHA }} --generate
       - name: Build and Push operator-catalog image
         uses: ./.github/actions/docker-build
         with:
@@ -114,7 +112,6 @@ jobs:
           imageTags: |
             type=raw,value=next
             type=sha,prefix=next-
-          # to autodelete PR image tags, set an expiry date
           imageLabels: quay.expires-after=14d
           push: true
           dockerfile: index.Dockerfile
