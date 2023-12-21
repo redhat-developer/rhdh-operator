@@ -85,30 +85,38 @@ jobs:
           imageTags: |
             type=ref,prefix=pr-,event=pr
             type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
-
           # to autodelete PR image tags, set an expiry date
           imageLabels: quay.expires-after=14d
           push: true
           dockerfile: docker/bundle.Dockerfile
 
-      - name: Build and Push operator-catalog image
+      - name: Generate operator-catalog dockerfile
         run: |
           set -ex
-          export QUAY_USERNAME=${{ secrets.JANUS_QUAY_USERNAME }}
-          export QUAY_TOKEN=${{ secrets.JANUS_QUAY_TOKEN }}
-          echo "${QUAY_TOKEN}" | docker login -u="${QUAY_USERNAME}" --password-stdin ${{ env.REGISTRY }}
-          # TODO use janus-idp/operator* images instead of janus/operator*; switch to organization-level secrets
-          # export QUAY_USERNAME=${{ secrets.QUAY_USERNAME }}
-          # export QUAY_TOKEN=${{ secrets.QUAY_TOKEN }}
           OS=$(go env GOOS) && ARCH=$(go env GOARCH) && \
           curl -sSLo /tmp/opm https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/${OS}-${ARCH}-opm && chmod +x /tmp/opm
-          /tmp/opm index add --container-tool docker --mode semver --tag operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
-            --bundles quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
-          docker buildx imagetools create \
-            --label quay.expires-after=21d \
-            --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }} \
-            --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
-            operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
+          /tmp/opm index add --container-tool docker --mode semver \
+            --tag operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
+            --bundles quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} --generate
+      - name: Build and Push operator-catalog image
+        uses: ./.github/actions/docker-build
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.JANUS_QUAY_USERNAME }}
+          password: ${{ secrets.JANUS_QUAY_TOKEN }}
+          # TODO use janus-idp/operator* images instead of janus/operator*; switch to organization-level secrets
+          # username: ${{ vars.QUAY_USERNAME }}
+          # password: ${{ secrets.QUAY_TOKEN }}
+          # imageName: ${{ github.repository }}-catalog
+          imageName: janus/operator-catalog
+          imageTags: |
+            type=ref,prefix=pr-,event=pr
+            type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
+          # to autodelete PR image tags, set an expiry date
+          imageLabels: quay.expires-after=14d
+          push: true
+          dockerfile: index.Dockerfile
+
       - name: Comment the image pull link
         uses: actions/github-script@v6
         with:

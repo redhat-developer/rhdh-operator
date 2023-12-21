@@ -28,3 +28,5 @@ __debug_bin*
 .vscode/
 .scripts/
 .DS_Store
+database/
+index.Dockerfile
