@@ -55,7 +55,7 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
           # TODO use janus-idp/operator* images instead of janus/operator*
           # imageName: ${{ github.repository }}
-	  imageName: janus/operator
+          imageName: janus/operator
           imageTags: |
             type=ref,prefix=pr-,event=pr
             type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
@@ -72,11 +72,11 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
           # TODO use janus-idp/operator* images instead of janus/operator*
           # imageName: ${{ github.repository }}-bundle
-	  imageName: janus/operator-bundle
+          imageName: janus/operator-bundle
           imageTags: |
             type=ref,prefix=pr-,event=pr
             type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
-	    
+
           # to autodelete PR image tags, set an expiry date
           imageLabels: quay.expires-after=14d
           push: true
@@ -90,10 +90,10 @@ jobs:
           chmod +x /tmp/opm
           # TODO use janus-idp/operator* images instead of janus/operator*
           /tmp/opm index add --container-tool docker --mode semver --tag operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
-	    --bundles quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
+            --bundles quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
           docker buildx imagetools create \
             --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }} \
-	    --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
+            --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
             operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
       - name: Comment the image pull link
         uses: actions/github-script@v6
