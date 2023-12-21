@@ -99,13 +99,14 @@ jobs:
           chmod +x /tmp/opm
           export QUAY_USERNAME=${{ secrets.JANUS_QUAY_USERNAME }}
           export QUAY_TOKEN=${{ secrets.JANUS_QUAY_TOKEN }}
-          echo "${QUAY_TOKEN}" | docker login -u="${QUAY_USER}" --password-stdin ${{ env.REGISTRY }}
+          echo "${QUAY_TOKEN}" | docker login -u="${QUAY_USERNAME}" --password-stdin ${{ env.REGISTRY }}
           # TODO use janus-idp/operator* images instead of janus/operator*; switch to organization-level secrets
           # export QUAY_USERNAME=${{ secrets.QUAY_USERNAME }}
           # export QUAY_TOKEN=${{ secrets.QUAY_TOKEN }}
           /tmp/opm index add --container-tool docker --mode semver --tag operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
             --bundles quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
           docker buildx imagetools create \
+            --label quay.expires-after=21d \
             --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }} \
             --tag quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
             operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}
