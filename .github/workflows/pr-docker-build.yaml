@@ -15,13 +15,8 @@
 name: PR Build operator, bundle, and catalog images
 
 on:
-  pull_request_target:
-    paths-ignore:
-      - 'docs/**'
-      - 'showcase-docs/**'
-      - '.changeset/**'
-    branches-ignore:
-      - 'changeset-release/**'
+  pull_request:
+    branches: [ "main" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.ref }}
