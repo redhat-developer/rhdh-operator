@@ -257,6 +257,10 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 	mv -f bundle.Dockerfile docker/bundle.Dockerfile
 	$(MAKE) fmt_license
 
+## to update the CSV with a new tagged version of the operator:
+## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/janus/backstage-operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
+## or 
+## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/janus/backstage-operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
 	$(CONTAINER_ENGINE) build -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) .

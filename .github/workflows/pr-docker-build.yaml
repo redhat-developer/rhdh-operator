@@ -71,6 +71,10 @@ jobs:
           push: true
           dockerfile: docker/Dockerfile
 
+      - name: Adjust operator image and tag in CSV
+        run: |
+          sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/janus/operator:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
+          echo "Operator in CSV changed to: quay.io/janus/operator:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}"
       - name: Build and Push operator-bundle image
         uses: ./.github/actions/docker-build
         with:
@@ -117,7 +121,7 @@ jobs:
           push: true
           dockerfile: index.Dockerfile
 
-      - name: Comment the image pull link
+      - name: Comment image links in PR
         uses: actions/github-script@v6
         with:
           # TODO use janus-idp/operator* images instead of janus/operator*
