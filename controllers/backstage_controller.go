@@ -99,6 +99,17 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, fmt.Errorf("failed to load backstage deployment from the cluster: %w", err)
 	}
 
+	// This update will make sure the status is always updated in case of any errors or successful result
+	defer func(bs *bs.Backstage) {
+		if err := r.Client.Status().Update(ctx, bs); err != nil {
+			if errors.IsConflict(err) {
+				lg.V(1).Info("Backstage object modified, retry syncing status", "Backstage Object", bs)
+				return
+			}
+			lg.Error(err, "Error updating the Backstage resource status", "Backstage Object", bs)
+		}
+	}(&backstage)
+
 	if pointer.BoolDeref(backstage.Spec.Database.EnableLocalDb, true) {
 
 		/* We use default strogeclass currently, and no PV is needed in that case.
@@ -108,29 +119,37 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 		*/
 
-		err := r.applyLocalDbStatefulSet(ctx, backstage, req.Namespace)
+		err := r.reconcileLocalDbStatefulSet(ctx, backstage, req.Namespace)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply Database StatefulSet: %w", err)
+			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SynckFailed, fmt.Sprintf("failed to sync Database StatefulSet:%s", err.Error()))
+			return ctrl.Result{}, fmt.Errorf("failed to sync Database StatefulSet: %w", err)
 		}
 
-		err = r.applyLocalDbServices(ctx, backstage, req.Namespace)
+		err = r.reconcileLocalDbServices(ctx, backstage, req.Namespace)
 		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to apply Database Service: %w", err)
+			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SynckFailed, fmt.Sprintf("failed to sync Database Services:%s", err.Error()))
+			return ctrl.Result{}, fmt.Errorf("failed to sync Database Service: %w", err)
 		}
-
+		setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionTrue, bs.SynckOK, "")
+	} else if isLocalDbSynced(&backstage) { // EnableLocalDb is off but local db has been deployed. Clean up the deployed local db resources
+		if err := r.cleanupLocalDbResources(ctx, &backstage); err != nil {
+			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SynckFailed, fmt.Sprintf("failed to delete Database Services:%s", err.Error()))
+			return ctrl.Result{}, fmt.Errorf("failed to delete Database Service: %w", err)
+		}
+		setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.Deleted, "")
 	}
 
-	err := r.applyBackstageDeployment(ctx, backstage, req.Namespace)
+	err := r.reconcileBackstageDeployment(ctx, backstage, req.Namespace)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to apply Backstage Deployment: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile Backstage Deployment: %w", err)
 	}
 
-	if err := r.applyBackstageService(ctx, backstage, req.Namespace); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to apply Backstage Service: %w", err)
+	if err := r.reconcileBackstageService(ctx, backstage, req.Namespace); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to reconcile Backstage Service: %w", err)
 	}
 
 	if r.IsOpenShift {
-		if err := r.applyBackstageRoute(ctx, backstage, req.Namespace); err != nil {
+		if err := r.reconcileBackstageRoute(ctx, &backstage, req.Namespace); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -138,11 +157,6 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	//TODO: it is just a placeholder for the time
 	r.setRunningStatus(ctx, &backstage, req.Namespace)
 	r.setSyncStatus(&backstage)
-	err = r.Status().Update(ctx, &backstage)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to set status: %w", err)
-		//log.FromContext(ctx).Error(err, "unable to update backstage.status")
-	}
 
 	return ctrl.Result{}, nil
 }
@@ -236,6 +250,62 @@ func (r *BackstageReconciler) setSyncStatus(backstage *bs.Backstage) {
 		Reason:             reason,
 		Message:            message,
 	})
+}
+
+// sets status condition
+func setStatusCondition(backstage *bs.Backstage, condType string, status v1.ConditionStatus, reason, msg string) {
+	meta.SetStatusCondition(&backstage.Status.Conditions, v1.Condition{
+		Type:               condType,
+		Status:             status,
+		LastTransitionTime: v1.Time{},
+		Reason:             reason,
+		Message:            msg,
+	})
+}
+
+func isSynced(backstage *bs.Backstage) bool {
+	return isStatusConditionTrue(bs.RuntimeConditionSynced, backstage)
+}
+
+func isRouteSynced(backstage *bs.Backstage) bool {
+	return isStatusConditionTrue(bs.RouteSynced, backstage)
+}
+
+func isLocalDbSynced(backstage *bs.Backstage) bool {
+	return isStatusConditionTrue(bs.LocalDbSynced, backstage)
+}
+
+func isStatusConditionTrue(condType string, backstage *bs.Backstage) bool {
+	if cond := meta.FindStatusCondition(backstage.Status.Conditions, condType); cond != nil {
+		return cond.Status == v1.ConditionTrue
+	}
+	return false
+}
+
+// cleanupResource deletes the resource from the cluster if exists
+func (r *BackstageReconciler) cleanupResource(ctx context.Context, obj client.Object, backstage *bs.Backstage) (bool, error) {
+	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return false, nil // Nothing to delete
+		}
+		return false, err // For retry
+	}
+	ownedByCR := false
+	for _, ownerRef := range obj.GetOwnerReferences() {
+		if ownerRef.APIVersion == bs.GroupVersion.String() && ownerRef.Kind == "Backstage" && ownerRef.Name == backstage.Name {
+			ownedByCR = true
+			break
+		}
+	}
+	if !ownedByCR { // The object is not owned by the backstage CR
+		return false, nil
+	}
+	err = r.Delete(ctx, obj)
+	if err == nil {
+		return true, nil // Deleted
+	}
+	return false, err
 }
 
 // sets backstage-{Id} for labels and selectors

@@ -6,4 +6,3 @@ metadata:
 spec:
   rawRuntimeConfig:
     backstageConfig: janus-config
-#  dryRun: true

@@ -121,7 +121,7 @@ var _ = Describe("Backstage controller", func() {
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
 			g.Expect(err).NotTo(HaveOccurred())
 			//TODO the status is under construction
-			g.Expect(len(backstage.Status.Conditions)).To(Equal(2))
+			g.Expect(isSynced(&backstage)).To(BeTrue())
 		}, time.Minute, time.Second).Should(Succeed())
 	}
 
@@ -347,6 +347,92 @@ var _ = Describe("Backstage controller", func() {
 
 			By("Checking the latest Status added to the Backstage instance")
 			verifyBackstageInstance(ctx)
+
+			By("Checking the localDb Sync Status in the Backstage instance")
+			Eventually(func(g Gomega) {
+				var backstage bsv1alpha1.Backstage
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(isLocalDbSynced(&backstage)).To(BeTrue())
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Checking the localdb statefulset has been created")
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}, &appsv1.StatefulSet{})
+				g.Expect(err).To(Not(HaveOccurred()))
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Checking the localdb services have been created")
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}, &corev1.Service{})
+				g.Expect(err).To(Not(HaveOccurred()))
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s-hl", backstageName), Namespace: ns}, &corev1.Service{})
+				g.Expect(err).To(Not(HaveOccurred()))
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Checking the localdb secret has been gnerated")
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-secret-%s", backstageName), Namespace: ns}, &corev1.Secret{})
+				g.Expect(err).To(Not(HaveOccurred()))
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Updating custom resource by disabling local db")
+			var enableLocalDb bool = false
+			Eventually(func(g Gomega) {
+				toBeUpdated := &bsv1alpha1.Backstage{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, toBeUpdated)
+				g.Expect(err).To(Not(HaveOccurred()))
+				toBeUpdated.Spec.Database.EnableLocalDb = &enableLocalDb
+				toBeUpdated.Spec.Database.AuthSecretName = "existing-db-secret"
+				err = k8sClient.Update(ctx, toBeUpdated)
+				g.Expect(err).To(Not(HaveOccurred()))
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Reconciling again after the custom resource update")
+			_, err = backstageReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+			})
+			Expect(err).To(Not(HaveOccurred()))
+
+			By("Checking the localDb Sync Status has been updated in the Backstage instance")
+			Eventually(func(g Gomega) {
+				var backstage bsv1alpha1.Backstage
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(isLocalDbSynced(&backstage)).To(BeFalse())
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Checking that the local db statefulset has been deleted")
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(ctx,
+					types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstage.Name)},
+					&appsv1.StatefulSet{})
+				g.Expect(err).Should(HaveOccurred())
+				g.Expect(errors.IsNotFound(err)).Should(BeTrue(), "Expected error to be a not-found one, but got %v", err)
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Checking that the local db services have been deleted")
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(ctx,
+					types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstage.Name)},
+					&corev1.Service{})
+				g.Expect(err).Should(HaveOccurred())
+				g.Expect(errors.IsNotFound(err)).Should(BeTrue(), "Expected error to be a not-found one, but got %v", err)
+				err = k8sClient.Get(ctx,
+					types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s-hl", backstage.Name)},
+					&corev1.Service{})
+				g.Expect(err).Should(HaveOccurred())
+				g.Expect(errors.IsNotFound(err)).Should(BeTrue(), "Expected error to be a not-found one, but got %v", err)
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Checking that the local db secret has been deleted")
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(ctx,
+					types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-secret-%s", backstage.Name)},
+					&corev1.Secret{})
+				g.Expect(err).Should(HaveOccurred())
+				g.Expect(errors.IsNotFound(err)).Should(BeTrue(), "Expected error to be a not-found one, but got %v", err)
+			}, time.Minute, time.Second).Should(Succeed())
 		})
 	})
 
@@ -1157,6 +1243,45 @@ plugins: []
 
 				By("Checking the latest Status added to the Backstage instance")
 				verifyBackstageInstance(ctx)
+
+				By("Updating the custom resource with extra env vars")
+				Eventually(func(g Gomega) {
+					toBeUpdated := &bsv1alpha1.Backstage{}
+					err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, toBeUpdated)
+					g.Expect(err).To(Not(HaveOccurred()))
+					toBeUpdated.Spec.Application.ExtraEnvs.Envs = []bsv1alpha1.Env{
+						{Name: "MY_ENV_VAR_3", Value: "value 30"},
+					}
+					err = k8sClient.Update(ctx, toBeUpdated)
+					g.Expect(err).To(Not(HaveOccurred()))
+				}, time.Minute, time.Second).Should(Succeed())
+
+				By("Checking extra envs in the custom resource are updated")
+				Eventually(func(g Gomega) {
+					found := &bsv1alpha1.Backstage{}
+					err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
+					g.Expect(err).To(Not(HaveOccurred()))
+					g.Expect(found.Spec.Application.ExtraEnvs.Envs).Should(HaveLen(1))
+					g.Expect(found.Spec.Application.ExtraEnvs.Envs[0].Name).To(Equal("MY_ENV_VAR_3"))
+				}, time.Minute, time.Second).Should(Succeed())
+
+				By("Reconciling again after the custom resource update")
+				_, err = backstageReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+				})
+				Expect(err).To(Not(HaveOccurred()))
+
+				By("Checking the Deployment's env variables are updated after the custom resource update")
+				Eventually(func(g Gomega) {
+					found := &appsv1.Deployment{}
+					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
+					g.Expect(err).To(Not(HaveOccurred()))
+					mainCont := found.Spec.Template.Spec.Containers[0]
+					_, ok := findEnvVar(mainCont.Env, "MY_ENV_VAR_3")
+					Expect(ok).To(BeTrue(), "Env var MY_ENV_VAR_3 should be injected into the main container")
+					_, ok = findEnvVar(mainCont.Env, "MY_ENV_VAR_1")
+					Expect(ok).To(BeFalse(), "Env var MY_ENV_VAR_1 should have been removed from the main container")
+				}, time.Minute, time.Second).Should(Succeed())
 			})
 		})
 	})
@@ -1263,7 +1388,7 @@ plugins: []
 
 	When("setting the number of replicas", func() {
 		var nbReplicas int32 = 5
-
+		var nbReplicasUpdated int32 = 3
 		var backstage *bsv1alpha1.Backstage
 
 		BeforeEach(func() {
@@ -1302,6 +1427,38 @@ plugins: []
 
 			By("Checking the latest Status added to the Backstage instance")
 			verifyBackstageInstance(ctx)
+
+			By("Updating replicas in the custom resource")
+			Eventually(func(g Gomega) {
+				toBeUpdated := &bsv1alpha1.Backstage{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, toBeUpdated)
+				g.Expect(err).To(Not(HaveOccurred()))
+				toBeUpdated.Spec.Application.Replicas = &nbReplicasUpdated
+				err = k8sClient.Update(ctx, toBeUpdated)
+				g.Expect(err).To(Not(HaveOccurred()))
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Checking replicas in the custom resource is updated")
+			Eventually(func(g Gomega) {
+				found := &bsv1alpha1.Backstage{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
+				g.Expect(err).To(Not(HaveOccurred()))
+				g.Expect(found.Spec.Application.Replicas).Should(HaveValue(BeEquivalentTo(nbReplicasUpdated)))
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Reconciling again after the custom resource update")
+			_, err = backstageReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+			})
+			Expect(err).To(Not(HaveOccurred()))
+
+			By("Checking the Deployment's replicas is updated after replicas is updated in the custom resource")
+			Eventually(func(g Gomega) {
+				found := &appsv1.Deployment{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
+				g.Expect(err).To(Not(HaveOccurred()))
+				g.Expect(found.Spec.Replicas).Should(HaveValue(BeEquivalentTo(nbReplicasUpdated)))
+			}, time.Minute, time.Second).Should(Succeed())
 		})
 	})
 

@@ -21,6 +21,11 @@ import (
 const (
 	RuntimeConditionRunning string = "RuntimeRunning"
 	RuntimeConditionSynced  string = "RuntimeSyncedWithConfig"
+	RouteSynced             string = "RouteSynced"
+	LocalDbSynced           string = "LocalDbSynced"
+	SynckOK                 string = "SyncOK"
+	SynckFailed             string = "SyncFailed"
+	Deleted                 string = "Deleted"
 	EnvPostGresImage        string = "RELATED_IMAGE_postgresql"
 	EnvBackstageImage       string = "RELATED_IMAGE_backstage"
 )

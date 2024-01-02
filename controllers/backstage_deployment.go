@@ -18,13 +18,14 @@ import (
 	"context"
 	"fmt"
 
-	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 )
 
 const (
@@ -146,90 +147,63 @@ func visitContainers(podTemplateSpec *v1.PodTemplateSpec, visitor ContainerVisit
 	}
 }
 
-func (r *BackstageReconciler) applyBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
-
-	//lg := log.FromContext(ctx)
-
-	deployment := &appsv1.Deployment{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "deployment.yaml", ns, deployment)
-	if err != nil {
-		return fmt.Errorf("failed to read config: %s", err)
+func (r *BackstageReconciler) reconcileBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
+	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+		Name:      fmt.Sprintf("backstage-%s", backstage.Name),
+		Namespace: ns},
 	}
-
-	r.setDefaultDeploymentImage(deployment)
-
-	foundDeployment := &appsv1.Deployment{}
-	deployment.Name = fmt.Sprintf("backstage-%s", backstage.Name)
-	err = r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: ns}, foundDeployment)
-	if err != nil {
-		if errors.IsNotFound(err) {
-
-			setBackstageAppLabel(&deployment.Spec.Template.ObjectMeta.Labels, backstage)
-			setBackstageAppLabel(&deployment.Spec.Selector.MatchLabels, backstage)
-			r.labels(&deployment.ObjectMeta, backstage)
-
-			if r.OwnsRuntime {
-				if err = controllerutil.SetControllerReference(&backstage, deployment, r.Scheme); err != nil {
-					return fmt.Errorf("failed to set owner reference: %s", err)
-				}
-			}
-
-			err = r.addVolumes(ctx, backstage, ns, deployment)
-			if err != nil {
-				return fmt.Errorf("failed to add volumes to Backstage deployment, reason: %s", err)
-			}
-
-			err = r.addVolumeMounts(ctx, backstage, ns, deployment)
-			if err != nil {
-				return fmt.Errorf("failed to add volume mounts to Backstage deployment, reason: %s", err)
-			}
-
-			err = r.addContainerArgs(ctx, backstage, ns, deployment)
-			if err != nil {
-				return fmt.Errorf("failed to add container args to Backstage deployment, reason: %s", err)
-			}
-
-			err = r.addEnvVars(backstage, ns, deployment)
-			if err != nil {
-				return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
-			}
-
-			if backstage.Spec.Application != nil {
-				deployment.Spec.Replicas = backstage.Spec.Application.Replicas
-
-				if backstage.Spec.Application.Image != nil {
-					visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
-						container.Image = *backstage.Spec.Application.Image
-					})
-				}
-
-				for _, imagePullSecret := range backstage.Spec.Application.ImagePullSecrets {
-					deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{
-						Name: imagePullSecret,
-					})
-				}
-			}
-
-			err = r.validateAndUpdatePsqlSecretRef(backstage, deployment)
-			if err != nil {
-				return fmt.Errorf("failed to validate database secret, reason: %s", err)
-			}
-			err = r.Create(ctx, deployment)
-			if err != nil {
-				return fmt.Errorf("failed to create backstage deployment, reason: %s", err)
-			}
-
-		} else {
-			return fmt.Errorf("failed to get backstage deployment.yaml, reason: %s", err)
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, r.deploymentObjectMutFun(ctx, deployment, backstage, ns)); err != nil {
+		if errors.IsConflict(err) {
+			return fmt.Errorf("retry sync needed: %v", err)
 		}
-	} else {
-		//lg.Info("CR update is ignored for the time")
-		err = r.Update(ctx, foundDeployment)
-		if err != nil {
-			return fmt.Errorf("failed to update backstage deplyment, reason: %s", err)
-		}
+		return err
 	}
 	return nil
+}
+
+func (r *BackstageReconciler) deploymentObjectMutFun(ctx context.Context, deployment *appsv1.Deployment, backstage bs.Backstage, ns string) controllerutil.MutateFn {
+	return func() error {
+		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "deployment.yaml", ns, deployment)
+		if err != nil {
+			return fmt.Errorf("failed to read config: %s", err)
+		}
+
+		// Override deployment name
+		deployment.Name = fmt.Sprintf("backstage-%s", backstage.Name)
+
+		r.setDefaultDeploymentImage(deployment)
+
+		r.applyBackstageLabels(backstage, deployment)
+
+		if err = r.addVolumes(ctx, backstage, ns, deployment); err != nil {
+			return fmt.Errorf("failed to add volumes to Backstage deployment, reason: %s", err)
+		}
+
+		if err = r.addVolumeMounts(ctx, backstage, ns, deployment); err != nil {
+			return fmt.Errorf("failed to add volume mounts to Backstage deployment, reason: %s", err)
+		}
+
+		if err = r.addContainerArgs(ctx, backstage, ns, deployment); err != nil {
+			return fmt.Errorf("failed to add container args to Backstage deployment, reason: %s", err)
+		}
+
+		if err = r.addEnvVars(backstage, ns, deployment); err != nil {
+			return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
+		}
+
+		r.applyApplicationParamsFromCR(backstage, deployment)
+
+		if err = r.validateAndUpdatePsqlSecretRef(backstage, deployment); err != nil {
+			return fmt.Errorf("failed to validate database secret, reason: %s", err)
+		}
+
+		if r.OwnsRuntime {
+			if err = controllerutil.SetControllerReference(&backstage, deployment, r.Scheme); err != nil {
+				return fmt.Errorf("failed to set owner reference: %s", err)
+			}
+		}
+		return nil
+	}
 }
 
 func (r *BackstageReconciler) addVolumes(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
@@ -311,4 +285,26 @@ func (r *BackstageReconciler) setDefaultDeploymentImage(deployment *appsv1.Deplo
 			container.Image = r.BackstageImage
 		}
 	})
+}
+
+func (r *BackstageReconciler) applyBackstageLabels(backstage bs.Backstage, deployment *appsv1.Deployment) {
+	setBackstageAppLabel(&deployment.Spec.Template.ObjectMeta.Labels, backstage)
+	setBackstageAppLabel(&deployment.Spec.Selector.MatchLabels, backstage)
+	r.labels(&deployment.ObjectMeta, backstage)
+}
+
+func (r *BackstageReconciler) applyApplicationParamsFromCR(backstage bs.Backstage, deployment *appsv1.Deployment) {
+	if backstage.Spec.Application != nil {
+		deployment.Spec.Replicas = backstage.Spec.Application.Replicas
+		if backstage.Spec.Application.Image != nil {
+			visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
+				container.Image = *backstage.Spec.Application.Image
+			})
+		}
+		for _, imagePullSecret := range backstage.Spec.Application.ImagePullSecrets {
+			deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{
+				Name: imagePullSecret,
+			})
+		}
+	}
 }

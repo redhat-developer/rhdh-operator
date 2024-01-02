@@ -19,13 +19,11 @@ import (
 	"context"
 	"fmt"
 
+	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 )
 
 // var (`
@@ -63,51 +61,62 @@ import (
 //
 // `
 // )
-func (r *BackstageReconciler) applyLocalDbServices(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) reconcileLocalDbServices(ctx context.Context, backstage bs.Backstage, ns string) error {
 	name := fmt.Sprintf("backstage-psql-%s", backstage.Name)
-	err := r.applyPsqlService(ctx, backstage, name, name, ns, "db-service.yaml")
+	err := r.reconcilePsqlService(ctx, backstage, name, name, ns, "db-service.yaml")
 	if err != nil {
 		return err
 	}
 	nameHL := fmt.Sprintf("backstage-psql-%s-hl", backstage.Name)
-	return r.applyPsqlService(ctx, backstage, nameHL, name, ns, "db-service-hl.yaml")
+	return r.reconcilePsqlService(ctx, backstage, nameHL, name, ns, "db-service-hl.yaml")
 
 }
 
-func (r *BackstageReconciler) applyPsqlService(ctx context.Context, backstage bs.Backstage, name, label, ns string, key string) error {
-
-	lg := log.FromContext(ctx)
-
-	service := &corev1.Service{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, key, ns, service)
-	if err != nil {
+func (r *BackstageReconciler) reconcilePsqlService(ctx context.Context, backstage bs.Backstage, name, label, ns, key string) error {
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+	}
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, r.psqlServiceObjectMutFun(ctx, service, backstage, label, ns, key)); err != nil {
+		if errors.IsConflict(err) {
+			return fmt.Errorf("retry sync needed: %v", err)
+		}
 		return err
 	}
-	service.SetName(name)
-	setBackstageLocalDbLabel(&service.ObjectMeta.Labels, label)
-	setBackstageLocalDbLabel(&service.Spec.Selector, label)
-	err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: ns}, service)
-	if err != nil {
-		if errors.IsNotFound(err) {
+	return nil
+}
 
-		} else {
-			return fmt.Errorf("failed to get service, reason: %s", err)
+func (r *BackstageReconciler) psqlServiceObjectMutFun(ctx context.Context, service *corev1.Service, backstage bs.Backstage, label, ns, key string) controllerutil.MutateFn {
+	return func() error {
+		tmp := service.DeepCopy()
+		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, key, ns, service)
+		if err != nil {
+			return err
 		}
-	} else {
-		lg.Info("CR update is ignored for the time")
+		service.SetName(tmp.Name)
+		setBackstageLocalDbLabel(&service.ObjectMeta.Labels, label)
+		setBackstageLocalDbLabel(&service.Spec.Selector, label)
+
+		if r.OwnsRuntime {
+			if err := controllerutil.SetControllerReference(&backstage, service, r.Scheme); err != nil {
+				return fmt.Errorf(ownerRefFmt, err)
+			}
+		}
+		if len(tmp.Spec.ClusterIP) > 0 && service.Spec.ClusterIP != "" && service.Spec.ClusterIP != "None" && service.Spec.ClusterIP != tmp.Spec.ClusterIP {
+			return fmt.Errorf("db service IP can not be updated: %s, %s, %s", tmp.Name, tmp.Spec.ClusterIP, service.Spec.ClusterIP)
+		}
+		service.Spec.ClusterIP = tmp.Spec.ClusterIP
+		for _, ip1 := range tmp.Spec.ClusterIPs {
+			for _, ip2 := range service.Spec.ClusterIPs {
+				if len(ip1) > 0 && ip2 != "" && ip2 != "None" && ip1 != ip2 {
+					return fmt.Errorf("db service IPs can not be updated: %s, %v, %v", tmp.Name, tmp.Spec.ClusterIPs, service.Spec.ClusterIPs)
+				}
+			}
+		}
+		service.Spec.ClusterIPs = tmp.Spec.ClusterIPs
+
 		return nil
 	}
-
-	if r.OwnsRuntime {
-		if err := controllerutil.SetControllerReference(&backstage, service, r.Scheme); err != nil {
-			return fmt.Errorf(ownerRefFmt, err)
-		}
-	}
-
-	err = r.Create(ctx, service)
-	if err != nil {
-		return fmt.Errorf("failed to create service, reason: %s", err)
-	}
-
-	return nil
 }

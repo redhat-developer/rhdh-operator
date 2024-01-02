@@ -24,53 +24,67 @@ import (
 	openshift "github.com/openshift/api/route/v1"
 	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *BackstageReconciler) applyBackstageRoute(ctx context.Context, backstage bs.Backstage, ns string) error {
-	if !shouldCreateRoute(backstage) {
-		return nil
-	}
-
-	route := &openshift.Route{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "route.yaml", ns, route)
-	if err != nil {
-		return err
-	}
-
+func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backstage *bs.Backstage, ns string) error {
 	// Override the route and service names
 	name := fmt.Sprintf("backstage-%s", backstage.Name)
-	route.Name = name
-	route.Spec.To.Name = name
+	route := &openshift.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+	}
 
-	err = r.Get(ctx, types.NamespacedName{Name: route.Name, Namespace: ns}, route)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to get backstage route, reason: %s", err)
+	if !shouldCreateRoute(backstage) {
+		if isRouteSynced(backstage) {
+			deleted, err := r.cleanupResource(ctx, route, backstage)
+			if err == nil && deleted {
+				setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionFalse, bs.Deleted, "")
+			}
+			return err
 		}
-	} else {
-		//lg.Info("CR update is ignored for the time")
 		return nil
 	}
 
-	r.labels(&route.ObjectMeta, backstage)
-
-	if r.OwnsRuntime {
-		if err := controllerutil.SetControllerReference(&backstage, route, r.Scheme); err != nil {
-			return fmt.Errorf("failed to set owner reference: %s", err)
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, route, r.routeObjectMutFun(ctx, route, backstage, ns)); err != nil {
+		if errors.IsConflict(err) {
+			return fmt.Errorf("retry sync needed: %v", err)
 		}
+		setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionFalse, bs.SynckFailed, fmt.Sprintf("Error:%s", err.Error()))
+		return err
 	}
-
-	r.applyRouteParamsFromCR(route, backstage)
-
-	err = r.Create(ctx, route)
-	if err != nil {
-		return fmt.Errorf("failed to create backstage route, reason: %s", err)
-	}
+	setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.SynckOK, fmt.Sprintf("Route host:%s", route.Spec.Host))
 	return nil
 }
 
-func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, backstage bs.Backstage) {
+func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, route *openshift.Route, backstage *bs.Backstage, ns string) controllerutil.MutateFn {
+	return func() error {
+		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "route.yaml", ns, route)
+		if err != nil {
+			return err
+		}
+
+		// Override the route and service names
+		name := fmt.Sprintf("backstage-%s", backstage.Name)
+		route.Name = name
+		route.Spec.To.Name = route.Name
+
+		r.labels(&route.ObjectMeta, *backstage)
+
+		r.applyRouteParamsFromCR(route, backstage)
+
+		if r.OwnsRuntime {
+			if err := controllerutil.SetControllerReference(backstage, route, r.Scheme); err != nil {
+				return fmt.Errorf("failed to set owner reference: %s", err)
+			}
+		}
+		return nil
+	}
+}
+
+func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, backstage *bs.Backstage) {
 	if backstage.Spec.Application == nil || backstage.Spec.Application.Route == nil {
 		return // Nothing to override
 	}
@@ -116,7 +130,7 @@ func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, bac
 	}
 }
 
-func shouldCreateRoute(backstage bs.Backstage) bool {
+func shouldCreateRoute(backstage *bs.Backstage) bool {
 	if backstage.Spec.Application == nil {
 		return true
 	}
