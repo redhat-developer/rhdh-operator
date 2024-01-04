@@ -46,13 +46,13 @@ jobs:
 
       - name: use-owners
         run: |
-          echo "owners: ${{ steps.read_action_js.outputs['owners'] }}"
-          echo "owners[]: ${{ steps.read_action_js.outputs['owners[]'] }}"
-          echo "owners.1: ${{ steps.read_action_js.outputs['owners.1'] }}"
-          echo "owners.2: ${{ steps.read_action_js.outputs['owners.2'] }}"
-          echo "owners.3: ${{ steps.read_action_js.outputs['owners.3'] }}"
-          echo "owners.4: ${{ steps.read_action_js.outputs['owners.4'] }}"
-          echo "owners.5: ${{ steps.read_action_js.outputs['owners.5'] }}"
+          echo "approvers: ${{ steps.read_action_js.outputs['approvers'] }}"
+          echo "approvers[]: ${{ steps.read_action_js.outputs['approvers[]'] }}"
+          echo "approvers.1: ${{ steps.read_action_js.outputs['approvers.1'] }}"
+          echo "approvers.2: ${{ steps.read_action_js.outputs['approvers.2'] }}"
+          echo "approvers.3: ${{ steps.read_action_js.outputs['approvers.3'] }}"
+          echo "approvers.4: ${{ steps.read_action_js.outputs['approvers.4'] }}"
+          echo "approvers.5: ${{ steps.read_action_js.outputs['approvers.5'] }}"
 
   authorize:
     # The 'external' environment is configured with the odo-maintainers team as required reviewers.
