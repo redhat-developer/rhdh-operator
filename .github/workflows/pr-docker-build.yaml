@@ -39,7 +39,7 @@ jobs:
         uses: pietrobolcato/action-read-yaml@1.1.0
         id: read_action_js
         with:
-          config: ${{ github.workspace }}/OWNERS
+          config: OWNERS
       - name: use-owners
         run: |
           echo "owners: ${{ steps.read_action_js.outputs['owners'] }}"
