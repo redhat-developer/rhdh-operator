@@ -1,99 +1,64 @@
-# backstage-operator
-Operator for deploying Backstage for Janus-IDP.
+# Backstage Operator
 
-## Description
-Implementing https://janus-idp.io/docs/deployment/k8s/ procedure
-At first stage CR update does not affect Backstage Objects, just installation (same as Helm)
-TODO: Do we need to continuosly sync the states? Which way if so: from CR to Objects or back or (somehow) back and forth?
+## The Goal
+The Goal of [Backstage](https://backstage.io) Operator project is creating Kubernetes Operator for configuring, installing and synchronizing Backstage instance on Kubernetes/OpenShift. 
+The initial target is in support of Red Hat's assemblies of Backstage - specifically supporting [dynamic-plugins](https://github.com/janus-idp/backstage-showcase/blob/main/showcase-docs/dynamic-plugins.md)) on OpenShift. This includes [Janus-IDP](https://janus-idp.io/) and [Red Hat Developer Hub (RHDH)](https://developers.redhat.com/rhdh) but may be flexible enough to install any compatible Backstage instance on Kubernetes. See additional information under [Configuration](docs/configuration.md)).
+The Operator provides clear and flexible configuration options to satisfy a wide range of expectations, from "no  configuration for default quick start" to "highly customized configuration for production".
 
-Make sure namespace is created.
-
-Local Database (PostgreSQL) is created by default, to disable
-spec: 
-  skipLocalDb: true
-This way third party DB can theorethically be configured. TODO: It just requires some changes in Backstage appConfig (I think), 
-because it only expects either in-container SQLite or MySQL.
-TODO: should we consider using in-container SQLite for K8s deployment as well (single container deployment)?
-
-TODO: POSTGRES_HOST = <name-of the service> , POSTGRES_PORT = <port>[5432] can be delivered to the Backstage 
-Deployment out of Postgres Secret? Indeed, it is not really a secret.
+[More documentation...](#more-documentation)
 
 ## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
+You’ll need a Kubernetes or OpenShift cluster. You can use [Minikube](https://minikube.sigs.k8s.io/docs/) or [KIND](https://sigs.k8s.io/kind) for local testing, or deploy to a remote cluster.
 **Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
-```sh
-kubectl apply -f config/samples/
-```
-2. Build and push your image to the location specified by `IMG`:
-```sh
-make docker-build docker-push IMG=<some-registry>/backstage-operator:tag
-```
-3. Deploy the controller to the cluster with the image specified by `IMG`:
-```sh
-make deploy IMG=<some-registry>/backstage-operator:tag
-```
-### Uninstall CRDs
-To delete the CRDs from the cluster:
-```sh
-make uninstall
-```
-### Undeploy controller
-UnDeploy the controller from the cluster:
-```sh
-make undeploy
-```
-## Build and Deploy with OLM
-1. To build operator, bundle and catalog images:
-```sh
-make release-build
-```
-2. To push operator, bundle and catalog images to the registry:
-```sh
-make release-push
-```
-3. To deploy or update catalog source:
-```sh
-make catalog-update
-```
-4. To deloy the operator with OLM
-```sh
-make deploy-olm
-```
-4. To undeloy the operator with OLM
-```sh
-make undeploy-olm
-```
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+To test it on minikube from the source code:
 
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
+Both **kubectl** and **minikube** must be installed. See [tools](https://kubernetes.io/docs/tasks/tools/).
 
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/) 
-which provides a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
-
-### Test It Out
-1. Install the CRDs into the cluster:
+1.  Get your copy of Operator from GitHub: 
 ```sh
-make install
+git clone https://github.com/janus-idp/operator
 ```
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
+2. Deploy Operator on the minikube cluster:
 ```sh
-make run
+cd <your-janus-idp-operator-project-dir>
+make deploy
 ```
-**NOTE:** You can also run this in one step by running: `make install run`
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
+you can check if the Operator pod is up by running 
 ```sh
-make manifests
+kubectl get pods -n backstage-system
+It should be something like:
+NAME                                           READY   STATUS    RESTARTS   AGE
+backstage-controller-manager-cfc44bdfd-xzk8g   2/2     Running   0          32s
 ```
-**NOTE:** Run `make --help` for more information on all potential `make` targets
+3. Create Backstage Custom resource on some namespace (make sure this namespace exists)
+```sh
+kubectl -n <your-namespace> apply -f examples/bs1.yaml
+```
+you can check if the Operand pods are up by running
+```sh
+kubectl get pods -n <your-namespace>
+It should be something like:
+NAME                         READY   STATUS    RESTARTS   AGE
+backstage-85fc4657b5-lqk6r   1/1     Running   0          78s
+backstage-psql-bs1-0         1/1     Running   0          79s
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+```
+4. Tunnel Backstage Service and get URL for access Backstage
+```sh
+minikube service -n <your-namespace> backstage --url
+Output:
+>http://127.0.0.1:53245
+```
+5. Access your Backstage instance in your browser using this URL. 
+
+## More documentation
+
+- [Openshift deployment](docs/openshift.md)
+- [Configuration](docs/configuration.md)
+- [Developer Guide](docs/developer.md)
+- [Operator Design](docs/developer.md)
+
 
 ## License
 
