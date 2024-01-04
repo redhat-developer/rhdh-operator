@@ -35,11 +35,15 @@ jobs:
   get-owners:
     runs-on: ubuntu-latest
     steps:
-      - name: read-owners
+      - name: checkout
+        uses: actions/checkout@v3
+
+      - name: read-owners-file
         uses: pietrobolcato/action-read-yaml@1.1.0
         id: read_action_js
         with:
-          config: OWNERS
+          config: ${{ github.workspace }}/OWNERS
+
       - name: use-owners
         run: |
           echo "owners: ${{ steps.read_action_js.outputs['owners'] }}"
