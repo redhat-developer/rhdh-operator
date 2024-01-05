@@ -52,10 +52,10 @@ func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backs
 		if errors.IsConflict(err) {
 			return fmt.Errorf("retry sync needed: %v", err)
 		}
-		setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionFalse, bs.SynckFailed, fmt.Sprintf("Error:%s", err.Error()))
+		setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("Error:%s", err.Error()))
 		return err
 	}
-	setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.SynckOK, fmt.Sprintf("Route host:%s", route.Spec.Host))
+	setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.SyncOK, fmt.Sprintf("Route host:%s", route.Spec.Host))
 	return nil
 }
 

@@ -121,19 +121,19 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 		err := r.reconcileLocalDbStatefulSet(ctx, backstage, req.Namespace)
 		if err != nil {
-			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SynckFailed, fmt.Sprintf("failed to sync Database StatefulSet:%s", err.Error()))
+			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("failed to sync Database StatefulSet:%s", err.Error()))
 			return ctrl.Result{}, fmt.Errorf("failed to sync Database StatefulSet: %w", err)
 		}
 
 		err = r.reconcileLocalDbServices(ctx, backstage, req.Namespace)
 		if err != nil {
-			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SynckFailed, fmt.Sprintf("failed to sync Database Services:%s", err.Error()))
+			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("failed to sync Database Services:%s", err.Error()))
 			return ctrl.Result{}, fmt.Errorf("failed to sync Database Service: %w", err)
 		}
-		setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionTrue, bs.SynckOK, "")
+		setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionTrue, bs.SyncOK, "")
 	} else if isLocalDbSynced(&backstage) { // EnableLocalDb is off but local db has been deployed. Clean up the deployed local db resources
 		if err := r.cleanupLocalDbResources(ctx, &backstage); err != nil {
-			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SynckFailed, fmt.Sprintf("failed to delete Database Services:%s", err.Error()))
+			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("failed to delete Database Services:%s", err.Error()))
 			return ctrl.Result{}, fmt.Errorf("failed to delete Database Service: %w", err)
 		}
 		setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.Deleted, "")
