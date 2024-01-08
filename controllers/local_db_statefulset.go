@@ -219,7 +219,7 @@ func (r *BackstageReconciler) setDefaultStatefulSetImage(statefulSet *appsv1.Sta
 }
 
 // cleanupLocalDbResources removes all local db related resources, including statefulset, services and generated secret.
-func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backstage *bs.Backstage) error {
+func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backstage bs.Backstage) error {
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("backstage-psql-%s", backstage.Name),

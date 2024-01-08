@@ -37,18 +37,18 @@ func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backs
 		},
 	}
 
-	if !shouldCreateRoute(backstage) {
-		if isRouteSynced(backstage) {
-			deleted, err := r.cleanupResource(ctx, route, backstage)
+	if !shouldCreateRoute(*backstage) {
+		if isRouteDeployed(*backstage) {
+			deleted, err := r.cleanupResource(ctx, route, *backstage)
 			if err == nil && deleted {
-				setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionFalse, bs.Deleted, "")
+				setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.Deleted, "")
 			}
 			return err
 		}
 		return nil
 	}
 
-	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, route, r.routeObjectMutFun(ctx, route, backstage, ns)); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, route, r.routeObjectMutFun(ctx, route, *backstage, ns)); err != nil {
 		if errors.IsConflict(err) {
 			return fmt.Errorf("retry sync needed: %v", err)
 		}
@@ -59,7 +59,7 @@ func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backs
 	return nil
 }
 
-func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, route *openshift.Route, backstage *bs.Backstage, ns string) controllerutil.MutateFn {
+func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, route *openshift.Route, backstage bs.Backstage, ns string) controllerutil.MutateFn {
 	return func() error {
 		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "route.yaml", ns, route)
 		if err != nil {
@@ -71,12 +71,12 @@ func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, route *open
 		route.Name = name
 		route.Spec.To.Name = route.Name
 
-		r.labels(&route.ObjectMeta, *backstage)
+		r.labels(&route.ObjectMeta, backstage)
 
 		r.applyRouteParamsFromCR(route, backstage)
 
 		if r.OwnsRuntime {
-			if err := controllerutil.SetControllerReference(backstage, route, r.Scheme); err != nil {
+			if err := controllerutil.SetControllerReference(&backstage, route, r.Scheme); err != nil {
 				return fmt.Errorf("failed to set owner reference: %s", err)
 			}
 		}
@@ -84,7 +84,7 @@ func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, route *open
 	}
 }
 
-func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, backstage *bs.Backstage) {
+func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, backstage bs.Backstage) {
 	if backstage.Spec.Application == nil || backstage.Spec.Application.Route == nil {
 		return // Nothing to override
 	}
@@ -130,7 +130,7 @@ func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, bac
 	}
 }
 
-func shouldCreateRoute(backstage *bs.Backstage) bool {
+func shouldCreateRoute(backstage bs.Backstage) bool {
 	if backstage.Spec.Application == nil {
 		return true
 	}

@@ -256,7 +256,7 @@ func (r *BackstageReconciler) addEnvVars(backstage bs.Backstage, ns string, depl
 
 func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backstage, deployment *appsv1.Deployment) error {
 	if len(backstage.Spec.Database.AuthSecretName) == 0 && !pointer.BoolDeref(backstage.Spec.Database.EnableLocalDb, true) {
-		return fmt.Errorf("existingDbSerect is required if enableLocalDb is false")
+		return fmt.Errorf("authSecretName is required if enableLocalDb is false")
 	}
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name != _defaultBackstageMainContainerName {

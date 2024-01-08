@@ -121,7 +121,7 @@ var _ = Describe("Backstage controller", func() {
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
 			g.Expect(err).NotTo(HaveOccurred())
 			//TODO the status is under construction
-			g.Expect(isSynced(&backstage)).To(BeTrue())
+			g.Expect(isSynced(backstage)).To(BeTrue())
 		}, time.Minute, time.Second).Should(Succeed())
 	}
 
@@ -353,7 +353,7 @@ var _ = Describe("Backstage controller", func() {
 				var backstage bsv1alpha1.Backstage
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(isLocalDbSynced(&backstage)).To(BeTrue())
+				g.Expect(isLocalDbDeployed(backstage)).To(BeTrue())
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking the localdb statefulset has been created")
@@ -399,7 +399,7 @@ var _ = Describe("Backstage controller", func() {
 				var backstage bsv1alpha1.Backstage
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
 				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(isLocalDbSynced(&backstage)).To(BeFalse())
+				g.Expect(isLocalDbDeployed(backstage)).To(BeFalse())
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking that the local db statefulset has been deleted")
@@ -1527,7 +1527,7 @@ plugins: []
 				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 			})
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("existingDbSerect is required if enableLocalDb is false"))
+			Expect(err.Error()).Should(ContainSubstring("authSecretName is required if enableLocalDb is false"))
 		})
 	})
 })
