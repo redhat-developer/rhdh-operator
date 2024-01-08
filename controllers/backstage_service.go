@@ -44,9 +44,11 @@ func (r *BackstageReconciler) reconcileBackstageService(ctx context.Context, bac
 
 // selector for deploy.spec.template.spec.meta.label
 // targetPort: http for deploy.spec.template.spec.containers.ports.name=http
-func (r *BackstageReconciler) serviceObjectMutFun(ctx context.Context, service *corev1.Service, backstage bs.Backstage, ns string) controllerutil.MutateFn {
+func (r *BackstageReconciler) serviceObjectMutFun(ctx context.Context, targetService *corev1.Service, backstage bs.Backstage, ns string) controllerutil.MutateFn {
 	return func() error {
-		tmp := service.DeepCopy()
+		service := &corev1.Service{}
+		targetService.ObjectMeta.DeepCopyInto(&service.ObjectMeta)
+
 		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "service.yaml", ns, service)
 		if err != nil {
 			return err
@@ -64,18 +66,21 @@ func (r *BackstageReconciler) serviceObjectMutFun(ctx context.Context, service *
 			}
 		}
 
-		if len(tmp.Spec.ClusterIP) > 0 && service.Spec.ClusterIP != "" && service.Spec.ClusterIP != "None" && service.Spec.ClusterIP != tmp.Spec.ClusterIP {
-			return fmt.Errorf("backstage service IP can not be updated: %s, %s, %s", tmp.Name, tmp.Spec.ClusterIP, service.Spec.ClusterIP)
+		if len(targetService.Spec.ClusterIP) > 0 && service.Spec.ClusterIP != "" && service.Spec.ClusterIP != "None" && service.Spec.ClusterIP != targetService.Spec.ClusterIP {
+			return fmt.Errorf("backstage service IP can not be updated: %s, current: %s, new: %s", targetService.Name, targetService.Spec.ClusterIP, service.Spec.ClusterIP)
 		}
-		service.Spec.ClusterIP = tmp.Spec.ClusterIP
-		for _, ip1 := range tmp.Spec.ClusterIPs {
+		service.Spec.ClusterIP = targetService.Spec.ClusterIP
+		for _, ip1 := range targetService.Spec.ClusterIPs {
 			for _, ip2 := range service.Spec.ClusterIPs {
 				if len(ip1) > 0 && ip2 != "" && ip2 != "None" && ip1 != ip2 {
-					return fmt.Errorf("backstage service IPs can not be updated: %s, %v, %v", tmp.Name, tmp.Spec.ClusterIPs, service.Spec.ClusterIPs)
+					return fmt.Errorf("backstage service IPs can not be updated: %s, current: %v, new: %v", targetService.Name, targetService.Spec.ClusterIPs, service.Spec.ClusterIPs)
 				}
 			}
 		}
-		service.Spec.ClusterIPs = tmp.Spec.ClusterIPs
+		service.Spec.ClusterIPs = targetService.Spec.ClusterIPs
+
+		service.ObjectMeta.DeepCopyInto(&targetService.ObjectMeta)
+		service.Spec.DeepCopyInto(&targetService.Spec)
 		return nil
 	}
 }

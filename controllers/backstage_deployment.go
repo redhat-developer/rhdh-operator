@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	bs "janus-idp.io/backstage-operator/api/v1alpha1"
@@ -161,8 +160,11 @@ func (r *BackstageReconciler) reconcileBackstageDeployment(ctx context.Context, 
 	return nil
 }
 
-func (r *BackstageReconciler) deploymentObjectMutFun(ctx context.Context, deployment *appsv1.Deployment, backstage bs.Backstage, ns string) controllerutil.MutateFn {
+func (r *BackstageReconciler) deploymentObjectMutFun(ctx context.Context, targetDeployment *appsv1.Deployment, backstage bs.Backstage, ns string) controllerutil.MutateFn {
 	return func() error {
+		deployment := &appsv1.Deployment{}
+		targetDeployment.ObjectMeta.DeepCopyInto(&deployment.ObjectMeta)
+
 		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "deployment.yaml", ns, deployment)
 		if err != nil {
 			return fmt.Errorf("failed to read config: %s", err)
@@ -202,6 +204,9 @@ func (r *BackstageReconciler) deploymentObjectMutFun(ctx context.Context, deploy
 				return fmt.Errorf("failed to set owner reference: %s", err)
 			}
 		}
+
+		deployment.ObjectMeta.DeepCopyInto(&targetDeployment.ObjectMeta)
+		deployment.Spec.DeepCopyInto(&targetDeployment.Spec)
 		return nil
 	}
 }
@@ -255,9 +260,6 @@ func (r *BackstageReconciler) addEnvVars(backstage bs.Backstage, ns string, depl
 }
 
 func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backstage, deployment *appsv1.Deployment) error {
-	if len(backstage.Spec.Database.AuthSecretName) == 0 && !pointer.BoolDeref(backstage.Spec.Database.EnableLocalDb, true) {
-		return fmt.Errorf("authSecretName is required if enableLocalDb is false")
-	}
 	for i, c := range deployment.Spec.Template.Spec.Containers {
 		if c.Name != _defaultBackstageMainContainerName {
 			continue
@@ -301,13 +303,14 @@ func (r *BackstageReconciler) applyApplicationParamsFromCR(backstage bs.Backstag
 				container.Image = *backstage.Spec.Application.Image
 			})
 		}
-
-		if len(backstage.Spec.Application.ImagePullSecrets) > 0 { // use image pull secrets from the CR spec
+		if backstage.Spec.Application.ImagePullSecrets != nil { // use image pull secrets from the CR spec
 			deployment.Spec.Template.Spec.ImagePullSecrets = nil
-			for _, imagePullSecret := range backstage.Spec.Application.ImagePullSecrets {
-				deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{
-					Name: imagePullSecret,
-				})
+			if len(*backstage.Spec.Application.ImagePullSecrets) > 0 {
+				for _, imagePullSecret := range *backstage.Spec.Application.ImagePullSecrets {
+					deployment.Spec.Template.Spec.ImagePullSecrets = append(deployment.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{
+						Name: imagePullSecret,
+					})
+				}
 			}
 		}
 	}

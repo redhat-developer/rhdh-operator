@@ -131,7 +131,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return ctrl.Result{}, fmt.Errorf("failed to sync Database Service: %w", err)
 		}
 		setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionTrue, bs.SyncOK, "")
-	} else if isLocalDbDeployed(backstage) { // EnableLocalDb is off but local db has been deployed. Clean up the deployed local db resources
+	} else { // Clean up the deployed local db resources if any
 		if err := r.cleanupLocalDbResources(ctx, backstage); err != nil {
 			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("failed to delete Database Services:%s", err.Error()))
 			return ctrl.Result{}, fmt.Errorf("failed to delete Database Service: %w", err)
@@ -263,28 +263,7 @@ func setStatusCondition(backstage *bs.Backstage, condType string, status v1.Cond
 	})
 }
 
-func isSynced(backstage bs.Backstage) bool {
-	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bs.RuntimeConditionSynced); cond != nil {
-		return cond.Status == v1.ConditionTrue
-	}
-	return false
-}
-
-func isRouteDeployed(backstage bs.Backstage) bool {
-	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bs.RouteSynced); cond != nil {
-		return cond.Status == v1.ConditionTrue && cond.Reason == bs.SyncOK
-	}
-	return false
-}
-
-func isLocalDbDeployed(backstage bs.Backstage) bool {
-	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bs.LocalDbSynced); cond != nil {
-		return cond.Status == v1.ConditionTrue && cond.Reason == bs.SyncOK
-	}
-	return false
-}
-
-// cleanupResource deletes the resource from the cluster if exists
+// cleanupResource deletes the resource that was previously deployed by the operator from the cluster
 func (r *BackstageReconciler) cleanupResource(ctx context.Context, obj client.Object, backstage bs.Backstage) (bool, error) {
 	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
 	if err != nil {

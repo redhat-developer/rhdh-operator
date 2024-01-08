@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -1345,7 +1346,7 @@ plugins: []
 		BeforeEach(func() {
 			backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 				Application: &bsv1alpha1.Application{
-					ImagePullSecrets: []string{ips1, ips2},
+					ImagePullSecrets: &[]string{ips1, ips2},
 				},
 			})
 			err := k8sClient.Create(ctx, backstage)
@@ -1507,7 +1508,7 @@ plugins: []
 				verifyBackstageInstance(ctx)
 			})
 		})
-		It("should fail to reconcile a custom resource for default Backstage without existing secret", func() {
+		It("should reconcile a custom resource for default Backstage without existing secret", func() {
 			backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
 				Database: bsv1alpha1.Database{
 					EnableLocalDb: pointer.Bool(false),
@@ -1526,8 +1527,7 @@ plugins: []
 			_, err = backstageReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 			})
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("authSecretName is required if enableLocalDb is false"))
+			Expect(err).Should(Not(HaveOccurred()))
 		})
 	})
 })
@@ -1539,4 +1539,18 @@ func findElementsByPredicate[T any](l []T, predicate func(t T) bool) (result []T
 		}
 	}
 	return result
+}
+
+func isLocalDbDeployed(backstage bsv1alpha1.Backstage) bool {
+	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bsv1alpha1.LocalDbSynced); cond != nil {
+		return cond.Status == metav1.ConditionTrue && cond.Reason == bsv1alpha1.SyncOK
+	}
+	return false
+}
+
+func isSynced(backstage bsv1alpha1.Backstage) bool {
+	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bsv1alpha1.RuntimeConditionSynced); cond != nil {
+		return cond.Status == metav1.ConditionTrue
+	}
+	return false
 }

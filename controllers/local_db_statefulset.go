@@ -153,8 +153,10 @@ func (r *BackstageReconciler) reconcileLocalDbStatefulSet(ctx context.Context, b
 	return nil
 }
 
-func (r *BackstageReconciler) localDBStatefulSetMutFun(ctx context.Context, statefulSet *appsv1.StatefulSet, backstage bs.Backstage, ns string) controllerutil.MutateFn {
+func (r *BackstageReconciler) localDBStatefulSetMutFun(ctx context.Context, targetStatefulSet *appsv1.StatefulSet, backstage bs.Backstage, ns string) controllerutil.MutateFn {
 	return func() error {
+		statefulSet := &appsv1.StatefulSet{}
+		targetStatefulSet.ObjectMeta.DeepCopyInto(&statefulSet.ObjectMeta)
 		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, "db-statefulset.yaml", ns, statefulSet)
 		if err != nil {
 			return err
@@ -194,6 +196,9 @@ func (r *BackstageReconciler) localDBStatefulSetMutFun(ctx context.Context, stat
 				return fmt.Errorf(ownerRefFmt, err)
 			}
 		}
+
+		statefulSet.ObjectMeta.DeepCopyInto(&targetStatefulSet.ObjectMeta)
+		statefulSet.Spec.DeepCopyInto(&targetStatefulSet.Spec)
 		return nil
 	}
 }

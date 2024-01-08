@@ -38,14 +38,11 @@ func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backs
 	}
 
 	if !shouldCreateRoute(*backstage) {
-		if isRouteDeployed(*backstage) {
-			deleted, err := r.cleanupResource(ctx, route, *backstage)
-			if err == nil && deleted {
-				setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.Deleted, "")
-			}
-			return err
+		deleted, err := r.cleanupResource(ctx, route, *backstage)
+		if err == nil && deleted {
+			setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.Deleted, "")
 		}
-		return nil
+		return err
 	}
 
 	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, route, r.routeObjectMutFun(ctx, route, *backstage, ns)); err != nil {
@@ -59,8 +56,11 @@ func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backs
 	return nil
 }
 
-func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, route *openshift.Route, backstage bs.Backstage, ns string) controllerutil.MutateFn {
+func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, targetRoute *openshift.Route, backstage bs.Backstage, ns string) controllerutil.MutateFn {
 	return func() error {
+		route := &openshift.Route{}
+		targetRoute.ObjectMeta.DeepCopyInto(&route.ObjectMeta)
+
 		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "route.yaml", ns, route)
 		if err != nil {
 			return err
@@ -80,6 +80,9 @@ func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, route *open
 				return fmt.Errorf("failed to set owner reference: %s", err)
 			}
 		}
+
+		route.ObjectMeta.DeepCopyInto(&targetRoute.ObjectMeta)
+		route.Spec.DeepCopyInto(&targetRoute.Spec)
 		return nil
 	}
 }
