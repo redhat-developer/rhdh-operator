@@ -206,7 +206,11 @@ spec:
                   value: quay.io/fedora/postgresql-15:latest
                 - name: RELATED_IMAGE_backstage
                   value: quay.io/janus-idp/backstage-showcase:next
+<<<<<<< HEAD
                 image: quay.io/janus-idp/operator:0.0.1
+=======
+                image: quay.io/janus/operator:v0.0.1
+>>>>>>> ff714ce (revert to use default image tag based on VERSION in Makefile)
                 livenessProbe:
                   httpGet:
                     path: /healthz
