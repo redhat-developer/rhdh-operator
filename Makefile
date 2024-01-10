@@ -215,7 +215,7 @@ GOLANGCI_LINT_VERSION ?= v1.55.2
 GOIMPORTS_VERSION ?= v0.15.0
 ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
-OP_VERSION ?= v1.33.0 
+OP_VERSION ?= v1.33.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -257,6 +257,7 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPSDK)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	echo "Dowloading https://github.com/operator-framework/operator-sdk/releases/download/$(OP_VERSION)/operator-sdk_$${OS}_$${ARCH} to ./bin/operator-sdk" ;\
 	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OP_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
@@ -274,6 +275,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	echo "Dowloading https://github.com/operator-framework/operator-registry/releases/download/$(OP_VERSION)/$${OS}-$${ARCH}-opm to ./bin/opm" ;\
 	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OP_VERSION)/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
