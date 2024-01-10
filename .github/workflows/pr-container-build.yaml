@@ -78,11 +78,8 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.JANUS_QUAY_USERNAME }}
-          password: ${{ secrets.JANUS_QUAY_TOKEN }}
-          # TODO use janus-idp/operator* images instead of janus/operator*; switch to organization-level secrets
-          # username: ${{ vars.QUAY_USERNAME }}
-          # password: ${{ secrets.QUAY_TOKEN }}
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Build and push operator, bundle, and catalog images
         run: |
@@ -99,17 +96,17 @@ jobs:
 
           # now copy images from local cache to quay, using 0.0.1-pr-123-f00cafe and 0.0.1-pr-123 tags
           for image in operator operator-bundle operator-catalog; do
-            skopeo --insecure-policy copy --all docker://quay.io/janus/${image}:${VERSION} docker://quay.io/janus/${image}:${VERSION}
-            skopeo --insecure-policy copy --all docker://quay.io/janus/${image}:${VERSION} docker://quay.io/janus/${image}:${VERSION%-*}
+            podman push quay.io/janus-idp/${image}:${VERSION} -q
+            skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:${VERSION%-*}
           done
       - name: Comment image links in PR
         uses: actions/github-script@v6
         with:
-          # TODO use janus-idp/operator* images instead of janus/operator*
           script: |
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'PR images are available:<br/><ol><li>https://quay.io/janus/operator:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-bundle:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-catalog:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
+              body: 'PR images are available:<br/><ol><li>https://quay.io/janus-idp/operator:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus-idp/operator-bundle:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus-idp/operator-catalog:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
             })
