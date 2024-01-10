@@ -6,6 +6,7 @@
 
 - You are logged in using the OpenShift web console.
 - You have configured the appropriate roles and permissions within your project to create an application.
+  See the [Red Hat OpenShift documentation on Building applications](https://docs.openshift.com/container-platform/4.14/applications/index.html) for more details.
 - You (or an administrator) have added the RHDH Operator Catalog Source. See https://gitlab.cee.redhat.com/rhidp/rhdh/-/blob/rhdh-1-rhel-9/docs/RHDH.adoc#user-content-operator-installation for more details. This is required until the Operator is fully available on the OpenShift Operator Hub.
 
 **Procedure**
