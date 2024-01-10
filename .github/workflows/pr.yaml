@@ -8,7 +8,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -30,17 +29,17 @@ jobs:
 
     strategy:
       matrix:
-        # See ../Makefile for value of single arch PLATFORM used with targets docker-build and podman-build
+        # See ../Makefile for value of single arch PLATFORM used with target operator-build
         # NOTE: to build multiple arches, see ../Makefile and use target docker-buildx with PLATFORMS
+        # only run this with docker since we have podman builds in pr-container-build.yaml
+        # TODO: do we really even need this check?
         engine: [docker, podman]
-
     steps:
       - uses: actions/checkout@v3
-
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
-
-      - name: ${{ matrix.engine }}-build
-        run: make ${{ matrix.engine }}-build
+      - name: ${{ matrix.engine }} build
+        run: |
+          CONTAINER_ENGINE=${{ matrix.engine }} make operator-build

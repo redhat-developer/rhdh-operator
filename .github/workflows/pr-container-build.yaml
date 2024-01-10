@@ -45,8 +45,8 @@ jobs:
         run: |
           echo "✓"
 
-  pr-docker-build:
-    name: PR Docker Build
+  pr-build:
+    name: PR Build
     runs-on: ubuntu-latest
     needs: authorize
     permissions:
@@ -71,9 +71,11 @@ jobs:
         run: |
           SHORT_SHA=$(git rev-parse --short ${{ github.event.pull_request.head.sha }})
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //") # 0.0.1
+          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
 
-      - name: Build and Push operator image
-        uses: ./.github/actions/docker-build
+      - name: Login to quay.io
+        uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ secrets.JANUS_QUAY_USERNAME }}
@@ -81,63 +83,29 @@ jobs:
           # TODO use janus-idp/operator* images instead of janus/operator*; switch to organization-level secrets
           # username: ${{ vars.QUAY_USERNAME }}
           # password: ${{ secrets.QUAY_TOKEN }}
-          # imageName: ${{ github.repository }}
-          imageName: janus/operator
-          imageTags: |
-            type=ref,prefix=pr-,event=pr
-            type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
-          imageLabels: quay.expires-after=14d
-          push: true
-          dockerfile: docker/Dockerfile
 
-      - name: Adjust operator image and tag in CSV
+      - name: Build and push operator, bundle, and catalog images
         run: |
-          sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/janus/operator:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
-          echo "Operator in CSV changed to: quay.io/janus/operator:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}"
-      - name: Build and Push operator-bundle image
-        uses: ./.github/actions/docker-build
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.JANUS_QUAY_USERNAME }}
-          password: ${{ secrets.JANUS_QUAY_TOKEN }}
-          # TODO use janus-idp/operator* images instead of janus/operator*; switch to organization-level secrets
-          # username: ${{ vars.QUAY_USERNAME }}
-          # password: ${{ secrets.QUAY_TOKEN }}
-          # imageName: ${{ github.repository }}-bundle
-          imageName: janus/operator-bundle
-          imageTags: |
-            type=ref,prefix=pr-,event=pr
-            type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
-          imageLabels: quay.expires-after=14d
-          push: true
-          dockerfile: docker/bundle.Dockerfile
+          # install skopeo, podman
+          sudo apt-get -y update; sudo apt-get -y install skopeo podman
 
-      - name: Generate operator-catalog dockerfile
-        run: |
+          export CONTAINER_ENGINE=podman 
+          export VERSION=${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }} 
+
           set -ex
+
+          # download opm
           OS=$(go env GOOS) && ARCH=$(go env GOARCH) && \
           curl -sSLo /tmp/opm https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/${OS}-${ARCH}-opm && chmod +x /tmp/opm
-          /tmp/opm index add --container-tool docker --mode semver \
-            --tag operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} \
-            --bundles quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }} --generate
-      - name: Build and Push operator-catalog image
-        uses: ./.github/actions/docker-build
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.JANUS_QUAY_USERNAME }}
-          password: ${{ secrets.JANUS_QUAY_TOKEN }}
-          # TODO use janus-idp/operator* images instead of janus/operator*; switch to organization-level secrets
-          # username: ${{ vars.QUAY_USERNAME }}
-          # password: ${{ secrets.QUAY_TOKEN }}
-          # imageName: ${{ github.repository }}-catalog
-          imageName: janus/operator-catalog
-          imageTags: |
-            type=ref,prefix=pr-,event=pr
-            type=ref,prefix=pr-,suffix=-${{ env.SHORT_SHA }},event=pr
-          imageLabels: quay.expires-after=14d
-          push: true
-          dockerfile: index.Dockerfile
 
+          # build 3 container images with a 14d expiry
+          CONTAINER_ENGINE=${CONTAINER_ENGINE} VERSION=${VERSION} make lint release-build
+
+          # now copy images from local cache to quay, using 0.0.1-pr-123-f00cafe and 0.0.1-pr-123 tags
+          for image in operator operator-bundle operator-catalog; do
+            skopeo --insecure-policy copy --all docker://quay.io/janus/${image}:${VERSION} docker://quay.io/janus/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://quay.io/janus/${image}:${VERSION} docker://quay.io/janus/${image}:${VERSION%-*}
+          done
       - name: Comment image links in PR
         uses: actions/github-script@v6
         with:
@@ -147,5 +115,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'PR images are available:<br/><ol><li>https://quay.io/janus/operator:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-bundle:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-catalog:pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
+              body: 'PR images are available:<br/><ol><li>https://quay.io/janus/operator:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-bundle:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/janus/operator-catalog:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
             })
