@@ -38,15 +38,15 @@ metadata:
 data:
   "app-config-rhdh.yaml": |
      app:
-       baseUrl: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_CLUSTER_ROUTE_HOST>
+       baseUrl: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_INGRESS_DOMAIN>
        title: Red Hat Developer Hub
      backend:
        auth:
          keys:
            - secret: "${BACKEND_SECRET}"
-       baseUrl: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_CLUSTER_ROUTE_HOST>
+       baseUrl: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_INGRESS_DOMAIN>
        cors:
-         origin: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_CLUSTER_ROUTE_HOST>
+         origin: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_INGRESS_DOMAIN>
 ```
 
 <details>
@@ -76,8 +76,8 @@ data:
 **Notes**:
 - There is a mandatory Backend Auth Key for Backstage. This will reference an environment variable backed by an OpenShift Secret.
 - You need to know the external URL of your Backstage instance and set it in the `app.baseUrl`, `backend.baseUrl` and `backend.cors.origin` fields of the application configuration.
-  By default, this will be named as follows: `https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_CLUSTER_ROUTE_HOST>`,
-  but if you are using a different host or sub-domain (customizable in the Custom Resource `spec.application.route` field), you will need to adjust the app configuration accordingly.
+  By default, this will be named as follows: `https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_INGRESS_DOMAIN>` (you can use the `oc get ingresses.config/cluster -o jsonpath='{.spec.domain}'` command to display your ingress domain).
+  If you are using a different host or sub-domain (customizable in the Custom Resource `spec.application.route` field), you will need to adjust the application configuration accordingly.
 
 **Procedure**
 
