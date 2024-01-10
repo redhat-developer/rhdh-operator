@@ -94,10 +94,6 @@ jobs:
 
           set -ex
 
-          # download opm
-          OS=$(go env GOOS) && ARCH=$(go env GOARCH) && \
-          curl -sSLo /tmp/opm https://github.com/operator-framework/operator-registry/releases/download/v1.33.0/${OS}-${ARCH}-opm && chmod +x /tmp/opm
-
           # build 3 container images with a 14d expiry
           CONTAINER_ENGINE=${CONTAINER_ENGINE} VERSION=${VERSION} make lint release-build
 
