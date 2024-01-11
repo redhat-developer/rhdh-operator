@@ -29,7 +29,7 @@ import (
 
 func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backstage *bs.Backstage, ns string) error {
 	// Override the route and service names
-	name := fmt.Sprintf("backstage-%s", backstage.Name)
+	name := getDefaultObjName(*backstage)
 	route := &openshift.Route{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -67,7 +67,7 @@ func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, targetRoute
 		}
 
 		// Override the route and service names
-		name := fmt.Sprintf("backstage-%s", backstage.Name)
+		name := getDefaultObjName(backstage)
 		route.Name = name
 		route.Spec.To.Name = route.Name
 

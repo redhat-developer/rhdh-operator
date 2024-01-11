@@ -62,64 +62,28 @@ import (
 // `
 // )
 func (r *BackstageReconciler) reconcileLocalDbServices(ctx context.Context, backstage bs.Backstage, ns string) error {
-	name := fmt.Sprintf("backstage-psql-%s", backstage.Name)
-	err := r.reconcilePsqlService(ctx, backstage, name, name, ns, "db-service.yaml")
+	name := getDefaultDbObjName(backstage)
+	err := r.reconcilePsqlService(ctx, backstage, name, name, "db-service.yaml", ns)
 	if err != nil {
 		return err
 	}
 	nameHL := fmt.Sprintf("backstage-psql-%s-hl", backstage.Name)
-	return r.reconcilePsqlService(ctx, backstage, nameHL, name, ns, "db-service-hl.yaml")
+	return r.reconcilePsqlService(ctx, backstage, nameHL, name, "db-service-hl.yaml", ns)
 
 }
 
-func (r *BackstageReconciler) reconcilePsqlService(ctx context.Context, backstage bs.Backstage, name, label, ns, key string) error {
+func (r *BackstageReconciler) reconcilePsqlService(ctx context.Context, backstage bs.Backstage, serviceName, label, configKey, ns string) error {
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      serviceName,
 			Namespace: ns,
 		},
 	}
-	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, r.psqlServiceObjectMutFun(ctx, service, backstage, label, ns, key)); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, r.serviceObjectMutFun(ctx, service, backstage, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, configKey, serviceName, label)); err != nil {
 		if errors.IsConflict(err) {
 			return fmt.Errorf("retry sync needed: %v", err)
 		}
 		return err
 	}
 	return nil
-}
-
-func (r *BackstageReconciler) psqlServiceObjectMutFun(ctx context.Context, targetService *corev1.Service, backstage bs.Backstage, label, ns, key string) controllerutil.MutateFn {
-	return func() error {
-		service := &corev1.Service{}
-		targetService.ObjectMeta.DeepCopyInto(&service.ObjectMeta)
-		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.LocalDbConfigName, key, ns, service)
-		if err != nil {
-			return err
-		}
-		service.SetName(targetService.Name)
-		setBackstageLocalDbLabel(&service.ObjectMeta.Labels, label)
-		setBackstageLocalDbLabel(&service.Spec.Selector, label)
-
-		if r.OwnsRuntime {
-			if err := controllerutil.SetControllerReference(&backstage, service, r.Scheme); err != nil {
-				return fmt.Errorf(ownerRefFmt, err)
-			}
-		}
-		if len(targetService.Spec.ClusterIP) > 0 && service.Spec.ClusterIP != "" && service.Spec.ClusterIP != "None" && service.Spec.ClusterIP != targetService.Spec.ClusterIP {
-			return fmt.Errorf("db service IP can not be updated: %s, %s, %s", targetService.Name, targetService.Spec.ClusterIP, service.Spec.ClusterIP)
-		}
-		service.Spec.ClusterIP = targetService.Spec.ClusterIP
-		for _, ip1 := range targetService.Spec.ClusterIPs {
-			for _, ip2 := range service.Spec.ClusterIPs {
-				if len(ip1) > 0 && ip2 != "" && ip2 != "None" && ip1 != ip2 {
-					return fmt.Errorf("db service IPs can not be updated: %s, %v, %v", targetService.Name, targetService.Spec.ClusterIPs, service.Spec.ClusterIPs)
-				}
-			}
-		}
-		service.Spec.ClusterIPs = targetService.Spec.ClusterIPs
-
-		service.ObjectMeta.DeepCopyInto(&targetService.ObjectMeta)
-		service.Spec.DeepCopyInto(&targetService.Spec)
-		return nil
-	}
 }

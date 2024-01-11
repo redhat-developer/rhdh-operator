@@ -148,7 +148,7 @@ func visitContainers(podTemplateSpec *v1.PodTemplateSpec, visitor ContainerVisit
 
 func (r *BackstageReconciler) reconcileBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
 	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
-		Name:      fmt.Sprintf("backstage-%s", backstage.Name),
+		Name:      getDefaultObjName(backstage),
 		Namespace: ns},
 	}
 	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, r.deploymentObjectMutFun(ctx, deployment, backstage, ns)); err != nil {
@@ -171,26 +171,14 @@ func (r *BackstageReconciler) deploymentObjectMutFun(ctx context.Context, target
 		}
 
 		// Override deployment name
-		deployment.Name = fmt.Sprintf("backstage-%s", backstage.Name)
+		deployment.Name = getDefaultObjName(backstage)
 
 		r.setDefaultDeploymentImage(deployment)
 
 		r.applyBackstageLabels(backstage, deployment)
 
-		if err = r.addVolumes(ctx, backstage, ns, deployment); err != nil {
-			return fmt.Errorf("failed to add volumes to Backstage deployment, reason: %s", err)
-		}
-
-		if err = r.addVolumeMounts(ctx, backstage, ns, deployment); err != nil {
-			return fmt.Errorf("failed to add volume mounts to Backstage deployment, reason: %s", err)
-		}
-
-		if err = r.addContainerArgs(ctx, backstage, ns, deployment); err != nil {
-			return fmt.Errorf("failed to add container args to Backstage deployment, reason: %s", err)
-		}
-
-		if err = r.addEnvVars(backstage, ns, deployment); err != nil {
-			return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
+		if err = r.addParams(ctx, backstage, ns, deployment); err != nil {
+			return err
 		}
 
 		r.applyApplicationParamsFromCR(backstage, deployment)
@@ -209,6 +197,25 @@ func (r *BackstageReconciler) deploymentObjectMutFun(ctx context.Context, target
 		deployment.Spec.DeepCopyInto(&targetDeployment.Spec)
 		return nil
 	}
+}
+
+func (r *BackstageReconciler) addParams(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
+	if err := r.addVolumes(ctx, backstage, ns, deployment); err != nil {
+		return fmt.Errorf("failed to add volumes to Backstage deployment, reason: %s", err)
+	}
+
+	if err := r.addVolumeMounts(ctx, backstage, ns, deployment); err != nil {
+		return fmt.Errorf("failed to add volume mounts to Backstage deployment, reason: %s", err)
+	}
+
+	if err := r.addContainerArgs(ctx, backstage, ns, deployment); err != nil {
+		return fmt.Errorf("failed to add container args to Backstage deployment, reason: %s", err)
+	}
+
+	if err := r.addEnvVars(backstage, ns, deployment); err != nil {
+		return fmt.Errorf("failed to add env vars to Backstage deployment, reason: %s", err)
+	}
+	return nil
 }
 
 func (r *BackstageReconciler) addVolumes(ctx context.Context, backstage bs.Backstage, ns string, deployment *appsv1.Deployment) error {
@@ -314,4 +321,12 @@ func (r *BackstageReconciler) applyApplicationParamsFromCR(backstage bs.Backstag
 			}
 		}
 	}
+}
+
+func getDefaultObjName(backstage bs.Backstage) string {
+	return fmt.Sprintf("backstage-%s", backstage.Name)
+}
+
+func getDefaultDbObjName(backstage bs.Backstage) string {
+	return fmt.Sprintf("backstage-psql-%s", backstage.Name)
 }

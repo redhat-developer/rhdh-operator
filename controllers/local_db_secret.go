@@ -67,7 +67,7 @@ func (r *BackstageReconciler) handlePsqlSecret(ctx context.Context, statefulSet 
 		}(24)
 		sec.StringData["POSTGRES_PASSWORD"] = val
 		sec.StringData["POSTGRESQL_ADMIN_PASSWORD"] = val
-		sec.StringData["POSTGRES_HOST"] = fmt.Sprintf("backstage-psql-%s", backstage.Name)
+		sec.StringData["POSTGRES_HOST"] = getDefaultDbObjName(*backstage)
 		if r.OwnsRuntime {
 			// Set the ownerreferences for the secret so that when the backstage CR is deleted,
 			// the generated secret is automatically deleted

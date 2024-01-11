@@ -140,7 +140,7 @@ const (
 func (r *BackstageReconciler) reconcileLocalDbStatefulSet(ctx context.Context, backstage bs.Backstage, ns string) error {
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("backstage-psql-%s", backstage.Name),
+			Name:      getDefaultDbObjName(backstage),
 			Namespace: ns,
 		},
 	}
@@ -163,7 +163,7 @@ func (r *BackstageReconciler) localDBStatefulSetMutFun(ctx context.Context, targ
 		}
 
 		// Override the name
-		statefulSet.Name = fmt.Sprintf("backstage-psql-%s", backstage.Name)
+		statefulSet.Name = getDefaultDbObjName(backstage)
 		if err = r.patchLocalDbStatefulSetObj(statefulSet, backstage); err != nil {
 			return err
 		}
@@ -204,13 +204,13 @@ func (r *BackstageReconciler) localDBStatefulSetMutFun(ctx context.Context, targ
 }
 
 func (r *BackstageReconciler) patchLocalDbStatefulSetObj(statefulSet *appsv1.StatefulSet, backstage bs.Backstage) error {
-	name := fmt.Sprintf("backstage-psql-%s", backstage.Name)
+	name := getDefaultDbObjName(backstage)
 	statefulSet.SetName(name)
 	statefulSet.Spec.Template.SetName(name)
 	statefulSet.Spec.ServiceName = fmt.Sprintf("%s-hl", name)
 
-	setBackstageLocalDbLabel(&statefulSet.Spec.Template.ObjectMeta.Labels, name)
-	setBackstageLocalDbLabel(&statefulSet.Spec.Selector.MatchLabels, name)
+	setLabel(&statefulSet.Spec.Template.ObjectMeta.Labels, name)
+	setLabel(&statefulSet.Spec.Selector.MatchLabels, name)
 
 	return nil
 }
@@ -227,7 +227,7 @@ func (r *BackstageReconciler) setDefaultStatefulSetImage(statefulSet *appsv1.Sta
 func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backstage bs.Backstage) error {
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("backstage-psql-%s", backstage.Name),
+			Name:      getDefaultDbObjName(backstage),
 			Namespace: backstage.Namespace,
 		},
 	}
@@ -237,7 +237,7 @@ func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backs
 
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("backstage-psql-%s", backstage.Name),
+			Name:      getDefaultDbObjName(backstage),
 			Namespace: backstage.Namespace,
 		},
 	}
@@ -257,7 +257,7 @@ func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backs
 
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("backstage-psql-secret-%s", backstage.Name),
+			Name:      getDefaultDbObjName(backstage),
 			Namespace: backstage.Namespace,
 		},
 	}

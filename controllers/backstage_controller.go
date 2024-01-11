@@ -291,18 +291,15 @@ func (r *BackstageReconciler) cleanupResource(ctx context.Context, obj client.Ob
 
 // sets backstage-{Id} for labels and selectors
 func setBackstageAppLabel(labels *map[string]string, backstage bs.Backstage) {
-	if *labels == nil {
-		*labels = map[string]string{}
-	}
-	(*labels)[BackstageAppLabel] = fmt.Sprintf("backstage-%s", backstage.Name)
+	setLabel(labels, getDefaultObjName(backstage))
 }
 
 // sets backstage-psql-{Id} for labels and selectors
-func setBackstageLocalDbLabel(labels *map[string]string, name string) {
+func setLabel(labels *map[string]string, label string) {
 	if *labels == nil {
 		*labels = map[string]string{}
 	}
-	(*labels)[BackstageAppLabel] = name
+	(*labels)[BackstageAppLabel] = label
 }
 
 // sets labels on Backstage's instance resources
@@ -312,7 +309,7 @@ func (r *BackstageReconciler) labels(meta *v1.ObjectMeta, backstage bs.Backstage
 	}
 	meta.Labels["app.kubernetes.io/name"] = "backstage"
 	meta.Labels["app.kubernetes.io/instance"] = backstage.Name
-	//meta.Labels[BackstageAppLabel] = fmt.Sprintf("backstage-%s", backstage.Name)
+	//meta.Labels[BackstageAppLabel] = getDefaultObjName(backstage)
 }
 
 // SetupWithManager sets up the controller with the Manager.
