@@ -395,7 +395,7 @@ var _ = Describe("Backstage controller", func() {
 
 			By("Checking the localdb secret has been gnerated")
 			Eventually(func(g Gomega) {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-secret-%s", backstageName), Namespace: ns}, &corev1.Secret{})
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: getDefaultPsqlSecretName(backstage), Namespace: ns}, &corev1.Secret{})
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 

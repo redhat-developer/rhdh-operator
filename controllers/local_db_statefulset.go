@@ -257,7 +257,7 @@ func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backs
 
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getDefaultDbObjName(backstage),
+			Name:      getDefaultPsqlSecretName(&backstage),
 			Namespace: backstage.Namespace,
 		},
 	}
