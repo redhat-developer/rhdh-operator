@@ -47,6 +47,7 @@ spec:
   - email: jianrzha@redhat.com
     name: Jianrong Zhang
   maturity: alpha
+  minKubeVersion: 1.25.0
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/

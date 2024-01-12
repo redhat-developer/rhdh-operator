@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-01-09T20:56:26Z"
+    createdAt: "2024-01-12T14:31:03Z"
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: backstage-operator.v0.0.1
@@ -301,6 +301,7 @@ spec:
   - email: jianrzha@redhat.com
     name: Jianrong Zhang
   maturity: alpha
+  minKubeVersion: 1.25.0
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
