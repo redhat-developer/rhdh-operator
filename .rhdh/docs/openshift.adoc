@@ -72,7 +72,7 @@ data:
       baseUrl: https://backstage-backstage-sample-my-ns.apps.ci-ln-vtkzr22-72292.origin-ci-int-gce.dev.rhcloud.com
       cors:
         origin: https://backstage-backstage-sample-my-ns.apps.ci-ln-vtkzr22-72292.origin-ci-int-gce.dev.rhcloud.com
----
+----
 ====
 
 *Notes*:
