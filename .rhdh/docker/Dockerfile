@@ -52,9 +52,11 @@ RUN source ./cachito.env && rm -f ./cachito.env && mkdir -p /workspace
 RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH="amd64"; elif [[ ${ARCH} == "aarch64" ]]; then export ARCH="arm64"; fi && \
     CGO_ENABLED=1 GOOS=linux GOARCH=${ARCH} go build -a -o manager main.go
 
-# NOTE: ubi-micro will not be FIPS compliant, if openssl is not installed
-#@follow_tag(registry.redhat.io/ubi9/ubi-micro:latest)
-FROM registry.access.redhat.com/ubi9/ubi-micro:9.3-9
+# Install openssl for FIPS support
+#@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
+FROM registry.access.redhat.com/ubi9-minimal:9.3-1475 AS runtime
+RUN microdnf install -y openssl; microdnf clean -y all
+
 # Upstream sources
 # Downstream comment
 # ENV CONTAINER_SOURCE=/workspace

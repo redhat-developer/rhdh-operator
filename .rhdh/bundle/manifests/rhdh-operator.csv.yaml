@@ -28,8 +28,19 @@ metadata:
     operatorframework.io/suggested-namespace: openshift-operators
     operators.openshift.io/valid-subscription: '["OpenShift Container Platform", "OpenShift
       Platform Plus"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.32.0
+    operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    # Infrastructure Feature Test annotations - see https://issues.redhat.com/browse/RHIDP-294
+    features.operators.openshift.io/disconnected: true
+    features.operators.openshift.io/fips-compliant: true
+    features.operators.openshift.io/proxy-aware: false
+    features.operators.openshift.io/cnf: false
+    features.operators.openshift.io/cni: false
+    features.operators.openshift.io/csi: false
+    features.operators.openshift.io/tls-profiles: false
+    features.operators.openshift.io/token-auth-aws: false
+    features.operators.openshift.io/token-auth-azure: false
+    features.operators.openshift.io/token-auth-gcp: false
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
     support: Red Hat
   name: rhdh-operator.v1.0.0
