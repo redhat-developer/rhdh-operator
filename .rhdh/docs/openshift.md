@@ -4,16 +4,17 @@
 
 **Prerequisites**
 
-- You are logged in using the OpenShift web console.
+- You are logged in as an *administrator* to the OpenShift web console.
 - You have configured the appropriate roles and permissions within your project to create an application.
   See the [Red Hat OpenShift documentation on Building applications](https://docs.openshift.com/container-platform/4.14/applications/index.html) for more details.
-- You (or an administrator) have added the RHDH Operator Catalog Source. See https://gitlab.cee.redhat.com/rhidp/rhdh/-/blob/rhdh-1-rhel-9/docs/RHDH.adoc#user-content-operator-installation for more details. This is required until the Operator is fully available on the OpenShift Operator Hub.
+- If installing a CI build from quay.io/rhdh, you (or an administrator) have [added a RHDH Operator Catalog Source](https://gist.github.com/nickboldt/d54ba9d7264a5480d14eea6c3bd2ecdf) and a [pull secret](https://gist.github.com/nickboldt/84bea28da11ec5aab549c182818356e0#file-oc-pull-secret-update-project-sh). For GA releases, this is not required. 
 
 **Procedure**
 
-1. Create a project in the OpenShift, if not present.
+0. In the **Administrator** view of the OpenShift web console, go to **Operators** → **OperatorHub** and search for **Red Hat Developer Hub**. Install the Red Hat Developer Hub Operator. For more info, see [Installing from OperatorHub using the web console](https://docs.openshift.com/container-platform/4.14/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster).
+1. Create an OpenShift project to be used by your Backstage instance. 
    For more information about creating a project in OpenShift, see the [Red Hat OpenShift documentation](https://docs.openshift.com/container-platform/4.14/applications/projects/working-with-projects.html#creating-a-project-using-the-web-console_projects).
-2. Switch to **Developer** mode on your Red Hat OpenShift web console.
+2. Switch to the **Developer** view in your Red Hat OpenShift web console.
 3. Click **+Add**.
 4. From the **Developer Catalog** panel, click **Operator Backed**.
 5. Search for _Backstage_ in the search bar and select the **Backstage** card.
