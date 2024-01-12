@@ -1,0 +1,275 @@
+== Using the Operator to manage Red Hat Developer Hub (RHDH)
+
+=== Installing RHDH using Operator
+
+*Prerequisites*
+
+* You are logged in as an _administrator_ to the OpenShift web console.
+* You have configured the appropriate roles and permissions within your project to create an application.
+See the https://docs.openshift.com/container-platform/4.14/applications/index.html[Red Hat OpenShift documentation on Building applications] for more details.
+* If installing a CI build from quay.io/rhdh, you (or an administrator) have https://gist.github.com/nickboldt/d54ba9d7264a5480d14eea6c3bd2ecdf[added a RHDH Operator Catalog Source] and a https://gist.github.com/nickboldt/84bea28da11ec5aab549c182818356e0#file-oc-pull-secret-update-project-sh[pull secret]. For GA releases, this is not required.
+
+*Procedure*
+
+. In the *Administrator* view of the OpenShift web console, go to *Operators* → *OperatorHub* and search for *Red Hat Developer Hub*. Install the Red Hat Developer Hub Operator. For more info, see https://docs.openshift.com/container-platform/4.14/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster[Installing from OperatorHub using the web console].
+. Create an OpenShift project to be used by your Backstage instance.
+For more information about creating a project in OpenShift, see the https://docs.openshift.com/container-platform/4.14/applications/projects/working-with-projects.html#creating-a-project-using-the-web-console_projects[Red Hat OpenShift documentation].
+. Switch to the *Developer* view in your Red Hat OpenShift web console.
+. Click *+Add*.
+. From the *Developer Catalog* panel, click *Operator Backed*.
+. Search for _Backstage_ in the search bar and select the *Backstage* card.
+. Click *Create*.
+. Click *Create* and wait for the database and Red Hat Developer Hub to start.
+. Click the *Open URL* option to start using the Red Hat Developer Hub platform.
+
+image::images/rhdh_from_operator.png[RHDH from Operator]
+
+=== Configurations for Operator-backed RHDH
+
+==== Adding a custom application configuration file to OpenShift
+
+To access the Red Hat Developer Hub, you must add a custom application configuration file to OpenShift.
+In OpenShift, you can use the following content as a base template to create a ConfigMap named `app-config-rhdh`:
+
+[,yaml]
+----
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: app-config-rhdh
+data:
+  "app-config-rhdh.yaml": |
+     app:
+       baseUrl: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_INGRESS_DOMAIN>
+       title: Red Hat Developer Hub
+     backend:
+       auth:
+         keys:
+           - secret: "${BACKEND_SECRET}"
+       baseUrl: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_INGRESS_DOMAIN>
+       cors:
+         origin: https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_INGRESS_DOMAIN>
+----
+
+.Example
+[%collapsible]
+====
+[,yaml]
+----
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: app-config-rhdh
+data:
+  "app-config-rhdh.yaml": |
+    app:
+      title: Red Hat Developer Hub
+      baseUrl: https://backstage-backstage-sample-my-ns.apps.ci-ln-vtkzr22-72292.origin-ci-int-gce.dev.rhcloud.com
+    backend:
+      auth:
+        keys:
+          - secret: "${BACKEND_SECRET}"
+      baseUrl: https://backstage-backstage-sample-my-ns.apps.ci-ln-vtkzr22-72292.origin-ci-int-gce.dev.rhcloud.com
+      cors:
+        origin: https://backstage-backstage-sample-my-ns.apps.ci-ln-vtkzr22-72292.origin-ci-int-gce.dev.rhcloud.com
+---
+====
+
+*Notes*:
+
+* There is a mandatory Backend Auth Key for Backstage. This will reference an environment variable backed by an OpenShift Secret.
+* You need to know the external URL of your Backstage instance and set it in the `app.baseUrl`, `backend.baseUrl` and `backend.cors.origin` fields of the application configuration.
+By default, this will be named as follows: `+https://backstage-<CUSTOM_RESOURCE_NAME>-<NAMESPACE_NAME>.<OPENSHIFT_INGRESS_DOMAIN>+` (you can use the `oc get ingresses.config/cluster -o jsonpath='{.spec.domain}'` command to display your ingress domain).
+If you are using a different host or sub-domain (customizable in the Custom Resource `spec.application.route` field), you will need to adjust the application configuration accordingly.
+
+*Procedure*
+
+. Navigate to OpenShift and select the *ConfigMaps* tab.
+. Click *Create ConfigMap*.
+. Select the *YAML view* option in *Configure via* and make the changes to the file, if needed.
+. Click *Create*.
+. Select the *Secrets* tab.
+. Click *Create* then *Key/value* secret.
+. Name the Secret `secrets-rhdh`.
+. Add a key named `BACKEND_SECRET` and add any random string as value. It is recommended to use a unique value per RHDH Instance.
+. Click *Create*.
+. Go to the *Topology* view.
+. Click on the three dots of your Backstage instance and select *Edit Backstage*.
+image:images/edit_backstage_cr_instance.png[Editing RHDH CR]
+. This will load the YAML view of the Backstage Instance.
+   Add the `spec.application.appConfig.configMaps` and `spec.application.extraEnvs.secrets` fields to the Custom Resource, like so:
++
+[,yaml]
+----
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+      configMaps:
+         - name: app-config-rhdh
+    extraEnvs:
+      secrets:
+         - name: secrets-rhdh
+    extraFiles:
+      mountPath: /opt-/app-root/src
+    replicas: 1
+    route:
+      enabled: true
+  database:
+    enableLocalDb: true
+----
++
+image::images/app-config_in_cr.png[Adding custom app-config to RHDH CR]
+
+. Click *Save*.
+. Navigate back to the *Topology* view and delete the Backstage Deployment, so that the Operator can recreate it with the new changes to the CR.
+Note that this is a manual step at this time, but the operator will soon be able to handle such changes automatically.
+image:images/delete_backstage_deployment.png[Recreating RHDH Deployment]
+. Wait for the Red Hat Developer Hub Pod to start.
+. Click the *Open URL* option to start using the Red Hat Developer Hub platform with the new configuration changes.
+
+==== Configuring Dynamic Plugins with the Operator
+
+Configuration for Dynamic Plugins can be stored in any ConfigMap object, which can then be referenced into the Custom Resource.
+Example with the Dynamic Plugin for GitHub:
+In OpenShift, you can use the following content as a base template to create a ConfigMap named `dynamic-plugins-rhdh`:
+
+[,yaml]
+----
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: dynamic-plugins-rhdh
+data:
+  "dynamic-plugins.yaml": |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins:
+      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
+        disabled: false
+        pluginConfig: {}
+----
+
+NOTE: If the `pluginConfig` field references environment variables, they will need to be provided by editing your `secrets-rhdh` Secret accordingly.
+
+*Procedure*
+
+. Navigate to OpenShift and select the *ConfigMaps* tab.
+. Click *Create ConfigMap*.
+. Select the *YAML view* option in Configure via and make the changes to the file, if needed.
+. Click *Create*.
+. Go to the *Topology* Tab.
+. Click on the three dots of your Backstage instance and select *Edit Backstage*.
+image:images/edit_backstage_cr_instance.png[Editing RHDH CR]
+. This will load the YAML view of the Backstage Instance. Add the `spec.application.dynamicPluginsConfigMapName` field to the Custom Resource, like so:
++
+[,yaml]
+----
+spec:
+  application:
+ appConfig:
+   mountPath: /opt/app-root/src
+   configMaps:
+      - name: app-config-rhdh
+ dynamicPluginsConfigMapName: dynamic-plugins-rhdh
+ extraEnvs:
+   secrets:
+      - name: secrets-rhdh
+ extraFiles:
+   mountPath: /opt-/app-root/src
+ replicas: 1
+ route:
+   enabled: true
+  database:
+ enableLocalDb: true
+----
++
+image::images/dynamic_plugins_in_cr.png[Adding dynamic plugins ConfigMap to RHDH CR]
+
+. Click *Save*.
+. Navigate back to the *Topology* View and delete the Backstage Deployment, so that the Operator can recreate it with the new changes to the CR.
+Note that this is a manual step at this time, but the operator will soon be able to handle such changes automatically.
+. Wait for the Red Hat Developer Hub Pod to start.
+. Click the *Open URL* option to start using the Red Hat Developer Hub platform with the new configuration changes.
+
+*Verification*
+
+To check that the dynamic plugins configuration has been loaded, append the following to your Red Hat Developer Hub root URL: `/api/dynamic-plugins-info/loaded-plugins` and check the list of plugins:
+
+image::images/checking_list_of_plugins.png[List of plugins from RHDH instance]
+
+==== Using an external Database
+
+By default, the Custom Resource (CR) is set to deploy a local PostgreSQL database, but this behavior can be disabled in the CR.
+To do so, you need to:
+
+* set the `spec.database.enableLocalDb` field to false;
+* and fill the `spec.database.authSecretName` field referencing a Secret containing the external DB connection information.
+
+The external DB Secret is expected to have the following keys defined in it:
+
+* `POSTGRES_HOST`
+* `POSTGRES_PORT`
+* `POSTGRES_USER`
+* `POSTGRES_PASSWORD`
+
+*Procedure*
+
+. Select the *Secrets* tab.
+. Click *Create* then *Key/value* secret.
+. Name the Secret `secrets-db-rhdh`.
+. Add all the `POSTGRES_*` keys from the list above, along with their values.
+. Click *Create*.
+. Go to the *Topology* view.
+. Click on the three dots of your Backstage instance and select *Edit Backstage*.
+image:images/edit_backstage_cr_instance.png[Editing RHDH CR]
+. This will load the YAML view of the Backstage Instance.
+Set the `spec.database.enableLocalDb` field to false and fill the `spec.database.authSecretName` field, like so
++
+[,yaml]
+----
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+      configMaps:
+         - name: app-config-rhdh
+    dynamicPluginsConfigMapName: dynamic-plugins-rhdh
+    extraEnvs:
+      secrets:
+         - name: secrets-rhdh
+    extraFiles:
+      mountPath: /opt-/app-root/src
+    replicas: 1
+    route:
+      enabled: true
+  database:
+    enableLocalDb: false
+    authSecretName: secrets-db-rhdh
+----
+
+. Click *Save*.
+. Navigate back to the *Topology* view and delete both the Backstage Deployment and PostgreSQL StatefulSet, so that the Operator can recreate it with the new changes to the CR.
+Note that this is a manual step at this time, but the operator will soon be able to handle such changes automatically.
+image:images/delete_backstage_deployment.png[Recreating RHDH Deployment]
+image:images/delete_postgres_statefulset.png[Deleting RHDH Postgresql Deployment]
+. Wait for the Red Hat Developer Hub Pod to start. The Database resource should not be created.
+image:images/rhdh_without_local_db.png[RHDH with no local DB]
+. Click the *Open URL* option to start using the Red Hat Developer Hub platform with the new configuration changes.
+
+*Note*
+
+If your RHDH pod is stuck in a `CrashLoopBackOff` and you see the following logs:
+
+----
+Loaded config from app-config-from-configmap.yaml, env
+...
+Backend failed to start up Error: Failed to connect to the database to make sure that 'backstage_plugin_auth' exists
+----
+
+Then, first, verify the connection information to the external database and make sure the external database is configured accordingly.
+This is because the credentials might not be valid or the external database might not be configured to accept connections from this instance.
+
+==== Air-gap/Offline support
+
+TODO
