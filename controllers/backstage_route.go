@@ -24,50 +24,67 @@ import (
 	openshift "github.com/openshift/api/route/v1"
 	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *BackstageReconciler) applyBackstageRoute(ctx context.Context, backstage bs.Backstage, ns string) error {
-	if !shouldCreateRoute(backstage) {
-		return nil
+func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backstage *bs.Backstage, ns string) error {
+	// Override the route and service names
+	name := getDefaultObjName(*backstage)
+	route := &openshift.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
 	}
 
-	route := &openshift.Route{}
-	err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "route.yaml", ns, route)
-	if err != nil {
+	if !shouldCreateRoute(*backstage) {
+		deleted, err := r.cleanupResource(ctx, route, *backstage)
+		if err == nil && deleted {
+			setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.Deleted, "")
+		}
 		return err
 	}
 
-	// Override the route and service names
-	name := fmt.Sprintf("backstage-%s", backstage.Name)
-	route.Name = name
-	route.Spec.To.Name = name
-
-	err = r.Get(ctx, types.NamespacedName{Name: route.Name, Namespace: ns}, route)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return fmt.Errorf("failed to get backstage route, reason: %s", err)
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, route, r.routeObjectMutFun(ctx, route, *backstage, ns)); err != nil {
+		if errors.IsConflict(err) {
+			return fmt.Errorf("retry sync needed: %v", err)
 		}
-	} else {
-		//lg.Info("CR update is ignored for the time")
+		setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("Error:%s", err.Error()))
+		return err
+	}
+	setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.SyncOK, fmt.Sprintf("Route host:%s", route.Spec.Host))
+	return nil
+}
+
+func (r *BackstageReconciler) routeObjectMutFun(ctx context.Context, targetRoute *openshift.Route, backstage bs.Backstage, ns string) controllerutil.MutateFn {
+	return func() error {
+		route := &openshift.Route{}
+		targetRoute.ObjectMeta.DeepCopyInto(&route.ObjectMeta)
+
+		err := r.readConfigMapOrDefault(ctx, backstage.Spec.RawRuntimeConfig.BackstageConfigName, "route.yaml", ns, route)
+		if err != nil {
+			return err
+		}
+
+		// Override the route and service names
+		name := getDefaultObjName(backstage)
+		route.Name = name
+		route.Spec.To.Name = route.Name
+
+		r.labels(&route.ObjectMeta, backstage)
+
+		r.applyRouteParamsFromCR(route, backstage)
+
+		if r.OwnsRuntime {
+			if err := controllerutil.SetControllerReference(&backstage, route, r.Scheme); err != nil {
+				return fmt.Errorf("failed to set owner reference: %s", err)
+			}
+		}
+
+		route.ObjectMeta.DeepCopyInto(&targetRoute.ObjectMeta)
+		route.Spec.DeepCopyInto(&targetRoute.Spec)
 		return nil
 	}
-
-	r.labels(&route.ObjectMeta, backstage)
-
-	if r.OwnsRuntime {
-		if err := controllerutil.SetControllerReference(&backstage, route, r.Scheme); err != nil {
-			return fmt.Errorf("failed to set owner reference: %s", err)
-		}
-	}
-
-	r.applyRouteParamsFromCR(route, backstage)
-
-	err = r.Create(ctx, route)
-	if err != nil {
-		return fmt.Errorf("failed to create backstage route, reason: %s", err)
-	}
-	return nil
 }
 
 func (r *BackstageReconciler) applyRouteParamsFromCR(route *openshift.Route, backstage bs.Backstage) {

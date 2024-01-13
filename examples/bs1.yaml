@@ -4,6 +4,5 @@ metadata:
   name: bs1
 #  namespace: backstage
 #spec:
-#  skipLocalDb: true
-#  dryRun: true
-
+#  database:
+#    enableLocalDb: false

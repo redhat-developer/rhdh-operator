@@ -267,14 +267,13 @@ spec:
                 properties:
                   authSecretName:
                     description: 'Name of the secret for database authentication.
-                      Required for external database access. Optional for a local
-                      database (EnableLocalDb=true) and if absent a secret will be
-                      auto generated. The secret shall include information used for
-                      the database access. An example for PostgreSQL DB access: "POSTGRES_PASSWORD":
-                      "rl4s3Fh4ng3M4" "POSTGRES_PORT": "5432" "POSTGRES_USER": "postgres"
-                      "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4" "POSTGRES_HOST":
-                      "backstage-psql-bs1"  # For local database, set to "backstage-psql-<CR
-                      name>".'
+                      Optional. For a local database deployment (EnableLocalDb=true),
+                      a secret will be auto generated if it does not exist. The secret
+                      shall include information used for the database access. An example
+                      for PostgreSQL DB access: "POSTGRES_PASSWORD": "rl4s3Fh4ng3M4"
+                      "POSTGRES_PORT": "5432" "POSTGRES_USER": "postgres" "POSTGRESQL_ADMIN_PASSWORD":
+                      "rl4s3Fh4ng3M4" "POSTGRES_HOST": "backstage-psql-bs1"  # For
+                      local database, set to "backstage-psql-<CR name>".'
                     type: string
                   enableLocalDb:
                     default: true

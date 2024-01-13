@@ -2,7 +2,6 @@ apiVersion: janus-idp.io/v1alpha1
 kind: Backstage
 metadata:
   name: bs-route
-  namespace: backstage
 spec:
   application:
     route:

@@ -3,7 +3,8 @@ kind: Backstage
 metadata:
   name: my-backstage-app-with-app-config
 spec:
-  enableLocalDb: true
+  database:
+    enableLocalDb: true
   application:
     replicas: 2
     appConfig:

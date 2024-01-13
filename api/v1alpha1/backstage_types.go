@@ -21,6 +21,11 @@ import (
 const (
 	RuntimeConditionRunning string = "RuntimeRunning"
 	RuntimeConditionSynced  string = "RuntimeSyncedWithConfig"
+	RouteSynced             string = "RouteSynced"
+	LocalDbSynced           string = "LocalDbSynced"
+	SyncOK                  string = "SyncOK"
+	SyncFailed              string = "SyncFailed"
+	Deleted                 string = "Deleted"
 	EnvPostGresImage        string = "RELATED_IMAGE_postgresql"
 	EnvBackstageImage       string = "RELATED_IMAGE_backstage"
 )
@@ -43,8 +48,8 @@ type Database struct {
 	//+kubebuilder:default=true
 	EnableLocalDb *bool `json:"enableLocalDb,omitempty"`
 
-	// Name of the secret for database authentication. Required for external database access.
-	// Optional for a local database (EnableLocalDb=true) and if absent a secret will be auto generated.
+	// Name of the secret for database authentication. Optional.
+	// For a local database deployment (EnableLocalDb=true), a secret will be auto generated if it does not exist.
 	// The secret shall include information used for the database access.
 	// An example for PostgreSQL DB access:
 	// "POSTGRES_PASSWORD": "rl4s3Fh4ng3M4"
@@ -95,7 +100,7 @@ type Application struct {
 
 	// Image Pull Secrets to use in all containers (including Init Containers)
 	// +optional
-	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+	ImagePullSecrets *[]string `json:"imagePullSecrets,omitempty"`
 
 	// Route configuration. Used for OpenShift only.
 	Route *Route `json:"route,omitempty"`
