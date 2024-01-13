@@ -247,11 +247,10 @@ addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
 $(ADDLICENSE): $(LOCALBIN)
 	test -s $(LOCALBIN)/addlicense || GOBIN=$(LOCALBIN) go install github.com/google/addlicense@$(ADDLICENSE_VERSION)
 
-.PHONY: operator-sdk
 OPSDK = ./bin/operator-sdk
+.PHONY: operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
 ifeq (,$(wildcard $(OPSDK)))
-ifeq (,$(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPSDK)) ;\
@@ -260,16 +259,12 @@ ifeq (,$(shell which operator-sdk 2>/dev/null))
 	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OP_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
-else
-OPSDK = $(shell which operator-sdk)
-endif
 endif
 
 .PHONY: opm
 OPM = ./bin/opm
 opm: ## Download opm locally if necessary.
 ifeq (,$(wildcard $(OPM)))
-ifeq (,$(shell which opm 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
@@ -278,9 +273,6 @@ ifeq (,$(shell which opm 2>/dev/null))
 	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OP_VERSION)/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
-else
-OPM = $(shell which opm)
-endif
 endif
 
 ## this will fail if VERSION is not a semver x.y.z version
