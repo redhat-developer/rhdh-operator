@@ -26,6 +26,10 @@ image::images/rhdh_from_operator.png[RHDH from Operator]
 
 === Configurations for Operator-backed RHDH
 
+NOTE: At the moment, updates to the Backstage Custom Resource (CR) are automatically handled by the Operator.
+But updates to resources (e.g., ConfigMaps, Secrets) referenced in the CR are currently not handled automatically (unless the CR itself is updated).
+In this case, you will need to manually delete the Backstage Deployment, so that the Operator can recreate it with the updates.
+
 ==== Adding a custom application configuration file to OpenShift
 
 To access the Red Hat Developer Hub, you must add a custom application configuration file to OpenShift.
@@ -122,10 +126,7 @@ spec:
 image::images/app-config_in_cr.png[Adding custom app-config to RHDH CR]
 
 . Click *Save*.
-. Navigate back to the *Topology* view and delete the Backstage Deployment, so that the Operator can recreate it with the new changes to the CR.
-Note that this is a manual step at this time, but the operator will soon be able to handle such changes automatically.
-image:images/delete_backstage_deployment.png[Recreating RHDH Deployment]
-. Wait for the Red Hat Developer Hub Pod to start.
+. Navigate back to the *Topology* view and wait for the Red Hat Developer Hub Pod to start.
 . Click the *Open URL* option to start using the Red Hat Developer Hub platform with the new configuration changes.
 
 ==== Configuring Dynamic Plugins with the Operator
@@ -187,9 +188,7 @@ spec:
 image::images/dynamic_plugins_in_cr.png[Adding dynamic plugins ConfigMap to RHDH CR]
 
 . Click *Save*.
-. Navigate back to the *Topology* View and delete the Backstage Deployment, so that the Operator can recreate it with the new changes to the CR.
-Note that this is a manual step at this time, but the operator will soon be able to handle such changes automatically.
-. Wait for the Red Hat Developer Hub Pod to start.
+. Navigate back to the *Topology* View and wait for the Red Hat Developer Hub Pod to start.
 . Click the *Open URL* option to start using the Red Hat Developer Hub platform with the new configuration changes.
 
 *Verification*
@@ -249,11 +248,7 @@ spec:
 ----
 
 . Click *Save*.
-. Navigate back to the *Topology* view and delete both the Backstage Deployment and PostgreSQL StatefulSet, so that the Operator can recreate it with the new changes to the CR.
-Note that this is a manual step at this time, but the operator will soon be able to handle such changes automatically.
-image:images/delete_backstage_deployment.png[Recreating RHDH Deployment]
-image:images/delete_postgres_statefulset.png[Deleting RHDH Postgresql Deployment]
-. Wait for the Red Hat Developer Hub Pod to start. The Database resource should not be created.
+. Navigate back to the *Topology* view and wait for the Red Hat Developer Hub Pod to start. The Postgres pod should not be created.
 image:images/rhdh_without_local_db.png[RHDH with no local DB]
 . Click the *Open URL* option to start using the Red Hat Developer Hub platform with the new configuration changes.
 
