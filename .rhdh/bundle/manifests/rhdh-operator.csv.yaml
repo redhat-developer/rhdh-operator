@@ -10,7 +10,7 @@ metadata:
           "apiVersion": "janus-idp.io/v1alpha1",
           "kind": "Backstage",
           "metadata": {
-            "name": "backstage-sample"
+            "name": "developer-hub"
           },
           "spec": {
           }
