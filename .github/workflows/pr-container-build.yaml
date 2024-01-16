@@ -21,7 +21,7 @@ on:
   # we are adding an 'authorize' job that checks if the workflow was triggered from a fork PR. In that case, the "external" environment
   # will prevent the job from running until it's approved manually by human intervention.
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, closed]
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [ main ]
 
 concurrency:
