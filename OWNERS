@@ -1,4 +1,4 @@
-# if adding/removing approvers, remember to update pr-docker-build.yaml to add/remove them from the authorize job
+# if adding/removing approvers, remember to update pr-container-build.yaml to add/remove them from the authorize job
 approvers:
  - gazarenkov
  - jianrongzhang89
