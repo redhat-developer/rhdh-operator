@@ -29,4 +29,4 @@ __debug_bin*
 .scripts/
 .DS_Store
 database/
-index.Dockerfile
+docker/index.Dockerfile

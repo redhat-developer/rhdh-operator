@@ -142,12 +142,12 @@ PLATFORM ?= linux/amd64
 # (i.e. docker build --platform linux/arm64 ). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 
-.PHONY: operator-build
-operator-build: test ## Build docker image with the manager using docker.
+.PHONY: image-build
+image-build: test ## Build docker image with the manager using docker.
 	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f docker/Dockerfile -t $(IMG) --label $(LABEL) .
 
-.PHONY: operator-push
-operator-push: ## Push IMG image to registry
+.PHONY: image-push
+image-push: ## Push IMG image to registry
 	$(CONTAINER_ENGINE) push $(IMG)
 
 # PLATFORMS defines the target platforms for  the manager image be build to provide support to multiple
@@ -296,7 +296,7 @@ bundle-build: ## Build the bundle image.
 
 .PHONY: bundle-push
 bundle-push: ## Push bundle image to registry
-	$(MAKE) operator-push IMG=$(BUNDLE_IMG)
+	$(MAKE) image-push IMG=$(BUNDLE_IMG)
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.
@@ -315,18 +315,19 @@ endif
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
 catalog-build: bundle-push opm ## Generate operator-catalog dockerfile using the operator-bundle image built and published above; then build catalog image
-	$(OPM) index add --container-tool $(CONTAINER_ENGINE) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT) --generate
-	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f index.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) .
+    ## [GA] added '-d docker/index.Dockerfile' to avoid generating in the root
+	$(OPM) index add --container-tool $(CONTAINER_ENGINE) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT) --generate -d docker/index.Dockerfile
+	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f docker/index.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) .
 
 .PHONY: catalog-push
 catalog-push: ## Push catalog image to registry
-	$(MAKE) operator-push IMG=$(CATALOG_IMG)
+	$(MAKE) image-push IMG=$(CATALOG_IMG)
 
 .PHONY:
-release-build: bundle operator-build bundle-build catalog-build ## Build operator, bundle + catalog images
+release-build: bundle image-build bundle-build catalog-build ## Build operator, bundle + catalog images
 
 .PHONY:
-release-push: operator-push bundle-push catalog-push ## Push operator, bundle + catalog images
+release-push: image-push bundle-push catalog-push ## Push operator, bundle + catalog images
 
 .PHONY: deploy-olm
 deploy-olm: ## Deploy the operator with OLM
@@ -342,5 +343,9 @@ undeploy-olm: ## Un-deploy the operator with OLM
 DEFAULT_OLM_NAMESPACE ?= openshift-marketplace
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in the default namespace for catalogsource
-	-kubectl delete catalogsource backstage-operator -n $(DEFAULT_OLM_NAMESPACE)
+	kubectl delete catalogsource backstage-operator -n $(DEFAULT_OLM_NAMESPACE)
 	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | kubectl apply -n $(DEFAULT_OLM_NAMESPACE) -f -
+
+.PHONY: deploy-openshift
+deploy-openshift: release-build release-push catalog-update ## Deploy the operator on openshift cluster
+

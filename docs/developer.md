@@ -38,7 +38,7 @@ You can use [minikube](https://kubernetes.io/docs/tasks/tools/#minikube) or [kin
 
 - Build and push your image to the location specified by `IMG`:
 ```sh
-make docker-build docker-push IMG=<your-registry>/backstage-operator:tag
+make image-build image-push IMG=<your-registry>/backstage-operator:tag
 ```
 
 - Install the CRDs into the local cluster (minikube is installed and running):
@@ -84,9 +84,14 @@ make catalog-update
 ```sh
 make deploy-olm
 ```
-4. To undeloy the operator with OLM
+5. To undeploy the operator with OLM
 ```sh
 make undeploy-olm
+```
+
+6. To deploy the operator to Openshift with OLM
+```sh
+make deploy-openshift [IMAGE_TAG_BASE=<your-registry>/backstage-operator]
 ```
 
 ### Modifying the API definitions

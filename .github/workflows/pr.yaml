@@ -29,7 +29,7 @@ jobs:
 
     strategy:
       matrix:
-        # See ../Makefile for value of single arch PLATFORM used with target operator-build
+        # See ../Makefile for value of single arch PLATFORM used with target image-build
         # NOTE: to build multiple arches, see ../Makefile and use target docker-buildx with PLATFORMS
         # only run this with docker since we have podman builds in pr-container-build.yaml
         # TODO: do we really even need this check?
@@ -42,4 +42,4 @@ jobs:
           go-version-file: 'go.mod'
       - name: ${{ matrix.engine }} build
         run: |
-          CONTAINER_ENGINE=${{ matrix.engine }} make operator-build
+          CONTAINER_ENGINE=${{ matrix.engine }} make image-build
