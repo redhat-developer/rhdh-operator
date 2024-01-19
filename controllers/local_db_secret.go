@@ -1,18 +1,17 @@
-/*
-Copyright 2023.
+//
+// Copyright (c) 2023 Red Hat, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package controller
 
 import (
@@ -31,7 +30,6 @@ import (
 )
 
 const (
-	_defaultPostGresSecretValue   = "sq4s3Eh4pw3N2"
 	postGresSecret                = "<POSTGRESQL_SECRET>"
 	_defaultPsqlMainContainerName = "postgresql"
 )
@@ -57,16 +55,12 @@ func (r *BackstageReconciler) handlePsqlSecret(ctx context.Context, statefulSet 
 			return nil, fmt.Errorf("failed to get secret for PostgreSQL DB (%q), reason: %s", secretName, err)
 		}
 		// Create a secret with a random value
-		val := func(length int) string {
-			bytes := make([]byte, length)
-			if _, randErr := rand.Read(bytes); randErr != nil {
-				// Do not fail, but use a fallback value
-				return _defaultPostGresSecretValue
-			}
-			return base64.StdEncoding.EncodeToString(bytes) // Encode the password to prevent special characters
-		}(24)
-		sec.StringData["POSTGRES_PASSWORD"] = val
-		sec.StringData["POSTGRESQL_ADMIN_PASSWORD"] = val
+		pwd, pwdErr := generatePassword(24)
+		if pwdErr != nil {
+			return nil, fmt.Errorf("failed to generate a password for the PostgreSQL database: %w", pwdErr)
+		}
+		sec.StringData["POSTGRES_PASSWORD"] = pwd
+		sec.StringData["POSTGRESQL_ADMIN_PASSWORD"] = pwd
 		sec.StringData["POSTGRES_HOST"] = getDefaultDbObjName(*backstage)
 		if r.OwnsRuntime {
 			// Set the ownerreferences for the secret so that when the backstage CR is deleted,
@@ -86,6 +80,15 @@ func (r *BackstageReconciler) handlePsqlSecret(ctx context.Context, statefulSet 
 
 func getDefaultPsqlSecretName(backstage *bs.Backstage) string {
 	return fmt.Sprintf("backstage-psql-secret-%s", backstage.Name)
+}
+
+func generatePassword(length int) (string, error) {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	// Encode the password to prevent special characters
+	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
 func getSecretNameForGeneration(statefulSet *appsv1.StatefulSet, backstage *bs.Backstage) string {
