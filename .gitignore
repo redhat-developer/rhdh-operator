@@ -30,3 +30,4 @@ __debug_bin*
 .DS_Store
 database/
 docker/index.Dockerfile
+gosec.sarif

@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	postGresSecret                = "<POSTGRESQL_SECRET>"
+	postGresSecret                = "<POSTGRESQL_SECRET>" // #nosec G101.  This is a placeholder for a secret name not an actual secret
 	_defaultPsqlMainContainerName = "postgresql"
 )
 

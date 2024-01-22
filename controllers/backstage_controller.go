@@ -208,7 +208,7 @@ func readYaml(manifest []byte, object interface{}) error {
 
 func readYamlFile(path string, object interface{}) error {
 
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) // #nosec G304, path is constructed internally
 	if err != nil {
 		return fmt.Errorf("failed to read YAML file: %w", err)
 	}

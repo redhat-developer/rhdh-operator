@@ -111,6 +111,11 @@ fmt_license: addlicense ## Ensure the license header is set on all files
 	$(ADDLICENSE) -v -f license_header.txt $$(find . -not -path '*/\.*' -name '*.go')
 	$(ADDLICENSE) -v -f license_header.txt $$(find . -name '*ockerfile')
 
+.PHONY: gosec
+gosec: addgosec ## run the gosec scanner for non-test files in this repo
+  	# we let the report content trigger a failure using the GitHub Security features.
+	$(GOSEC) -no-fail -fmt $(GOSEC_FMT) -out $(GOSEC_OUTPUT_FILE)  ./...
+
 .PHONY: lint
 lint: golangci-lint ## Run the linter on the codebase
 	$(GOLANGCI_LINT) run ./... --timeout 15m
@@ -206,6 +211,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
 ADDLICENSE ?= $(LOCALBIN)/addlicense
+GOSEC ?= $(LOCALBIN)/gosec
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
@@ -215,6 +221,11 @@ GOIMPORTS_VERSION ?= v0.15.0
 ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
 OP_VERSION ?= v1.33.0
+GOSEC_VERSION ?= v2.18.2
+
+## Gosec options - default format is sarif so we can integrate with Github code scanning
+GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
+GOSEC_OUTPUT_FILE ?= gosec.sarif
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -246,6 +257,11 @@ $(GOIMPORTS): $(LOCALBIN)
 addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
 $(ADDLICENSE): $(LOCALBIN)
 	test -s $(LOCALBIN)/addlicense || GOBIN=$(LOCALBIN) go install github.com/google/addlicense@$(ADDLICENSE_VERSION)
+
+.PHONY: addgosec
+addgosec: $(GOSEC) ## Download gosec locally if necessary.
+$(GOSEC): $(LOCALBIN)
+	test -s $(LOCALBIN)/gosec || GOBIN=$(LOCALBIN) go install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
 
 OPSDK = ./bin/operator-sdk
 .PHONY: operator-sdk
