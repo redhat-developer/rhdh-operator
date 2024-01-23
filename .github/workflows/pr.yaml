@@ -1,4 +1,4 @@
-name: Makefile CI
+name: Test Operator
 
 on:
   push:
@@ -32,23 +32,3 @@ jobs:
       with:
         # Path to SARIF file relative to the root of the repository
         sarif_file: gosec.sarif
-
-  container-image-build:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        # See ../Makefile for value of single arch PLATFORM used with target image-build
-        # NOTE: to build multiple arches, see ../Makefile and use target docker-buildx with PLATFORMS
-        # only run this with docker since we have podman builds in pr-container-build.yaml
-        # TODO: do we really even need this check?
-        engine: [docker, podman]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version-file: 'go.mod'
-      - name: ${{ matrix.engine }} build
-        run: |
-          CONTAINER_ENGINE=${{ matrix.engine }} make image-build
