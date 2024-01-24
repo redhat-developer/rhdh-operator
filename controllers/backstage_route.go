@@ -38,21 +38,22 @@ func (r *BackstageReconciler) reconcileBackstageRoute(ctx context.Context, backs
 	}
 
 	if !shouldCreateRoute(*backstage) {
-		deleted, err := r.cleanupResource(ctx, route, *backstage)
-		if err == nil && deleted {
-			setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.Deleted, "")
+		_, err := r.cleanupResource(ctx, route, *backstage)
+		if err != nil {
+			setStatusCondition(backstage, bs.ConditionDeployed, metav1.ConditionFalse, bs.DeployFailed, fmt.Sprintf("failed to delete route: %s", err))
+			return err
 		}
-		return err
+		return nil
 	}
 
 	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, route, r.routeObjectMutFun(ctx, route, *backstage, ns)); err != nil {
 		if errors.IsConflict(err) {
-			return fmt.Errorf("retry sync needed: %v", err)
+			return retryReconciliation(err)
 		}
-		setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("Error:%s", err.Error()))
-		return err
+		msg := fmt.Sprintf("failed to deploy Backstage Route: %s", err)
+		setStatusCondition(backstage, bs.ConditionDeployed, metav1.ConditionFalse, bs.DeployFailed, msg)
+		return fmt.Errorf(msg)
 	}
-	setStatusCondition(backstage, bs.RouteSynced, metav1.ConditionTrue, bs.SyncOK, fmt.Sprintf("Route host:%s", route.Spec.Host))
 	return nil
 }
 

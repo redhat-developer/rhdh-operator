@@ -18,16 +18,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Constants for status conditions
 const (
-	RuntimeConditionRunning string = "RuntimeRunning"
-	RuntimeConditionSynced  string = "RuntimeSyncedWithConfig"
-	RouteSynced             string = "RouteSynced"
-	LocalDbSynced           string = "LocalDbSynced"
-	SyncOK                  string = "SyncOK"
-	SyncFailed              string = "SyncFailed"
-	Deleted                 string = "Deleted"
-	EnvPostGresImage        string = "RELATED_IMAGE_postgresql"
-	EnvBackstageImage       string = "RELATED_IMAGE_backstage"
+	// TODO: RuntimeConditionRunning string = "RuntimeRunning"
+	ConditionDeployed string = "Deployed"
+	DeployOK          string = "DeployOK"
+	DeployFailed      string = "DeployFailed"
+	DeployInProgress  string = "DeployInProgress"
+)
+
+// Constants for image placeholders
+const (
+	EnvPostGresImage  string = "RELATED_IMAGE_postgresql"
+	EnvBackstageImage string = "RELATED_IMAGE_backstage"
 )
 
 // BackstageSpec defines the desired state of Backstage

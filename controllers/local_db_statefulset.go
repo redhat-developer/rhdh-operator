@@ -137,18 +137,20 @@ const (
 	ownerRefFmt = "failed to set owner reference: %s"
 )
 
-func (r *BackstageReconciler) reconcileLocalDbStatefulSet(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) reconcileLocalDbStatefulSet(ctx context.Context, backstage *bs.Backstage, ns string) error {
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getDefaultDbObjName(backstage),
+			Name:      getDefaultDbObjName(*backstage),
 			Namespace: ns,
 		},
 	}
-	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, statefulSet, r.localDBStatefulSetMutFun(ctx, statefulSet, backstage, ns)); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, statefulSet, r.localDBStatefulSetMutFun(ctx, statefulSet, *backstage, ns)); err != nil {
 		if errors.IsConflict(err) {
-			return fmt.Errorf("retry sync needed: %v", err)
+			return retryReconciliation(err)
 		}
-		return err
+		msg := fmt.Sprintf("failed to deploy Database StatefulSet: %s", err)
+		setStatusCondition(backstage, bs.ConditionDeployed, metav1.ConditionFalse, bs.DeployFailed, msg)
+		return fmt.Errorf(msg)
 	}
 	return nil
 }
@@ -232,7 +234,7 @@ func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backs
 		},
 	}
 	if _, err := r.cleanupResource(ctx, statefulSet, backstage); err != nil {
-		return err
+		return fmt.Errorf("failed to delete database statefulset, reason: %s", err)
 	}
 
 	service := &v1.Service{
@@ -242,9 +244,8 @@ func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backs
 		},
 	}
 	if _, err := r.cleanupResource(ctx, service, backstage); err != nil {
-		return err
+		return fmt.Errorf("failed to delete database service, reason: %s", err)
 	}
-
 	serviceHL := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("backstage-psql-%s-hl", backstage.Name),
@@ -252,7 +253,7 @@ func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backs
 		},
 	}
 	if _, err := r.cleanupResource(ctx, serviceHL, backstage); err != nil {
-		return err
+		return fmt.Errorf("failed to delete headless database service, reason: %s", err)
 	}
 
 	secret := &v1.Secret{
@@ -262,7 +263,7 @@ func (r *BackstageReconciler) cleanupLocalDbResources(ctx context.Context, backs
 		},
 	}
 	if _, err := r.cleanupResource(ctx, secret, backstage); err != nil {
-		return err
+		return fmt.Errorf("failed to delete generated database secret, reason: %s", err)
 	}
 	return nil
 }

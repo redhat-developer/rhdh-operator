@@ -125,8 +125,20 @@ var _ = Describe("Backstage controller", func() {
 			var backstage bsv1alpha1.Backstage
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
 			g.Expect(err).NotTo(HaveOccurred())
-			//TODO the status is under construction
-			g.Expect(isSynced(backstage)).To(BeTrue())
+			g.Expect(isDeployed(backstage)).To(BeTrue())
+		}, time.Minute, time.Second).Should(Succeed())
+	}
+
+	verifyBackstageInstanceError := func(ctx context.Context, errMsg string) {
+		Eventually(func(g Gomega) {
+			var backstage bsv1alpha1.Backstage
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
+			g.Expect(err).NotTo(HaveOccurred())
+			cond := meta.FindStatusCondition(backstage.Status.Conditions, bsv1alpha1.ConditionDeployed)
+			g.Expect(cond).NotTo(BeNil())
+			g.Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			g.Expect(cond.Reason).To(Equal(bsv1alpha1.DeployFailed))
+			g.Expect(cond.Message).To(ContainSubstring(errMsg))
 		}, time.Minute, time.Second).Should(Succeed())
 	}
 
@@ -371,14 +383,6 @@ var _ = Describe("Backstage controller", func() {
 			By("Checking the latest Status added to the Backstage instance")
 			verifyBackstageInstance(ctx)
 
-			By("Checking the localDb Sync Status in the Backstage instance")
-			Eventually(func(g Gomega) {
-				var backstage bsv1alpha1.Backstage
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(isLocalDbDeployed(backstage)).To(BeTrue())
-			}, time.Minute, time.Second).Should(Succeed())
-
 			By("Checking the localdb statefulset has been created")
 			Eventually(func(g Gomega) {
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}, &appsv1.StatefulSet{})
@@ -416,14 +420,6 @@ var _ = Describe("Backstage controller", func() {
 				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 			})
 			Expect(err).To(Not(HaveOccurred()))
-
-			By("Checking the localDb Sync Status has been updated in the Backstage instance")
-			Eventually(func(g Gomega) {
-				var backstage bsv1alpha1.Backstage
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(isLocalDbDeployed(backstage)).To(BeFalse())
-			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking that the local db statefulset has been deleted")
 			Eventually(func(g Gomega) {
@@ -604,13 +600,13 @@ spec:
 	Context("App Configs", func() {
 		When("referencing non-existing ConfigMap as app-config", func() {
 			var backstage *bsv1alpha1.Backstage
-
+			const cmName = "a-non-existing-cm"
 			BeforeEach(func() {
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 					Application: &bsv1alpha1.Application{
 						AppConfig: &bsv1alpha1.AppConfig{
 							ConfigMaps: []bsv1alpha1.ObjectKeyRef{
-								{Name: "a-non-existing-cm"},
+								{Name: cmName},
 							},
 						},
 					},
@@ -631,6 +627,9 @@ spec:
 					NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 				})
 				Expect(err).To(HaveOccurred())
+				errStr := fmt.Sprintf("failed to add volume mounts to Backstage deployment, reason: configmaps \"%s\" not found", cmName)
+				Expect(err.Error()).Should(ContainSubstring(errStr))
+				verifyBackstageInstanceError(ctx, errStr)
 
 				By("Not creating a Backstage Deployment")
 				Consistently(func() error {
@@ -855,13 +854,13 @@ plugins: []
 			kind := kind
 			When(fmt.Sprintf("referencing non-existing %s as extra-file", kind), func() {
 				var backstage *bsv1alpha1.Backstage
+				name := "a-non-existing-" + strings.ToLower(kind)
 
 				BeforeEach(func() {
 					var (
 						cmExtraFiles  []bsv1alpha1.ObjectKeyRef
 						secExtraFiles []bsv1alpha1.ObjectKeyRef
 					)
-					name := "a-non-existing-" + strings.ToLower(kind)
 					switch kind {
 					case "ConfigMap":
 						cmExtraFiles = append(cmExtraFiles, bsv1alpha1.ObjectKeyRef{Name: name})
@@ -892,6 +891,9 @@ plugins: []
 						NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 					})
 					Expect(err).To(HaveOccurred())
+					errStr := fmt.Sprintf("failed to add volume mounts to Backstage deployment, reason: %ss \"%s\" not found", strings.ToLower(kind), name)
+					Expect(err.Error()).Should(ContainSubstring(errStr))
+					verifyBackstageInstanceError(ctx, errStr)
 
 					By("Not creating a Backstage Deployment")
 					Consistently(func() error {
@@ -1525,15 +1527,8 @@ func findElementsByPredicate[T any](l []T, predicate func(t T) bool) (result []T
 	return result
 }
 
-func isLocalDbDeployed(backstage bsv1alpha1.Backstage) bool {
-	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bsv1alpha1.LocalDbSynced); cond != nil {
-		return cond.Status == metav1.ConditionTrue && cond.Reason == bsv1alpha1.SyncOK
-	}
-	return false
-}
-
-func isSynced(backstage bsv1alpha1.Backstage) bool {
-	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bsv1alpha1.RuntimeConditionSynced); cond != nil {
+func isDeployed(backstage bsv1alpha1.Backstage) bool {
+	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bsv1alpha1.ConditionDeployed); cond != nil {
 		return cond.Status == metav1.ConditionTrue
 	}
 	return false

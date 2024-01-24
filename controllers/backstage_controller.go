@@ -103,12 +103,16 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	defer func(bs *bs.Backstage) {
 		if err := r.Client.Status().Update(ctx, bs); err != nil {
 			if errors.IsConflict(err) {
-				lg.V(1).Info("Backstage object modified, retry syncing status", "Backstage Object", bs)
+				lg.V(1).Info("Backstage object modified, retry reconciliation", "Backstage Object", bs)
 				return
 			}
 			lg.Error(err, "Error updating the Backstage resource status", "Backstage Object", bs)
 		}
 	}(&backstage)
+
+	if len(backstage.Status.Conditions) == 0 {
+		setStatusCondition(&backstage, bs.ConditionDeployed, v1.ConditionFalse, bs.DeployInProgress, "Deployment process started")
+	}
 
 	if pointer.BoolDeref(backstage.Spec.Database.EnableLocalDb, true) {
 
@@ -119,33 +123,29 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 		*/
 
-		err := r.reconcileLocalDbStatefulSet(ctx, backstage, req.Namespace)
+		err := r.reconcileLocalDbStatefulSet(ctx, &backstage, req.Namespace)
 		if err != nil {
-			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("failed to sync Database StatefulSet:%s", err.Error()))
-			return ctrl.Result{}, fmt.Errorf("failed to sync Database StatefulSet: %w", err)
+			return ctrl.Result{}, err
 		}
 
-		err = r.reconcileLocalDbServices(ctx, backstage, req.Namespace)
+		err = r.reconcileLocalDbServices(ctx, &backstage, req.Namespace)
 		if err != nil {
-			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("failed to sync Database Services:%s", err.Error()))
-			return ctrl.Result{}, fmt.Errorf("failed to sync Database Service: %w", err)
+			return ctrl.Result{}, err
 		}
-		setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionTrue, bs.SyncOK, "")
 	} else { // Clean up the deployed local db resources if any
 		if err := r.cleanupLocalDbResources(ctx, backstage); err != nil {
-			setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionFalse, bs.SyncFailed, fmt.Sprintf("failed to delete Database Services:%s", err.Error()))
+			setStatusCondition(&backstage, bs.ConditionDeployed, v1.ConditionFalse, bs.DeployFailed, fmt.Sprintf("failed to delete Database Services:%s", err.Error()))
 			return ctrl.Result{}, fmt.Errorf("failed to delete Database Service: %w", err)
 		}
-		setStatusCondition(&backstage, bs.LocalDbSynced, v1.ConditionTrue, bs.Deleted, "")
 	}
 
-	err := r.reconcileBackstageDeployment(ctx, backstage, req.Namespace)
+	err := r.reconcileBackstageDeployment(ctx, &backstage, req.Namespace)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile Backstage Deployment: %w", err)
+		return ctrl.Result{}, err
 	}
 
-	if err := r.reconcileBackstageService(ctx, backstage, req.Namespace); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to reconcile Backstage Service: %w", err)
+	if err := r.reconcileBackstageService(ctx, &backstage, req.Namespace); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if r.IsOpenShift {
@@ -154,10 +154,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
-	//TODO: it is just a placeholder for the time
-	r.setRunningStatus(ctx, &backstage, req.Namespace)
-	r.setSyncStatus(&backstage)
-
+	setStatusCondition(&backstage, bs.ConditionDeployed, v1.ConditionTrue, bs.DeployOK, "")
 	return ctrl.Result{}, nil
 }
 
@@ -219,7 +216,8 @@ func defFile(key string) string {
 	return filepath.Join(os.Getenv("LOCALBIN"), "default-config", key)
 }
 
-// sets the RuntimeRunning condition
+/* TODO
+sets the RuntimeRunning condition
 func (r *BackstageReconciler) setRunningStatus(ctx context.Context, backstage *bs.Backstage, ns string) {
 
 	meta.SetStatusCondition(&backstage.Status.Conditions, v1.Condition{
@@ -230,27 +228,7 @@ func (r *BackstageReconciler) setRunningStatus(ctx context.Context, backstage *b
 		Message:            "Runtime in unknown status",
 	})
 }
-
-// sets the RuntimeSyncedWithConfig condition
-func (r *BackstageReconciler) setSyncStatus(backstage *bs.Backstage) {
-
-	status := v1.ConditionUnknown
-	reason := "Unknown"
-	message := "Sync in unknown status"
-	if r.OwnsRuntime {
-		status = v1.ConditionTrue
-		reason = "Synced"
-		message = "Backstage syncs runtime"
-	}
-
-	meta.SetStatusCondition(&backstage.Status.Conditions, v1.Condition{
-		Type:               bs.RuntimeConditionSynced,
-		Status:             status,
-		LastTransitionTime: v1.Time{},
-		Reason:             reason,
-		Message:            message,
-	})
-}
+*/
 
 // sets status condition
 func setStatusCondition(backstage *bs.Backstage, condType string, status v1.ConditionStatus, reason, msg string) {
@@ -336,4 +314,8 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager, log logr.Logger
 	}
 
 	return builder.Complete(r)
+}
+
+func retryReconciliation(err error) error {
+	return fmt.Errorf("reconciliation retry needed: %v", err)
 }

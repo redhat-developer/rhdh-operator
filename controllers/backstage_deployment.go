@@ -146,16 +146,18 @@ func visitContainers(podTemplateSpec *v1.PodTemplateSpec, visitor ContainerVisit
 	}
 }
 
-func (r *BackstageReconciler) reconcileBackstageDeployment(ctx context.Context, backstage bs.Backstage, ns string) error {
+func (r *BackstageReconciler) reconcileBackstageDeployment(ctx context.Context, backstage *bs.Backstage, ns string) error {
 	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
-		Name:      getDefaultObjName(backstage),
+		Name:      getDefaultObjName(*backstage),
 		Namespace: ns},
 	}
-	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, r.deploymentObjectMutFun(ctx, deployment, backstage, ns)); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, r.deploymentObjectMutFun(ctx, deployment, *backstage, ns)); err != nil {
 		if errors.IsConflict(err) {
-			return fmt.Errorf("retry sync needed: %v", err)
+			return retryReconciliation(err)
 		}
-		return err
+		msg := fmt.Sprintf("failed to deploy Backstage Deployment: %s", err)
+		setStatusCondition(backstage, bs.ConditionDeployed, metav1.ConditionFalse, bs.DeployFailed, msg)
+		return fmt.Errorf(msg)
 	}
 	return nil
 }
