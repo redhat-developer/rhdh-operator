@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build operator, bundle, and catalog images
+# for main branch, use next tags; for 1.x branches, use :latest tags
+name: Build and push operator, bundle, and catalog images
 
 on:
   push:
-    branches: [ main ]
+    branches: 
+    - main
+    - rhdh-1.[0.9]+
+    - 1.[0-9]+.x
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -63,8 +67,13 @@ jobs:
           # install skopeo, podman
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
 
-          export CONTAINER_ENGINE=podman 
-          export VERSION=${{ env.BASE_VERSION }}-next-${{ env.SHORT_SHA }}
+          export CONTAINER_ENGINE=podman
+          latestNext="next"
+          # for main branch, use next tags; for 1.x branches, use :latest tags
+          if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]; then
+            latestNext="latest" 
+          fi
+          export VERSION=${{ env.BASE_VERSION }}-${latestNext}-${{ env.SHORT_SHA }}
 
           set -ex
 
@@ -76,5 +85,5 @@ jobs:
             podman push quay.io/janus-idp/${image}:${VERSION} -q
             skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:${VERSION}
             skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:${VERSION%-*}
-            skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:next
+            skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:${latestNext}
           done
