@@ -24,7 +24,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: 
     - main
-    - rhdh-1.[0.9]+
+    - rhdh-1.[0-9]+
     - 1.[0-9]+.x
 
 concurrency:
