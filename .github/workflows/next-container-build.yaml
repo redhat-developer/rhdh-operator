@@ -34,13 +34,21 @@ jobs:
     # check if the change for this PR necessitates a rebuild of containers
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: check-changes
         # check changes in this commit for regex include and exclude matches; pipe to an env var
         run: |
           CHANGES="$(git diff --name-only | \
-          grep -E "/docker/|\.dockerignore|workflows/.+-container-build.yaml|Makefile|/bundle/|/config/|go.mod|go.sum|.+\.go" | \
-          grep -v -E ".+_test.go|/.rhdh/")" \
-          >> $GITHUB_ENV
+          grep -E "docker/|\.dockerignore|workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go" | \
+          grep -v -E ".+_test.go|/.rhdh/")";
+          echo "Changed files for this commit:"
+          echo "=============================="
+          echo "$CHANGES"
+          echo "=============================="
+          echo "CHANGES=$CHANGES" >> $GITHUB_ENV
 
   next-build:
     name: Next build
