@@ -30,16 +30,21 @@ env:
   REGISTRY: quay.io
 
 jobs:
-  check-changes:
-    # check if the change for this PR necessitates a rebuild of containers
+  next-build:
+    name: Next build
     runs-on: ubuntu-latest
+    needs: check-changes
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: check-changes
-        # check changes in this commit for regex include and exclude matches; pipe to an env var
+
+      # check changes in this commit for regex include and exclude matches; pipe to an env var
+      - name: Check for changes to build
         run: |
           # don't fail if nothing returned by grep
           set +e 
@@ -56,27 +61,6 @@ jobs:
             echo EOF
           } >> "$GITHUB_ENV"
 
-  next-build:
-    name: Next build
-    runs-on: ubuntu-latest
-    needs: check-changes
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Go
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'go.mod'
-
       - name: Get the last commit short SHA
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
@@ -85,6 +69,13 @@ jobs:
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
           BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //") # 0.0.1
           echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
+
+      - name: Setup Go
+        # run this stage only if there are changes that match the includes and not the excludes
+        if: ${{ env.CHANGES != '' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
       - name: Login to quay.io
         # run this stage only if there are changes that match the includes and not the excludes
