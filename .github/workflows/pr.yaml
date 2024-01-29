@@ -34,11 +34,9 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Lint
-      run: make lint
-
-    - name: Test
-      run: make test
+    - name: build
+      run: |
+        make lint test
 
     - name: Run Gosec Security Scanner
       run: make gosec
