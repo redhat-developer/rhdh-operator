@@ -22,27 +22,61 @@ on:
     - 1.[0-9]+.x
 
 jobs:
+  check-changes:
+    # check if the change for this PR necessitates a rebuild of containers
+    runs-on: ubuntu-latest
+    needs: authorize
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+      - name: check-changes
+        # check changes in this commit for regex include and exclude matches; pipe to an env var
+        # note regexes are different for the PR check than for *-container-build.yaml
+        run: |
+          # don't fail if nothing returned by grep
+          set +e 
+          CHANGES="$(git diff --name-only | \
+          grep -E "workflows/pr.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go" | \
+          grep -v -E "/.rhdh/")";
+          echo "Changed files for this commit:"
+          echo "=============================="
+          echo "$CHANGES"
+          echo "=============================="
+          echo "CHANGES=$CHANGES" >> $GITHUB_ENV
+
   pr-validate:
     name: PR Validate
     runs-on: ubuntu-latest
-
+    needs: check-changes
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Setup Go
-      uses: actions/setup-go@v4
-      with:
-        go-version-file: 'go.mod'
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
 
-    - name: build
-      run: |
-        make lint test
+      # gosec needs a "build" stage so connect it to the lint step which we always do
+      - name: build
+        run: make lint
 
-    - name: Run Gosec Security Scanner
-      run: make gosec
+      - name: test
+        # run this stage only if there are changes that match the includes and not the excludes
+        if: ${{ env.CHANGES != '' }}
+        run: make test
 
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        # Path to SARIF file relative to the root of the repository
-        sarif_file: gosec.sarif
+      - name: Run Gosec Security Scanner
+        run: make gosec
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          # Path to SARIF file relative to the root of the repository
+          sarif_file: gosec.sarif

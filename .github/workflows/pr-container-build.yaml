@@ -62,6 +62,8 @@ jobs:
       - name: check-changes
         # check changes in this commit for regex include and exclude matches; pipe to an env var
         run: |
+          # don't fail if nothing returned by grep
+          set +e 
           CHANGES="$(git diff --name-only HEAD~1 | \
           grep -E "docker/|\.dockerignore|workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go" | \
           grep -v -E ".+_test.go|/.rhdh/")";
