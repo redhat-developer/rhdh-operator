@@ -48,39 +48,10 @@ jobs:
         run: |
           echo "✓"
 
-  check-changes:
-    # check if the change for this PR necessitates a rebuild of containers
-    runs-on: ubuntu-latest
-    needs: authorize
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-      - name: check-changes
-        # check changes in this commit for regex include and exclude matches; pipe to an env var
-        run: |
-          # don't fail if nothing returned by grep
-          set +e 
-          CHANGES="$(git diff --name-only HEAD~1 | \
-          grep -E "workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go|docker/|\.dockerignore" | \
-          grep -v -E ".+_test.go|/.rhdh/")";
-          echo "Changed files for this commit:"
-          echo "=============================="
-          echo "$CHANGES"
-          echo "=============================="
-          {
-            echo 'CHANGES<<EOF'
-            echo $CHANGES
-            echo EOF
-          } >> "$GITHUB_ENV"
-
   pr-build:
     name: PR Publish
     runs-on: ubuntu-latest
-    needs: [authorize, check-changes]
+    needs: authorize
     permissions:
       contents: read
       packages: write
@@ -93,6 +64,24 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.ref }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+      # check changes in this commit for regex include and exclude matches; pipe to an env var
+      - name: Check for changes to build
+        run: |
+          # don't fail if nothing returned by grep
+          set +e 
+          CHANGES="$(git diff --name-only HEAD~1 | \
+            grep -E "workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go|docker/|\.dockerignore" | \
+            grep -v -E ".+_test.go|/.rhdh/")";
+          echo "Changed files for this commit:"
+          echo "=============================="
+          echo "$CHANGES"
+          echo "=============================="
+          {
+            echo 'CHANGES<<EOF'
+            echo $CHANGES
+            echo EOF
+          } >> "$GITHUB_ENV"
 
       - name: Setup Go
         # run this stage only if there are changes that match the includes and not the excludes

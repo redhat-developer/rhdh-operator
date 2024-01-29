@@ -22,25 +22,23 @@ on:
     - 1.[0-9]+.x
 
 jobs:
-  check-changes:
-    # check if the change for this PR necessitates a rebuild of containers
+  pr-validate:
+    name: PR Validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-      - name: check-changes
-        # check changes in this commit for regex include and exclude matches; pipe to an env var
-        # note regexes are different for the PR check than for *-container-build.yaml
+
+      # check changes in this commit for regex include and exclude matches; pipe to an env var
+      - name: Check for changes to build
         run: |
           # don't fail if nothing returned by grep
           set +e 
           CHANGES="$(git diff --name-only HEAD~1 | \
-          grep -E "workflows/pr.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go" | \
-          grep -v -E "/.rhdh/")";
+            grep -E "workflows/pr.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go" | \
+            grep -v -E "/.rhdh/")";
           echo "Changed files for this commit:"
           echo "=============================="
           echo "$CHANGES"
@@ -50,16 +48,6 @@ jobs:
             echo $CHANGES
             echo EOF
           } >> "$GITHUB_ENV"
-
-  pr-validate:
-    name: PR Validate
-    runs-on: ubuntu-latest
-    needs: check-changes
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
