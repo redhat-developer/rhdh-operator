@@ -65,7 +65,7 @@ jobs:
           # don't fail if nothing returned by grep
           set +e 
           CHANGES="$(git diff --name-only HEAD~1 | \
-          grep -E "docker/|\.dockerignore|workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go" | \
+          grep -E "workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go|docker/|\.dockerignore" | \
           grep -v -E ".+_test.go|/.rhdh/")";
           echo "Changed files for this commit:"
           echo "=============================="

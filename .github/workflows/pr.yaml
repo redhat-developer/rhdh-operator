@@ -39,14 +39,18 @@ jobs:
         run: |
           # don't fail if nothing returned by grep
           set +e 
-          CHANGES="$(git diff --name-only | \
+          CHANGES="$(git diff --name-only HEAD~1 | \
           grep -E "workflows/pr.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go" | \
           grep -v -E "/.rhdh/")";
           echo "Changed files for this commit:"
           echo "=============================="
           echo "$CHANGES"
           echo "=============================="
-          echo "CHANGES=$CHANGES" >> $GITHUB_ENV
+          {
+            echo 'CHANGES<<EOF'
+            echo $CHANGES
+            echo EOF
+          } >> "$GITHUB_ENV"
 
   pr-validate:
     name: PR Validate
