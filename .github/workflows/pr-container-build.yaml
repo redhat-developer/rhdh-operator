@@ -23,9 +23,9 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: 
-    - main
-    - rhdh-1.[0-9]+
-    - 1.[0-9]+.x
+      - main
+      - rhdh-1.[0-9]+
+      - 1.[0-9]+.x
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.ref }}
@@ -48,10 +48,23 @@ jobs:
         run: |
           echo "✓"
 
+  check-changes:
+    # check if the change for this PR necessitates a rebuild of containers
+    runs-on: ubuntu-latest
+    needs: authorize
+    steps:
+      - name: check-changes
+        # check changes in this commit for regex include and exclude matches; pipe to an env var
+        run: |
+          CHANGES="$(git diff --name-only | \
+          grep -E "/docker/|\.dockerignore|workflows/.+-container-build.yaml|Makefile|/bundle/|/config/|go.mod|go.sum|.+\.go" | \
+          grep -v -E ".+_test.go|/.rhdh/")" \
+          >> $GITHUB_ENV
+
   pr-build:
     name: PR Publish
     runs-on: ubuntu-latest
-    needs: authorize
+    needs: [authorize, check-changes]
     permissions:
       contents: read
       packages: write
@@ -66,11 +79,15 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
 
       - name: Setup Go
+        # run this stage only if there are changes that match the includes and not the excludes
+        if: ${{ env.CHANGES != '' }}
         uses: actions/setup-go@v4
         with:
           go-version-file: 'go.mod'
 
       - name: Get the last commit short SHA of the PR
+        # run this stage only if there are changes that match the includes and not the excludes
+        if: ${{ env.CHANGES != '' }}
         run: |
           SHORT_SHA=$(git rev-parse --short ${{ github.event.pull_request.head.sha }})
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
@@ -78,6 +95,8 @@ jobs:
           echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
 
       - name: Login to quay.io
+        # run this stage only if there are changes that match the includes and not the excludes
+        if: ${{ env.CHANGES != '' }}
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
@@ -85,6 +104,8 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Build and push operator, bundle, and catalog images
+        # run this stage only if there are changes that match the includes and not the excludes
+        if: ${{ env.CHANGES != '' }}
         run: |
           # install skopeo, podman
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
@@ -104,6 +125,8 @@ jobs:
             skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:${VERSION%-*}
           done
       - name: Comment image links in PR
+        # run this stage only if there are changes that match the includes and not the excludes
+        if: ${{ env.CHANGES != '' }}
         uses: actions/github-script@v6
         with:
           script: |
