@@ -33,7 +33,6 @@ jobs:
   next-build:
     name: Next build
     runs-on: ubuntu-latest
-    needs: check-changes
     permissions:
       contents: read
       packages: write
