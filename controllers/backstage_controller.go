@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,8 +44,6 @@ const (
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
-
-	Clientset *kubernetes.Clientset
 
 	Scheme *runtime.Scheme
 	// If true, Backstage Controller always sync the state of runtime objects created
@@ -298,14 +295,6 @@ func (r *BackstageReconciler) labels(meta *v1.ObjectMeta, backstage bs.Backstage
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager, log logr.Logger) error {
-
-	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
-	if err != nil {
-		log.Error(err, "unable to create clientset")
-		return err
-	}
-	r.Clientset = clientset
-
 	if len(r.PsqlImage) == 0 {
 		r.PsqlImage = "quay.io/fedora/postgresql-15:latest"
 		log.Info("Enviroment variable is not set, default is used", bs.EnvPostGresImage, r.PsqlImage)
