@@ -62,7 +62,6 @@ var _ = Describe("Backstage controller", func() {
 
 		backstageReconciler = &BackstageReconciler{
 			Client:         k8sClient,
-			Clientset:      k8sClientset,
 			Scheme:         k8sClient.Scheme(),
 			Namespace:      ns,
 			OwnsRuntime:    true,

@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,7 +39,6 @@ import (
 
 var cfg *rest.Config
 var k8sClient client.Client
-var k8sClientset *kubernetes.Clientset
 
 var testEnv *envtest.Environment
 
@@ -77,10 +75,6 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-
-	k8sClientset, err = kubernetes.NewForConfig(cfg)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClientset).NotTo(BeNil())
 })
 
 var _ = AfterSuite(func() {
