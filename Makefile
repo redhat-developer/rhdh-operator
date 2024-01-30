@@ -359,7 +359,7 @@ undeploy-olm: ## Un-deploy the operator with OLM
 DEFAULT_OLM_NAMESPACE ?= openshift-marketplace
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in the default namespace for catalogsource
-	kubectl delete catalogsource backstage-operator -n $(DEFAULT_OLM_NAMESPACE)
+	-kubectl delete catalogsource backstage-operator -n $(DEFAULT_OLM_NAMESPACE)
 	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | kubectl apply -n $(DEFAULT_OLM_NAMESPACE) -f -
 
 .PHONY: deploy-openshift

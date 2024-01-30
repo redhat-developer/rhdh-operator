@@ -62,6 +62,7 @@ var _ = Describe("Backstage controller", func() {
 
 		backstageReconciler = &BackstageReconciler{
 			Client:         k8sClient,
+			Clientset:      k8sClientset,
 			Scheme:         k8sClient.Scheme(),
 			Namespace:      ns,
 			OwnsRuntime:    true,
@@ -852,9 +853,19 @@ plugins: []
 	Context("Extra Files", func() {
 		for _, kind := range []string{"ConfigMap", "Secret"} {
 			kind := kind
-			When(fmt.Sprintf("referencing non-existing %s as extra-file", kind), func() {
+			name := "a-" + strings.ToLower(kind)
+			title := ""
+			errExpected := ""
+			switch kind {
+			case "ConfigMap":
+				title = fmt.Sprintf("referencing non-existing %s as extra-file without key", kind)
+				errExpected = fmt.Sprintf("configmaps \"%s\" not found", name)
+			case "Secret":
+				title = fmt.Sprintf("referencing %s as extra-file without key", kind)
+				errExpected = fmt.Sprintf("key is required to mount extra file with secret %s", name)
+			}
+			When(title, func() {
 				var backstage *bsv1alpha1.Backstage
-				name := "a-non-existing-" + strings.ToLower(kind)
 
 				BeforeEach(func() {
 					var (
@@ -891,9 +902,8 @@ plugins: []
 						NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 					})
 					Expect(err).To(HaveOccurred())
-					errStr := fmt.Sprintf("failed to add volume mounts to Backstage deployment, reason: %ss \"%s\" not found", strings.ToLower(kind), name)
-					Expect(err.Error()).Should(ContainSubstring(errStr))
-					verifyBackstageInstanceError(ctx, errStr)
+					Expect(err.Error()).Should(ContainSubstring(errExpected))
+					verifyBackstageInstanceError(ctx, errExpected)
 
 					By("Not creating a Backstage Deployment")
 					Consistently(func() error {
@@ -903,13 +913,11 @@ plugins: []
 				})
 			})
 		}
-
 		for _, mountPath := range []string{"", "/some/path/for/extra/config"} {
 			mountPath := mountPath
 			When("referencing ConfigMaps and Secrets for extra files - mountPath="+mountPath, func() {
 				const (
 					extraConfig1CmNameAll        = "my-extra-config-1-cm-all"
-					extraConfig2SecretNameAll    = "my-extra-config-2-secret-all"
 					extraConfig1CmNameSingle     = "my-extra-config-1-cm-single"
 					extraConfig2SecretNameSingle = "my-extra-config-2-secret-single"
 				)
@@ -926,17 +934,6 @@ plugins: []
 `,
 					})
 					err := k8sClient.Create(ctx, extraConfig1CmAll)
-					Expect(err).To(Not(HaveOccurred()))
-
-					extraConfig2SecretAll := buildSecret(extraConfig2SecretNameAll, map[string][]byte{
-						"my-extra-config-21.yaml": []byte(`
-# my-extra-config-21.yaml
-`),
-						"my-extra-config-22.yaml": []byte(`
-# my-extra-config-22.yaml
-`),
-					})
-					err = k8sClient.Create(ctx, extraConfig2SecretAll)
 					Expect(err).To(Not(HaveOccurred()))
 
 					extraConfig1CmSingle := buildConfigMap(extraConfig1CmNameSingle, map[string]string{
@@ -970,7 +967,6 @@ plugins: []
 									{Name: extraConfig1CmNameSingle, Key: "my-extra-file-12-single.yaml"},
 								},
 								Secrets: []bsv1alpha1.ObjectKeyRef{
-									{Name: extraConfig2SecretNameAll},
 									{Name: extraConfig2SecretNameSingle, Key: "my-extra-file-22-single.yaml"},
 								},
 							},
@@ -1012,7 +1008,7 @@ plugins: []
 					})
 
 					By("Checking the Volumes in the Backstage Deployment", func() {
-						Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(8))
+						Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(7))
 
 						backendAuthAppConfigVol, ok := findVolume(found.Spec.Template.Spec.Volumes, backendAuthConfigName)
 						Expect(ok).To(BeTrue(), "No volume found with name: %s", backendAuthConfigName)
@@ -1025,12 +1021,6 @@ plugins: []
 						Expect(extraConfig1CmVol.VolumeSource.Secret).To(BeNil())
 						Expect(extraConfig1CmVol.VolumeSource.ConfigMap.DefaultMode).To(HaveValue(Equal(int32(420))))
 						Expect(extraConfig1CmVol.VolumeSource.ConfigMap.LocalObjectReference.Name).To(Equal(extraConfig1CmNameAll))
-
-						extraConfig2SecretVol, ok := findVolume(found.Spec.Template.Spec.Volumes, extraConfig2SecretNameAll)
-						Expect(ok).To(BeTrue(), "No volume found with name: %s", extraConfig2SecretNameAll)
-						Expect(extraConfig2SecretVol.VolumeSource.ConfigMap).To(BeNil())
-						Expect(extraConfig2SecretVol.VolumeSource.Secret.DefaultMode).To(HaveValue(Equal(int32(420))))
-						Expect(extraConfig2SecretVol.VolumeSource.Secret.SecretName).To(Equal(extraConfig2SecretNameAll))
 
 						extraConfig1SingleCmVol, ok := findVolume(found.Spec.Template.Spec.Volumes, extraConfig1CmNameSingle)
 						Expect(ok).To(BeTrue(), "No volume found with name: %s", extraConfig1CmNameSingle)
@@ -1051,13 +1041,12 @@ plugins: []
 
 						// Extra config mounted in the main container
 						Expect(findVolumeMounts(initCont.VolumeMounts, extraConfig1CmNameAll)).Should(HaveLen(0))
-						Expect(findVolumeMounts(initCont.VolumeMounts, extraConfig2SecretNameAll)).Should(HaveLen(0))
 					})
 
 					mainCont := found.Spec.Template.Spec.Containers[0]
 
 					By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
-						Expect(mainCont.VolumeMounts).To(HaveLen(8))
+						Expect(mainCont.VolumeMounts).To(HaveLen(6))
 
 						expectedMountPath := mountPath
 						if expectedMountPath == "" {
@@ -1081,20 +1070,6 @@ plugins: []
 								SatisfyAny(
 									Equal("my-extra-config-11.yaml"),
 									Equal("my-extra-config-12.yaml")))
-						}
-
-						extraConfig2SecretMounts := findVolumeMounts(mainCont.VolumeMounts, extraConfig2SecretNameAll)
-						Expect(extraConfig2SecretMounts).To(HaveLen(2), "No volume mounts found with name: %s", extraConfig2SecretNameAll)
-						Expect(extraConfig2SecretMounts[0].MountPath).ToNot(Equal(extraConfig2SecretMounts[1].MountPath))
-						for i := 0; i <= 1; i++ {
-							Expect(extraConfig2SecretMounts[i].MountPath).To(
-								SatisfyAny(
-									Equal(expectedMountPath+"/my-extra-config-21.yaml"),
-									Equal(expectedMountPath+"/my-extra-config-22.yaml")))
-							Expect(extraConfig2SecretMounts[i].SubPath).To(
-								SatisfyAny(
-									Equal("my-extra-config-21.yaml"),
-									Equal("my-extra-config-22.yaml")))
 						}
 
 						extraConfig1CmSingleMounts := findVolumeMounts(mainCont.VolumeMounts, extraConfig1CmNameSingle)

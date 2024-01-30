@@ -23,7 +23,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	bs "janus-idp.io/backstage-operator/api/v1alpha1"
@@ -49,31 +48,25 @@ func (r *BackstageReconciler) handlePsqlSecret(ctx context.Context, statefulSet 
 	//Generate the PostGresSQL secret if it does not exist
 	sec.SetName(secretName)
 	sec.SetNamespace(statefulSet.Namespace)
-	err = r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: statefulSet.Namespace}, &sec)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get secret for PostgreSQL DB (%q), reason: %s", secretName, err)
+	// Create a secret with a random value
+	pwd, pwdErr := generatePassword(24)
+	if pwdErr != nil {
+		return nil, fmt.Errorf("failed to generate a password for the PostgreSQL database: %w", pwdErr)
+	}
+	sec.StringData["POSTGRES_PASSWORD"] = pwd
+	sec.StringData["POSTGRESQL_ADMIN_PASSWORD"] = pwd
+	sec.StringData["POSTGRES_HOST"] = getDefaultDbObjName(*backstage)
+	if r.OwnsRuntime {
+		// Set the ownerreferences for the secret so that when the backstage CR is deleted,
+		// the generated secret is automatically deleted
+		if err := controllerutil.SetControllerReference(backstage, &sec, r.Scheme); err != nil {
+			return nil, fmt.Errorf(ownerRefFmt, err)
 		}
-		// Create a secret with a random value
-		pwd, pwdErr := generatePassword(24)
-		if pwdErr != nil {
-			return nil, fmt.Errorf("failed to generate a password for the PostgreSQL database: %w", pwdErr)
-		}
-		sec.StringData["POSTGRES_PASSWORD"] = pwd
-		sec.StringData["POSTGRESQL_ADMIN_PASSWORD"] = pwd
-		sec.StringData["POSTGRES_HOST"] = getDefaultDbObjName(*backstage)
-		if r.OwnsRuntime {
-			// Set the ownerreferences for the secret so that when the backstage CR is deleted,
-			// the generated secret is automatically deleted
-			if err := controllerutil.SetControllerReference(backstage, &sec, r.Scheme); err != nil {
-				return nil, fmt.Errorf(ownerRefFmt, err)
-			}
-		}
+	}
 
-		err = r.Create(ctx, &sec)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create secret for local PostgreSQL DB, reason: %s", err)
-		}
+	err = r.Create(ctx, &sec)
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return nil, fmt.Errorf("failed to create secret for local PostgreSQL DB, reason: %s", err)
 	}
 	return nil, nil // If the secret already exists, simply return
 }

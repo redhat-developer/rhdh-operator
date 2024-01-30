@@ -3,7 +3,8 @@ kind: ClusterServiceVersion
 metadata:
   annotations:
     alm-examples: '[]'
-    capabilities: Basic Install
+    capabilities: Seamless Upgrades
+    operatorframework.io/suggested-namespace: backstage-system
   name: backstage-operator.v0.0.0
   namespace: placeholder
 spec:

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,6 +45,9 @@ const (
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
+
+	Clientset *kubernetes.Clientset
+
 	Scheme *runtime.Scheme
 	// If true, Backstage Controller always sync the state of runtime objects created
 	// otherwise, runtime objects can be re-configured independently
@@ -64,10 +68,12 @@ type BackstageReconciler struct {
 //+kubebuilder:rbac:groups=janus-idp.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=janus-idp.io,resources=backstages/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=janus-idp.io,resources=backstages/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=configmaps;secrets;persistentvolumes;persistentvolumeclaims;services,verbs=get;watch;create;update;list;delete
-//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;watch;create;update;list;delete
-//+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;watch;create;update;list;delete
-//+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete
+//+kubebuilder:rbac:groups="",resources=configmaps;services,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups="",resources=persistentvolumes;persistentvolumeclaims,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=create;delete
+//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;list;watch;create;update;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -292,6 +298,13 @@ func (r *BackstageReconciler) labels(meta *v1.ObjectMeta, backstage bs.Backstage
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager, log logr.Logger) error {
+
+	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		log.Error(err, "unable to create clientset")
+		return err
+	}
+	r.Clientset = clientset
 
 	if len(r.PsqlImage) == 0 {
 		r.PsqlImage = "quay.io/fedora/postgresql-15:latest"

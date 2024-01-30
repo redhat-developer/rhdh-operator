@@ -97,7 +97,8 @@ type Application struct {
 	//+kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	// Image to use in all containers (including Init Containers)
+	// Custom image to use in all containers (including Init Containers).
+	// It is your responsibility to make sure the image is from trusted sources and has been validated for security compliance
 	// +optional
 	Image *string `json:"image,omitempty"`
 
@@ -138,8 +139,7 @@ type ExtraFiles struct {
 	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
 
 	// List of references to Secrets objects mounted as extra files under the MountPath specified.
-	// For each item in this array, if a key is not specified, it means that all keys in the Secret will be mounted as files.
-	// Otherwise, only the specified key will be mounted as a file.
+	// For each item in this array, a key must be specified that will be mounted as a file.
 	// +optional
 	Secrets []ObjectKeyRef `json:"secrets,omitempty"`
 }

@@ -21,6 +21,7 @@ spec:
         - name: "my-backstage-extra-files-cm1"
       secrets:
         - name: "my-backstage-extra-files-secret1"
+          key: secret_file1.txt
     extraEnvs:
       envs:
         - name: GITHUB_ORG
