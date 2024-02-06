@@ -7,7 +7,7 @@
 * You are logged in as an _administrator_ to the OpenShift web console.
 * You have configured the appropriate roles and permissions within your project to create an application.
 See the https://docs.openshift.com/container-platform/4.14/applications/index.html[Red Hat OpenShift documentation on Building applications] for more details.
-* If installing a CI build from quay.io/rhdh, you (or an administrator) have https://gist.github.com/nickboldt/d54ba9d7264a5480d14eea6c3bd2ecdf[added a RHDH Operator Catalog Source] and a https://gist.github.com/nickboldt/84bea28da11ec5aab549c182818356e0#file-oc-pull-secret-update-project-sh[pull secret]. For GA releases, this is not required.
+* **(Optional for unofficial, unreleased CI builds)**. Refer to link:installing-ci-builds.adoc[Installing CI Builds] to install from https://quay.io/rhdh[quay.io/rhdh].
 
 *Procedure*
 
