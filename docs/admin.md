@@ -81,6 +81,8 @@ kubectl get -n backstage-system configmap default-config > my-config.yaml
 
 It has to be re-applied to the controller's container after being reconciled by kubernetes processes.
 
+### Recommended Namespace for Operator Installation
+It is recommended to deploy the Backstage Operator in a dedicated default namespace `backstage-system`. The cluster administrator can restrict access to the operator resources through RoleBindings or ClusterRoleBindings. On OpenShift, you can choose to deploy the operator in the `openshift-operators` namespace instead. However, you should keep in mind that the Backstage Operator shares the namespace with other operators and therefore any users who can create workloads in that namespace can get their privileges escalated from all operators' service accounts.
 
 ### Use Cases
 
@@ -97,3 +99,7 @@ If you plan to deploy to a [restricted environment](https://docs.openshift.com/c
 you will need to configure your cluster or network to allow these images to be pulled.
 For the list of related images deployed by the Operator, see the `RELATED_IMAGE_*` env vars or `relatedImages` section of the [CSV](../bundle/manifests/backstage-operator.clusterserviceversion.yaml).
 See also https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html
+
+#### Custom Backstage Image
+
+You can use the Backstage Operator to deploy a backstage application with your custom backstage image by setting the field `spec.application.image` in your Backstage CR. This is at your own risk and it is your responsibility to ensure that the image is from trusted sources, and has been tested and validated for security compliance.

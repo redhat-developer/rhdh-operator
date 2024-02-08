@@ -25,7 +25,7 @@ metadata:
       It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
       which can help streamline the process of setting up a self-managed internal
       developer portal for adopters who are just starting out.
-    operatorframework.io/suggested-namespace: openshift-rhdh-operator
+    operatorframework.io/suggested-namespace: rhdh-operator
     operators.openshift.io/valid-subscription: '["OpenShift Container Platform", "OpenShift
       Platform Plus"]'
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
