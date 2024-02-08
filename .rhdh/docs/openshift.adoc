@@ -24,6 +24,7 @@ For more information about creating a project in OpenShift, see the https://docs
 
 image::images/rhdh_from_operator.png[RHDH from Operator]
 
+[#_configurations_for_operator_backed_rhdh]
 === Configurations for Operator-backed RHDH
 
 NOTE: At the moment, updates to the Backstage Custom Resource (CR) are automatically handled by the Operator.
@@ -267,4 +268,4 @@ This is because the credentials might not be valid or the external database migh
 
 ==== Air-gap/Offline support
 
-TODO
+More details in link:airgap.adoc[Air-gap/Offline support].

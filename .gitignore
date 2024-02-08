@@ -31,3 +31,10 @@ __debug_bin*
 database/
 docker/index.Dockerfile
 gosec.sarif
+
+# from prepare-restricted-environment script
+catalog_mirror.log
+manifests-rhdh-index-*
+rhdh-disconnected-install/
+rhdh-disconnected-install.Dockerfile
+
