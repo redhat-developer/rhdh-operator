@@ -36,6 +36,8 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      # Required because the operator does not work without a Service Account Token
+      automountServiceAccountToken: true # NOSONAR
       # TODO(user): Uncomment the following code to configure the nodeAffinity expression
       # according to the platforms which are supported by your solution. 
       # It is considered best practice to support multiple architectures. You can
@@ -100,6 +102,7 @@ spec:
           limits:
             cpu: 500m
             memory: 128Mi
+            ephemeral-storage: 20Mi
           requests:
             cpu: 10m
             memory: 64Mi

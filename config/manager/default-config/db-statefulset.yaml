@@ -15,9 +15,13 @@ spec:
         janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
     spec:
-      persistentVolumeClaimRetentionPolicy:
-        whenDeleted: Retain
-        whenScaled: Retain
+      automountServiceAccountToken: false
+      ## https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+      ## The optional .spec.persistentVolumeClaimRetentionPolicy field controls if and how PVCs are deleted during the lifecycle of a StatefulSet.
+      ## You must enable the StatefulSetAutoDeletePVC feature gate on the API server and the controller manager to use this field.
+#      persistentVolumeClaimRetentionPolicy:
+#        whenDeleted: Retain
+#        whenScaled: Retain
       containers:
         - env:
             - name: POSTGRESQL_PORT_NUMBER
@@ -73,7 +77,9 @@ spec:
               cpu: 250m
               memory: 256Mi
             limits:
+              cpu: 250m
               memory: 1024Mi
+              ephemeral-storage: 20Mi
           volumeMounts:
             - mountPath: /dev/shm
               name: dshm
