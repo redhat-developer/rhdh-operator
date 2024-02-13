@@ -41,6 +41,11 @@ const (
 	BackstageAppLabel = "janus-idp.io/app"
 )
 
+var (
+	envPostgresImage  string
+	envBackstageImage string
+)
+
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
@@ -56,10 +61,6 @@ type BackstageReconciler struct {
 	Namespace string
 
 	IsOpenShift bool
-
-	PsqlImage string
-
-	BackstageImage string
 }
 
 //+kubebuilder:rbac:groups=janus-idp.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
@@ -295,14 +296,13 @@ func (r *BackstageReconciler) labels(meta *v1.ObjectMeta, backstage bs.Backstage
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager, log logr.Logger) error {
-	if len(r.PsqlImage) == 0 {
-		r.PsqlImage = "quay.io/fedora/postgresql-15:latest"
-		log.Info("Enviroment variable is not set, default is used", bs.EnvPostGresImage, r.PsqlImage)
-	}
 
-	if len(r.BackstageImage) == 0 {
-		r.BackstageImage = "quay.io/janus-idp/backstage-showcase:next"
-		log.Info("Enviroment variable is not set, default is used", bs.EnvBackstageImage, r.BackstageImage)
+	var ok bool
+	if envPostgresImage, ok = os.LookupEnv("RELATED_IMAGE_postgresql"); !ok {
+		log.Info("RELATED_IMAGE_postgresql environment variable is not set, default will be used")
+	}
+	if envBackstageImage, ok = os.LookupEnv("RELATED_IMAGE_backstage"); !ok {
+		log.Info("RELATED_IMAGE_backstage environment variable is not set, default will be used")
 	}
 
 	builder := ctrl.NewControllerManagedBy(mgr).

@@ -27,12 +27,6 @@ const (
 	DeployInProgress  string = "DeployInProgress"
 )
 
-// Constants for image placeholders
-const (
-	EnvPostGresImage  string = "RELATED_IMAGE_postgresql"
-	EnvBackstageImage string = "RELATED_IMAGE_backstage"
-)
-
 // BackstageSpec defines the desired state of Backstage
 type BackstageSpec struct {
 	// Configuration for Backstage. Optional.

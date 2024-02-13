@@ -80,6 +80,7 @@ data:
           target: https://github.com/ododev/odo-backstage-software-template/blob/main/template.yaml
           rules:
             - allow: [Template]
+    # # catalog.providers.githubOrg.default.orgUrl
 
 ---
 apiVersion: v1
@@ -132,7 +133,7 @@ data:
             endpoints:
               /explore-backend-completed:
                 target: 'http://localhost:7017'
-
+                
 ---
 apiVersion: v1
 kind: ConfigMap

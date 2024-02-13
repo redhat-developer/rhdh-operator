@@ -61,12 +61,12 @@ var _ = Describe("Backstage controller", func() {
 		Expect(err).To(Not(HaveOccurred()))
 
 		backstageReconciler = &BackstageReconciler{
-			Client:         k8sClient,
-			Scheme:         k8sClient.Scheme(),
-			Namespace:      ns,
-			OwnsRuntime:    true,
-			PsqlImage:      "test-postgresql-15:latest",
-			BackstageImage: "test-backstage-showcase:next",
+			Client:      k8sClient,
+			Scheme:      k8sClient.Scheme(),
+			Namespace:   ns,
+			OwnsRuntime: true,
+			//PsqlImage:      "test-postgresql-15:latest",
+			//BackstageImage: "test-backstage-showcase:next",
 		}
 	})
 

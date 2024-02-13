@@ -62,9 +62,13 @@ data:
             janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
           name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
         spec:
-          persistentVolumeClaimRetentionPolicy:
-            whenDeleted: Retain
-            whenScaled: Retain
+          automountServiceAccountToken: false
+          ## https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+          ## The optional .spec.persistentVolumeClaimRetentionPolicy field controls if and how PVCs are deleted during the lifecycle of a StatefulSet.
+          ## You must enable the StatefulSetAutoDeletePVC feature gate on the API server and the controller manager to use this field.
+    #      persistentVolumeClaimRetentionPolicy:
+    #        whenDeleted: Retain
+    #        whenScaled: Retain
           containers:
             - env:
                 - name: POSTGRESQL_PORT_NUMBER
@@ -76,7 +80,8 @@ data:
               envFrom:
                 - secretRef:
                     name: <POSTGRESQL_SECRET>  # will be replaced with 'backstage-psql-secrets-<cr-name>'
-              image: <RELATED_IMAGE_postgresql> # will be replaced with the actual image
+              # image will be replaced by the value of the `RELATED_IMAGE_postgresql` env var, if set
+              image: quay.io/fedora/postgresql-15:latest
               imagePullPolicy: IfNotPresent
               securityContext:
                 runAsNonRoot: true
@@ -120,7 +125,9 @@ data:
                   cpu: 250m
                   memory: 256Mi
                 limits:
+                  cpu: 250m
                   memory: 1024Mi
+                  ephemeral-storage: 20Mi
               volumeMounts:
                 - mountPath: /dev/shm
                   name: dshm
@@ -164,7 +171,7 @@ data:
           labels:
             janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
         spec:
-          #      serviceAccountName: default
+          automountServiceAccountToken: false
           volumes:
             - ephemeral:
                 volumeClaimTemplate:
@@ -188,7 +195,8 @@ data:
               env:
                 - name: NPM_CONFIG_USERCONFIG
                   value: /opt/app-root/src/.npmrc.dynamic-plugins
-              image: <RELATED_IMAGE_backstage> # will be replaced with the actual image quay.io/janus-idp/backstage-showcase:next
+              # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
+              image: quay.io/janus-idp/backstage-showcase:latest
               imagePullPolicy: IfNotPresent
               name: install-dynamic-plugins
               volumeMounts:
@@ -199,10 +207,15 @@ data:
                   readOnly: true
                   subPath: .npmrc
               workingDir: /opt/app-root/src
-
+              resources:
+                limits:
+                  cpu: 1000m
+                  memory: 2.5Gi
+                  ephemeral-storage: 5Gi
           containers:
             - name: backstage-backend
-              image: <RELATED_IMAGE_backstage> # will be replaced with the actual image quay.io/janus-idp/backstage-showcase:next
+              # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
+              image: quay.io/janus-idp/backstage-showcase:latest
               imagePullPolicy: IfNotPresent
               args:
                 - "--config"
@@ -241,6 +254,11 @@ data:
               volumeMounts:
                 - mountPath: /opt/app-root/src/dynamic-plugins-root
                   name: dynamic-plugins-root
+              resources:
+                limits:
+                  cpu: 1000m
+                  memory: 2.5Gi
+                  ephemeral-storage: 5Gi
   dynamic-plugins-configmap.yaml: |-
     apiVersion: v1
     kind: ConfigMap

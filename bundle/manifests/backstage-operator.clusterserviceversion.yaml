@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Seamless Upgrades
-    createdAt: "2024-01-29T20:18:14Z"
+    createdAt: "2024-02-13T07:11:47Z"
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -185,6 +185,7 @@ spec:
                         operator: In
                         values:
                         - linux
+              automountServiceAccountToken: true
               containers:
               - args:
                 - --secure-listen-address=0.0.0.0:8443
@@ -219,7 +220,7 @@ spec:
                 - name: RELATED_IMAGE_postgresql
                   value: quay.io/fedora/postgresql-15:latest
                 - name: RELATED_IMAGE_backstage
-                  value: quay.io/janus-idp/backstage-showcase:next
+                  value: quay.io/janus-idp/backstage-showcase:latest
                 image: quay.io/janus-idp/operator:0.0.1
                 livenessProbe:
                   httpGet:
@@ -237,6 +238,7 @@ spec:
                 resources:
                   limits:
                     cpu: 500m
+                    ephemeral-storage: 20Mi
                     memory: 128Mi
                   requests:
                     cpu: 10m
@@ -322,6 +324,6 @@ spec:
   relatedImages:
   - image: quay.io/fedora/postgresql-15:latest
     name: postgresql
-  - image: quay.io/janus-idp/backstage-showcase:next
+  - image: quay.io/janus-idp/backstage-showcase:latest
     name: backstage
   version: 0.0.1

@@ -33,103 +33,6 @@ const (
 	_containersWorkingDir              = "/opt/app-root/src"
 )
 
-//var (
-//	DefaultBackstageDeployment = fmt.Sprintf(`
-//apiVersion: apps/v1
-//kind: Deployment
-//metadata:
-// name: backstage
-//spec:
-// replicas: 1
-// selector:
-//   matchLabels:
-//     janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
-// template:
-//   metadata:
-//     labels:
-//       janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
-//   spec:
-//#      serviceAccountName: default
-//
-//     volumes:
-//       - ephemeral:
-//           volumeClaimTemplate:
-//             spec:
-//               accessModes:
-//               - ReadWriteOnce
-//               resources:
-//                 requests:
-//                   storage: 1Gi
-//         name: dynamic-plugins-root
-//       - name: dynamic-plugins-npmrc
-//         secret:
-//           defaultMode: 420
-//           optional: true
-//           secretName: dynamic-plugins-npmrc
-//
-//     initContainers:
-//       - command:
-//         - ./install-dynamic-plugins.sh
-//         - /dynamic-plugins-root
-//         env:
-//         - name: NPM_CONFIG_USERCONFIG
-//           value: %[3]s/.npmrc.dynamic-plugins
-//         image: 'quay.io/janus-idp/backstage-showcase:next'
-//         imagePullPolicy: IfNotPresent
-//         name: %[1]s
-//         volumeMounts:
-//         - mountPath: /dynamic-plugins-root
-//           name: dynamic-plugins-root
-//         - mountPath: %[3]s/.npmrc.dynamic-plugins
-//           name: dynamic-plugins-npmrc
-//           readOnly: true
-//           subPath: .npmrc
-//         workingDir: %[3]s
-//
-//     containers:
-//       - name: %[2]s
-//         image: quay.io/janus-idp/backstage-showcase:next
-//         imagePullPolicy: IfNotPresent
-//         args:
-//           - "--config"
-//           - "dynamic-plugins-root/app-config.dynamic-plugins.yaml"
-//         readinessProbe:
-//           failureThreshold: 3
-//           httpGet:
-//             path: /healthcheck
-//             port: 7007
-//             scheme: HTTP
-//           initialDelaySeconds: 30
-//           periodSeconds: 10
-//           successThreshold: 2
-//           timeoutSeconds: 2
-//         livenessProbe:
-//           failureThreshold: 3
-//           httpGet:
-//             path: /healthcheck
-//             port: 7007
-//             scheme: HTTP
-//           initialDelaySeconds: 60
-//           periodSeconds: 10
-//           successThreshold: 1
-//           timeoutSeconds: 2
-//         ports:
-//           - name: http
-//             containerPort: 7007
-//         env:
-//           - name: APP_CONFIG_backend_listen_port
-//             value: "7007"
-//         envFrom:
-//           - secretRef:
-//               name: postgres-secrets
-//#            - secretRef:
-//#                name: backstage-secrets
-//         volumeMounts:
-//           - mountPath: %[3]s/dynamic-plugins-root
-//             name: dynamic-plugins-root
-//`, _defaultBackstageInitContainerName, _defaultBackstageMainContainerName, _containersWorkingDir)
-//)
-
 // ContainerVisitor is called with each container
 type ContainerVisitor func(container *v1.Container)
 
@@ -291,11 +194,12 @@ func (r *BackstageReconciler) validateAndUpdatePsqlSecretRef(backstage bs.Backst
 }
 
 func (r *BackstageReconciler) setDefaultDeploymentImage(deployment *appsv1.Deployment) {
-	visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
-		if len(container.Image) == 0 || container.Image == fmt.Sprintf("<%s>", bs.EnvBackstageImage) {
-			container.Image = r.BackstageImage
-		}
-	})
+	if envBackstageImage != "" {
+		visitContainers(&deployment.Spec.Template, func(container *v1.Container) {
+			container.Image = envBackstageImage
+
+		})
+	}
 }
 
 func (r *BackstageReconciler) applyBackstageLabels(backstage bs.Backstage, deployment *appsv1.Deployment) {
