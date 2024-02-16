@@ -85,6 +85,7 @@ func (r *BackstageReconciler) reconcilePsqlService(ctx context.Context, backstag
 		}
 		msg := fmt.Sprintf("failed to deploy database service: %s", err)
 		setStatusCondition(backstage, bs.ConditionDeployed, metav1.ConditionFalse, bs.DeployFailed, msg)
+		return fmt.Errorf("%s %w", msg, err)
 	}
 	return nil
 }

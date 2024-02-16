@@ -33,14 +33,19 @@ func (r *BackstageReconciler) reconcileBackstageService(ctx context.Context, bac
 			Namespace: ns,
 		},
 	}
+
 	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, r.serviceObjectMutFun(ctx, service, *backstage,
 		backstage.Spec.RawRuntimeConfig.BackstageConfigName, "service.yaml", service.Name, service.Name)); err != nil {
+
 		if errors.IsConflict(err) {
 			return retryReconciliation(err)
 		}
 		msg := fmt.Sprintf("failed to deploy Backstage Service: %s", err)
+
 		setStatusCondition(backstage, bs.ConditionDeployed, metav1.ConditionFalse, bs.DeployFailed, msg)
+		return fmt.Errorf("%s %w", msg, err)
 	}
+
 	return nil
 }
 
@@ -49,6 +54,7 @@ func (r *BackstageReconciler) reconcileBackstageService(ctx context.Context, bac
 func (r *BackstageReconciler) serviceObjectMutFun(ctx context.Context, targetService *corev1.Service, backstage bs.Backstage,
 	configName, configKey, serviceName, label string) controllerutil.MutateFn {
 	return func() error {
+
 		service := &corev1.Service{}
 		targetService.ObjectMeta.DeepCopyInto(&service.ObjectMeta)
 
@@ -75,6 +81,7 @@ func (r *BackstageReconciler) serviceObjectMutFun(ctx context.Context, targetSer
 
 		service.ObjectMeta.DeepCopyInto(&targetService.ObjectMeta)
 		service.Spec.DeepCopyInto(&targetService.Spec)
+
 		return nil
 	}
 }
