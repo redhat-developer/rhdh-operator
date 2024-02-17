@@ -20,7 +20,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	bs "janus-idp.io/backstage-operator/api/v1alpha1"
+	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

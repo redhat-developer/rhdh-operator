@@ -44,7 +44,7 @@ Mapping of configMap keys (yaml files) to runtime objects (NOTE: for the time (D
 
 NOTES: 
  - Mandatory means it is needed to be present in either (or both) Default and CR Raw Configuration.
- - dynamic-plugins.yaml is a fragment of app-config.yaml provided with RHDH/Janus-IDP, which is mounted into a dedicated initContainer. 
+ - dynamic-plugins.yaml is a fragment of app-config.yaml provided with RHDH, which is mounted into a dedicated initContainer. 
  - items marked as version 0.0.1 are not supported in version 0.0.2 
 ### Operator Bundle configuration 
 
@@ -90,7 +90,7 @@ It is recommended to deploy the Backstage Operator in a dedicated default namesp
 
 When creating the Backstage CR, the Operator will try to create a Backstage Pod, deploying:
 - Backstage Container from the image, configured in *(deployment.yaml).spec.template.spec.Containers[].image*
-- Init Container (applied for RHDH/Janus-IDP configuration, usually the same as Backstage Container)
+- Init Container (applied for RHDH configuration, usually the same as Backstage Container)
 
 Also, if Backstage CR configured with *EnabledLocalDb*,  it will create a PostgreSQL container pod, configured in *(db-deployment.yaml).spec.template.spec.Containers[].image*
 

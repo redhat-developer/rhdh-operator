@@ -5,7 +5,7 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
+    rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
   ports:
     - name: http-backend
       port: 80

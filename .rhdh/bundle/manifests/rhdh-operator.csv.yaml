@@ -7,7 +7,7 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "janus-idp.io/v1alpha1",
+          "apiVersion": "rhdh.redhat.com/v1alpha1",
           "kind": "Backstage",
           "metadata": {
             "name": "developer-hub"
@@ -55,7 +55,7 @@ spec:
         developer portal for adopters who are just starting out.
       displayName: Red Hat Developer Hub
       kind: Backstage
-      name: backstages.janus-idp.io
+      name: backstages.rhdh.redhat.com
       version: v1alpha1
   description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
@@ -107,7 +107,7 @@ spec:
           - update
           - watch
         - apiGroups:
-          - janus-idp.io
+          - rhdh.redhat.com
           resources:
           - backstages
           verbs:
@@ -119,13 +119,13 @@ spec:
           - update
           - watch
         - apiGroups:
-          - janus-idp.io
+          - rhdh.redhat.com
           resources:
           - backstages/finalizers
           verbs:
           - update
         - apiGroups:
-          - janus-idp.io
+          - rhdh.redhat.com
           resources:
           - backstages/status
           verbs:
@@ -316,7 +316,6 @@ spec:
     type: AllNamespaces
   keywords:
   - Backstage
-  - Janus-IDP
   - RHDH
   links:
   - name: Product Page

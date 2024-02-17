@@ -1,18 +1,18 @@
-domain: janus-idp.io
+domain: rhdh.redhat.com
 layout:
 - go.kubebuilder.io/v3
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: backstage-operator
-repo: janus-idp.io/backstage-operator
+repo: redhat-developer/red-hat-developer-hub-operator
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: janus-idp.io
+  domain: rhdh.redhat.com
   kind: Backstage
-  path: janus-idp.io/backstage-operator/api/v1alpha1
+  path: redhat-developer/red-hat-developer-hub-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

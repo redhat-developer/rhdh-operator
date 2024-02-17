@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	bs "janus-idp.io/backstage-operator/api/v1alpha1"
+	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
 )
 
 const (

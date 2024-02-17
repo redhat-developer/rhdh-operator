@@ -4,9 +4,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.3
   creationTimestamp: null
-  name: backstages.janus-idp.io
+  name: backstages.rhdh.redhat.com
 spec:
-  group: janus-idp.io
+  group: rhdh.redhat.com
   names:
     kind: Backstage
     listKind: BackstageList

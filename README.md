@@ -2,7 +2,7 @@
 
 ## The Goal
 The Goal of [Backstage](https://backstage.io) Operator project is creating Kubernetes Operator for configuring, installing and synchronizing Backstage instance on Kubernetes/OpenShift. 
-The initial target is in support of Red Hat's assemblies of Backstage - specifically supporting [dynamic-plugins](https://github.com/janus-idp/backstage-showcase/blob/main/showcase-docs/dynamic-plugins.md)) on OpenShift. This includes [Janus-IDP](https://janus-idp.io/) and [Red Hat Developer Hub (RHDH)](https://developers.redhat.com/rhdh) but may be flexible enough to install any compatible Backstage instance on Kubernetes. See additional information under [Configuration](docs/configuration.md)).
+The initial target is in support of Red Hat's assemblies of Backstage - specifically supporting [dynamic-plugins](https://github.com/janus-idp/backstage-showcase/blob/main/showcase-docs/dynamic-plugins.md) on OpenShift. This includes [Red Hat Developer Hub (RHDH)](https://developers.redhat.com/rhdh) but may be flexible enough to install any compatible Backstage instance on Kubernetes. See additional information under [Configuration](docs/configuration.md).
 The Operator provides clear and flexible configuration options to satisfy a wide range of expectations, from "no  configuration for default quick start" to "highly customized configuration for production".
 
 [More documentation...](#more-documentation)
@@ -21,7 +21,7 @@ git clone https://github.com/janus-idp/operator
 ```
 2. Deploy Operator on the minikube cluster:
 ```sh
-cd <your-janus-idp-operator-project-dir>
+cd <your-rhdh-operator-project-dir>
 make deploy
 ```
 you can check if the Operator pod is up by running 

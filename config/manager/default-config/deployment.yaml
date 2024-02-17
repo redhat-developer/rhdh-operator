@@ -6,11 +6,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
+      rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
   template:
     metadata:
       labels:
-        janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
+        rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
     spec:
       automountServiceAccountToken: false
       volumes:

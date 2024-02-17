@@ -21,8 +21,9 @@ import (
 	"os"
 	"path/filepath"
 
+	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+
 	"github.com/go-logr/logr"
-	bs "janus-idp.io/backstage-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +39,7 @@ import (
 )
 
 const (
-	BackstageAppLabel = "janus-idp.io/app"
+	BackstageAppLabel = "rhdh.redhat.com/app"
 )
 
 var (
@@ -63,9 +64,9 @@ type BackstageReconciler struct {
 	IsOpenShift bool
 }
 
-//+kubebuilder:rbac:groups=janus-idp.io,resources=backstages,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=janus-idp.io,resources=backstages/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=janus-idp.io,resources=backstages/finalizers,verbs=update
+//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=configmaps;services,verbs=get;list;watch;create;update;delete
 //+kubebuilder:rbac:groups="",resources=persistentvolumes;persistentvolumeclaims,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=create;delete

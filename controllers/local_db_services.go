@@ -19,7 +19,8 @@ import (
 	"context"
 	"fmt"
 
-	bs "janus-idp.io/backstage-operator/api/v1alpha1"
+	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,7 @@ import (
 // spec:
 //
 //	selector:
-//	    janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+//	    rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
 //	ports:
 //	  - port: 5432
 //
@@ -54,7 +55,7 @@ import (
 // spec:
 //
 //	selector:
-//	    janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+//	    rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
 //	clusterIP: None
 //	ports:
 //	  - port: 5432

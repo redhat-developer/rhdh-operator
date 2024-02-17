@@ -15,7 +15,8 @@
 package controller
 
 import (
-	bs "janus-idp.io/backstage-operator/api/v1alpha1"
+	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 )

@@ -30,7 +30,7 @@ data:
       name: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
     spec:
       selector:
-        janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+        rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       clusterIP: None
       ports:
         - port: 5432
@@ -41,7 +41,7 @@ data:
       name: backstage-psql # placeholder for 'backstage-psql-<cr-name>' .NOTE: For the time it is static and linked to Secret-> postgres-secrets -> OSTGRES_HOST
     spec:
       selector:
-        janus-idp.io/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+        rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       ports:
         - port: 5432
   db-statefulset.yaml: |
@@ -54,12 +54,12 @@ data:
       replicas: 1
       selector:
         matchLabels:
-          janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+          rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       serviceName: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
       template:
         metadata:
           labels:
-            janus-idp.io/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+            rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
           name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
         spec:
           automountServiceAccountToken: false
@@ -165,11 +165,11 @@ data:
       replicas: 1
       selector:
         matchLabels:
-          janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
       template:
         metadata:
           labels:
-            janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
+            rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
         spec:
           automountServiceAccountToken: false
           volumes:
@@ -292,7 +292,7 @@ data:
     spec:
       type: ClusterIP
       selector:
-        janus-idp.io/app:  # placeholder for 'backstage-<cr-name>'
+        rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
       ports:
         - name: http-backend
           port: 80

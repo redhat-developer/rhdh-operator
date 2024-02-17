@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: janus-config
+  name: showcase-config
 data:
   deploy: |-
     apiVersion: apps/v1
