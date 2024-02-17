@@ -1,5 +1,7 @@
 == Installing CI builds of Red Hat Developer Hub
 
+WARNING: The procedure below will not work properly on OpenShift clusters with hosted control planes, like link:https://hypershift-docs.netlify.app/[HyperShift] or link:https://www.redhat.com/en/blog/red-hat-openshift-service-aws-hosted-control-planes-now-available[ROSA with hosted control planes]. This is due to a limitation preventing link:https://docs.openshift.com/container-platform/4.14/rest_api/operator_apis/imagecontentsourcepolicy-operator-openshift-io-v1alpha1.html[`ImageContentSourcePolicy`] resources from being propagated to the cluster nodes. There is currently no workaround for these clusters.
+
 *Prerequisites*
 
 * You are logged in as an administrator on the OpenShift web console.
