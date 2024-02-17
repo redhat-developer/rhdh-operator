@@ -70,7 +70,7 @@ jobs:
         run: |
           # don't fail if nothing returned by grep
           set +e 
-          CHANGES="$(git diff --name-only HEAD~1 | \
+          CHANGES="$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | \
             grep -E "workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go|docker/|\.dockerignore" | \
             grep -v -E ".+_test.go|/.rhdh/")";
           echo "Changed files for this commit:"
