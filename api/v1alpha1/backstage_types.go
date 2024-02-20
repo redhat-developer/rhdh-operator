@@ -180,7 +180,7 @@ type Env struct {
 type RuntimeConfig struct {
 	// Name of ConfigMap containing Backstage runtime objects configuration
 	BackstageConfigName string `json:"backstageConfig,omitempty"`
-	// Name of ConfigMap containing LocalDb (P|ostgreSQL) runtime objects configuration
+	// Name of ConfigMap containing LocalDb (PostgreSQL) runtime objects configuration
 	LocalDbConfigName string `json:"localDbConfig,omitempty"`
 }
 
