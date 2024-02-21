@@ -132,7 +132,7 @@ jobs:
       - name: Comment image links in PR
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             await github.rest.issues.createComment({
