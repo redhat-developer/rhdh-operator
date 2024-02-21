@@ -220,7 +220,8 @@ GOLANGCI_LINT_VERSION ?= v1.55.2
 GOIMPORTS_VERSION ?= v0.15.0
 ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
-OP_VERSION ?= v1.33.0
+OPM_VERSION ?= v1.36.0
+OPERATOR_SDK_VERSION ?= v1.33.0
 GOSEC_VERSION ?= v2.18.2
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
@@ -271,8 +272,8 @@ ifeq (,$(wildcard $(OPSDK)))
 	set -e ;\
 	mkdir -p $(dir $(OPSDK)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	echo "Dowloading https://github.com/operator-framework/operator-sdk/releases/download/$(OP_VERSION)/operator-sdk_$${OS}_$${ARCH} to ./bin/operator-sdk" ;\
-	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OP_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
+	echo "Dowloading https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} to ./bin/operator-sdk" ;\
+	curl -sSLo $(OPSDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
 	chmod +x $(OPSDK) ;\
 	}
 endif
@@ -285,8 +286,8 @@ ifeq (,$(wildcard $(OPM)))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	echo "Dowloading https://github.com/operator-framework/operator-registry/releases/download/$(OP_VERSION)/$${OS}-$${ARCH}-opm to ./bin/opm" ;\
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OP_VERSION)/$${OS}-$${ARCH}-opm ;\
+	echo "Dowloading https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm to ./bin/opm" ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 endif
