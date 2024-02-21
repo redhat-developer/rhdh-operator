@@ -1,0 +1,13 @@
+{
+  "extends": [
+    "config:js-app",
+    ":gitSignOff",
+    ":rebaseStalePrs",
+    "group:allNonMajor",
+    "group:linters",
+    "group:test"
+  ],
+  "constraints": {
+    "go": "1.20"
+  }
+}
