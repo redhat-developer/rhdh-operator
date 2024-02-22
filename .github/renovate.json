@@ -1,13 +1,28 @@
 {
   "extends": [
-    "config:js-app",
+    "config:best-practices",
     ":gitSignOff",
     ":rebaseStalePrs",
+    "docker:pinDigests",
+    "docker:enableMajor",
     "group:allNonMajor",
     "group:linters",
     "group:test"
   ],
   "constraints": {
     "go": "1.20"
-  }
+  },
+  "docker": {
+    "branchPrefix": "docker-",
+    "digest": {
+      "enabled": true
+    }
+  },
+  "go": {
+    "branchPrefix": "go-"
+  },
+  "packageRules": [
+    { "matchDatasources": ["docker"] },
+    { "matchDatasources": ["go"] }
+  ]
 }
