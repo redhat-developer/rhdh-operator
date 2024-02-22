@@ -3,7 +3,6 @@
     "config:best-practices",
     ":gitSignOff",
     ":rebaseStalePrs",
-    "docker:pinDigests",
     "docker:enableMajor",
     "group:allNonMajor",
     "group:linters",
@@ -11,5 +10,13 @@
   ],
   "constraints": {
     "go": "1.20"
-  }
+  },
+  "packageRules": [
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "pinDigests": false
+    }
+  ]  
 }
