@@ -1,7 +1,7 @@
 apiVersion: rhdh.redhat.com/v1alpha1
 kind: Backstage
 metadata:
-  name: my-backstage-app-with-app-config
+  name: bs-app-config
 spec:
   database:
     enableLocalDb: true

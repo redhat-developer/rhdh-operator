@@ -8,6 +8,8 @@ VERSION ?= 0.2.0
 # Using docker or podman to build and push images
 CONTAINER_ENGINE ?= docker
 
+PKGS := $(shell go list ./... | grep -v /tests)
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -127,7 +129,7 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	mkdir -p $(LOCALBIN)/default-config && cp config/manager/$(CONF_DIR)/* $(LOCALBIN)/default-config
-	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 ##@ Build
 
@@ -227,6 +229,9 @@ GOSEC_VERSION ?= v2.18.2
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
 GOSEC_OUTPUT_FILE ?= gosec.sarif
+
+GINKGO ?= $(LOCALBIN)/ginkgo
+GINKGO_VERSION ?= v2.9.5
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -366,3 +371,33 @@ catalog-update: ## Update catalog source in the default namespace for catalogsou
 .PHONY: deploy-openshift
 deploy-openshift: release-build release-push catalog-update ## Deploy the operator on openshift cluster
 
+# After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
+POLL_PROGRESS_INTERVAL := 120s
+TIMEOUT ?= 14400s
+
+GINKGO_FLAGS_ALL = $(GINKGO_TEST_ARGS) --randomize-all --poll-progress-after=$(POLL_PROGRESS_INTERVAL) --poll-progress-interval=$(POLL_PROGRESS_INTERVAL) -timeout $(TIMEOUT) --no-color
+
+# Flags for tests that may be run in parallel
+GINKGO_FLAGS=$(GINKGO_FLAGS_ALL) -nodes=$(TEST_EXEC_NODES)
+# Flags to run one test per core.
+GINKGO_FLAGS_AUTO = $(GINKGO_FLAGS_ALL) -p
+ifdef TEST_EXEC_NODES
+   TEST_EXEC_NODES := $(TEST_EXEC_NODES)
+else
+   TEST_EXEC_NODES := 1
+endif
+
+.PHONY: ginkgo
+ginkgo: $(GINKGO) ## Download Ginkgo locally if necessary.
+$(GINKGO): $(LOCALBIN)
+	test -s $(LOCALBIN)/ginkgo || GOBIN=$(LOCALBIN) go install github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
+
+.PHONY: test-e2e
+test-e2e: ginkgo ## Run end-to-end tests. See the 'tests/e2e/README.md' file for more details.
+	$(GINKGO) $(GINKGO_FLAGS) tests/e2e
+
+show-img:
+	@echo -n $(IMG)
+
+show-container-engine:
+	@echo -n $(CONTAINER_ENGINE)
