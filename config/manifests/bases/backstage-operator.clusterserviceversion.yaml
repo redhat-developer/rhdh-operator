@@ -5,7 +5,8 @@ metadata:
     alm-examples: '[]'
     capabilities: Seamless Upgrades
     operatorframework.io/suggested-namespace: backstage-system
-  name: backstage-operator.v0.0.0
+    skipRange: '>=0.0.1 <0.2.0'
+  name: backstage-operator.v0.2.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -52,4 +53,6 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 0.0.0
+  version: 0.2.0
+  # TODO: once we have a published 0.1.0 version in Quay, we can use the replaces logic to support seamless upgrades
+  # replaces: backstage-operator.v0.1.0

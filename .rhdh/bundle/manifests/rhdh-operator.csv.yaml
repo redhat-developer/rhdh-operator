@@ -43,6 +43,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
     support: Red Hat
+    skipRange: '>=1.0.0 <1.2.0'
   name: rhdh-operator.v1.2.0
   namespace: placeholder
 spec:
@@ -341,3 +342,5 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   version: 1.2.0
+  # TODO: once we have a published 1.1.0 version in RHEC, we can use the replaces logic to support seamless upgrades
+  # replaces: rhdh-operator.v1.1.0

@@ -25,6 +25,7 @@ metadata:
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    skipRange: '>=0.0.1 <0.2.0'
   name: backstage-operator.v0.2.0
   namespace: placeholder
 spec:
@@ -327,3 +328,5 @@ spec:
   - image: quay.io/janus-idp/backstage-showcase:latest
     name: backstage
   version: 0.2.0
+  # TODO: once we have a published 0.1.0 version in Quay, we can use the replaces logic to support seamless upgrades
+  # replaces: backstage-operator.v0.1.0
