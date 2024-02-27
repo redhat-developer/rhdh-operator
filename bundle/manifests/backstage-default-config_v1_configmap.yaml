@@ -180,7 +180,7 @@ data:
                       - ReadWriteOnce
                     resources:
                       requests:
-                        storage: 1Gi
+                        storage: 2Gi
               name: dynamic-plugins-root
             - name: dynamic-plugins-npmrc
               secret:

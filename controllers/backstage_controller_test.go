@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -299,8 +300,17 @@ var _ = Describe("Backstage controller", func() {
 			By("Checking the Volumes in the Backstage Deployment", func() {
 				Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(4))
 
-				_, ok := findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-root")
+				dpRootVol, ok := findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-root")
 				Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-root")
+				Expect(dpRootVol.Ephemeral).ShouldNot(BeNil())
+				Expect(dpRootVol.Ephemeral.VolumeClaimTemplate).ShouldNot(BeNil())
+				storage := dpRootVol.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests.Storage()
+				Expect(storage).ShouldNot(BeNil())
+				q, pErr := resource.ParseQuantity("1Gi")
+				Expect(pErr).ShouldNot(HaveOccurred())
+				// https://issues.redhat.com/browse/RHIDP-1332: storage size should be > 1Gi
+				Expect(storage.Cmp(q)).To(Equal(1),
+					"storage size for dynamic-plugins-root volume is currently %v, but it should be more than %v", storage, q)
 
 				_, ok = findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-npmrc")
 				Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-npmrc")
