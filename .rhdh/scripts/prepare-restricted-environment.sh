@@ -34,7 +34,7 @@ done
 declare prod_operator_index="${prod_operator_index:?Must set --prod_operator_index: for OCP 4.12, use registry.redhat.io/redhat/redhat-operator-index:v4.12 or quay.io/rhdh/iib:latest-v4.14-x86_64}"
 declare prod_operator_package_name="rhdh"
 declare prod_operator_bundle_name="rhdh-operator"
-declare prod_operator_version="${prod_operator_version:?Must set --prod_operator_version: for stable channel, use v1.1.0; for stable-1.1 channel, use v1.1.1}" # eg., v1.1.0 or v1.1.1
+declare prod_operator_version="${prod_operator_version:?Must set --prod_operator_version: for fast or fast-1.y channels, use v1.1.0, v1.1.1, etc.}"
 
 # Destination registry
 declare my_operator_index_image_name_and_tag=${prod_operator_package_name}-index:${prod_operator_version}
