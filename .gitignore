@@ -35,6 +35,7 @@ gosec.sarif
 # from prepare-restricted-environment script
 catalog_mirror.log
 manifests-rhdh-index-*
+rhdh-operator-*.yaml
 rhdh-disconnected-install/
 rhdh-disconnected-install.Dockerfile
 

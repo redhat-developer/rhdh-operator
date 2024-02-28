@@ -54,7 +54,16 @@ make run
 
 - Or deploy the controller to the cluster with the image specified by `IMG`:
 ```sh
-make deploy IMG=<your-registry>/backstage-operator:tag
+make deploy [IMG=<your-registry>/backstage-operator:tag]
+```
+
+- To generate deployment manifest, use:
+```sh
+make deployment-manifest [IMG=<your-registry>/backstage-operator:tag]
+```
+it will create the file rhdh-operator-${VERSION}.yaml on the project root and you will be able to share it to make it possible to deploy operator with:
+```sh
+kubectl apply -f <path-or-url-to-deployment-script>
 ```
 
 ### Uninstall CRDs
@@ -102,3 +111,4 @@ make manifests
 **NOTE:** Run `make --help` for more information on all potential `make` targets
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+
