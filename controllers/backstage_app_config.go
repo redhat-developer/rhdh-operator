@@ -23,7 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type appConfigData struct {
@@ -43,7 +43,7 @@ func (r *BackstageReconciler) appConfigsToVolumes(backstage bs.Backstage, backen
 	for _, cm := range cms {
 		volumeSource := v1.VolumeSource{
 			ConfigMap: &v1.ConfigMapVolumeSource{
-				DefaultMode:          pointer.Int32(420),
+				DefaultMode:          ptr.To[int32](420),
 				LocalObjectReference: v1.LocalObjectReference{Name: cm.Name},
 			},
 		}

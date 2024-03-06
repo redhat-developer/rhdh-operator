@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
@@ -1440,7 +1440,7 @@ plugins: []
 			It("should successfully reconcile a custom resource for default Backstage with existing secret", func() {
 				backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
 					Database: bsv1alpha1.Database{
-						EnableLocalDb:  pointer.Bool(false),
+						EnableLocalDb:  ptr.To(false),
 						AuthSecretName: "existing-secret",
 					},
 				})
@@ -1481,7 +1481,7 @@ plugins: []
 		It("should reconcile a custom resource for default Backstage without existing secret", func() {
 			backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
 				Database: bsv1alpha1.Database{
-					EnableLocalDb: pointer.Bool(false),
+					EnableLocalDb: ptr.To(false),
 				},
 			})
 			err := k8sClient.Create(ctx, backstage)

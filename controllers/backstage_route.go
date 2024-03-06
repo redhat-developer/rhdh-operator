@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
@@ -142,5 +142,5 @@ func shouldCreateRoute(backstage bs.Backstage) bool {
 	if backstage.Spec.Application.Route == nil {
 		return true
 	}
-	return pointer.BoolDeref(backstage.Spec.Application.Route.Enabled, true)
+	return ptr.Deref(backstage.Spec.Application.Route.Enabled, true)
 }

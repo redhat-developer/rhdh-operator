@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -92,7 +92,7 @@ func (r *BackstageReconciler) getDynamicPluginsConfVolume(ctx context.Context, b
 		Name: dpConf,
 		VolumeSource: v1.VolumeSource{
 			ConfigMap: &v1.ConfigMapVolumeSource{
-				DefaultMode:          pointer.Int32(420),
+				DefaultMode:          ptr.To[int32](420),
 				LocalObjectReference: v1.LocalObjectReference{Name: dpConf},
 			},
 		},

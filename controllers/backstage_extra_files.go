@@ -23,7 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func (r *BackstageReconciler) extraFilesToVolumes(backstage bs.Backstage) (result []v1.Volume) {
@@ -36,7 +36,7 @@ func (r *BackstageReconciler) extraFilesToVolumes(backstage bs.Backstage) (resul
 				Name: cmExtraFile.Name,
 				VolumeSource: v1.VolumeSource{
 					ConfigMap: &v1.ConfigMapVolumeSource{
-						DefaultMode:          pointer.Int32(420),
+						DefaultMode:          ptr.To[int32](420),
 						LocalObjectReference: v1.LocalObjectReference{Name: cmExtraFile.Name},
 					},
 				},
@@ -49,7 +49,7 @@ func (r *BackstageReconciler) extraFilesToVolumes(backstage bs.Backstage) (resul
 				Name: secExtraFile.Name,
 				VolumeSource: v1.VolumeSource{
 					Secret: &v1.SecretVolumeSource{
-						DefaultMode: pointer.Int32(420),
+						DefaultMode: ptr.To[int32](420),
 						SecretName:  secExtraFile.Name,
 					},
 				},
