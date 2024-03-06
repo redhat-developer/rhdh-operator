@@ -54,5 +54,3 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   version: 0.2.0
-  # TODO: once we have a published 0.1.0 version in Quay, we can use the replaces logic to support seamless upgrades
-  # replaces: backstage-operator.v0.1.0

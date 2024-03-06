@@ -291,7 +291,7 @@ spec:
                       configuration
                     type: string
                   localDbConfig:
-                    description: Name of ConfigMap containing LocalDb (P|ostgreSQL)
+                    description: Name of ConfigMap containing LocalDb (PostgreSQL)
                       runtime objects configuration
                     type: string
                 type: object

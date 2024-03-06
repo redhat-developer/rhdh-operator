@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Seamless Upgrades
-    createdAt: "2024-02-20T11:10:01Z"
+    createdAt: "2024-03-06T17:17:14Z"
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -328,5 +328,3 @@ spec:
   - image: quay.io/janus-idp/backstage-showcase:latest
     name: backstage
   version: 0.2.0
-  # TODO: once we have a published 0.1.0 version in Quay, we can use the replaces logic to support seamless upgrades
-  # replaces: backstage-operator.v0.1.0
