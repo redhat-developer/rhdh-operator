@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: authorize
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     steps:
       - name: Checkout
@@ -87,11 +87,13 @@ jobs:
         uses: actions/github-script@v7
         if: ${{ !cancelled() && steps.bundle-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
         continue-on-error: true
+        env:
+          GH_BLOB_VIEWER_BASE_URL: ${{github.event.pull_request.head.repo.html_url}}/blob/${{github.event.pull_request.head.ref}}
         with:
           script: |
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⚠️ <b>Files changed in bundle generation<b>!<br/><br/>Those changes to the operator bundle manifests should have been pushed automatically to your PR branch.<br/>You might also need to manually update the [`.rhdh/bundle/manifests/rhdh-operator.csv.yaml`](.rhdh/bundle/manifests/rhdh-operator.csv.yaml) CSV file accordingly.'
+              body: '⚠️ <b>Files changed in bundle generation!</b><br/><br/>Those changes to the operator bundle manifests should have been pushed automatically to your PR branch.<br/>You might also need to manually update the [`.rhdh/bundle/manifests/rhdh-operator.csv.yaml`](${{ env.GH_BLOB_VIEWER_BASE_URL }}/.rhdh/bundle/manifests/rhdh-operator.csv.yaml) CSV file accordingly.'
             })
