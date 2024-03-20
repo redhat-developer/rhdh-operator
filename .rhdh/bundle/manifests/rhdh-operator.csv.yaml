@@ -26,13 +26,12 @@ metadata:
       which can help streamline the process of setting up a self-managed internal
       developer portal for adopters who are just starting out.
     operatorframework.io/suggested-namespace: rhdh-operator
-    operators.openshift.io/valid-subscription: '["OpenShift Container Platform", "OpenShift
-      Platform Plus"]'
+    operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     # Infrastructure Feature Test annotations - must be strings, not booleans - see https://issues.redhat.com/browse/RHIDP-294
     features.operators.openshift.io/disconnected: "true"
-    features.operators.openshift.io/fips-compliant: "true"
+    features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
     features.operators.openshift.io/cnf: "false"
     features.operators.openshift.io/cni: "false"
@@ -342,5 +341,4 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   version: 1.2.0
-  # TODO: once we have a published 1.1.0 version in RHEC, we can use the replaces logic to support seamless upgrades
-  # replaces: rhdh-operator.v1.1.0
+  replaces: rhdh-operator.v1.1.0
