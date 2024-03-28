@@ -4,10 +4,9 @@
     ":gitSignOff",
     ":rebaseStalePrs",
     "docker:enableMajor",
-    "group:allNonMajor",
-    "group:linters",
-    "group:test"
+    "group:allNonMajor"
   ],
+  "labels": ["kind/dependency upgrade"],
   "constraints": {
     "go": "1.20"
   },
@@ -18,5 +17,10 @@
       ],
       "pinDigests": false
     }
-  ]  
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "addLabels": ["kind/security"]
+  },
+  "osvVulnerabilityAlerts": true
 }
