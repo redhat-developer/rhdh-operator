@@ -2,7 +2,6 @@ apiVersion: rhdh.redhat.com/v1alpha1
 kind: Backstage
 metadata:
   name: bs1
-#  namespace: backstage
-#spec:
-#  database:
-#    enableLocalDb: false
+
+
+

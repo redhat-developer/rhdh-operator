@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-dynamic-plugins #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name
+data:
+  "dynamic-plugins.yaml": |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins: []

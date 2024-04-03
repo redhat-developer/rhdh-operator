@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-backstage-config-cm1
+data:
+  default.app-config.yaml: |
+    backend:
+      database:
+        connection:
+          password: ${POSTGRES_PASSWORD}
+          user: ${POSTGRES_USER}
+      auth:
+        keys:
+          # This is a default value, which you should change by providing your own app-config
+          - secret: "pl4s3Ch4ng3M3"

@@ -15,6 +15,7 @@ rules:
   - delete
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -33,6 +34,8 @@ rules:
   verbs:
   - create
   - delete
+  - patch
+  - update
 - apiGroups:
   - apps
   resources:
@@ -42,6 +45,7 @@ rules:
   - delete
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -53,6 +57,7 @@ rules:
   - delete
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -91,5 +96,6 @@ rules:
   - delete
   - get
   - list
+  - patch
   - update
   - watch

@@ -16,15 +16,19 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
-// Constants for status conditions
+type BackstageConditionReason string
+
+type BackstageConditionType string
+
 const (
-	// TODO: RuntimeConditionRunning string = "RuntimeRunning"
-	ConditionDeployed string = "Deployed"
-	DeployOK          string = "DeployOK"
-	DeployFailed      string = "DeployFailed"
-	DeployInProgress  string = "DeployInProgress"
+	BackstageConditionTypeDeployed BackstageConditionType = "Deployed"
+
+	BackstageConditionReasonDeployed   BackstageConditionReason = "Deployed"
+	BackstageConditionReasonFailed     BackstageConditionReason = "DeployFailed"
+	BackstageConditionReasonInProgress BackstageConditionReason = "DeployInProgress"
 )
 
 // BackstageSpec defines the desired state of Backstage
@@ -32,11 +36,18 @@ type BackstageSpec struct {
 	// Configuration for Backstage. Optional.
 	Application *Application `json:"application,omitempty"`
 
-	// Raw Runtime Objects configuration. For Advanced scenarios.
-	RawRuntimeConfig RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
+	// Raw Runtime RuntimeObjects configuration. For Advanced scenarios.
+	RawRuntimeConfig *RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
 
 	// Configuration for database access. Optional.
-	Database Database `json:"database,omitempty"`
+	Database *Database `json:"database,omitempty"`
+}
+
+type RuntimeConfig struct {
+	// Name of ConfigMap containing Backstage runtime objects configuration
+	BackstageConfigName string `json:"backstageConfig,omitempty"`
+	// Name of ConfigMap containing LocalDb (PostgreSQL) runtime objects configuration
+	LocalDbConfigName string `json:"localDbConfig,omitempty"`
 }
 
 type Database struct {
@@ -98,7 +109,7 @@ type Application struct {
 
 	// Image Pull Secrets to use in all containers (including Init Containers)
 	// +optional
-	ImagePullSecrets *[]string `json:"imagePullSecrets,omitempty"`
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
 	// Route configuration. Used for OpenShift only.
 	Route *Route `json:"route,omitempty"`
@@ -175,13 +186,6 @@ type Env struct {
 	// Value of the environment variable
 	//+kubebuilder:validation:Required
 	Value string `json:"value"`
-}
-
-type RuntimeConfig struct {
-	// Name of ConfigMap containing Backstage runtime objects configuration
-	BackstageConfigName string `json:"backstageConfig,omitempty"`
-	// Name of ConfigMap containing LocalDb (PostgreSQL) runtime objects configuration
-	LocalDbConfigName string `json:"localDbConfig,omitempty"`
 }
 
 // BackstageStatus defines the observed state of Backstage
@@ -267,4 +271,24 @@ type TLS struct {
 
 func init() {
 	SchemeBuilder.Register(&Backstage{}, &BackstageList{})
+}
+
+// IsLocalDbEnabled returns true if Local database is configured and enabled
+func (s *BackstageSpec) IsLocalDbEnabled() bool {
+	if s.Database == nil {
+		return true
+	}
+	return ptr.Deref(s.Database.EnableLocalDb, true)
+}
+
+// IsRouteEnabled returns value of Application.Route.Enabled if defined or true by default
+func (s *BackstageSpec) IsRouteEnabled() bool {
+	if s.Application != nil && s.Application.Route != nil {
+		return ptr.Deref(s.Application.Route.Enabled, true)
+	}
+	return true
+}
+
+func (s *BackstageSpec) IsAuthSecretSpecified() bool {
+	return s.Database != nil && s.Database.AuthSecretName != ""
 }

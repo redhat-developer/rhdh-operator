@@ -15,6 +15,10 @@ spec:
         rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
     spec:
+      # fsGroup does not work for Openshift
+      # AKS/EKS does not work w/o it
+      #securityContext:
+      #  fsGroup: 26
       automountServiceAccountToken: false
       ## https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
       ## The optional .spec.persistentVolumeClaimRetentionPolicy field controls if and how PVCs are deleted during the lifecycle of a StatefulSet.
@@ -30,13 +34,12 @@ spec:
               value: /var/lib/pgsql/data
             - name: PGDATA
               value: /var/lib/pgsql/data/userdata
-          envFrom:
-            - secretRef:
-                name: <POSTGRESQL_SECRET>  # will be replaced with 'backstage-psql-secrets-<cr-name>'
-          # image will be replaced by the value of the `RELATED_IMAGE_postgresql` env var, if set
-          image: quay.io/fedora/postgresql-15:latest
+          image: quay.io/fedora/postgresql-15:latest # will be replaced with the actual image
           imagePullPolicy: IfNotPresent
           securityContext:
+            # runAsUser:26 does not work for Openshift but looks work for AKS/EKS
+            # runAsUser: 26
+            runAsGroup: 0
             runAsNonRoot: true
             allowPrivilegeEscalation: false
             seccompProfile:
@@ -87,8 +90,6 @@ spec:
             - mountPath: /var/lib/pgsql/data
               name: data
       restartPolicy: Always
-      securityContext: {}
-      serviceAccount: default
       serviceAccountName: default
       volumes:
         - emptyDir:

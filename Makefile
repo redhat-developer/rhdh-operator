@@ -131,6 +131,12 @@ test: manifests generate fmt vet envtest ## Run tests. We need LOCALBIN=$(LOCALB
 	mkdir -p $(LOCALBIN)/default-config && cp config/manager/$(CONF_DIR)/* $(LOCALBIN)/default-config
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
+.PHONY: integration-test
+integration-test: ginkgo manifests generate fmt vet envtest ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
+	mkdir -p $(LOCALBIN)/default-config && cp config/manager/$(CONF_DIR)/* $(LOCALBIN)/default-config
+	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r integration_tests
+
+
 ##@ Build
 
 .PHONY: build
@@ -194,6 +200,12 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
+.PHONY: deployment-manifest
+deployment-manifest: manifests kustomize ## Generate manifest to deploy operator.
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/default > rhdh-operator-${VERSION}.yaml
+	@echo "Generated operator script rhdh-operator-${VERSION}.yaml"
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
@@ -402,9 +414,4 @@ show-img:
 show-container-engine:
 	@echo -n $(CONTAINER_ENGINE)
 
-.PHONY: deployment-manifest
-deployment-manifest: manifests kustomize ## Generate manifest to deploy operator.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/default > rhdh-operator-${VERSION}.yaml
-	@echo "Generated operator script rhdh-operator-${VERSION}.yaml"
 

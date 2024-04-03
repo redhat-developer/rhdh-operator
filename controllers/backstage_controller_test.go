@@ -17,8 +17,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 	"strings"
 	"time"
+
+	"k8s.io/utils/ptr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -26,10 +29,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/ptr"
+
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
@@ -37,6 +39,10 @@ import (
 
 const (
 	fmtNotFound = "Expected error to be a not-found one, but got %v"
+)
+const (
+	_defaultBackstageMainContainerName = "backstage-backend"
+	_defaultPsqlMainContainerName      = "postgresql"
 )
 
 var _ = Describe("Backstage controller", func() {
@@ -135,10 +141,10 @@ var _ = Describe("Backstage controller", func() {
 			var backstage bsv1alpha1.Backstage
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, &backstage)
 			g.Expect(err).NotTo(HaveOccurred())
-			cond := meta.FindStatusCondition(backstage.Status.Conditions, bsv1alpha1.ConditionDeployed)
+			cond := meta.FindStatusCondition(backstage.Status.Conditions, string(bsv1alpha1.BackstageConditionTypeDeployed))
 			g.Expect(cond).NotTo(BeNil())
 			g.Expect(cond.Status).To(Equal(metav1.ConditionFalse))
-			g.Expect(cond.Reason).To(Equal(bsv1alpha1.DeployFailed))
+			g.Expect(cond.Reason).To(Equal(string(bsv1alpha1.BackstageConditionReasonFailed)))
 			g.Expect(cond.Message).To(ContainSubstring(errMsg))
 		}, time.Minute, time.Second).Should(Succeed())
 	}
@@ -218,7 +224,7 @@ var _ = Describe("Backstage controller", func() {
 		By("Checking the Deployment's replicas is updated after replicas is updated in the custom resource")
 		Eventually(func(g Gomega) {
 			found := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-%s", backstageName)}, found)
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, found)
 			g.Expect(err).To(Not(HaveOccurred()))
 			verify(found)
 			//			g.Expect(err).To(Not(HaveOccurred()))
@@ -250,7 +256,7 @@ var _ = Describe("Backstage controller", func() {
 			By("creating a secret for accessing the Database")
 			Eventually(func(g Gomega) {
 				found := &corev1.Secret{}
-				name := getDefaultPsqlSecretName(backstage)
+				name := model.DbSecretDefaultName(backstage.Name)
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
 				g.Expect(err).ShouldNot(HaveOccurred())
 			}, time.Minute, time.Second).Should(Succeed())
@@ -258,14 +264,15 @@ var _ = Describe("Backstage controller", func() {
 			By("creating a StatefulSet for the Database")
 			Eventually(func(g Gomega) {
 				found := &appsv1.StatefulSet{}
-				name := getDefaultDbObjName(*backstage)
+				name := model.DbStatefulSetName(backstage.Name)
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				secName := getSecretName(found.Spec.Template.Spec.Containers, _defaultPsqlMainContainerName)
-				g.Expect(secName).Should(Equal(getDefaultPsqlSecretName(backstage)))
+				secName := getSecretName(found.Spec.Template.Spec.Containers, _defaultPsqlMainContainerName, model.DbSecretDefaultName(backstage.Name))
+				g.Expect(secName).Should(Equal(model.DbSecretDefaultName(backstage.Name)))
 			}, time.Minute, time.Second).Should(Succeed())
 
-			backendAuthConfigName := fmt.Sprintf("%s-auth-app-config", backstageName)
+			//backendAuthConfigName := fmt.Sprintf("%s-auth-app-config", backstageName)
+			backendAuthConfigName := model.AppConfigDefaultName(backstageName)
 			By("Creating a ConfigMap for default backend auth key", func() {
 				Eventually(func(g Gomega) {
 					found := &corev1.ConfigMap{}
@@ -276,7 +283,8 @@ var _ = Describe("Backstage controller", func() {
 			})
 
 			By("Generating a ConfigMap for default config for dynamic plugins")
-			dynamicPluginsConfigName := fmt.Sprintf("%s-dynamic-plugins", backstageName)
+			dynamicPluginsConfigName := model.DynamicPluginsDefaultName(backstageName)
+			//fmt.Sprintf("%s-dynamic-plugins", backstageName)
 			Eventually(func(g Gomega) {
 				found := &corev1.ConfigMap{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: dynamicPluginsConfigName}, found)
@@ -291,7 +299,7 @@ var _ = Describe("Backstage controller", func() {
 			found := &appsv1.Deployment{}
 			Eventually(func() error {
 				// TODO to get name from default
-				return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, found)
+				return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("checking the number of replicas")
@@ -306,11 +314,13 @@ var _ = Describe("Backstage controller", func() {
 				Expect(dpRootVol.Ephemeral.VolumeClaimTemplate).ShouldNot(BeNil())
 				storage := dpRootVol.Ephemeral.VolumeClaimTemplate.Spec.Resources.Requests.Storage()
 				Expect(storage).ShouldNot(BeNil())
-				q, pErr := resource.ParseQuantity("1Gi")
-				Expect(pErr).ShouldNot(HaveOccurred())
+
+				// Operator does NOT control dynamic-plugins-root volume
+				//q, pErr := resource.ParseQuantity("1Gi")
+				//Expect(pErr).ShouldNot(HaveOccurred())
 				// https://issues.redhat.com/browse/RHIDP-1332: storage size should be > 1Gi
-				Expect(storage.Cmp(q)).To(Equal(1),
-					"storage size for dynamic-plugins-root volume is currently %v, but it should be more than %v", storage, q)
+				//Expect(storage.Cmp(q)).To(Equal(1),
+				//	"storage size for dynamic-plugins-root volume is currently %v, but it should be more than %v", storage, q)
 
 				_, ok = findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-npmrc")
 				Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-npmrc")
@@ -369,7 +379,7 @@ var _ = Describe("Backstage controller", func() {
 				Expect(mainCont.Args[0]).To(Equal("--config"))
 				Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
 				Expect(mainCont.Args[2]).To(Equal("--config"))
-				Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/app-config.backend-auth.default.yaml"))
+				Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 			})
 
 			By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
@@ -382,34 +392,35 @@ var _ = Describe("Backstage controller", func() {
 
 				bsAuth := findVolumeMounts(mainCont.VolumeMounts, backendAuthConfigName)
 				Expect(bsAuth).To(HaveLen(1), "No volume mount found with name: %s", backendAuthConfigName)
-				Expect(bsAuth[0].MountPath).To(Equal("/opt/app-root/src/app-config.backend-auth.default.yaml"))
-				Expect(bsAuth[0].SubPath).To(Equal("app-config.backend-auth.default.yaml"))
+				Expect(bsAuth[0].MountPath).To(Equal("/opt/app-root/src/default.app-config.yaml"))
+				Expect(bsAuth[0].SubPath).To(Equal("default.app-config.yaml"))
 			})
 
 			By("Checking the db secret used by the Backstage Deployment")
-			secName := getSecretName(found.Spec.Template.Spec.Containers, _defaultBackstageMainContainerName)
-			Expect(secName).Should(Equal(getDefaultPsqlSecretName(backstage)))
+			secName := getSecretName(found.Spec.Template.Spec.Containers, _defaultBackstageMainContainerName, model.DbSecretDefaultName(backstage.Name))
+			Expect(secName).Should(Equal(model.DbSecretDefaultName(backstage.Name)))
 
 			By("Checking the latest Status added to the Backstage instance")
 			verifyBackstageInstance(ctx)
 
 			By("Checking the localdb statefulset has been created")
 			Eventually(func(g Gomega) {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}, &appsv1.StatefulSet{})
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: model.DbStatefulSetName(backstageName), Namespace: ns}, &appsv1.StatefulSet{})
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking the localdb services have been created")
 			Eventually(func(g Gomega) {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}, &corev1.Service{})
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: model.DbServiceName(backstageName), Namespace: ns}, &corev1.Service{})
 				g.Expect(err).To(Not(HaveOccurred()))
-				err = k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s-hl", backstageName), Namespace: ns}, &corev1.Service{})
-				g.Expect(err).To(Not(HaveOccurred()))
+
+				//err = k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s-hl", backstageName), Namespace: ns}, &corev1.Service{})
+				//g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
-			By("Checking the localdb secret has been gnerated")
+			By("Checking the localdb secret has been generated")
 			Eventually(func(g Gomega) {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: getDefaultPsqlSecretName(backstage), Namespace: ns}, &corev1.Secret{})
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: model.DbSecretDefaultName(backstage.Name), Namespace: ns}, &corev1.Secret{})
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
@@ -419,6 +430,9 @@ var _ = Describe("Backstage controller", func() {
 				toBeUpdated := &bsv1alpha1.Backstage{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, toBeUpdated)
 				g.Expect(err).To(Not(HaveOccurred()))
+				if toBeUpdated.Spec.Database == nil {
+					toBeUpdated.Spec.Database = &bsv1alpha1.Database{}
+				}
 				toBeUpdated.Spec.Database.EnableLocalDb = &enableLocalDb
 				toBeUpdated.Spec.Database.AuthSecretName = "existing-db-secret"
 				err = k8sClient.Update(ctx, toBeUpdated)
@@ -434,7 +448,7 @@ var _ = Describe("Backstage controller", func() {
 			By("Checking that the local db statefulset has been deleted")
 			Eventually(func(g Gomega) {
 				err := k8sClient.Get(ctx,
-					types.NamespacedName{Namespace: ns, Name: getDefaultDbObjName(*backstage)},
+					types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstage.Name)},
 					&appsv1.StatefulSet{})
 				g.Expect(err).Should(HaveOccurred())
 				g.Expect(errors.IsNotFound(err)).Should(BeTrue(), fmtNotFound, err)
@@ -443,7 +457,7 @@ var _ = Describe("Backstage controller", func() {
 			By("Checking that the local db services have been deleted")
 			Eventually(func(g Gomega) {
 				err := k8sClient.Get(ctx,
-					types.NamespacedName{Namespace: ns, Name: getDefaultDbObjName(*backstage)},
+					types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstage.Name)},
 					&corev1.Service{})
 				g.Expect(err).Should(HaveOccurred())
 				g.Expect(errors.IsNotFound(err)).Should(BeTrue(), fmtNotFound, err)
@@ -457,7 +471,7 @@ var _ = Describe("Backstage controller", func() {
 			By("Checking that the local db secret has been deleted")
 			Eventually(func(g Gomega) {
 				err := k8sClient.Get(ctx,
-					types.NamespacedName{Namespace: ns, Name: getDefaultDbObjName(*backstage)},
+					types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstage.Name)},
 					&corev1.Secret{})
 				g.Expect(err).Should(HaveOccurred())
 				g.Expect(errors.IsNotFound(err)).Should(BeTrue(), fmtNotFound, err)
@@ -476,29 +490,29 @@ var _ = Describe("Backstage controller", func() {
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: bs1-deployment
-  labels:
-    app: bs1
+ name: bs1-deployment
+ labels:
+   app: bs1
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: bs1
-  template:
-    metadata:
-      labels:
-        app: bs1
-    spec:
-      containers:
-        - name: bs1
-          image: busybox
+ replicas: 1
+ selector:
+   matchLabels:
+     app: bs1
+ template:
+   metadata:
+     labels:
+       app: bs1
+   spec:
+     containers:
+       - name: bs1
+         image: busybox
 `,
 					})
 				err := k8sClient.Create(ctx, backstageConfigMap)
 				Expect(err).To(Not(HaveOccurred()))
 
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-					RawRuntimeConfig: bsv1alpha1.RuntimeConfig{
+					RawRuntimeConfig: &bsv1alpha1.RuntimeConfig{
 						BackstageConfigName: backstageConfigMap.Name,
 					},
 				})
@@ -523,7 +537,7 @@ spec:
 				By("Checking if Deployment was successfully created in the reconciliation")
 				Eventually(func() error {
 					found := &appsv1.Deployment{}
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, found)
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, found)
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
@@ -540,27 +554,27 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: db-statefulset
+ name: db-statefulset
 spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: db
-  template:
-    metadata:
-      labels:
-        app: db
-    spec:
-      containers:
-        - name: db
-          image: busybox
+ replicas: 3
+ selector:
+   matchLabels:
+     app: db
+ template:
+   metadata:
+     labels:
+       app: db
+   spec:
+     containers:
+       - name: db
+         image: busybox
 `,
 				})
 				err := k8sClient.Create(ctx, localDbConfigMap)
 				Expect(err).To(Not(HaveOccurred()))
 
 				backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
-					RawRuntimeConfig: bsv1alpha1.RuntimeConfig{
+					RawRuntimeConfig: &bsv1alpha1.RuntimeConfig{
 						LocalDbConfigName: localDbConfigMap.Name,
 					},
 				})
@@ -585,7 +599,7 @@ spec:
 				By("Checking if StatefulSet was successfully created in the reconciliation")
 				Eventually(func(g Gomega) {
 					found := &appsv1.StatefulSet{}
-					name := getDefaultDbObjName(*backstage)
+					name := model.DbStatefulSetName(backstage.Name)
 					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, found)
 					g.Expect(err).ShouldNot(HaveOccurred())
 					g.Expect(found.Spec.Replicas).Should(HaveValue(BeEquivalentTo(3)))
@@ -637,14 +651,14 @@ spec:
 					NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 				})
 				Expect(err).To(HaveOccurred())
-				errStr := fmt.Sprintf("failed to add volume mounts to Backstage deployment, reason: configmaps \"%s\" not found", cmName)
+				errStr := fmt.Sprintf("configmaps \"%s\" not found", cmName)
 				Expect(err.Error()).Should(ContainSubstring(errStr))
 				verifyBackstageInstanceError(ctx, errStr)
 
 				By("Not creating a Backstage Deployment")
 				Consistently(func() error {
 					// TODO to get name from default
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, &appsv1.Deployment{})
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, &appsv1.Deployment{})
 				}, 5*time.Second, time.Second).Should(Not(Succeed()))
 			})
 		})
@@ -665,21 +679,21 @@ spec:
 						BeforeEach(func() {
 							appConfig1Cm := buildConfigMap(appConfig1CmName, map[string]string{
 								"my-app-config-11.yaml": `
-# my-app-config-11.yaml
-`,
+	# my-app-config-11.yaml
+	`,
 								"my-app-config-12.yaml": `
-# my-app-config-12.yaml
-`,
+	# my-app-config-12.yaml
+	`,
 							})
 							err := k8sClient.Create(ctx, appConfig1Cm)
 							Expect(err).To(Not(HaveOccurred()))
 
 							dynamicPluginsCm := buildConfigMap(dynamicPluginsConfigName, map[string]string{
 								"dynamic-plugins.yaml": `
-# dynamic-plugins.yaml (configmap)
-includes: [dynamic-plugins.default.yaml]
-plugins: []
-`,
+	# dynamic-plugins.yaml (configmap)
+	includes: [dynamic-plugins.default.yaml]
+	plugins: []
+	`,
 							})
 							err = k8sClient.Create(ctx, dynamicPluginsCm)
 							Expect(err).To(Not(HaveOccurred()))
@@ -719,12 +733,16 @@ plugins: []
 							found := &appsv1.Deployment{}
 							Eventually(func(g Gomega) {
 								// TODO to get name from default
-								err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, found)
+								err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, found)
 								g.Expect(err).To(Not(HaveOccurred()))
 							}, time.Minute, time.Second).Should(Succeed())
-
+							//dynamic-plugins-root
+							//dynamic-plugins-npmrc
+							//test-backstage-cqzfx-default-appconfig
+							//my-app-config-1-cm
+							//my-dynamic-plugins-config
 							By("Checking the Volumes in the Backstage Deployment", func() {
-								Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(4))
+								Expect(found.Spec.Template.Spec.Volumes).To(HaveLen(5))
 
 								_, ok := findVolume(found.Spec.Template.Spec.Volumes, "dynamic-plugins-root")
 								Expect(ok).To(BeTrue(), "No volume found with name: dynamic-plugins-root")
@@ -789,9 +807,23 @@ plugins: []
 							}
 
 							By("Checking the main container Args in the Backstage Deployment", func() {
-								nbArgs := 6
+								//          "--config",
+								//          "dynamic-plugins-root/app-config.dynamic-plugins.yaml",
+								//          "--config",
+								//          "/opt/app-root/src/default.app-config.yaml",
+								//          "--config",
+								//          "/some/path/for/app-config/my-app-config-11.yaml",
+								//          "--config",
+								//          "/some/path/for/app-config/my-app-config-12.yaml",
+								nbArgs := 8
 								if key != "" {
-									nbArgs = 4
+									//          "--config",
+									//          "dynamic-plugins-root/app-config.dynamic-plugins.yaml",
+									//          "--config",
+									//          "/opt/app-root/src/default.app-config.yaml",
+									//          "--config",
+									//          "/some/path/for/app-config/my-app-config-12.yaml",
+									nbArgs = 6
 								}
 								Expect(mainCont.Args).To(HaveLen(nbArgs))
 								Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
@@ -802,24 +834,33 @@ plugins: []
 									//TODO(rm3l): the order of the rest of the --config args should be the same as the order in
 									// which the keys are listed in the ConfigMap/Secrets
 									// But as this is returned as a map, Go does not provide any guarantee on the iteration order.
-									Expect(mainCont.Args[3]).To(SatisfyAny(
+									Expect(mainCont.Args[5]).To(SatisfyAny(
 										Equal(expectedMountPath+"/my-app-config-11.yaml"),
 										Equal(expectedMountPath+"/my-app-config-12.yaml"),
 									))
-									Expect(mainCont.Args[5]).To(SatisfyAny(
+									Expect(mainCont.Args[7]).To(SatisfyAny(
 										Equal(expectedMountPath+"/my-app-config-11.yaml"),
 										Equal(expectedMountPath+"/my-app-config-12.yaml"),
 									))
 									Expect(mainCont.Args[3]).To(Not(Equal(mainCont.Args[5])))
 								} else {
-									Expect(mainCont.Args[3]).To(Equal(fmt.Sprintf("%s/%s", expectedMountPath, key)))
+									Expect(mainCont.Args[5]).To(Equal(fmt.Sprintf("%s/%s", expectedMountPath, key)))
 								}
 							})
 
 							By("Checking the main container Volume Mounts in the Backstage Deployment", func() {
-								nbMounts := 3
+								//"/opt/app-root/src/dynamic-plugins-root"
+								//"/opt/app-root/src/default.app-config.yaml"
+								// /some/path/for/app-config/my-app-config-11.yaml"
+								//"/some/path/for/app-config/my-app-config-12.yaml"
+								nbMounts := 4
+								nbMounts2 := 2
 								if key != "" {
-									nbMounts = 2
+									//"/opt/app-root/src/dynamic-plugins-root"
+									//"/opt/app-root/src/default.app-config.yaml"
+									//"/some/path/for/app-config/my-app-config-11.yaml"
+									nbMounts = 3
+									nbMounts2 = 1
 								}
 								Expect(mainCont.VolumeMounts).To(HaveLen(nbMounts))
 
@@ -829,7 +870,7 @@ plugins: []
 								Expect(dpRoot[0].SubPath).To(BeEmpty())
 
 								appConfig1CmMounts := findVolumeMounts(mainCont.VolumeMounts, appConfig1CmName)
-								Expect(appConfig1CmMounts).To(HaveLen(nbMounts-1), "Wrong number of volume mounts found with name: %s", appConfig1CmName)
+								Expect(appConfig1CmMounts).To(HaveLen(nbMounts2), "Wrong number of volume mounts found with name: %s", appConfig1CmName)
 								if key != "" {
 									Expect(appConfig1CmMounts).To(HaveLen(1), "Wrong number of volume mounts found with name: %s", appConfig1CmName)
 									Expect(appConfig1CmMounts[0].MountPath).To(Equal(fmt.Sprintf("%s/%s", expectedMountPath, key)))
@@ -917,7 +958,7 @@ plugins: []
 					By("Not creating a Backstage Deployment")
 					Consistently(func() error {
 						// TODO to get name from default
-						return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, &appsv1.Deployment{})
+						return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, &appsv1.Deployment{})
 					}, 5*time.Second, time.Second).Should(Not(Succeed()))
 				})
 			})
@@ -936,33 +977,33 @@ plugins: []
 				BeforeEach(func() {
 					extraConfig1CmAll := buildConfigMap(extraConfig1CmNameAll, map[string]string{
 						"my-extra-config-11.yaml": `
-# my-extra-config-11.yaml
-`,
+	# my-extra-config-11.yaml
+	`,
 						"my-extra-config-12.yaml": `
-# my-extra-config-12.yaml
-`,
+	# my-extra-config-12.yaml
+	`,
 					})
 					err := k8sClient.Create(ctx, extraConfig1CmAll)
 					Expect(err).To(Not(HaveOccurred()))
 
 					extraConfig1CmSingle := buildConfigMap(extraConfig1CmNameSingle, map[string]string{
 						"my-extra-file-11-single.yaml": `
-# my-extra-file-11-single.yaml
-`,
+	# my-extra-file-11-single.yaml
+	`,
 						"my-extra-file-12-single.yaml": `
-# my-extra-file-12-single.yaml
-`,
+	# my-extra-file-12-single.yaml
+	`,
 					})
 					err = k8sClient.Create(ctx, extraConfig1CmSingle)
 					Expect(err).To(Not(HaveOccurred()))
 
 					extraConfig2SecretSingle := buildSecret(extraConfig2SecretNameSingle, map[string][]byte{
 						"my-extra-file-21-single.yaml": []byte(`
-# my-extra-file-21-single.yaml
-`),
+	# my-extra-file-21-single.yaml
+	`),
 						"my-extra-file-22-single.yaml": []byte(`
-# my-extra-file-22-single.yaml
-`),
+	# my-extra-file-22-single.yaml
+	`),
 					})
 					err = k8sClient.Create(ctx, extraConfig2SecretSingle)
 					Expect(err).To(Not(HaveOccurred()))
@@ -1002,11 +1043,11 @@ plugins: []
 					found := &appsv1.Deployment{}
 					Eventually(func(g Gomega) {
 						// TODO to get name from default
-						err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, found)
+						err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, found)
 						g.Expect(err).To(Not(HaveOccurred()))
 					}, time.Minute, time.Second).Should(Succeed())
 
-					backendAuthConfigName := fmt.Sprintf("%s-auth-app-config", backstageName)
+					backendAuthConfigName := model.AppConfigDefaultName(backstageName)
 					By("Creating a ConfigMap for default backend auth key", func() {
 						Eventually(func(g Gomega) {
 							found := &corev1.ConfigMap{}
@@ -1064,8 +1105,8 @@ plugins: []
 
 						bsAuth := findVolumeMounts(mainCont.VolumeMounts, backendAuthConfigName)
 						Expect(bsAuth).To(HaveLen(1), "No volume mount found with name: %s", backendAuthConfigName)
-						Expect(bsAuth[0].MountPath).To(Equal("/opt/app-root/src/app-config.backend-auth.default.yaml"))
-						Expect(bsAuth[0].SubPath).To(Equal("app-config.backend-auth.default.yaml"))
+						Expect(bsAuth[0].MountPath).To(Equal("/opt/app-root/src/default.app-config.yaml"))
+						Expect(bsAuth[0].SubPath).To(Equal("default.app-config.yaml"))
 
 						extraConfig1CmMounts := findVolumeMounts(mainCont.VolumeMounts, extraConfig1CmNameAll)
 						Expect(extraConfig1CmMounts).To(HaveLen(2), "No volume mounts found with name: %s", extraConfig1CmNameAll)
@@ -1178,7 +1219,7 @@ plugins: []
 				found := &appsv1.Deployment{}
 				Eventually(func(g Gomega) {
 					// TODO to get name from default
-					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, found)
+					err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, found)
 					g.Expect(err).To(Not(HaveOccurred()))
 				}, time.Minute, time.Second).Should(Succeed())
 
@@ -1308,12 +1349,12 @@ plugins: []
 			found := &appsv1.Deployment{}
 			Eventually(func(g Gomega) {
 				// TODO to get name from default
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, found)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, found)
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking that the image was set on all containers in the Pod Spec")
-			visitContainers(&found.Spec.Template, func(container *corev1.Container) {
+			model.VisitContainers(&found.Spec.Template.Spec, func(container *corev1.Container) {
 				By(fmt.Sprintf("Checking Image in the Backstage Deployment - container: %q", container.Name), func() {
 					Expect(container.Image).Should(Equal(imageName))
 				})
@@ -1335,7 +1376,7 @@ plugins: []
 		BeforeEach(func() {
 			backstage = buildBackstageCR(bsv1alpha1.BackstageSpec{
 				Application: &bsv1alpha1.Application{
-					ImagePullSecrets: &[]string{ips1, ips2},
+					ImagePullSecrets: []string{ips1, ips2},
 				},
 			})
 			err := k8sClient.Create(ctx, backstage)
@@ -1359,7 +1400,7 @@ plugins: []
 			found := &appsv1.Deployment{}
 			Eventually(func(g Gomega) {
 				// TODO to get name from default
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, found)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, found)
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
@@ -1408,7 +1449,7 @@ plugins: []
 			found := &appsv1.Deployment{}
 			Eventually(func(g Gomega) {
 				// TODO to get name from default
-				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, found)
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, found)
 				g.Expect(err).To(Not(HaveOccurred()))
 			}, time.Minute, time.Second).Should(Succeed())
 
@@ -1439,7 +1480,7 @@ plugins: []
 		When("disabling PostgreSQL in the CR", func() {
 			It("should successfully reconcile a custom resource for default Backstage with existing secret", func() {
 				backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
-					Database: bsv1alpha1.Database{
+					Database: &bsv1alpha1.Database{
 						EnableLocalDb:  ptr.To(false),
 						AuthSecretName: "existing-secret",
 					},
@@ -1462,7 +1503,7 @@ plugins: []
 				By("not creating a StatefulSet for the Database")
 				Consistently(func(g Gomega) {
 					err := k8sClient.Get(ctx,
-						types.NamespacedName{Namespace: ns, Name: getDefaultDbObjName(*backstage)},
+						types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstage.Name)},
 						&appsv1.StatefulSet{})
 					g.Expect(err).Should(HaveOccurred())
 					g.Expect(errors.IsNotFound(err)).Should(BeTrue(), fmtNotFound, err)
@@ -1471,7 +1512,7 @@ plugins: []
 				By("Checking if Deployment was successfully created in the reconciliation")
 				Eventually(func() error {
 					// TODO to get name from default
-					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: getDefaultObjName(*backstage)}, &appsv1.Deployment{})
+					return k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstage.Name)}, &appsv1.Deployment{})
 				}, time.Minute, time.Second).Should(Succeed())
 
 				By("Checking the latest Status added to the Backstage instance")
@@ -1480,7 +1521,7 @@ plugins: []
 		})
 		It("should reconcile a custom resource for default Backstage without existing secret", func() {
 			backstage := buildBackstageCR(bsv1alpha1.BackstageSpec{
-				Database: bsv1alpha1.Database{
+				Database: &bsv1alpha1.Database{
 					EnableLocalDb: ptr.To(false),
 				},
 			})
@@ -1512,17 +1553,19 @@ func findElementsByPredicate[T any](l []T, predicate func(t T) bool) (result []T
 }
 
 func isDeployed(backstage bsv1alpha1.Backstage) bool {
-	if cond := meta.FindStatusCondition(backstage.Status.Conditions, bsv1alpha1.ConditionDeployed); cond != nil {
+	if cond := meta.FindStatusCondition(backstage.Status.Conditions, string(bsv1alpha1.BackstageConditionTypeDeployed)); cond != nil {
 		return cond.Status == metav1.ConditionTrue
 	}
 	return false
 }
 
-func getSecretName(containers []corev1.Container, name string) string {
+func getSecretName(containers []corev1.Container, name string, secretName string) string {
 	for _, c := range containers {
 		if c.Name == name {
 			for _, from := range c.EnvFrom {
-				return from.SecretRef.Name
+				if from.SecretRef.Name == secretName {
+					return from.SecretRef.Name
+				}
 			}
 			break
 		}

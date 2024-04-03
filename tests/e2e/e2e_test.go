@@ -82,11 +82,15 @@ var _ = Describe("Backstage Operator E2E", func() {
 						ExpectedHttpStatusCode: 200,
 						BodyMatcher: SatisfyAll(
 							ContainSubstring("backstage-plugin-catalog-backend-module-github-dynamic"),
-							ContainSubstring("@dfatwork-pkgs/scaffolder-backend-module-http-request-wrapped-dynamic"),
-							ContainSubstring("@dfatwork-pkgs/explore-backend-wrapped-dynamic"),
-						),
+							ContainSubstring("backstage-plugin-techdocs-backend-dynamic"),
+							ContainSubstring("backstage-plugin-catalog-backend-module-gitlab-dynamic")),
 					},
 				},
+			},
+			{
+				name:       "with custom DB auth secret",
+				crFilePath: filepath.Join("examples", "bs-existing-secret.yaml"),
+				crName:     "bs-existing-secret",
 			},
 		} {
 			tt := tt

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bs1-deployment
+  labels:
+    app: bs1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bs1
+  template:
+    metadata:
+      labels:
+        app: bs1
+    spec:
+      containers:
+        - name: bs1
+          image: busybox

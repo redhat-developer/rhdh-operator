@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: # placeholder for '<cr-name>-dynamic-plugins'
 data:
-  "dynamic-plugins.yaml": |
+  "config-plugins123.yaml": |
     includes:
       - dynamic-plugins.default.yaml
     plugins: []

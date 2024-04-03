@@ -124,16 +124,25 @@ data:
                     # supports ISO duration, "human duration (used below)
                     timeout: { minutes: 3}
                     initialDelay: { seconds: 15}
-      - package: '@dfatwork-pkgs/scaffolder-backend-module-http-request-wrapped-dynamic@4.0.9-0'
-        integrity: 'sha512-+YYESzHdg1hsk2XN+zrtXPnsQnfbzmWIvcOM0oQLS4hf8F4iGTtOXKjWnZsR/14/khGsPrzy0oq1ytJ1/4ORkQ=='
-      - package: '@dfatwork-pkgs/explore-backend-wrapped-dynamic@0.0.9-next.11'
-        integrity: 'sha512-/qUxjSedxQ0dmYqMWsZ2+OLGeovaaigRRrX1aTOz0GJMwSjOAauUUD1bMs56VPX74qWL1rf3Xr4nViiKo8rlIA=='
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
         pluginConfig:
-          proxy:
-            endpoints:
-              /explore-backend-completed:
-                target: 'http://localhost:7017'
-                
+          # Reference documentation http://backstage.io/docs/features/techdocs/configuration
+          # Note: After experimenting with basic setup, use CI/CD to generate docs
+          # and an external cloud storage when deploying TechDocs for production use-case.
+          # https://backstage.io/docs/features/techdocs/how-to-guides#how-to-migrate-from-techdocs-basic-to-recommended-deployment-approach
+          techdocs:
+            builder: local
+            generator:
+              runIn: local
+            publisher:
+              type: local
+      - package: ./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-gitlab-dynamic
+        disabled: false
+        pluginConfig:
+          catalog:
+            providers:
+              gitlab: {} 
+
 ---
 apiVersion: v1
 kind: ConfigMap

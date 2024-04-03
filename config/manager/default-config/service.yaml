@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name:  # placeholder for 'backstage-<cr-name>'
+  name: backstage # placeholder for 'backstage-<cr-name>'
 spec:
   type: ClusterIP
   selector:

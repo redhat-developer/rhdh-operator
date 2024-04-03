@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: <to_be_replaced> # placeholder for '<cr-name>-dynamic-plugins'
+data:
+  "dynamic-plugins123.yaml": |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins: []

@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -65,7 +66,7 @@ func PatchBackstageCR(ns string, crName string, jsonPatch string, patchType stri
 }
 
 func DoesBackstageRouteExist(ns string, crName string) (bool, error) {
-	routeName := "backstage-" + crName
+	routeName := model.RouteName(crName)
 	out, err := Run(exec.Command(GetPlatformTool(), "get", "route", routeName, "-n", ns)) // #nosec G204
 	if err != nil {
 		if strings.Contains(string(out), fmt.Sprintf("%q not found", routeName)) {
@@ -77,7 +78,7 @@ func DoesBackstageRouteExist(ns string, crName string) (bool, error) {
 }
 
 func GetBackstageRouteHost(ns string, crName string) (string, error) {
-	routeName := "backstage-" + crName
+	routeName := model.RouteName(crName)
 
 	hostBytes, err := Run(exec.Command(
 		GetPlatformTool(), "get", "route", routeName, "-o", "go-template={{if .spec.host}}{{.spec.host}}{{end}}", "-n", ns)) // #nosec G204
@@ -142,6 +143,7 @@ func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpoin
 
 	performTest := func(tt ApiEndpointTest) {
 		url := fmt.Sprintf("https://%s/%s", host, strings.TrimPrefix(tt.Endpoint, "/"))
+		fmt.Fprintf(GinkgoWriter, "--> GET %q\n", url)
 		resp, rErr := httpClient.Get(url)
 		g.Expect(rErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while trying to GET %q", url))
 		defer resp.Body.Close()
