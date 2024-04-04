@@ -34,7 +34,7 @@ jobs:
     # see list of approvers in OWNERS file
     environment:
       ${{ (github.event.pull_request.head.repo.full_name == github.repository ||
-      contains(fromJSON('["gazarenkov","jianrongzhang89","kadel","nickboldt","rm3l"]'), github.actor)) && 'internal' || 'external' }}
+      contains(fromJSON('["gazarenkov","jianrongzhang89","kadel","nickboldt","rm3l","kim-tsao","openshift-cherrypick-robot"]'), github.actor)) && 'internal' || 'external' }}
     runs-on: ubuntu-latest
     steps:
       - name: approved
