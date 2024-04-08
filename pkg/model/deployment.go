@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/utils/ptr"
+
 	corev1 "k8s.io/api/core/v1"
 
 	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
@@ -77,12 +79,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, _ bsv1alpha1.Bac
 	// override image with env var
 	// [GA] TODO Do we need this feature?
 	if os.Getenv(BackstageImageEnvVar) != "" {
-		b.deployment.Spec.Template.Spec.Containers[0].Image = os.Getenv(BackstageImageEnvVar)
-		// exactly the same image for initContainer and want it to be overriden
-		// the same way as Backstage's one
-		for i := range b.deployment.Spec.Template.Spec.InitContainers {
-			b.deployment.Spec.Template.Spec.InitContainers[i].Image = os.Getenv(BackstageImageEnvVar)
-		}
+		b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
 	}
 
 	return true, nil
@@ -155,13 +152,17 @@ func (b *BackstageDeployment) setReplicas(replicas *int32) {
 // sets container image name of Backstage Container
 func (b *BackstageDeployment) setImage(image *string) {
 	if image != nil {
-		// TODO this is a workaround for RHDH/Janus configuration
+		b.container().Image = *image
+		// this is a workaround for RHDH/Janus configuration
 		// it is not a fact that all the containers should be updated
-		// in general case need something smarter (probably annotation based)
+		// in general case need something smarter
 		// to mark/recognize containers for update
-		VisitContainers(b.podSpec(), func(container *corev1.Container) {
-			container.Image = *image
-		})
+		if len(b.podSpec().InitContainers) > 0 {
+			i, ic := dynamicPluginsInitContainer(b.podSpec().InitContainers)
+			if ic != nil {
+				b.podSpec().InitContainers[i].Image = *image
+			}
+		}
 	}
 }
 
@@ -188,21 +189,5 @@ func (b *BackstageDeployment) setImagePullSecrets(pullSecrets []string) {
 	for _, ps := range pullSecrets {
 		b.deployment.Spec.Template.Spec.ImagePullSecrets = append(b.deployment.Spec.Template.Spec.ImagePullSecrets,
 			corev1.LocalObjectReference{Name: ps})
-	}
-}
-
-// ContainerVisitor is called with each container
-type ContainerVisitor func(container *corev1.Container)
-
-// visitContainers invokes the visitor function for every container in the given pod template spec
-func VisitContainers(podTemplateSpec *corev1.PodSpec, visitor ContainerVisitor) {
-	for i := range podTemplateSpec.InitContainers {
-		visitor(&podTemplateSpec.InitContainers[i])
-	}
-	for i := range podTemplateSpec.Containers {
-		visitor(&podTemplateSpec.Containers[i])
-	}
-	for i := range podTemplateSpec.EphemeralContainers {
-		visitor((*corev1.Container)(&podTemplateSpec.EphemeralContainers[i].EphemeralContainerCommon))
 	}
 }

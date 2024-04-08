@@ -28,14 +28,6 @@ spec:
             defaultMode: 420
             optional: true
             secretName: dynamic-plugins-npmrc
-#        - name: dynamic-plugins-conf
-#          configMap:
-#            name: default-dynamic-plugins
-#            optional: true
-#            items:
-#              - key: dynamic-plugins.yaml
-#                path: dynamic-plugins.yaml
-
       initContainers:
         - command:
             - ./install-dynamic-plugins.sh
@@ -53,9 +45,6 @@ spec:
               name: dynamic-plugins-npmrc
               readOnly: true
               subPath: .npmrc
-#            - mountPath: /opt/app-root/src/dynamic-plugins.yaml
-#              subPath: dynamic-plugins.yaml
-#              name: dynamic-plugins-conf
           workingDir: /opt/app-root/src
 
       containers:

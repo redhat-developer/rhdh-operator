@@ -1354,7 +1354,7 @@ spec:
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking that the image was set on all containers in the Pod Spec")
-			model.VisitContainers(&found.Spec.Template.Spec, func(container *corev1.Container) {
+			VisitContainers(&found.Spec.Template.Spec, func(container *corev1.Container) {
 				By(fmt.Sprintf("Checking Image in the Backstage Deployment - container: %q", container.Name), func() {
 					Expect(container.Image).Should(Equal(imageName))
 				})
@@ -1571,4 +1571,20 @@ func getSecretName(containers []corev1.Container, name string, secretName string
 		}
 	}
 	return ""
+}
+
+// ContainerVisitor is called with each container
+type ContainerVisitor func(container *corev1.Container)
+
+// visitContainers invokes the visitor function for every container in the given pod template spec
+func VisitContainers(podTemplateSpec *corev1.PodSpec, visitor ContainerVisitor) {
+	for i := range podTemplateSpec.InitContainers {
+		visitor(&podTemplateSpec.InitContainers[i])
+	}
+	for i := range podTemplateSpec.Containers {
+		visitor(&podTemplateSpec.Containers[i])
+	}
+	for i := range podTemplateSpec.EphemeralContainers {
+		visitor((*corev1.Container)(&podTemplateSpec.EphemeralContainers[i].EphemeralContainerCommon))
+	}
 }

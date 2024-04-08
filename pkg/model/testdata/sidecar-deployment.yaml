@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:  <to_be_replaced> # placeholder for 'backstage-<cr-name>'
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+  template:
+    metadata:
+      labels:
+        rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+    spec:
+      initContainers:
+         - image: 'quay.io/janus-idp/backstage-showcase:next'
+           name: install-dynamic-plugins
+      containers:
+        - name: backstage-backend    # placeholder for 'backstage-backend'
+          image: quay.io/janus-idp/backstage-showcase:next
+        - name: sidecar
+          image: busybox
+
+
+
