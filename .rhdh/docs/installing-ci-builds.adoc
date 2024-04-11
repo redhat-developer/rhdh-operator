@@ -6,7 +6,6 @@ WARNING: The procedure below will not work properly on OpenShift clusters with h
 
 * You are logged in as an administrator on the OpenShift web console.
 * You have configured the appropriate roles and permissions within your project to create an application. See the link:https://docs.openshift.com/container-platform/4.14/applications/index.html[Red Hat OpenShift documentation on Building applications] for more details.
-* You have been granted permission to pull private images from the `rhdh` organization on quay.io. Ask the team for more info.
 
 *Procedure*
 
