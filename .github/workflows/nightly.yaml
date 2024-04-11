@@ -28,61 +28,26 @@ jobs:
         name: Checkout ${{ matrix.branch }} branch
         run: git switch ${{ matrix.branch }}
 
-      # check changes in this commit for regex include and exclude matches; pipe to an env var
-      - name: Check for changes to build
-        run: |
-          # don't fail if nothing returned by grep
-          set +e 
-          CHANGES="$(git diff --name-only HEAD~1 | \
-            grep -E "workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go|docker/|\.dockerignore" | \
-            grep -v -E ".+_test.go|/.rhdh/")";
-          echo "Changed files for this commit:"
-          echo "=============================="
-          echo "$CHANGES"
-          echo "=============================="
-          {
-            echo 'CHANGES<<EOF'
-            echo $CHANGES
-            echo EOF
-          } >> "$GITHUB_ENV"
-
       - name: Setup Go
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5
         with:
           go-version-file: 'go.mod'
 
       - name: Determine built operator image
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //") # 0.1.0
-          echo "OPERATOR_IMAGE=quay.io/janus-idp/operator:${BASE_VERSION}-${SHORT_SHA}" >> $GITHUB_ENV
-
-      - name: Wait until image exists in registry or timeout is reached
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
-        timeout-minutes: 10
-        run: |
-          echo "Waiting until operator image is found or timeout expires: ${{ env.OPERATOR_IMAGE }}..."
-          until ${CONTAINER_ENGINE} image pull "${{ env.OPERATOR_IMAGE }}"; do
-            sleep 2
-            echo ...
-          done
-          echo "... operator image found: ${{ env.OPERATOR_IMAGE }}."
+          latestNext="next"
+          # for main branch, use next tags; for 1.x branches, use :latest tags
+          if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]; then
+            latestNext="latest" 
+          fi
+          echo "OPERATOR_IMAGE=quay.io/janus-idp/operator:${latestNext}" >> $GITHUB_ENV
 
       - name: Start Minikube
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
         uses: medyagh/setup-minikube@317d92317e473a10540357f1f4b2878b80ee7b95 # v0.0.16
         with:
           addons: ingress
 
       - name: Run E2E tests
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
           IMG: ${{ env.OPERATOR_IMAGE }}
