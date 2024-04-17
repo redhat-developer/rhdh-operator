@@ -76,7 +76,7 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1alpha1.Backstage
 	model.setRuntimeObject(b)
 
 	// override image with env var
-	// [GA] TODO Do we really need this feature?
+	// [GA] Do we really need this feature?
 	if os.Getenv(LocalDbImageEnvVar) != "" {
 		b.container().Image = os.Getenv(LocalDbImageEnvVar)
 	}
@@ -92,6 +92,9 @@ func (b *DbStatefulSet) EmptyObject() client.Object {
 // implementation of RuntimeObject interface
 func (b *DbStatefulSet) validate(model *BackstageModel, backstage bsv1alpha1.Backstage) error {
 
+	if backstage.Spec.Application != nil {
+		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
+	}
 	if backstage.Spec.IsAuthSecretSpecified() {
 		utils.SetDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
 	} else if model.LocalDbSecret != nil {
@@ -112,6 +115,6 @@ func (b *DbStatefulSet) container() *corev1.Container {
 }
 
 // returns DB pod
-func (b *DbStatefulSet) podSpec() corev1.PodSpec {
-	return b.statefulSet.Spec.Template.Spec
+func (b *DbStatefulSet) podSpec() *corev1.PodSpec {
+	return &b.statefulSet.Spec.Template.Spec
 }

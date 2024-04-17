@@ -116,3 +116,14 @@ func AddEnvVarsFrom(container *corev1.Container, kind ObjectKind, objectName, va
 func SetDbSecretEnvVar(container *corev1.Container, secretName string) {
 	AddEnvVarsFrom(container, SecretObjectKind, secretName, "")
 }
+
+// sets pullSecret for Pod
+func SetImagePullSecrets(podSpec *corev1.PodSpec, pullSecrets []string) {
+	if pullSecrets == nil {
+		return
+	}
+	podSpec.ImagePullSecrets = []corev1.LocalObjectReference{}
+	for _, ps := range pullSecrets {
+		podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, corev1.LocalObjectReference{Name: ps})
+	}
+}
