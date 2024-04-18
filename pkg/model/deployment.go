@@ -158,7 +158,7 @@ func (b *BackstageDeployment) setImage(image *string) {
 		// in general case need something smarter
 		// to mark/recognize containers for update
 		if len(b.podSpec().InitContainers) > 0 {
-			i, ic := dynamicPluginsInitContainer(b.podSpec().InitContainers)
+			i, ic := DynamicPluginsInitContainer(b.podSpec().InitContainers)
 			if ic != nil {
 				b.podSpec().InitContainers[i].Image = *image
 			}
@@ -168,7 +168,7 @@ func (b *BackstageDeployment) setImage(image *string) {
 
 // adds environment variables to the Backstage Container
 func (b *BackstageDeployment) addContainerEnvVar(env bsv1alpha1.Env) {
-	b.deployment.Spec.Template.Spec.Containers[0].Env =
+	b.container().Env =
 		append(b.deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 			Name:  env.Name,
 			Value: env.Value,

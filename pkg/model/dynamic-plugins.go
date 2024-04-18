@@ -54,7 +54,7 @@ func addDynamicPlugins(spec v1alpha1.BackstageSpec, deployment *appsv1.Deploymen
 		return nil
 	}
 
-	if _, ic := dynamicPluginsInitContainer(deployment.Spec.Template.Spec.InitContainers); ic == nil {
+	if _, ic := DynamicPluginsInitContainer(deployment.Spec.Template.Spec.InitContainers); ic == nil {
 		return fmt.Errorf("deployment validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
 	}
 
@@ -106,7 +106,7 @@ func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
 	//it creates a volume with dynamic-plugins ConfigMap (there should be a key named "dynamic-plugins.yaml")
 	//and mount it to the dynamic-plugin initContainer's WorkingDir (what if not specified?)
 
-	_, initContainer := dynamicPluginsInitContainer(deployment.Spec.Template.Spec.InitContainers)
+	_, initContainer := DynamicPluginsInitContainer(deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
 		// it will fail on validate
 		return
@@ -121,7 +121,7 @@ func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
 func (p *DynamicPlugins) validate(model *BackstageModel, _ v1alpha1.Backstage) error {
 
-	_, initContainer := dynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
 		return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
 	}
@@ -142,7 +142,7 @@ func (p *DynamicPlugins) setMetaInfo(backstageName string) {
 
 // returns initContainer supposed to initialize DynamicPlugins
 // TODO consider to use a label to identify instead
-func dynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev1.Container) {
+func DynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev1.Container) {
 	for i, ic := range initContainers {
 		if ic.Name == dynamicPluginInitContainerName {
 			return i, &ic
