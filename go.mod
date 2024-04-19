@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
-	github.com/openshift/api v0.0.0-20240415140253-c0feb35ae9fb
+	github.com/openshift/api v0.0.0-20240418150331-2449d07abb86
 	github.com/stretchr/testify v1.9.0
 	k8s.io/api v0.29.4
 	k8s.io/apimachinery v0.29.4
