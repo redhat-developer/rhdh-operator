@@ -21,9 +21,14 @@
       "matchCategories": [
         "docker"
       ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "digest": {
         "enabled": false
-      }
+      },
+      "automerge": true,
+      "pinDigests": false
     },
     {
       "matchDatasources": [
@@ -32,6 +37,9 @@
       "matchUpdateTypes": [
         "patch"
       ],
+      "digest": {
+        "enabled": false
+      },
       "automerge": true,
       "pinDigests": false
     },
