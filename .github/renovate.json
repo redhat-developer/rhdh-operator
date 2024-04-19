@@ -3,19 +3,33 @@
     "config:best-practices",
     ":gitSignOff",
     ":rebaseStalePrs",
-    "docker:enableMajor",
     "group:allNonMajor"
   ],
   "labels": ["kind/dependency upgrade"],
+  "baseBranches": ["main", "/^1\\..*\\.x/"],
   "constraints": {
     "go": "1.20"
   },
   "packageRules": [
     {
-      "matchDatasources": [
-        "docker"
-      ],
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true,
       "pinDigests": false
+    },
+    {
+      "matchDatasources": ["go"],
+      "matchUpdateTypes": ["minor,","patch"],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true,
+      "pinDigests": true
+    },
+    {
+      "matchDatasources": ["golang-version"],
+      "rangeStrategy": "bump",
+      "enabled": false,
+      "automerge": false
     }
   ],
   "vulnerabilityAlerts": {
