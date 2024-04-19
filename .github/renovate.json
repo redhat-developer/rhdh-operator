@@ -3,7 +3,8 @@
     "config:best-practices",
     ":gitSignOff",
     ":rebaseStalePrs",
-    "group:allNonMajor"
+    "group:allNonMajor",
+    "docker:disableMajor"
   ],
   "labels": ["kind/dependency upgrade"],
   "baseBranches": ["main", "/^1\\..*\\.x/"],
@@ -19,7 +20,6 @@
     {
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["patch"],
-      "matchCurrentVersion": "!/^0/",
       "automerge": true,
       "pinDigests": false
     },
