@@ -56,6 +56,8 @@ Examples:
 "
 }
 
+if [[ "$#" -lt 1 ]]; then usage; exit 0; fi
+
 # minimum requirements
 if [[ ! $(command -v oc) ]]; then
   errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
@@ -65,7 +67,6 @@ if [[ ! $(command -v jq) ]]; then
   errorf "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
   exit 1
 fi
-
 
 # Check we're logged into a cluster
 if ! oc whoami > /dev/null 2>&1; then
