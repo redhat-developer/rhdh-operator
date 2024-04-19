@@ -6,32 +6,51 @@
     "group:allNonMajor",
     "docker:disableMajor"
   ],
-  "labels": ["kind/dependency upgrade"],
-  "baseBranches": ["main", "/^1\\..*\\.x/"],
+  "labels": [
+    "kind/dependency upgrade"
+  ],
+  "baseBranches": [
+    "main",
+    "/^1\\..*\\.x/"
+  ],
   "constraints": {
     "go": "1.20"
   },
-  "docker": {
-    "digest": {
-      "enabled": false
-    }
-  },
   "packageRules": [
     {
-      "matchDatasources": ["docker"],
-      "matchUpdateTypes": ["patch"],
+      "matchCategories": [
+        "docker"
+      ],
+      "digest": {
+        "enabled": false
+      }
+    },
+    {
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "automerge": true,
       "pinDigests": false
     },
     {
-      "matchDatasources": ["go"],
-      "matchUpdateTypes": ["minor,","patch"],
+      "matchDatasources": [
+        "go"
+      ],
+      "matchUpdateTypes": [
+        "minor,",
+        "patch"
+      ],
       "matchCurrentVersion": "!/^0/",
       "automerge": true,
       "pinDigests": true
     },
     {
-      "matchDatasources": ["golang-version"],
+      "matchDatasources": [
+        "golang-version"
+      ],
       "rangeStrategy": "bump",
       "enabled": false,
       "automerge": false
@@ -39,7 +58,9 @@
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
-    "addLabels": ["kind/security"]
+    "addLabels": [
+      "kind/security"
+    ]
   },
   "osvVulnerabilityAlerts": true
 }
