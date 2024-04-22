@@ -42,13 +42,125 @@
       "pinDigests": false
     },
     {
-      "description": "Do NOT generate PRs for major or minor go dependency updates ",
+      "description": "k8s go: minor and patch updates in main",
+      "enabled": true,
+      "groupName": "k8s-go main",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackagePrefixes": [
+        "k8s.io/api",
+        "k8s.io/apimachinery",
+        "k8s.io/client-go"
+      ],
+      "matchUpdateTypes": [
+        "minor", "patch"
+      ],
+      "baseBranches": [
+        "main"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "k8s go: patch updates only in 1.y.x",
+      "enabled": true,
+      "groupName": "k8s-go 1.y.x",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackagePrefixes": [
+        "k8s.io/api",
+        "k8s.io/apimachinery",
+        "k8s.io/client-go"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "baseBranches": [
+        "/^1\\..*\\.x/"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "ginkgo: minor and patch updates in main",
+      "enabled": true,
+      "groupName": "ginkgo main",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackagePrefixes": [
+        "github.com/onsi/ginkgo/v2"
+      ],
+      "matchUpdateTypes": [
+        "minor", "patch"
+      ],
+      "baseBranches": [
+        "main"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "ginkgo: patch updates only in 1.y.x",
+      "enabled": true,
+      "groupName": "ginkgo 1.y.x",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackagePrefixes": [
+        "github.com/onsi/ginkgo/v2"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "baseBranches": [
+        "/^1\\..*\\.x/"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "gomega: minor and patch updates in main",
+      "enabled": true,
+      "groupName": "gomega main",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackagePrefixes": [
+	      "github.com/onsi/gomega"
+      ],
+      "matchUpdateTypes": [
+        "minor", "patch"
+      ],
+      "baseBranches": [
+        "main"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "gomega: patch updates only in 1.y.x",
+      "enabled": true,
+      "groupName": "gomega 1.y.x",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchPackagePrefixes": [
+	      "github.com/onsi/gomega"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "baseBranches": [
+        "/^1\\..*\\.x/"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Do NOT generate PRs for major go dependency updates ",
       "enabled": false,
       "matchDatasources": [
         "go"
       ],
       "matchUpdateTypes": [
-        "major", "minor"
+        "major"
       ],
       "automerge": false
     },
@@ -65,10 +177,13 @@
       "automerge": true
     },
     {
-      "description": "Do generate PRs for golang version bumps, keeping x.yy version the same",
+      "description": "Do generate PRs for golang version patch bumps, keeping x.yy version the same",
       "enabled": true,
       "matchDatasources": [
         "golang-version"
+      ],
+      "matchUpdateTypes": [
+        "patch"
       ],
       "rangeStrategy": "bump",
       "automerge": false
