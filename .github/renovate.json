@@ -5,7 +5,8 @@
     ":rebaseStalePrs",
     "group:allNonMajor",
     "docker:disableMajor",
-    "default:pinDigestsDisabled"
+    "default:pinDigestsDisabled",
+    "helpers:pinGitHubActionDigests"
   ],
   "labels": [
     "kind/dependency upgrade"
@@ -187,7 +188,20 @@
       ],
       "rangeStrategy": "bump",
       "automerge": false
+    },
+    {
+      "description": "Do automerge and pin actions in GH workflows, except for versions starting with 0",
+      "enabled": true,
+      "matchDatasources": [
+        "github-runners"
+      ],
+      "matchUpdateTypes": [
+        "minor","patch"
+      ],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
     }
+
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
