@@ -4,7 +4,8 @@
     ":gitSignOff",
     ":rebaseStalePrs",
     "group:allNonMajor",
-    "docker:disableMajor"
+    "docker:disableMajor",
+    "default:pinDigestsDisabled"
   ],
   "labels": [
     "kind/dependency upgrade"
@@ -18,49 +19,58 @@
   },
   "packageRules": [
     {
-      "matchCategories": [
+      "description": "Do NOT generate PRs to pin or apply digests to dockerfiles",
+      "enabled": false,
+      "matchDatasources": [
         "docker"
       ],
       "matchUpdateTypes": [
-        "patch"
+        "pin","pinDigest", "digest"
       ],
-      "digest": {
-        "enabled": false
-      },
-      "automerge": true,
-      "pinDigests": false
+      "automerge": false
     },
     {
+      "description": "Do automerge patch updates to dockerfiles",
+      "enabled": true,
       "matchDatasources": [
         "docker"
       ],
       "matchUpdateTypes": [
         "patch"
       ],
-      "digest": {
-        "enabled": false
-      },
       "automerge": true,
       "pinDigests": false
     },
     {
+      "description": "Do NOT generate PRs for major or minor go dependency updates ",
+      "enabled": false,
       "matchDatasources": [
         "go"
       ],
       "matchUpdateTypes": [
-        "minor,",
+        "major", "minor"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Do automerge go dependency patch updates, except for versions starting with 0",
+      "enabled": true,
+      "matchDatasources": [
+        "go"
+      ],
+      "matchUpdateTypes": [
         "patch"
       ],
       "matchCurrentVersion": "!/^0/",
-      "automerge": true,
-      "pinDigests": true
+      "automerge": true
     },
     {
+      "description": "Do generate PRs for golang version bumps, keeping x.yy version the same",
+      "enabled": true,
       "matchDatasources": [
         "golang-version"
       ],
       "rangeStrategy": "bump",
-      "enabled": false,
       "automerge": false
     }
   ],
