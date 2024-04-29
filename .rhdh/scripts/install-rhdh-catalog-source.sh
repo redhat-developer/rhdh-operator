@@ -99,7 +99,24 @@ while [[ "$#" -gt 0 ]]; do
   shift 1
 done
 
+# check if the IIB we're going to install as a catalog source exists before trying to install it
+if [[ ! $(command -v skopeo) ]]; then
+  errorf "Please install skopeo 1.11+"
+  exit 1
+fi
+
+# shellcheck disable=SC2086
+UPSTREAM_IIB_MANIFEST="$(skopeo inspect docker://${UPSTREAM_IIB} --raw || exit 2)"
+# echo "Got: $UPSTREAM_IIB_MANIFEST"
+if [[ $UPSTREAM_IIB_MANIFEST == *"Error parsing image name "* ]] || [[ $UPSTREAM_IIB_MANIFEST == *"manifest unknown"* ]]; then
+  echo "$UPSTREAM_IIB_MANIFEST"; exit 3
+else
+  echo "[INFO] Using iib from image $UPSTREAM_IIB"
+  IIB_IMAGE="${UPSTREAM_IIB}"
+fi
+
 TMPDIR=$(mktemp -d)
+# shellcheck disable=SC2064
 trap "rm -fr $TMPDIR" EXIT
 
 # Add ImageContentSourcePolicy to resolve references to images not on quay as if from quay.io
@@ -167,8 +184,6 @@ spec:
     source: registry-proxy.engineering.redhat.com
 " > "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml"
 
-echo "[INFO] Using iib from image $UPSTREAM_IIB"
-IIB_IMAGE="${UPSTREAM_IIB}"
 CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
 DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
 
@@ -191,7 +206,7 @@ spec:
   image: ${IIB_IMAGE}
   publisher: IIB testing ${DISPLAY_NAME_SUFFIX}
   displayName: IIB testing catalog ${DISPLAY_NAME_SUFFIX}
-" > $TMPDIR/CatalogSource.yml && oc apply -f $TMPDIR/CatalogSource.yml
+" > "$TMPDIR"/CatalogSource.yml && oc apply -f "$TMPDIR"/CatalogSource.yml
 
 if [ -z "$TO_INSTALL" ]; then
   echo "Done. Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
@@ -205,7 +220,7 @@ kind: OperatorGroup
 metadata:
   name: rhdh-operator-group
   namespace: ${NAMESPACE_SUBSCRIPTION}
-" > $TMPDIR/OperatorGroup.yml && oc apply -f $TMPDIR/OperatorGroup.yml
+" > "$TMPDIR"/OperatorGroup.yml && oc apply -f "$TMPDIR"/OperatorGroup.yml
 
 # Create subscription for operator
 echo "apiVersion: operators.coreos.com/v1alpha1
@@ -219,4 +234,4 @@ spec:
   name: $TO_INSTALL
   source: ${CATALOGSOURCE_NAME}
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
-" > $TMPDIR/Subscription.yml && oc apply -f $TMPDIR/Subscription.yml
+" > "$TMPDIR"/Subscription.yml && oc apply -f "$TMPDIR"/Subscription.yml
