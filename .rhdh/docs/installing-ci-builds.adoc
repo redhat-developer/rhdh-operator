@@ -13,24 +13,27 @@ WARNING: The procedure below will not work properly on OpenShift clusters with h
 +
 [source,console]
 ----
-$ oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/my-global-pull-secret.yaml
-$ oc registry login --registry="quay.io" --auth-basic="<user>:<token>" --to=/tmp/my-global-pull-secret.yaml
+oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/my-global-pull-secret.yaml
+oc registry login --registry="quay.io" --auth-basic="<user>:<token>" --to=/tmp/my-global-pull-secret.yaml
 
-$ oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/my-global-pull-secret.yaml
+oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/my-global-pull-secret.yaml
 
-$ rm -f /tmp/my-global-pull-secret.yaml
+rm -f /tmp/my-global-pull-secret.yaml
 ----
 
 . Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate version, but the `--next` option allows to install the current development build (from the `main` branch). For example:
 +
 [source,console]
 ----
-$ cd /tmp
-$ curl -sSLO https://raw.githubusercontent.com/janus-idp/operator/main/.rhdh/scripts/install-rhdh-catalog-source.sh
-$ chmod +x install-rhdh-catalog-source.sh
-$ ./install-rhdh-catalog-source.sh --latest # install only the catalog source
-# or
-$ ./install-rhdh-catalog-source.sh --latest --install-operator rhdh  # install catalog source and operator subscription
+cd /tmp
+curl -sSLO https://raw.githubusercontent.com/janus-idp/operator/main/.rhdh/scripts/install-rhdh-catalog-source.sh
+chmod +x install-rhdh-catalog-source.sh
+
+# install catalog source and operator subscription, for the latest stable RC or GA from 1.yy.x branch
+./install-rhdh-catalog-source.sh --latest --install-operator rhdh  
+
+# OR, install catalog source and operator subscription, for the next CI build from main branch
+./install-rhdh-catalog-source.sh --next --install-operator rhdh  
 ----
 
 . If you did not create a subscription in the previous step, you can do so now. In the *Administrator* perspective of the OpenShift web console, go to *Operators* → *OperatorHub*, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator. For more info, see link:https://docs.openshift.com/container-platform/4.14/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster[Installing from OperatorHub using the web console].
