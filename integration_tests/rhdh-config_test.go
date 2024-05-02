@@ -39,7 +39,7 @@ var _ = When("create default backstage", func() {
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1alpha1.BackstageSpec{})
+		backstageName := createAndReconcileBackstage(ctx, ns, bsv1alpha1.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			deploy := &appsv1.Deployment{}

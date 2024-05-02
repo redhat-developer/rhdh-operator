@@ -141,8 +141,15 @@ func randString(n int) string {
 	return string(b)
 }
 
-func createBackstage(ctx context.Context, spec bsv1alpha1.BackstageSpec, ns string) string {
-	backstageName := "test-backstage-" + randString(5)
+func generateRandName() string {
+	return "test-backstage-" + randString(5)
+}
+func createBackstage(ctx context.Context, spec bsv1alpha1.BackstageSpec, ns string, name string) string {
+	backstageName := generateRandName()
+	if name != "" {
+		backstageName = name
+	}
+
 	err := k8sClient.Create(ctx, &bsv1alpha1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backstageName,
@@ -154,8 +161,8 @@ func createBackstage(ctx context.Context, spec bsv1alpha1.BackstageSpec, ns stri
 	return backstageName
 }
 
-func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1alpha1.BackstageSpec) string {
-	backstageName := createBackstage(ctx, spec, ns)
+func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1alpha1.BackstageSpec, name string) string {
+	backstageName := createBackstage(ctx, spec, ns, name)
 
 	Eventually(func() error {
 		found := &bsv1alpha1.Backstage{}

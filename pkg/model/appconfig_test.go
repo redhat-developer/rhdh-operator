@@ -146,16 +146,8 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 	assert.Equal(t, 4, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
-	//assert.Equal(t, filepath.Dir(deployment.deployment.Spec.Template.Spec.Containers[0].Args[1]),
-	//	deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath)
-
-	// it should be valid assertion using Volumes and VolumeMounts indexes since the order of adding is from default to specified
-
 	//assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret()deployment.deployment.Spec.Template.Spec.Volumes[0].Name
 	assert.Equal(t, deployment.deployment.Spec.Template.Spec.Volumes[0].Name,
 		deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
-
-	//t.Log(">>>>>>>>>>>>>>>>", )
-	//t.Log(">>>>>>>>>>>>>>>>", )
 
 }

@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-secret
+  labels:
+    rhdh.redhat.com/ext-config-sync: "true"
+  annotations:
+    rhdh.redhat.com/backstage-name: bs-rc-config
+stringData:
+  GH_CLIENT_ID: "54123321"
+  GH_CLIENT_SECRET: "54123321"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rc-app-config
+  labels:
+    rhdh.redhat.com/ext-config-sync: "true"
+  annotations:
+    rhdh.redhat.com/backstage-name: bs-rc-config
+#    test: test
+data:
+  rc-app-config.yaml: |
+    auth:
+      # see https://backstage.io/docs/auth/ to learn about auth providers
+      environment: development
+      providers:
+        github:
+          development:
+            clientId: '${GH_CLIENT_ID}'
+            clientSecret: '${GH_CLIENT_SECRET}'
+
+---
+apiVersion: rhdh.redhat.com/v1alpha1
+kind: Backstage
+metadata:
+  name: bs-rc-config
+spec:
+  application:
+    replicas: 1
+    appConfig:
+      configMaps:
+        - name: "rc-app-config"
+    extraEnvs:
+      secrets:
+        - name: "my-secret"

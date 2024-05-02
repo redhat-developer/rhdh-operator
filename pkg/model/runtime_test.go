@@ -17,6 +17,8 @@ package model
 import (
 	"context"
 	"fmt"
+
+	//	corev1 "k8s.io/api/core/v1"
 	"testing"
 
 	"k8s.io/utils/ptr"
@@ -29,7 +31,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//const backstageContainerName = "backstage-backend"
+func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
+	for _, cfg := range runtimeConfig {
+		obj := cfg.ObjectFactory.newBackstageObject()
+		assert.NotNil(t, obj.EmptyObject())
+		// TODO
+		//assert.NotEmpty(t, obj.EmptyObject().GetObjectKind().GroupVersionKind().Kind)
+	}
+}
 
 // NOTE: to make it work locally env var LOCALBIN should point to the directory where default-config folder located
 func TestInitDefaultDeploy(t *testing.T) {
@@ -135,4 +144,33 @@ func TestAddToModel(t *testing.T) {
 	assert.Nil(t, rm.backstageDeployment)
 	assert.Equal(t, testService, *rm.backstageService)
 	assert.Equal(t, testService, *rm.RuntimeObjects[0].(*BackstageService))
+}
+
+func TestGetHash(t *testing.T) {
+	ec := ExternalConfig{}
+	//ec.RawConfig = map[string]string{"rc1": "rc1", "rc2": "rc2"}
+	//ec.AppConfigs = map[string]corev1.ConfigMap{
+	//	"ac1": corev1.ConfigMap{
+	//		Data: map[string]string{
+	//			"ac11": "ac11",
+	//			"ac12": "ac12",
+	//		},
+	//	},
+	//	"ac2": corev1.ConfigMap{
+	//		Data: map[string]string{
+	//			"ac21": "ac21",
+	//			"ac22": "ac22",
+	//		},
+	//	},
+	//}
+
+	res := ec.GetHash()
+
+	t.Log(">>>> ", res)
+
+	//	ec.RawConfig["rc3"] = "test"
+
+	//res = ec.GetHash()
+	//
+	//t.Log(">>>> ", res)
 }

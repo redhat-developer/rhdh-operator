@@ -37,11 +37,7 @@ import (
 const BackstageAppLabel = "rhdh.redhat.com/app"
 
 // Backstage configuration scaffolding with empty BackstageObjects.
-// There are all possible objects for configuration, can be:
-// Mandatory - Backstage Deployment (Pod), Service
-// Optional - mostly (but not only) Backstage Pod configuration objects (AppConfig, ExtraConfig)
-// ForLocalDatabase - mandatory if EnabledLocalDb, ignored otherwise
-// ForOpenshift - if configured, used for Openshift deployment, ignored otherwise
+// There are all possible objects for configuration
 var runtimeConfig []ObjectConfig
 
 // BackstageModel represents internal object model
@@ -61,21 +57,11 @@ type BackstageModel struct {
 	RuntimeObjects []RuntimeObject
 
 	ExternalConfig ExternalConfig
-
-	//appConfigs []SpecifiedConfigMap
 }
 
 type SpecifiedConfigMap struct {
 	ConfigMap corev1.ConfigMap
 	Key       string
-}
-
-type ExternalConfig struct {
-	RawConfig           map[string]string
-	AppConfigs          map[string]corev1.ConfigMap
-	ExtraFileConfigMaps map[string]corev1.ConfigMap
-	ExtraEnvConfigMaps  map[string]corev1.ConfigMap
-	DynamicPlugins      corev1.ConfigMap
 }
 
 func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
