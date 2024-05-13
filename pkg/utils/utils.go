@@ -48,7 +48,7 @@ func GenerateLabel(labels *map[string]string, name string, value string) {
 
 // GenerateRuntimeObjectName generates name using BackstageCR name and objectType which is ConfigObject Key without '.yaml' (like 'deployment')
 func GenerateRuntimeObjectName(backstageCRName string, objectType string) string {
-	return fmt.Sprintf("%s-%s", backstageCRName, objectType)
+	return fmt.Sprintf("%s-%s", objectType, backstageCRName)
 }
 
 // GenerateVolumeNameFromCmOrSecret generates volume name for mounting ConfigMap or Secret
