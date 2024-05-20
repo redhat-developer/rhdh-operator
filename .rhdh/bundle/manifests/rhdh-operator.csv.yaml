@@ -81,17 +81,33 @@ spec:
           - ""
           resources:
           - configmaps
-          - persistentvolumeclaims
-          - persistentvolumes
-          - secrets
           - services
           verbs:
           - create
           - delete
           - get
           - list
+          - patch
           - update
           - watch
+        - apiGroups:
+          - ""
+          resources:
+          - persistentvolumeclaims
+          - persistentvolumes
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - create
+          - delete
+          - patch
+          - update
         - apiGroups:
           - apps
           resources:
@@ -101,6 +117,7 @@ spec:
           - delete
           - get
           - list
+          - patch
           - update
           - watch
         - apiGroups:
@@ -112,6 +129,7 @@ spec:
           - delete
           - get
           - list
+          - patch
           - update
           - watch
         - apiGroups:
@@ -144,11 +162,13 @@ spec:
           - route.openshift.io
           resources:
           - routes
+          - routes/custom-host
           verbs:
           - create
           - delete
           - get
           - list
+          - patch
           - update
           - watch
         - apiGroups:
