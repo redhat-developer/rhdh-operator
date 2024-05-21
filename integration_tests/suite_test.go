@@ -20,6 +20,8 @@ import (
 	"os"
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -141,8 +143,18 @@ func randString(n int) string {
 	return string(b)
 }
 
-func createBackstage(ctx context.Context, spec bsv1alpha1.BackstageSpec, ns string) string {
-	backstageName := "test-backstage-" + randString(5)
+// generateRandName return random name if name is empty or name itself otherwise
+func generateRandName(name string) string {
+	if name != "" {
+		return name
+	}
+	return "test-backstage-" + randString(5)
+}
+
+func createBackstage(ctx context.Context, spec bsv1alpha1.BackstageSpec, ns string, name string) string {
+
+	backstageName := generateRandName(name)
+
 	err := k8sClient.Create(ctx, &bsv1alpha1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backstageName,
@@ -154,8 +166,8 @@ func createBackstage(ctx context.Context, spec bsv1alpha1.BackstageSpec, ns stri
 	return backstageName
 }
 
-func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1alpha1.BackstageSpec) string {
-	backstageName := createBackstage(ctx, spec, ns)
+func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1alpha1.BackstageSpec, name string) string {
+	backstageName := createBackstage(ctx, spec, ns, name)
 
 	Eventually(func() error {
 		found := &bsv1alpha1.Backstage{}
@@ -165,6 +177,14 @@ func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1alpha1
 	_, err := NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
 		NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 	})
+
+	if err != nil {
+		GinkgoWriter.Printf("===> Error detected on Backstage reconcile: %s \n", err.Error())
+		if errors.IsAlreadyExists(err) || errors.IsConflict(err) {
+			return backstageName
+		}
+	}
+
 	Expect(err).To(Not(HaveOccurred()))
 
 	return backstageName

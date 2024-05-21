@@ -27,7 +27,7 @@ import (
 type DbServiceFactory struct{}
 
 func (f DbServiceFactory) newBackstageObject() RuntimeObject {
-	return &DbService{ /*service: &corev1.Service{}*/ }
+	return &DbService{}
 }
 
 type DbService struct {
@@ -85,5 +85,5 @@ func (b *DbService) validate(_ *BackstageModel, _ bsv1alpha1.Backstage) error {
 
 func (b *DbService) setMetaInfo(backstageName string) {
 	b.service.SetName(DbServiceName(backstageName))
-	utils.GenerateLabel(&b.service.Spec.Selector, BackstageAppLabel, fmt.Sprintf("backstage-db-%s", backstageName))
+	utils.GenerateLabel(&b.service.Spec.Selector, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstageName))
 }

@@ -39,7 +39,7 @@ type PodMutator struct {
 // podSpec - PodSpec to add Volume to
 // container - container to add VolumeMount(s) to
 // kind - kind of source, can be ConfigMap or Secret
-// object name - name of source object
+// objectName - name of source object
 // mountPath - mount path, default one or  as it specified in BackstageCR.spec.Application.AppConfig|ExtraFiles
 // fileName - file name which fits one of the object's key, otherwise error will be returned.
 // data - key:value pairs from the object. should be specified if fileName specified
@@ -77,6 +77,10 @@ func MountFilesFrom(podSpec *corev1.PodSpec, container *corev1.Container, kind O
 
 }
 
+// AddEnvVarsFrom adds environment variable to specified container
+// kind - kind of source, can be ConfigMap or Secret
+// objectName - name of source object
+// varName - name of env variable
 func AddEnvVarsFrom(container *corev1.Container, kind ObjectKind, objectName, varName string) {
 
 	if varName == "" {

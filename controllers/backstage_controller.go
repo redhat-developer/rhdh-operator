@@ -19,6 +19,12 @@ import (
 	"fmt"
 	"reflect"
 
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -44,7 +50,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var recNumber = 0
+var watchedConfigSelector = metav1.LabelSelector{
+	MatchExpressions: []metav1.LabelSelectorRequirement{
+		{
+			Key:      model.ExtConfigSyncLabel,
+			Values:   []string{"true"},
+			Operator: metav1.LabelSelectorOpIn,
+		},
+	},
+}
 
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
@@ -53,23 +67,16 @@ type BackstageReconciler struct {
 	// If true, Backstage Controller always sync the state of runtime objects created
 	// otherwise, runtime objects can be re-configured independently
 	OwnsRuntime bool
-
-	// Namespace allows to restrict the reconciliation to this particular namespace,
-	// and ignore requests from other namespaces.
-	// This is mostly useful for our tests, to overcome a limitation of EnvTest about namespace deletion.
-	Namespace string
-
+	// indicates if current cluster is Openshift
 	IsOpenShift bool
 }
 
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=configmaps;services,verbs=get;watch;create;update;list;delete;patch
+//+kubebuilder:rbac:groups="",resources=configmaps;secrets;services,verbs=get;watch;create;update;list;delete;patch
 //+kubebuilder:rbac:groups="",resources=persistentvolumes;persistentvolumeclaims,verbs=get;list;watch
-//+kubebuilder:rbac:groups="",resources=secrets,verbs=create;delete;patch;update
-//+kubebuilder:rbac:groups="apps",resources=deployments,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;watch;create;update;list;delete;patch
+//+kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
 //+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -78,16 +85,6 @@ type BackstageReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	lg := log.FromContext(ctx)
-
-	recNumber = recNumber + 1
-	lg.V(1).Info(fmt.Sprintf("starting reconciliation (namespace: %q), number %d", req.NamespacedName, recNumber))
-
-	// Ignore requests for other namespaces, if specified.
-	// This is mostly useful for our tests, to overcome a limitation of EnvTest about namespace deletion.
-	// More details on https://book.kubebuilder.io/reference/envtest.html#namespace-usage-limitation
-	if r.Namespace != "" && req.Namespace != r.Namespace {
-		return ctrl.Result{}, nil
-	}
 
 	backstage := bs.Backstage{}
 	if err := r.Get(ctx, req.NamespacedName, &backstage); err != nil {
@@ -282,18 +279,90 @@ func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionT
 	})
 }
 
+// requestByLabel returns a request with current Namespace and Backstage Object name taken from label
+// or empty request object if label not found
+func (r *BackstageReconciler) requestByLabel(ctx context.Context, object client.Object) []reconcile.Request {
+
+	lg := log.FromContext(ctx)
+
+	backstageName := object.GetAnnotations()[model.BackstageNameAnnotation]
+	if backstageName == "" {
+		lg.V(1).Info(fmt.Sprintf("warning: %s annotation is not defined for %s, Backstage instances will not be reconciled in this loop", model.BackstageNameAnnotation, object.GetName()))
+		return []reconcile.Request{}
+	}
+
+	nn := types.NamespacedName{
+		Namespace: object.GetNamespace(),
+		Name:      backstageName,
+	}
+
+	backstage := bs.Backstage{}
+	if err := r.Get(ctx, nn, &backstage); err != nil {
+		if !errors.IsNotFound(err) {
+			lg.Error(err, "request by label failed, get Backstage ")
+		}
+		return []reconcile.Request{}
+	}
+
+	ec, err := r.preprocessSpec(ctx, backstage)
+	if err != nil {
+		lg.Error(err, "request by label failed, preprocess Backstage ")
+		return []reconcile.Request{}
+	}
+
+	deploy := &appsv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: object.GetNamespace()}, deploy); err != nil {
+		if errors.IsNotFound(err) {
+			lg.V(1).Info("request by label, deployment not found", "name", model.DeploymentName(backstage.Name))
+		} else {
+			lg.Error(err, "request by label failed, get Deployment ", "error ", err)
+		}
+		return []reconcile.Request{}
+	}
+
+	newHash := ec.GetHash()
+	oldHash := deploy.Spec.Template.ObjectMeta.GetAnnotations()[model.ExtConfigHashAnnotation]
+	if newHash == oldHash {
+		lg.V(1).Info("request by label, hash are equal", "hash", newHash)
+		return []reconcile.Request{}
+	}
+
+	lg.V(1).Info("enqueuing reconcile for", object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), "new hash: ", newHash, "old hash: ", oldHash)
+	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: backstage.Name, Namespace: object.GetNamespace()}}}
+
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
-	builder := ctrl.NewControllerManagedBy(mgr).
-		For(&bs.Backstage{})
+	pred, err := predicate.LabelSelectorPredicate(watchedConfigSelector)
+	if err != nil {
+		return fmt.Errorf("failed to construct the predicate for matching secrets. This should not happen: %w", err)
+	}
 
-	// [GA] do not remove it
-	//if r.OwnsRuntime {
-	//	builder.Owns(&appsv1.Deployment{}).
-	//		Owns(&corev1.Service{}).
-	//		Owns(&appsv1.StatefulSet{})
-	//}
+	b := ctrl.NewControllerManagedBy(mgr).
+		For(&bs.Backstage{}).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+				return r.requestByLabel(ctx, o)
+			}),
+			builder.WithPredicates(pred, predicate.Funcs{
+				DeleteFunc: func(e event.DeleteEvent) bool { return true },
+				UpdateFunc: func(e event.UpdateEvent) bool { return true },
+				//CreateFunc: func(e event.CreateEvent) bool { return true },
+			}),
+		).
+		Watches(
+			&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+				return r.requestByLabel(ctx, o)
+			}),
+			builder.WithPredicates(pred, predicate.Funcs{
+				DeleteFunc: func(e event.DeleteEvent) bool { return true },
+				UpdateFunc: func(e event.UpdateEvent) bool { return true },
+				//CreateFunc: func(e event.CreateEvent) bool { return true },
+			}))
 
-	return builder.Complete(r)
+	return b.Complete(r)
 }

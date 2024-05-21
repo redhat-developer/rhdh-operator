@@ -17,6 +17,7 @@ package model
 import (
 	"context"
 	"fmt"
+
 	"testing"
 
 	"k8s.io/utils/ptr"
@@ -29,7 +30,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//const backstageContainerName = "backstage-backend"
+func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
+	for _, cfg := range runtimeConfig {
+		obj := cfg.ObjectFactory.newBackstageObject()
+		assert.NotNil(t, obj.EmptyObject())
+		// TODO uncomment when Kind is available
+		//assert.NotEmpty(t, obj.EmptyObject().GetObjectKind().GroupVersionKind().Kind)
+	}
+}
 
 // NOTE: to make it work locally env var LOCALBIN should point to the directory where default-config folder located
 func TestInitDefaultDeploy(t *testing.T) {

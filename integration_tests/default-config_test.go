@@ -51,7 +51,7 @@ var _ = When("create default backstage", func() {
 
 	It("creates runtime objects", func() {
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1alpha1.BackstageSpec{})
+		backstageName := createAndReconcileBackstage(ctx, ns, bsv1alpha1.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			By("creating a secret for accessing the Database")
@@ -95,20 +95,30 @@ var _ = When("create default backstage", func() {
 			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(model.AppConfigDefaultName(backstageName))).
 				To(BeAddedAsVolumeToPodSpec(deploy.Spec.Template.Spec))
 
-			By("setting Backstage status")
-			bs := &bsv1alpha1.Backstage{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
-			g.Expect(err).ShouldNot(HaveOccurred())
-			// TODO better matcher for Conditions
-			g.Expect(bs.Status.Conditions[0].Reason).To(Equal("Deployed"))
-
-			for _, cond := range deploy.Status.Conditions {
-				if cond.Type == "Available" {
-					g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
-				}
-			}
-
 		}, 5*time.Minute, time.Second).Should(Succeed())
+
+		if *testEnv.UseExistingCluster {
+			By("setting Backstage status (real cluster only)")
+			Eventually(func(g Gomega) {
+
+				bs := &bsv1alpha1.Backstage{}
+				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				deploy := &appsv1.Deployment{}
+				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				// TODO better matcher for Conditions
+				g.Expect(bs.Status.Conditions[0].Reason).To(Equal("Deployed"))
+
+				for _, cond := range deploy.Status.Conditions {
+					if cond.Type == "Available" {
+						g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+					}
+				}
+			}, 5*time.Minute, time.Second).Should(Succeed())
+		}
 	})
 
 	It("creates runtime object using raw configuration ", func() {
@@ -116,15 +126,15 @@ var _ = When("create default backstage", func() {
 		bsConf := map[string]string{"deployment.yaml": readTestYamlFile("raw-deployment.yaml")}
 		dbConf := map[string]string{"db-statefulset.yaml": readTestYamlFile("raw-statefulset.yaml")}
 
-		bsRaw := generateConfigMap(ctx, k8sClient, "bsraw", ns, bsConf)
-		dbRaw := generateConfigMap(ctx, k8sClient, "dbraw", ns, dbConf)
+		bsRaw := generateConfigMap(ctx, k8sClient, "bsraw", ns, bsConf, nil, nil)
+		dbRaw := generateConfigMap(ctx, k8sClient, "dbraw", ns, dbConf, nil, nil)
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1alpha1.BackstageSpec{
 			RawRuntimeConfig: &bsv1alpha1.RuntimeConfig{
 				BackstageConfigName: bsRaw,
 				LocalDbConfigName:   dbRaw,
 			},
-		})
+		}, "")
 
 		Eventually(func(g Gomega) {
 			By("creating Deployment")

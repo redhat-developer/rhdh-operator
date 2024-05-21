@@ -8,10 +8,6 @@ data:
     data:
       default.app-config.yaml: |
         backend:
-          database:
-            connection:
-              password: ${POSTGRES_PASSWORD}
-              user: ${POSTGRES_USER}
           auth:
             keys:
               # This is a default value, which you should change by providing your own app-config

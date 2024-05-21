@@ -105,8 +105,8 @@ func (b *DbStatefulSet) validate(model *BackstageModel, backstage bsv1alpha1.Bac
 
 func (b *DbStatefulSet) setMetaInfo(backstageName string) {
 	b.statefulSet.SetName(DbStatefulSetName(backstageName))
-	utils.GenerateLabel(&b.statefulSet.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, fmt.Sprintf("backstage-db-%s", backstageName))
-	utils.GenerateLabel(&b.statefulSet.Spec.Selector.MatchLabels, BackstageAppLabel, fmt.Sprintf("backstage-db-%s", backstageName))
+	utils.GenerateLabel(&b.statefulSet.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstageName))
+	utils.GenerateLabel(&b.statefulSet.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstageName))
 }
 
 // returns DB container

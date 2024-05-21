@@ -15,10 +15,16 @@
 package integration_tests
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/remotecommand"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,11 +34,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func generateConfigMap(ctx context.Context, k8sClient client.Client, name, namespace string, data map[string]string) string {
+func generateConfigMap(ctx context.Context, k8sClient client.Client, name string, namespace string, data, labels map[string]string, annotations map[string]string) string {
 	Expect(k8sClient.Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Data: data,
 	})).To(Not(HaveOccurred()))
@@ -40,15 +48,20 @@ func generateConfigMap(ctx context.Context, k8sClient client.Client, name, names
 	return name
 }
 
-func generateSecret(ctx context.Context, k8sClient client.Client, name, namespace string, keys []string) string {
-	data := map[string]string{}
-	for _, v := range keys {
+func generateSecret(ctx context.Context, k8sClient client.Client, name, namespace string, data, labels, annotations map[string]string) string {
+	if data == nil {
+		data = map[string]string{}
+	}
+
+	for _, v := range data {
 		data[v] = fmt.Sprintf("value-%s", v)
 	}
 	Expect(k8sClient.Create(ctx, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:        name,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		StringData: data,
 	})).To(Not(HaveOccurred()))
@@ -61,4 +74,49 @@ func readTestYamlFile(name string) string {
 	b, err := os.ReadFile(filepath.Join("testdata", name)) // #nosec G304, path is constructed internally
 	Expect(err).NotTo(HaveOccurred())
 	return string(b)
+}
+
+func executeRemoteCommand(ctx context.Context, podNamespace, podName, container, command string) (string, string, error) {
+	kubeCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{},
+	)
+	restCfg, err := kubeCfg.ClientConfig()
+	if err != nil {
+		return "", "", err
+	}
+	coreClient, err := kubernetes.NewForConfig(restCfg)
+	if err != nil {
+		return "", "", err
+	}
+
+	buf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	request := coreClient.CoreV1().RESTClient().
+		Post().
+		Namespace(podNamespace).
+		Resource("pods").
+		Name(podName).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Command:   []string{"/bin/sh", "-c", command},
+			Container: container,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       true,
+		}, scheme.ParameterCodec)
+	exec, err := remotecommand.NewSPDYExecutor(restCfg, "POST", request.URL())
+	if err != nil {
+		return "", "", fmt.Errorf("%w failed creating executor  %s on %v/%v", err, command, podNamespace, podName)
+	}
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdout: buf,
+		Stderr: errBuf,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("%w Failed executing command %s on %v/%v", err, command, podNamespace, podName)
+	}
+
+	return buf.String(), errBuf.String(), nil
 }

@@ -78,5 +78,5 @@ func (b *BackstageService) validate(_ *BackstageModel, _ bsv1alpha1.Backstage) e
 
 func (b *BackstageService) setMetaInfo(backstageName string) {
 	b.service.SetName(ServiceName(backstageName))
-	utils.GenerateLabel(&b.service.Spec.Selector, BackstageAppLabel, fmt.Sprintf("backstage-%s", backstageName))
+	utils.GenerateLabel(&b.service.Spec.Selector, BackstageAppLabel, utils.BackstageAppLabelValue(backstageName))
 }
