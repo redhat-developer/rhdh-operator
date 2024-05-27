@@ -44,10 +44,10 @@ spec:
   maintainers:
   - email: asoro@redhat.com
     name: Armel Soro
+  - email: cdaley@redhat.com
+    name: Corey Daley
   - email: gazarenk@redhat.com
     name: Gennady Azarenkov
-  - email: jianrzha@redhat.com
-    name: Jianrong Zhang
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:

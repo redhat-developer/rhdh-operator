@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Seamless Upgrades
-    createdAt: "2024-05-21T10:47:18Z"
+    createdAt: "2024-05-27T15:07:37Z"
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -300,10 +300,10 @@ spec:
   maintainers:
   - email: asoro@redhat.com
     name: Armel Soro
+  - email: cdaley@redhat.com
+    name: Corey Daley
   - email: gazarenk@redhat.com
     name: Gennady Azarenkov
-  - email: jianrzha@redhat.com
-    name: Jianrong Zhang
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:

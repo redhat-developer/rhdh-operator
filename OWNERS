@@ -1,7 +1,7 @@
 # if adding/removing approvers, remember to update pr-container-build.yaml to add/remove them from the authorize job
 approvers:
+ - coreydaley
  - gazarenkov
- - jianrongzhang89
  - kadel
  - nickboldt
  - rm3l
