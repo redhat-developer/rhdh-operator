@@ -16,14 +16,13 @@ package model
 
 import (
 	"context"
+	"testing"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -85,6 +84,8 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	*sf = append(*sf, bsv1alpha1.ObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
 	*sf = append(*sf, bsv1alpha1.ObjectKeyRef{Name: "secret2", Key: "conf.yaml"})
+	// https://issues.redhat.com/browse/RHIDP-2246 - mounting secret/CM with dot in the name
+	*sf = append(*sf, bsv1alpha1.ObjectKeyRef{Name: "secret.dot", Key: "conf3.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -96,11 +97,13 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
+	assert.Equal(t, 3, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
 	assert.Equal(t, 0, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 3, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret1"), deployment.podSpec().Volumes[0].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret2"), deployment.podSpec().Volumes[1].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret.dot"), deployment.podSpec().Volumes[2].Name)
 
 }
 
