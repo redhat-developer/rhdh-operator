@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Seamless Upgrades
-    createdAt: "2024-05-27T15:07:37Z"
+    createdAt: "2024-05-28T09:36:34Z"
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -227,10 +227,10 @@ spec:
                   limits:
                     cpu: 500m
                     ephemeral-storage: 20Mi
-                    memory: 128Mi
+                    memory: 1Gi
                   requests:
                     cpu: 10m
-                    memory: 64Mi
+                    memory: 128Mi
                 securityContext:
                   allowPrivilegeEscalation: false
                   capabilities:
