@@ -24,17 +24,6 @@ data:
     #  POSTGRES_USER: postgres
     #  POSTGRESQL_ADMIN_PASSWORD: admin123
     #  POSTGRES_HOST: bs1-db-service    #placeholder <crname>-db-service
-  db-service-hl.yaml: |
-    apiVersion: v1
-    kind: Service
-    metadata:
-      name: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
-    spec:
-      selector:
-        rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
-      clusterIP: None
-      ports:
-        - port: 5432
   db-service.yaml: |
     apiVersion: v1
     kind: Service
@@ -43,6 +32,7 @@ data:
     spec:
       selector:
         rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+      clusterIP: None
       ports:
         - port: 5432
   db-statefulset.yaml: |-
@@ -61,7 +51,6 @@ data:
         metadata:
           labels:
             rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
-          name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
         spec:
           # fsGroup does not work for Openshift
           # AKS/EKS does not work w/o it

@@ -92,6 +92,9 @@ func (b *DbStatefulSet) EmptyObject() client.Object {
 // implementation of RuntimeObject interface
 func (b *DbStatefulSet) validate(model *BackstageModel, backstage bsv1alpha1.Backstage) error {
 
+	// point ServiceName to localDb
+	b.statefulSet.Spec.ServiceName = model.LocalDbService.service.Name
+
 	if backstage.Spec.Application != nil {
 		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
 	}

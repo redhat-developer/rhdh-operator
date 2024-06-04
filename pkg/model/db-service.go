@@ -67,6 +67,9 @@ func (b *DbService) addToModel(model *BackstageModel, _ bsv1alpha1.Backstage) (b
 		}
 	}
 
+	// force this service to be headless even if it is not set in the original config
+	b.service.Spec.ClusterIP = corev1.ClusterIPNone
+
 	model.LocalDbService = b
 	model.setRuntimeObject(b)
 

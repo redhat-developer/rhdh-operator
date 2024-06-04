@@ -13,7 +13,6 @@ spec:
     metadata:
       labels:
         rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
-      name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
     spec:
       # fsGroup does not work for Openshift
       # AKS/EKS does not work w/o it

@@ -29,17 +29,16 @@ Mapping of configMap keys (yaml files) to runtime objects (NOTE: for the time (D
 | service.yaml                   | corev1.Service     | Yes            | all     | Backstage Service                               |
 | db-statefulset.yaml            | appsv1.Statefulset | For DB enabled | all     | PostgreSQL StatefulSet                          |    
 | db-service.yaml                | corev1.Service     | For DB enabled | all     | PostgreSQL Service                              |
-| db-service-hl.yaml             | corev1.Service     | For DB enabled | all     | PostgreSQL Service                              |
 | db-secret.yaml                 | corev1.Secret      | For DB enabled | all     | Secret to connect Backstage to PSQL             |
 | route.yaml                     | openshift.Route    | No (for OCP)   | all     | Route exposing Backstage service                |
-| app-config.yaml                | corev1.ConfigMap   | No             | 0.0.2   | Backstage app-config.yaml                       |
-| configmap-files.yaml           | corev1.ConfigMap   | No             | 0.0.2   | Backstage config file inclusions from configMap |
-| configmap-envs.yaml            | corev1.ConfigMap   | No             | 0.0.2   | Backstage env variables from configMap          |
-| secret-files.yaml              | corev1.Secret      | No             | 0.0.2   | Backstage config file inclusions from Secret    |
-| secret-envs.yaml               | corev1.Secret      | No             | 0.0.2   | Backstage env variables from Secret             |
-| dynamic-plugins.yaml           | corev1.ConfigMap   | No             | 0.0.2   | dynamic-plugins config *                        |
-| dynamic-plugins-configmap.yaml | corev1.ConfigMap   | No             | 0.0.1   | dynamic-plugins config *                        |
-| backend-auth-configmap.yaml    | corev1.ConfigMap   | No             | 0.0.1   | backend auth config                             |
+| app-config.yaml                | corev1.ConfigMap   | No             | 0.2.0   | Backstage app-config.yaml                       |
+| configmap-files.yaml           | corev1.ConfigMap   | No             | 0.2.0   | Backstage config file inclusions from configMap |
+| configmap-envs.yaml            | corev1.ConfigMap   | No             | 0.2.0   | Backstage env variables from configMap          |
+| secret-files.yaml              | corev1.Secret      | No             | 0.2.0   | Backstage config file inclusions from Secret    |
+| secret-envs.yaml               | corev1.Secret      | No             | 0.2.0   | Backstage env variables from Secret             |
+| dynamic-plugins.yaml           | corev1.ConfigMap   | No             | 0.2.0   | dynamic-plugins config *                        |
+| dynamic-plugins-configmap.yaml | corev1.ConfigMap   | No             | 0.1.0   | dynamic-plugins config *                        |
+| backend-auth-configmap.yaml    | corev1.ConfigMap   | No             | 0.1.0   | backend auth config                             |
 
 
 NOTES: 
