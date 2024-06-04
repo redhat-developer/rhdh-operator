@@ -16,6 +16,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"k8s.io/utils/ptr"
@@ -50,7 +51,7 @@ func TestEmptyDbSecret(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model.LocalDbSecret)
-	assert.Equal(t, DbSecretDefaultName(bs.Name), model.LocalDbSecret.secret.Name)
+	assert.Equal(t, fmt.Sprintf("backstage-psql-secret-%s", bs.Name), model.LocalDbSecret.secret.Name)
 
 	dbss := model.localDbStatefulSet
 	assert.NotNil(t, dbss)
@@ -68,7 +69,7 @@ func TestDefaultWithGeneratedSecrets(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.Equal(t, DbSecretDefaultName(bs.Name), model.LocalDbSecret.secret.Name)
+	assert.Equal(t, fmt.Sprintf("backstage-psql-secret-%s", bs.Name), model.LocalDbSecret.secret.Name)
 	//should be generated
 	//	assert.NotEmpty(t, model.LocalDbSecret.secret.StringData["POSTGRES_USER"])
 	//	assert.NotEmpty(t, model.LocalDbSecret.secret.StringData["POSTGRES_PASSWORD"])

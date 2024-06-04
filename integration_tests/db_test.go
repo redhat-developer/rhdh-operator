@@ -16,10 +16,12 @@ package integration_tests
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,8 +29,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
 	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
 
@@ -60,13 +60,13 @@ var _ = When("create backstage with CR configured", func() {
 		Eventually(func(g Gomega) {
 			By("creating Deployment with database.enableLocalDb=true by default")
 
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstageName)}, &appsv1.StatefulSet{})
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &appsv1.StatefulSet{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstageName)}, &corev1.Service{})
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &corev1.Service{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstageName)}, &corev1.Secret{})
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-secret-%s", backstageName)}, &corev1.Secret{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
 		}, time.Minute, time.Second).Should(Succeed())
@@ -86,15 +86,15 @@ var _ = When("create backstage with CR configured", func() {
 
 		Eventually(func(g Gomega) {
 			By("deleting Local Db StatefulSet, Service and Secret")
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstageName)}, &appsv1.StatefulSet{})
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &appsv1.StatefulSet{})
 			g.Expect(err).To(HaveOccurred())
 			g.Expect(errors.IsNotFound(err))
 
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DbServiceName(backstageName)}, &corev1.Service{})
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &corev1.Service{})
 			g.Expect(err).To(HaveOccurred())
 			g.Expect(errors.IsNotFound(err))
 
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DbSecretDefaultName(backstageName)}, &corev1.Secret{})
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-secret-%s", backstageName)}, &corev1.Secret{})
 			g.Expect(err).To(HaveOccurred())
 			g.Expect(errors.IsNotFound(err))
 		}, time.Minute, time.Second).Should(Succeed())
@@ -112,7 +112,7 @@ var _ = When("create backstage with CR configured", func() {
 		Eventually(func(g Gomega) {
 			By("not creating a StatefulSet for the Database")
 			err := k8sClient.Get(ctx,
-				types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstageName)},
+				types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)},
 				&appsv1.StatefulSet{})
 			g.Expect(err).Should(HaveOccurred())
 			g.Expect(errors.IsNotFound(err))
@@ -133,7 +133,7 @@ var _ = When("create backstage with CR configured", func() {
 		Eventually(func(g Gomega) {
 			By("not creating a StatefulSet for the Database")
 			err := k8sClient.Get(ctx,
-				types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstageName)},
+				types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)},
 				&appsv1.StatefulSet{})
 			g.Expect(err).Should(HaveOccurred())
 			g.Expect(errors.IsNotFound(err))
@@ -143,4 +143,5 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(err).Should(Not(HaveOccurred()))
 		}, time.Minute, time.Second).Should(Succeed())
 	})
+
 })

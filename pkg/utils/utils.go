@@ -70,7 +70,7 @@ func BackstageAppLabelValue(backstageName string) string {
 }
 
 func BackstageDbAppLabelValue(backstageName string) string {
-	return fmt.Sprintf("backstage-db-%s", backstageName)
+	return fmt.Sprintf("backstage-psql-%s", backstageName)
 }
 
 func ReadYaml(manifest []byte, object interface{}) error {

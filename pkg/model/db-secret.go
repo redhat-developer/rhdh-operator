@@ -39,7 +39,7 @@ func init() {
 }
 
 func DbSecretDefaultName(backstageName string) string {
-	return utils.GenerateRuntimeObjectName(backstageName, "backstage-db")
+	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql-secret")
 }
 
 // implementation of RuntimeObject interface

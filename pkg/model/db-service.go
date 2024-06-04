@@ -39,7 +39,7 @@ func init() {
 }
 
 func DbServiceName(backstageName string) string {
-	return utils.GenerateRuntimeObjectName(backstageName, "backstage-db")
+	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql")
 }
 
 // implementation of RuntimeObject interface

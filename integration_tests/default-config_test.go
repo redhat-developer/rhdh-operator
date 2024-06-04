@@ -16,12 +16,15 @@ package integration_tests
 
 import (
 	"context"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+	"fmt"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
+
+	appsv1 "k8s.io/api/apps/v1"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
 
@@ -56,7 +59,7 @@ var _ = When("create default backstage", func() {
 		Eventually(func(g Gomega) {
 			By("creating a secret for accessing the Database")
 			secret := &corev1.Secret{}
-			secretName := model.DbSecretDefaultName(backstageName)
+			secretName := fmt.Sprintf("backstage-psql-secret-%s", backstageName)
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretName}, secret)
 			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
 			g.Expect(len(secret.Data)).To(Equal(5))
@@ -64,7 +67,7 @@ var _ = When("create default backstage", func() {
 
 			By("creating a StatefulSet for the Database")
 			ss := &appsv1.StatefulSet{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstageName)}, ss)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, ss)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			By("injecting default DB Secret as an env var for Db container")
@@ -72,7 +75,7 @@ var _ = When("create default backstage", func() {
 			g.Expect(ss.GetOwnerReferences()).To(HaveLen(1))
 
 			By("creating a Service for the Database")
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: model.DbServiceName(backstageName), Namespace: ns}, &corev1.Service{})
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}, &corev1.Service{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
 			By("creating Deployment")
@@ -147,13 +150,70 @@ var _ = When("create default backstage", func() {
 
 			By("creating StatefulSet")
 			ss := &appsv1.StatefulSet{}
-			name := model.DbStatefulSetName(backstageName)
+			name := fmt.Sprintf("backstage-psql-%s", backstageName)
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, ss)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(ss.Spec.Template.Spec.Containers).To(HaveLen(1))
 			g.Expect(ss.Spec.Template.Spec.Containers[0].Image).To(Equal("busybox"))
 		}, time.Minute, time.Second).Should(Succeed())
 
+	})
+
+	It("creates runtime object using raw configuration then updates StatefulSet to replace some immutable fields", func() {
+		if !*testEnv.UseExistingCluster {
+			Skip("Real cluster required to assert actual deletion and replacement of resources")
+		}
+
+		rawStatefulSetYamlContent := readTestYamlFile("raw-statefulset.yaml")
+		dbConf := map[string]string{"db-statefulset.yaml": rawStatefulSetYamlContent}
+
+		dbRaw := generateConfigMap(ctx, k8sClient, "dbraw", ns, dbConf, nil, nil)
+
+		backstageName := createAndReconcileBackstage(ctx, ns, bsv1alpha1.BackstageSpec{
+			RawRuntimeConfig: &bsv1alpha1.RuntimeConfig{
+				LocalDbConfigName: dbRaw,
+			},
+		}, "")
+
+		Eventually(func(g Gomega) {
+			By("creating Deployment")
+			deploy := &appsv1.Deployment{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			By("creating StatefulSet")
+			dbStatefulSet := &appsv1.StatefulSet{}
+			name := fmt.Sprintf("backstage-psql-%s", backstageName)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, dbStatefulSet)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(dbStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(1))
+			g.Expect(dbStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal("busybox"))
+			g.Expect(dbStatefulSet.Spec.PodManagementPolicy).To(Equal(appsv1.ParallelPodManagement))
+		}, time.Minute, time.Second).Should(Succeed())
+
+		By("updating CR to default config")
+		update := &bsv1alpha1.Backstage{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, update)
+		Expect(err).To(Not(HaveOccurred()))
+		update.Spec.RawRuntimeConfig = nil
+		err = k8sClient.Update(ctx, update)
+		Expect(err).To(Not(HaveOccurred()))
+
+		// Patching StatefulSets is done by the reconciler in two passes: first deleting the StatefulSet first, then recreating it in the next reconcilation.
+		for i := 0; i < 2; i++ {
+			_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+			})
+			Expect(err).To(Not(HaveOccurred()))
+		}
+
+		Eventually(func(g Gomega) {
+			By("replacing StatefulSet")
+			dbStatefulSet := &appsv1.StatefulSet{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, dbStatefulSet)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(dbStatefulSet.Spec.PodManagementPolicy).To(Equal(appsv1.OrderedReadyPodManagement))
+		}, time.Minute, time.Second).Should(Succeed())
 	})
 
 })

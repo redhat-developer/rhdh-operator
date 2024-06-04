@@ -4,6 +4,7 @@ metadata:
   name: db-statefulset
 spec:
   serviceName: ""
+  podManagementPolicy: Parallel
   replicas: 1
   selector:
     matchLabels:

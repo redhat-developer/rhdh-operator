@@ -181,11 +181,22 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 		}
 
 		if err := r.patchObject(ctx, baseObject, obj); err != nil {
+			_, isStatefulSet := obj.Object().(*appsv1.StatefulSet)
+			if isStatefulSet && errors.IsInvalid(err) && errors.HasStatusCause(err, metav1.CauseTypeForbidden) {
+				// Some resources like StatefulSets allow patching a limited set of fields.
+				// That's why we are trying to delete them first, taking care of orphaning the dependents so that resources like PVCs can be retained.
+				// They will be recreated at the next reconciliation.
+				if err = r.Delete(ctx, baseObject, client.PropagationPolicy(metav1.DeletePropagationOrphan)); err != nil {
+					return fmt.Errorf("failed to delete object %s so it can be recreated: %w", obj.Object(), err)
+				}
+				lg.V(1).Info("delete object ", objDispName(obj), obj.Object().GetName())
+				continue
+			}
+
 			return fmt.Errorf("failed to patch object %s: %w", obj.Object(), err)
 		}
 
 		lg.V(1).Info("patch object ", objDispName(obj), obj.Object().GetName())
-
 	}
 	return nil
 }
