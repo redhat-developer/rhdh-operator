@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [ main, 1.1.x ]
+        branch: [ main, 1.2.x, 1.1.x ]
     name: E2E Tests - ${{ matrix.branch }}
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.branch }}
@@ -35,19 +35,26 @@ jobs:
 
       - name: Determine built operator image
         run: |
-          latestNext="next"
-          # for main branch, use next tags; for 1.x branches, use :latest tags
-          if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]; then
-            latestNext="latest" 
-          fi
-          echo "OPERATOR_IMAGE=quay.io/janus-idp/operator:${latestNext}" >> $GITHUB_ENV
+          echo "OPERATOR_IMAGE=$(make show-img)" >> $GITHUB_ENV
+
+      - name: Check if image exists in remote registry
+        id: operator-image-existence-checker
+        run: |
+          echo "OPERATOR_IMAGE_EXISTS=$(if skopeo inspect "docker://${{ env.OPERATOR_IMAGE }}" > /dev/null; then echo "true"; else echo "false"; fi)" >> $GITHUB_OUTPUT
+
+      - name: Display warning if image was not found
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'false' }}
+        run: |
+          echo "::warning ::Image ${{ env.OPERATOR_IMAGE }} not found for testing the ${{ matrix.branch }} branch. It might have expired. E2E tests will be skipped for ${{ matrix.branch }}."
 
       - name: Start Minikube
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: medyagh/setup-minikube@317d92317e473a10540357f1f4b2878b80ee7b95 # v0.0.16
         with:
           addons: ingress
 
       - name: Run E2E tests
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
           IMG: ${{ env.OPERATOR_IMAGE }}
