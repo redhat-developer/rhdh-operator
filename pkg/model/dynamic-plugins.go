@@ -55,10 +55,15 @@ func addDynamicPlugins(spec v1alpha1.BackstageSpec, deployment *appsv1.Deploymen
 	}
 
 	if _, ic := DynamicPluginsInitContainer(deployment.Spec.Template.Spec.InitContainers); ic == nil {
-		return fmt.Errorf("deployment validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
+		return fmt.Errorf("validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
 	}
 
 	dp := DynamicPlugins{ConfigMap: &model.ExternalConfig.DynamicPlugins}
+
+	if dp.ConfigMap.Data == nil || len(dp.ConfigMap.Data) != 1 || dp.ConfigMap.Data[DynamicPluginsFile] == "" {
+		return fmt.Errorf("dynamic plugin configMap expects exactly one key named '%s' ", DynamicPluginsFile)
+	}
+
 	dp.updatePod(deployment)
 	return nil
 

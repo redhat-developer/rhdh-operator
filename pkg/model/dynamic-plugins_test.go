@@ -56,7 +56,28 @@ func TestDynamicPluginsValidationFailed(t *testing.T) {
 
 }
 
-// Janus pecific test
+func TestDynamicPluginsInvalidKeyName(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+
+	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
+		Data:       map[string]string{"WrongKeyName.yml": "tt"},
+	}
+
+	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "expects exactly one key named 'dynamic-plugins.yaml'")
+
+}
+
+// Janus specific test
 func TestDefaultDynamicPlugins(t *testing.T) {
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
@@ -92,7 +113,10 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
-	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "dplugin"}}
+	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
+		Data:       map[string]string{DynamicPluginsFile: "tt"},
+	}
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
 
@@ -106,7 +130,6 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 	//vol-dplugin
 	assert.Equal(t, 3, len(ic.VolumeMounts))
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("dplugin"), ic.VolumeMounts[2].Name)
-	//t.Log(">>>>>>>>>>>>>>>>", ic.VolumeMounts)
 }
 
 func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
