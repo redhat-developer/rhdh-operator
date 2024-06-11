@@ -406,7 +406,11 @@ $(GINKGO): $(LOCALBIN)
 
 .PHONY: test-e2e
 test-e2e: ginkgo ## Run end-to-end tests. See the 'tests/e2e/README.md' file for more details.
-	$(GINKGO) $(GINKGO_FLAGS) tests/e2e
+	$(GINKGO) $(GINKGO_FLAGS) --skip-file=e2e_upgrade_test.go tests/e2e
+
+.PHONY: test-e2e-upgrade
+test-e2e-upgrade: ginkgo ## Run end-to-end tests dedicated to the operator upgrade paths. See the 'tests/e2e/README.md' file for more details.
+	$(GINKGO) $(GINKGO_FLAGS) --focus-file=e2e_upgrade_test.go tests/e2e
 
 show-img:
 	@echo -n $(IMG)

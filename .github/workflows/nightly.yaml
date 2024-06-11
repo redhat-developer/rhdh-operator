@@ -53,6 +53,14 @@ jobs:
         with:
           addons: ingress
 
+      - name: Run E2E tests (Operator Upgrade path)
+        # Testing upgrade from 1.1.x
+        if: ${{ matrix.branch != '1.1.x' }}
+        env:
+          BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
+          IMG: ${{ env.OPERATOR_IMAGE }}
+        run: make test-e2e-upgrade
+
       - name: Run E2E tests
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:

@@ -184,31 +184,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 
 	By("validating that the controller-manager pod is running as expected")
-	verifyControllerUp := func(g Gomega) {
-		// Get pod name
-		cmd := exec.Command(helper.GetPlatformTool(), "get",
-			"pods", "-l", managerPodLabel,
-			"-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}"+
-				"{{ \"\\n\" }}{{ end }}{{ end }}",
-			"-n", _namespace,
-		)
-		podOutput, err := helper.Run(cmd)
-		g.Expect(err).ShouldNot(HaveOccurred())
-		podNames := helper.GetNonEmptyLines(string(podOutput))
-		g.Expect(podNames).Should(HaveLen(1), fmt.Sprintf("expected 1 controller pods running, but got %d", len(podNames)))
-		controllerPodName := podNames[0]
-		g.Expect(controllerPodName).ShouldNot(BeEmpty())
-
-		// Validate pod status
-		cmd = exec.Command(helper.GetPlatformTool(), "get",
-			"pods", controllerPodName, "-o", "jsonpath={.status.phase}",
-			"-n", _namespace,
-		)
-		status, err := helper.Run(cmd)
-		g.Expect(err).ShouldNot(HaveOccurred())
-		g.Expect(string(status)).Should(Equal("Running"), fmt.Sprintf("controller pod in %s status", status))
-	}
-	EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).Should(Succeed())
+	EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).WithArguments(managerPodLabel).Should(Succeed())
 
 	return nil
 }, func(_ []byte) {
@@ -217,8 +193,37 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 var _ = SynchronizedAfterSuite(func() {
 	//runs on *all* processes
-}, func() {
-	//runs *only* on process #1
+},
+	// the function below *only* on process #1
+	uninstallOperator,
+)
+
+func verifyControllerUp(g Gomega, managerPodLabel string) {
+	// Get pod name
+	cmd := exec.Command(helper.GetPlatformTool(), "get",
+		"pods", "-l", managerPodLabel,
+		"-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}"+
+			"{{ \"\\n\" }}{{ end }}{{ end }}",
+		"-n", _namespace,
+	)
+	podOutput, err := helper.Run(cmd)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	podNames := helper.GetNonEmptyLines(string(podOutput))
+	g.Expect(podNames).Should(HaveLen(1), fmt.Sprintf("expected 1 controller pods running, but got %d", len(podNames)))
+	controllerPodName := podNames[0]
+	g.Expect(controllerPodName).ShouldNot(BeEmpty())
+
+	// Validate pod status
+	cmd = exec.Command(helper.GetPlatformTool(), "get",
+		"pods", controllerPodName, "-o", "jsonpath={.status.phase}",
+		"-n", _namespace,
+	)
+	status, err := helper.Run(cmd)
+	g.Expect(err).ShouldNot(HaveOccurred())
+	g.Expect(string(status)).Should(Equal("Running"), fmt.Sprintf("controller pod in %s status", status))
+}
+
+func uninstallOperator() {
 	switch testMode {
 	case rhdhLatestTestMode, rhdhNextTestMode, rhdhAirgapTestMode:
 		uninstallRhdhOperator(testMode == rhdhAirgapTestMode)
@@ -226,7 +231,7 @@ var _ = SynchronizedAfterSuite(func() {
 		uninstallOperatorWithMakeUndeploy(testMode == olmDeployTestMode)
 	}
 	helper.DeleteNamespace(_namespace, true)
-})
+}
 
 func uninstallRhdhOperator(withAirgap bool) {
 	cmd := exec.Command(helper.GetPlatformTool(), "delete", "subscription", "rhdh", "-n", _namespace, "--ignore-not-found=true")
@@ -253,6 +258,5 @@ func uninstallOperatorWithMakeUndeploy(withOlm bool) {
 		undeployCmd += "-olm"
 	}
 	cmd := exec.Command("make", undeployCmd)
-	_, err := helper.Run(cmd)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	_, _ = helper.Run(cmd)
 }
