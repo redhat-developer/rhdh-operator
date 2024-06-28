@@ -55,7 +55,7 @@ jobs:
 
       - name: Run E2E tests (Operator Upgrade path)
         # Testing upgrade from 1.1.x
-        if: ${{ matrix.branch != '1.1.x' }}
+        if: ${{ matrix.branch != '1.1.x' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
           IMG: ${{ env.OPERATOR_IMAGE }}
