@@ -9,19 +9,7 @@ WARNING: The procedure below will not work properly on OpenShift clusters with h
 
 *Procedure*
 
-. Add your Quay token to the cluster global pull secret (link:https://docs.openshift.com/container-platform/4.14/openshift_images/managing_images/using-image-pull-secrets.html#images-update-global-pull-secret_using-image-pull-secrets[link]):
-+
-[source,console]
-----
-oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/my-global-pull-secret.yaml
-oc registry login --registry="quay.io" --auth-basic="<user>:<token>" --to=/tmp/my-global-pull-secret.yaml
-
-oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/my-global-pull-secret.yaml
-
-rm -f /tmp/my-global-pull-secret.yaml
-----
-
-. Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate version, but the `--next` option allows to install the current development build (from the `main` branch). For example:
+. Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate or GA version (from the `1.yy.x` branch), but the `--next` option allows to install the current development build (from the `main` branch). For example:
 +
 [source,console]
 ----
