@@ -32,256 +32,256 @@ spec:
     singular: backstage
   scope: Namespaced
   versions:
-  - name: v1alpha1
-    schema:
-      openAPIV3Schema:
-        description: Backstage is the Schema for the backstages API
-        properties:
-          apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-            type: string
-          kind:
-            description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: BackstageSpec defines the desired state of Backstage
-            properties:
-              application:
-                description: Configuration for Backstage. Optional.
-                properties:
-                  appConfig:
-                    description: References to existing app-configs ConfigMap objects, that will be mounted as files in the specified mount path. Each element can be a reference to any ConfigMap or Secret, and will be mounted inside the main application container under a specified mount directory. Additionally, each file will be passed as a `--config /mount/path/to/configmap/key` to the main container args in the order of the entries defined in the AppConfigs list. But bear in mind that for a single ConfigMap element containing several filenames, the order in which those files will be appended to the main container args cannot be guaranteed. So if you want to pass multiple app-config files, it is recommended to pass one ConfigMap per app-config file.
-                    properties:
-                      configMaps:
-                        description: List of ConfigMaps storing the app-config files. Will be mounted as files under the MountPath specified. For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be mounted as files. Otherwise, only the specified key will be mounted as a file. Bear in mind not to put sensitive data in those ConfigMaps. Instead, your app-config content can reference environment variables (which you can set with the ExtraEnvs field) and/or include extra files (see the ExtraFiles field). More details on https://backstage.io/docs/conf/writing/.
-                        items:
-                          properties:
-                            key:
-                              description: Key in the object
-                              type: string
-                            name:
-                              description: Name of the object We support only ConfigMaps and Secrets.
-                              type: string
-                          required:
-                          - name
-                          type: object
-                        type: array
-                      mountPath:
-                        default: /opt/app-root/src
-                        description: Mount path for all app-config files listed in the ConfigMapRefs field
-                        type: string
-                    type: object
-                  dynamicPluginsConfigMapName:
-                    description: 'Reference to an existing ConfigMap for Dynamic Plugins. A new one will be generated with the default config if not set. The ConfigMap object must have an existing key named: ''dynamic-plugins.yaml''.'
-                    type: string
-                  extraEnvs:
-                    description: Extra environment variables
-                    properties:
-                      configMaps:
-                        description: List of references to ConfigMaps objects to inject as additional environment variables. For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be injected as additional environment variables. Otherwise, only the specified key will be injected as an additional environment variable.
-                        items:
-                          properties:
-                            key:
-                              description: Key in the object
-                              type: string
-                            name:
-                              description: Name of the object We support only ConfigMaps and Secrets.
-                              type: string
-                          required:
-                          - name
-                          type: object
-                        type: array
-                      envs:
-                        description: List of name and value pairs to add as environment variables.
-                        items:
-                          properties:
-                            name:
-                              description: Name of the environment variable
-                              type: string
-                            value:
-                              description: Value of the environment variable
-                              type: string
-                          required:
-                          - name
-                          - value
-                          type: object
-                        type: array
-                      secrets:
-                        description: List of references to Secrets objects to inject as additional environment variables. For each item in this array, if a key is not specified, it means that all keys in the Secret will be injected as additional environment variables. Otherwise, only the specified key will be injected as environment variable.
-                        items:
-                          properties:
-                            key:
-                              description: Key in the object
-                              type: string
-                            name:
-                              description: Name of the object We support only ConfigMaps and Secrets.
-                              type: string
-                          required:
-                          - name
-                          type: object
-                        type: array
-                    type: object
-                  extraFiles:
-                    description: References to existing Config objects to use as extra config files. They will be mounted as files in the specified mount path. Each element can be a reference to any ConfigMap or Secret.
-                    properties:
-                      configMaps:
-                        description: List of references to ConfigMaps objects mounted as extra files under the MountPath specified. For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be mounted as files. Otherwise, only the specified key will be mounted as a file.
-                        items:
-                          properties:
-                            key:
-                              description: Key in the object
-                              type: string
-                            name:
-                              description: Name of the object We support only ConfigMaps and Secrets.
-                              type: string
-                          required:
-                          - name
-                          type: object
-                        type: array
-                      mountPath:
-                        default: /opt/app-root/src
-                        description: Mount path for all extra configuration files listed in the Items field
-                        type: string
-                      secrets:
-                        description: List of references to Secrets objects mounted as extra files under the MountPath specified. For each item in this array, a key must be specified that will be mounted as a file.
-                        items:
-                          properties:
-                            key:
-                              description: Key in the object
-                              type: string
-                            name:
-                              description: Name of the object We support only ConfigMaps and Secrets.
-                              type: string
-                          required:
-                          - name
-                          type: object
-                        type: array
-                    type: object
-                  image:
-                    description: Custom image to use in all containers (including Init Containers). It is your responsibility to make sure the image is from trusted sources and has been validated for security compliance
-                    type: string
-                  imagePullSecrets:
-                    description: Image Pull Secrets to use in all containers (including Init Containers)
-                    items:
-                      type: string
-                    type: array
-                  replicas:
-                    default: 1
-                    description: Number of desired replicas to set in the Backstage Deployment. Defaults to 1.
-                    format: int32
-                    type: integer
-                  route:
-                    description: Route configuration. Used for OpenShift only.
-                    properties:
-                      enabled:
-                        default: true
-                        description: Control the creation of a Route on OpenShift.
-                        type: boolean
-                      host:
-                        description: Host is an alias/DNS that points to the service. Optional. Ignored if Enabled is false. If not specified a route name will typically be automatically chosen.  Must follow DNS952 subdomain conventions.
-                        maxLength: 253
-                        pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
-                        type: string
-                      subdomain:
-                        description: 'Subdomain is a DNS subdomain that is requested within the ingress controller''s domain (as a subdomain). Ignored if Enabled is false. Example: subdomain `frontend` automatically receives the router subdomain `apps.mycluster.com` to have a full hostname `frontend.apps.mycluster.com`.'
-                        maxLength: 253
-                        pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
-                        type: string
-                      tls:
-                        description: The tls field provides the ability to configure certificates for the route. Ignored if Enabled is false.
-                        properties:
-                          caCertificate:
-                            description: caCertificate provides the cert authority certificate contents
-                            type: string
-                          certificate:
-                            description: certificate provides certificate contents. This should be a single serving certificate, not a certificate chain. Do not include a CA certificate.
-                            type: string
-                          externalCertificateSecretName:
-                            description: ExternalCertificateSecretName provides certificate contents as a secret reference. This should be a single serving certificate, not a certificate chain. Do not include a CA certificate. The secret referenced should be present in the same namespace as that of the Route. Forbidden when `certificate` is set.
-                            type: string
-                          key:
-                            description: key provides key file contents
-                            type: string
-                        type: object
-                    type: object
-                type: object
-              database:
-                description: Configuration for database access. Optional.
-                properties:
-                  authSecretName:
-                    description: 'Name of the secret for database authentication. Optional. For a local database deployment (EnableLocalDb=true), a secret will be auto generated if it does not exist. The secret shall include information used for the database access. An example for PostgreSQL DB access: "POSTGRES_PASSWORD": "rl4s3Fh4ng3M4" "POSTGRES_PORT": "5432" "POSTGRES_USER": "postgres" "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4" "POSTGRES_HOST": "backstage-psql-bs1"  # For local database, set to "backstage-psql-<CR name>".'
-                    type: string
-                  enableLocalDb:
-                    default: true
-                    description: Control the creation of a local PostgreSQL DB. Set to false if using for example an external Database for Backstage.
-                    type: boolean
-                type: object
-              rawRuntimeConfig:
-                description: Raw Runtime Objects configuration. For Advanced scenarios.
-                properties:
-                  backstageConfig:
-                    description: Name of ConfigMap containing Backstage runtime objects configuration
-                    type: string
-                  localDbConfig:
-                    description: Name of ConfigMap containing LocalDb (PostgreSQL) runtime objects configuration
-                    type: string
-                type: object
-            type: object
-          status:
-            description: BackstageStatus defines the observed state of Backstage
-            properties:
-              conditions:
-                description: Conditions is the list of conditions describing the state of the runtime
-                items:
-                  description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: Backstage is the Schema for the backstages API
+          properties:
+            apiVersion:
+              description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
+              type: string
+            kind:
+              description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: BackstageSpec defines the desired state of Backstage
+              properties:
+                application:
+                  description: Configuration for Backstage. Optional.
                   properties:
-                    lastTransitionTime:
-                      description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
-                      format: date-time
+                    appConfig:
+                      description: References to existing app-configs ConfigMap objects, that will be mounted as files in the specified mount path. Each element can be a reference to any ConfigMap or Secret, and will be mounted inside the main application container under a specified mount directory. Additionally, each file will be passed as a `--config /mount/path/to/configmap/key` to the main container args in the order of the entries defined in the AppConfigs list. But bear in mind that for a single ConfigMap element containing several filenames, the order in which those files will be appended to the main container args cannot be guaranteed. So if you want to pass multiple app-config files, it is recommended to pass one ConfigMap per app-config file.
+                      properties:
+                        configMaps:
+                          description: List of ConfigMaps storing the app-config files. Will be mounted as files under the MountPath specified. For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be mounted as files. Otherwise, only the specified key will be mounted as a file. Bear in mind not to put sensitive data in those ConfigMaps. Instead, your app-config content can reference environment variables (which you can set with the ExtraEnvs field) and/or include extra files (see the ExtraFiles field). More details on https://backstage.io/docs/conf/writing/.
+                          items:
+                            properties:
+                              key:
+                                description: Key in the object
+                                type: string
+                              name:
+                                description: Name of the object We support only ConfigMaps and Secrets.
+                                type: string
+                            required:
+                              - name
+                            type: object
+                          type: array
+                        mountPath:
+                          default: /opt/app-root/src
+                          description: Mount path for all app-config files listed in the ConfigMapRefs field
+                          type: string
+                      type: object
+                    dynamicPluginsConfigMapName:
+                      description: "Reference to an existing ConfigMap for Dynamic Plugins. A new one will be generated with the default config if not set. The ConfigMap object must have an existing key named: 'dynamic-plugins.yaml'."
                       type: string
-                    message:
-                      description: message is a human readable message indicating details about the transition. This may be an empty string.
-                      maxLength: 32768
+                    extraEnvs:
+                      description: Extra environment variables
+                      properties:
+                        configMaps:
+                          description: List of references to ConfigMaps objects to inject as additional environment variables. For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be injected as additional environment variables. Otherwise, only the specified key will be injected as an additional environment variable.
+                          items:
+                            properties:
+                              key:
+                                description: Key in the object
+                                type: string
+                              name:
+                                description: Name of the object We support only ConfigMaps and Secrets.
+                                type: string
+                            required:
+                              - name
+                            type: object
+                          type: array
+                        envs:
+                          description: List of name and value pairs to add as environment variables.
+                          items:
+                            properties:
+                              name:
+                                description: Name of the environment variable
+                                type: string
+                              value:
+                                description: Value of the environment variable
+                                type: string
+                            required:
+                              - name
+                              - value
+                            type: object
+                          type: array
+                        secrets:
+                          description: List of references to Secrets objects to inject as additional environment variables. For each item in this array, if a key is not specified, it means that all keys in the Secret will be injected as additional environment variables. Otherwise, only the specified key will be injected as environment variable.
+                          items:
+                            properties:
+                              key:
+                                description: Key in the object
+                                type: string
+                              name:
+                                description: Name of the object We support only ConfigMaps and Secrets.
+                                type: string
+                            required:
+                              - name
+                            type: object
+                          type: array
+                      type: object
+                    extraFiles:
+                      description: References to existing Config objects to use as extra config files. They will be mounted as files in the specified mount path. Each element can be a reference to any ConfigMap or Secret.
+                      properties:
+                        configMaps:
+                          description: List of references to ConfigMaps objects mounted as extra files under the MountPath specified. For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be mounted as files. Otherwise, only the specified key will be mounted as a file.
+                          items:
+                            properties:
+                              key:
+                                description: Key in the object
+                                type: string
+                              name:
+                                description: Name of the object We support only ConfigMaps and Secrets.
+                                type: string
+                            required:
+                              - name
+                            type: object
+                          type: array
+                        mountPath:
+                          default: /opt/app-root/src
+                          description: Mount path for all extra configuration files listed in the Items field
+                          type: string
+                        secrets:
+                          description: List of references to Secrets objects mounted as extra files under the MountPath specified. For each item in this array, a key must be specified that will be mounted as a file.
+                          items:
+                            properties:
+                              key:
+                                description: Key in the object
+                                type: string
+                              name:
+                                description: Name of the object We support only ConfigMaps and Secrets.
+                                type: string
+                            required:
+                              - name
+                            type: object
+                          type: array
+                      type: object
+                    image:
+                      description: Custom image to use in all containers (including Init Containers). It is your responsibility to make sure the image is from trusted sources and has been validated for security compliance
                       type: string
-                    observedGeneration:
-                      description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
-                      format: int64
-                      minimum: 0
+                    imagePullSecrets:
+                      description: Image Pull Secrets to use in all containers (including Init Containers)
+                      items:
+                        type: string
+                      type: array
+                    replicas:
+                      default: 1
+                      description: Number of desired replicas to set in the Backstage Deployment. Defaults to 1.
+                      format: int32
                       type: integer
-                    reason:
-                      description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
-                      maxLength: 1024
-                      minLength: 1
-                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
-                      type: string
-                    status:
-                      description: status of the condition, one of True, False, Unknown.
-                      enum:
-                      - "True"
-                      - "False"
-                      - Unknown
-                      type: string
-                    type:
-                      description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
-                      maxLength: 316
-                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
-                      type: string
-                  required:
-                  - lastTransitionTime
-                  - message
-                  - reason
-                  - status
-                  - type
+                    route:
+                      description: Route configuration. Used for OpenShift only.
+                      properties:
+                        enabled:
+                          default: true
+                          description: Control the creation of a Route on OpenShift.
+                          type: boolean
+                        host:
+                          description: Host is an alias/DNS that points to the service. Optional. Ignored if Enabled is false. If not specified a route name will typically be automatically chosen.  Must follow DNS952 subdomain conventions.
+                          maxLength: 253
+                          pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                          type: string
+                        subdomain:
+                          description: "Subdomain is a DNS subdomain that is requested within the ingress controller's domain (as a subdomain). Ignored if Enabled is false. Example: subdomain `frontend` automatically receives the router subdomain `apps.mycluster.com` to have a full hostname `frontend.apps.mycluster.com`."
+                          maxLength: 253
+                          pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                          type: string
+                        tls:
+                          description: The tls field provides the ability to configure certificates for the route. Ignored if Enabled is false.
+                          properties:
+                            caCertificate:
+                              description: caCertificate provides the cert authority certificate contents
+                              type: string
+                            certificate:
+                              description: certificate provides certificate contents. This should be a single serving certificate, not a certificate chain. Do not include a CA certificate.
+                              type: string
+                            externalCertificateSecretName:
+                              description: ExternalCertificateSecretName provides certificate contents as a secret reference. This should be a single serving certificate, not a certificate chain. Do not include a CA certificate. The secret referenced should be present in the same namespace as that of the Route. Forbidden when `certificate` is set.
+                              type: string
+                            key:
+                              description: key provides key file contents
+                              type: string
+                          type: object
+                      type: object
                   type: object
-                type: array
-            type: object
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
+                database:
+                  description: Configuration for database access. Optional.
+                  properties:
+                    authSecretName:
+                      description: 'Name of the secret for database authentication. Optional. For a local database deployment (EnableLocalDb=true), a secret will be auto generated if it does not exist. The secret shall include information used for the database access. An example for PostgreSQL DB access: "POSTGRES_PASSWORD": "rl4s3Fh4ng3M4" "POSTGRES_PORT": "5432" "POSTGRES_USER": "postgres" "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4" "POSTGRES_HOST": "backstage-psql-bs1"  # For local database, set to "backstage-psql-<CR name>".'
+                      type: string
+                    enableLocalDb:
+                      default: true
+                      description: Control the creation of a local PostgreSQL DB. Set to false if using for example an external Database for Backstage.
+                      type: boolean
+                  type: object
+                rawRuntimeConfig:
+                  description: Raw Runtime Objects configuration. For Advanced scenarios.
+                  properties:
+                    backstageConfig:
+                      description: Name of ConfigMap containing Backstage runtime objects configuration
+                      type: string
+                    localDbConfig:
+                      description: Name of ConfigMap containing LocalDb (PostgreSQL) runtime objects configuration
+                      type: string
+                  type: object
+              type: object
+            status:
+              description: BackstageStatus defines the observed state of Backstage
+              properties:
+                conditions:
+                  description: Conditions is the list of conditions describing the state of the runtime
+                  items:
+                    description: "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
+                    properties:
+                      lastTransitionTime:
+                        description: lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                        format: date-time
+                        type: string
+                      message:
+                        description: message is a human readable message indicating details about the transition. This may be an empty string.
+                        maxLength: 32768
+                        type: string
+                      observedGeneration:
+                        description: observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.
+                        format: int64
+                        minimum: 0
+                        type: integer
+                      reason:
+                        description: reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.
+                        maxLength: 1024
+                        minLength: 1
+                        pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                        type: string
+                      status:
+                        description: status of the condition, one of True, False, Unknown.
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                        type: string
+                      type:
+                        description: type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                        maxLength: 316
+                        pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                        type: string
+                    required:
+                      - lastTransitionTime
+                      - message
+                      - reason
+                      - status
+                      - type
+                    type: object
+                  type: array
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -309,37 +309,37 @@ metadata:
   name: backstage-leader-election-role
   namespace: backstage-system
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -347,94 +347,94 @@ metadata:
   creationTimestamp: null
   name: backstage-manager-role
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  - persistentvolumes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - rhdh.redhat.com
-  resources:
-  - backstages
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rhdh.redhat.com
-  resources:
-  - backstages/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - rhdh.redhat.com
-  resources:
-  - backstages/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - route.openshift.io
-  resources:
-  - routes
-  - routes/custom-host
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - create
+      - delete
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - rhdh.redhat.com
+    resources:
+      - backstages
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - rhdh.redhat.com
+    resources:
+      - backstages/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - rhdh.redhat.com
+    resources:
+      - backstages/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+      - routes/custom-host
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -448,10 +448,10 @@ metadata:
     app.kubernetes.io/part-of: backstage-operator
   name: backstage-metrics-reader
 rules:
-- nonResourceURLs:
-  - /metrics
-  verbs:
-  - get
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -465,18 +465,18 @@ metadata:
     app.kubernetes.io/part-of: backstage-operator
   name: backstage-proxy-role
 rules:
-- apiGroups:
-  - authentication.k8s.io
-  resources:
-  - tokenreviews
-  verbs:
-  - create
-- apiGroups:
-  - authorization.k8s.io
-  resources:
-  - subjectaccessreviews
-  verbs:
-  - create
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -495,9 +495,9 @@ roleRef:
   kind: Role
   name: backstage-leader-election-role
 subjects:
-- kind: ServiceAccount
-  name: backstage-controller-manager
-  namespace: backstage-system
+  - kind: ServiceAccount
+    name: backstage-controller-manager
+    namespace: backstage-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -515,9 +515,9 @@ roleRef:
   kind: ClusterRole
   name: backstage-manager-role
 subjects:
-- kind: ServiceAccount
-  name: backstage-controller-manager
-  namespace: backstage-system
+  - kind: ServiceAccount
+    name: backstage-controller-manager
+    namespace: backstage-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -535,9 +535,9 @@ roleRef:
   kind: ClusterRole
   name: backstage-proxy-role
 subjects:
-- kind: ServiceAccount
-  name: backstage-controller-manager
-  namespace: backstage-system
+  - kind: ServiceAccount
+    name: backstage-controller-manager
+    namespace: backstage-system
 ---
 apiVersion: v1
 data:
@@ -549,10 +549,12 @@ data:
     data:
       "app-config.backend-auth.default.yaml": |
         backend:
-          auth:
-            keys:
+        externalAccess:
+          - type: legacy
+            options:
+              subject: legacy-default-config
               # This is a default value, which you should change by providing your own app-config
-              - secret: "pl4s3Ch4ng3M3"
+              secret: "pl4s3Ch4ng3M3"
   db-secret.yaml: |
     apiVersion: v1
     kind: Secret
@@ -864,10 +866,10 @@ metadata:
   namespace: backstage-system
 spec:
   ports:
-  - name: https
-    port: 8443
-    protocol: TCP
-    targetPort: https
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: https
   selector:
     control-plane: controller-manager
 ---
@@ -900,91 +902,91 @@ spec:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
-            - matchExpressions:
-              - key: kubernetes.io/arch
-                operator: In
-                values:
-                - amd64
-                - arm64
-                - ppc64le
-                - s390x
-              - key: kubernetes.io/os
-                operator: In
-                values:
-                - linux
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      - arm64
+                      - ppc64le
+                      - s390x
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
       automountServiceAccountToken: true
       containers:
-      - args:
-        - --secure-listen-address=0.0.0.0:8443
-        - --upstream=http://127.0.0.1:8080/
-        - --logtostderr=true
-        - --v=0
-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 8443
-          name: https
-          protocol: TCP
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 5m
-            memory: 64Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-      - args:
-        - --health-probe-bind-address=:8081
-        - --metrics-bind-address=127.0.0.1:8080
-        - --leader-elect
-        command:
-        - /manager
-        env:
-        - name: RELATED_IMAGE_postgresql
-          value: quay.io/fedora/postgresql-15:latest
-        - name: RELATED_IMAGE_backstage
-          value: quay.io/janus-idp/backstage-showcase:latest
-        # TODO(asoro): Default image is 'quay.io/janus-idp/operator:0.1.3' on 1.1.x,
-        # but replaced by the one from RHDH, because the Janus-IDP image expires after 14d if not updated.
-        image: quay.io/rhdh/rhdh-rhel9-operator:1.1
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8081
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        name: manager
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 8081
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        resources:
-          limits:
-            cpu: 500m
-            ephemeral-storage: 20Mi
-            memory: 1024Mi
-          requests:
-            cpu: 10m
-            memory: 64Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-        volumeMounts:
-        - mountPath: /default-config
-          name: default-config
+        - args:
+            - --secure-listen-address=0.0.0.0:8443
+            - --upstream=http://127.0.0.1:8080/
+            - --logtostderr=true
+            - --v=0
+          image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+          name: kube-rbac-proxy
+          ports:
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 5m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+        - args:
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=127.0.0.1:8080
+            - --leader-elect
+          command:
+            - /manager
+          env:
+            - name: RELATED_IMAGE_postgresql
+              value: quay.io/fedora/postgresql-15:latest
+            - name: RELATED_IMAGE_backstage
+              value: quay.io/janus-idp/backstage-showcase:latest
+          # TODO(asoro): Default image is 'quay.io/janus-idp/operator:0.1.3' on 1.1.x,
+          # but replaced by the one from RHDH, because the Janus-IDP image expires after 14d if not updated.
+          image: quay.io/rhdh/rhdh-rhel9-operator:1.1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: manager
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              ephemeral-storage: 20Mi
+              memory: 1024Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: /default-config
+              name: default-config
       securityContext:
         runAsNonRoot: true
       serviceAccountName: backstage-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
-      - configMap:
-          name: backstage-default-config
-        name: default-config
+        - configMap:
+            name: backstage-default-config
+          name: default-config

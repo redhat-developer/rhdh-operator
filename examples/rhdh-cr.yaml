@@ -22,8 +22,11 @@ data:
   "app-config-rhdh.yaml": |
     backend:
       auth:
-        keys:
-          - secret: "${BACKEND_SECRET}"
+        externalAccess:
+            - type: legacy
+              options:
+                subject: legacy-default-config
+                secret: "${BACKEND_SECRET}"
     auth:
       # see https://backstage.io/docs/auth/ to learn about auth providers
       environment: development
