@@ -354,10 +354,24 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return fmt.Errorf("failed to construct the predicate for matching secrets. This should not happen: %w", err)
 	}
 
+	secretMeta := &metav1.PartialObjectMetadata{}
+	secretMeta.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "Secret",
+	})
+
+	configMapMeta := &metav1.PartialObjectMetadata{}
+	configMapMeta.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    "ConfigMap",
+	})
+
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&bs.Backstage{}).
-		Watches(
-			&corev1.Secret{},
+		WatchesMetadata(
+			secretMeta,
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 				return r.requestByLabel(ctx, o)
 			}),
@@ -367,8 +381,8 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				//CreateFunc: func(e event.CreateEvent) bool { return true },
 			}),
 		).
-		Watches(
-			&corev1.ConfigMap{},
+		WatchesMetadata(
+			configMapMeta,
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 				return r.requestByLabel(ctx, o)
 			}),
