@@ -15,7 +15,7 @@
 package model
 
 import (
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	openshift "github.com/openshift/api/route/v1"
@@ -36,7 +36,7 @@ func RouteName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage")
 }
 
-func (b *BackstageRoute) setRoute(specified *bsv1alpha1.Route) {
+func (b *BackstageRoute) setRoute(specified *bsv1.Route) {
 
 	if len(specified.Host) > 0 {
 		b.route.Spec.Host = specified.Host
@@ -101,7 +101,7 @@ func (b *BackstageRoute) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1alpha1.Backstage) (bool, error) {
+func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 
 	// not Openshift
 	if !model.isOpenshift {
@@ -137,7 +137,7 @@ func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1alpha1.
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) validate(model *BackstageModel, _ bsv1alpha1.Backstage) error {
+func (b *BackstageRoute) validate(model *BackstageModel, _ bsv1.Backstage) error {
 	b.route.Spec.To.Name = model.backstageService.service.Name
 	return nil
 }

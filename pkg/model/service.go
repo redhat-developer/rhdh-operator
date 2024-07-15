@@ -17,7 +17,7 @@ package model
 import (
 	"fmt"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -55,7 +55,7 @@ func (b *BackstageService) setObject(obj client.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) addToModel(model *BackstageModel, _ bsv1alpha1.Backstage) (bool, error) {
+func (b *BackstageService) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if b.service == nil {
 		return false, fmt.Errorf("Backstage Service is not initialized, make sure there is service.yaml in default or raw configuration")
 	}
@@ -72,7 +72,7 @@ func (b *BackstageService) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) validate(_ *BackstageModel, _ bsv1alpha1.Backstage) error {
+func (b *BackstageService) validate(_ *BackstageModel, _ bsv1.Backstage) error {
 	return nil
 }
 

@@ -29,7 +29,7 @@ import (
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -67,16 +67,16 @@ var _ = When("create backstage with external configuration", func() {
 		generateConfigMap(ctx, k8sClient, appConfig1, ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
 		generateSecret(ctx, k8sClient, secretEnv1, ns, map[string]string{"sec11": "val11"}, nil, nil)
 
-		bs := bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				AppConfig: &bsv1alpha1.AppConfig{
+		bs := bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				AppConfig: &bsv1.AppConfig{
 					MountPath: "/my/mount/path",
-					ConfigMaps: []bsv1alpha1.ObjectKeyRef{
+					ConfigMaps: []bsv1.ObjectKeyRef{
 						{Name: appConfig1},
 					},
 				},
-				ExtraEnvs: &bsv1alpha1.ExtraEnvs{
-					Secrets: []bsv1alpha1.ObjectKeyRef{
+				ExtraEnvs: &bsv1.ExtraEnvs{
+					Secrets: []bsv1.ObjectKeyRef{
 						{Name: secretEnv1, Key: "sec11"},
 					},
 				},

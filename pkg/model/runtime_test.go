@@ -22,8 +22,8 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -42,13 +42,13 @@ func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
 // NOTE: to make it work locally env var LOCALBIN should point to the directory where default-config folder located
 func TestInitDefaultDeploy(t *testing.T) {
 
-	bs := v1alpha1.Backstage{
+	bs := v1alpha2.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: v1alpha1.BackstageSpec{
-			Database: &v1alpha1.Database{
+		Spec: v1alpha2.BackstageSpec{
+			Database: &v1alpha2.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
@@ -78,13 +78,13 @@ func TestInitDefaultDeploy(t *testing.T) {
 
 func TestIfEmptyObjectIsValid(t *testing.T) {
 
-	bs := bsv1alpha1.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Database: &bsv1alpha1.Database{
+		Spec: bsv1.BackstageSpec{
+			Database: &bsv1.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
@@ -103,13 +103,13 @@ func TestIfEmptyObjectIsValid(t *testing.T) {
 
 func TestAddToModel(t *testing.T) {
 
-	bs := v1alpha1.Backstage{
+	bs := v1alpha2.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: v1alpha1.BackstageSpec{
-			Database: &v1alpha1.Database{
+		Spec: v1alpha2.BackstageSpec{
+			Database: &v1alpha2.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},

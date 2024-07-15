@@ -50,7 +50,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -116,7 +116,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = bsv1alpha1.AddToScheme(scheme.Scheme)
+	err = bsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -151,11 +151,11 @@ func generateRandName(name string) string {
 	return "test-backstage-" + randString(5)
 }
 
-func createBackstage(ctx context.Context, spec bsv1alpha1.BackstageSpec, ns string, name string) string {
+func createBackstage(ctx context.Context, spec bsv1.BackstageSpec, ns string, name string) string {
 
 	backstageName := generateRandName(name)
 
-	err := k8sClient.Create(ctx, &bsv1alpha1.Backstage{
+	err := k8sClient.Create(ctx, &bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backstageName,
 			Namespace: ns,
@@ -166,11 +166,11 @@ func createBackstage(ctx context.Context, spec bsv1alpha1.BackstageSpec, ns stri
 	return backstageName
 }
 
-func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1alpha1.BackstageSpec, name string) string {
+func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1.BackstageSpec, name string) string {
 	backstageName := createBackstage(ctx, spec, ns, name)
 
 	Eventually(func() error {
-		found := &bsv1alpha1.Backstage{}
+		found := &bsv1.Backstage{}
 		return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 	}, time.Minute, time.Second).Should(Succeed())
 

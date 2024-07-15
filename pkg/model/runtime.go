@@ -29,7 +29,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 )
@@ -105,7 +105,7 @@ func registerConfig(key string, factory ObjectFactory) {
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
-func InitObjects(ctx context.Context, backstage bsv1alpha1.Backstage, externalConfig ExternalConfig, ownsRuntime bool, isOpenshift bool, scheme *runtime.Scheme) (*BackstageModel, error) {
+func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, ownsRuntime bool, isOpenshift bool, scheme *runtime.Scheme) (*BackstageModel, error) {
 
 	// 3 phases of Backstage configuration:
 	// 1- load from Operator defaults, modify metadata (labels, selectors..) and namespace as needed
@@ -146,7 +146,7 @@ func InitObjects(ctx context.Context, backstage bsv1alpha1.Backstage, externalCo
 
 		// apply spec and add the object to the model and list
 		if added, err := backstageObject.addToModel(model, backstage); err != nil {
-			return nil, fmt.Errorf("failed to initialize %s reason: %s", backstageObject, err)
+			return nil, fmt.Errorf("failed to initialize backstage, reason: %s", err)
 		} else if added {
 			setMetaInfo(backstageObject, backstage, ownsRuntime, scheme)
 		}
@@ -167,7 +167,7 @@ func InitObjects(ctx context.Context, backstage bsv1alpha1.Backstage, externalCo
 }
 
 // Every RuntimeObject.setMetaInfo should as minimum call this
-func setMetaInfo(modelObject RuntimeObject, backstage bsv1alpha1.Backstage, ownsRuntime bool, scheme *runtime.Scheme) {
+func setMetaInfo(modelObject RuntimeObject, backstage bsv1.Backstage, ownsRuntime bool, scheme *runtime.Scheme) {
 	modelObject.setMetaInfo(backstage.Name)
 	modelObject.Object().SetNamespace(backstage.Namespace)
 	modelObject.Object().SetLabels(utils.SetKubeLabels(modelObject.Object().GetLabels(), backstage.Name))

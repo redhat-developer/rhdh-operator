@@ -19,7 +19,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +49,7 @@ func AppConfigDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-appconfig")
 }
 
-func addAppConfigs(spec bsv1alpha1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addAppConfigs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
 
 	if spec.Application == nil || spec.Application.AppConfig == nil || spec.Application.AppConfig.ConfigMaps == nil {
 		return
@@ -89,7 +89,7 @@ func (b *AppConfig) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1alpha1.Backstage) (bool, error) {
+func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if b.ConfigMap != nil {
 		model.setRuntimeObject(b)
 		return true, nil
@@ -98,7 +98,7 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1alpha1.Backstage) (b
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) validate(_ *BackstageModel, _ bsv1alpha1.Backstage) error {
+func (b *AppConfig) validate(_ *BackstageModel, _ bsv1.Backstage) error {
 	return nil
 }
 

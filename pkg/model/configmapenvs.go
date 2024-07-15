@@ -15,7 +15,7 @@
 package model
 
 import (
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,7 +38,7 @@ func init() {
 	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{})
 }
 
-func addConfigMapEnvs(spec v1alpha1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addConfigMapEnvs(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
 
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.ConfigMaps == nil {
 		return
@@ -72,7 +72,7 @@ func (p *ConfigMapEnvs) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ v1alpha1.Backstage) (bool, error) {
+func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (bool, error) {
 	if p.ConfigMap != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -81,7 +81,7 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ v1alpha1.Backstage) 
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) validate(_ *BackstageModel, _ v1alpha1.Backstage) error {
+func (p *ConfigMapEnvs) validate(_ *BackstageModel, _ v1alpha2.Backstage) error {
 	return nil
 }
 

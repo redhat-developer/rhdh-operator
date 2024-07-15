@@ -34,7 +34,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	backstageiov1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	backstageiov1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	controller "redhat-developer/red-hat-developer-hub-operator/controllers"
 
 	openshift "github.com/openshift/api/route/v1"

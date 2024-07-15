@@ -20,7 +20,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +48,7 @@ func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
 }
 
-func addDynamicPlugins(spec v1alpha1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) error {
+func addDynamicPlugins(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.DynamicPluginsConfigMapName == "" {
 		return nil
@@ -88,7 +88,7 @@ func (p *DynamicPlugins) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage v1alpha1.Backstage) (bool, error) {
+func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage v1alpha2.Backstage) (bool, error) {
 
 	if p.ConfigMap == nil || (backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "") {
 		return false, nil
@@ -124,7 +124,7 @@ func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-func (p *DynamicPlugins) validate(model *BackstageModel, _ v1alpha1.Backstage) error {
+func (p *DynamicPlugins) validate(model *BackstageModel, _ v1alpha2.Backstage) error {
 
 	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {

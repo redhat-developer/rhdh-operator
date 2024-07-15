@@ -17,7 +17,7 @@ package model
 import (
 	"context"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -43,16 +43,16 @@ var (
 	//	Data: map[string]string{"conf2.yaml": ""},
 	//}
 
-	configMapFilesTestBackstage = bsv1alpha1.Backstage{
+	configMapFilesTestBackstage = bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				ExtraFiles: &bsv1alpha1.ExtraFiles{
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				ExtraFiles: &bsv1.ExtraFiles{
 					MountPath:  "/my/path",
-					ConfigMaps: []bsv1alpha1.ObjectKeyRef{},
+					ConfigMaps: []bsv1.ObjectKeyRef{},
 				},
 			},
 		},
@@ -81,8 +81,8 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1alpha1.ObjectKeyRef{Name: appConfigTestCm.Name})
-	*cmf = append(*cmf, bsv1alpha1.ObjectKeyRef{Name: appConfigTestCm2.Name})
+	*cmf = append(*cmf, bsv1.ObjectKeyRef{Name: appConfigTestCm.Name})
+	*cmf = append(*cmf, bsv1.ObjectKeyRef{Name: appConfigTestCm2.Name})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -104,7 +104,7 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1alpha1.ObjectKeyRef{Name: appConfigTestCm.Name})
+	*cmf = append(*cmf, bsv1.ObjectKeyRef{Name: appConfigTestCm.Name})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 

@@ -22,7 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -31,13 +31,13 @@ import (
 
 func TestDefaultConfigMapEnvFrom(t *testing.T) {
 
-	bs := bsv1alpha1.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Database: &bsv1alpha1.Database{
+		Spec: bsv1.BackstageSpec{
+			Database: &bsv1.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
@@ -60,22 +60,22 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 
 func TestSpecifiedConfigMapEnvs(t *testing.T) {
 
-	bs := bsv1alpha1.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				ExtraEnvs: &bsv1alpha1.ExtraEnvs{
-					ConfigMaps: []bsv1alpha1.ObjectKeyRef{},
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				ExtraEnvs: &bsv1.ExtraEnvs{
+					ConfigMaps: []bsv1.ObjectKeyRef{},
 				},
 			},
 		},
 	}
 
 	bs.Spec.Application.ExtraEnvs.ConfigMaps = append(bs.Spec.Application.ExtraEnvs.ConfigMaps,
-		bsv1alpha1.ObjectKeyRef{Name: "mapName", Key: "ENV1"})
+		bsv1.ObjectKeyRef{Name: "mapName", Key: "ENV1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	testObj.externalConfig.ExtraEnvConfigMaps["mapName"] = corev1.ConfigMap{Data: map[string]string{"mapName": "ENV1"}}

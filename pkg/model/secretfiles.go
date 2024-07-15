@@ -20,7 +20,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -43,7 +43,7 @@ func init() {
 	registerConfig("secret-files.yaml", SecretFilesFactory{})
 }
 
-func addSecretFiles(spec v1alpha1.BackstageSpec, deployment *appsv1.Deployment) error {
+func addSecretFiles(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
 		return nil
@@ -90,7 +90,7 @@ func (p *SecretFiles) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) addToModel(model *BackstageModel, _ v1alpha1.Backstage) (bool, error) {
+func (p *SecretFiles) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (bool, error) {
 	if p.Secret != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -99,7 +99,7 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ v1alpha1.Backstage) (b
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) validate(_ *BackstageModel, _ v1alpha1.Backstage) error {
+func (p *SecretFiles) validate(_ *BackstageModel, _ v1alpha2.Backstage) error {
 	return nil
 }
 

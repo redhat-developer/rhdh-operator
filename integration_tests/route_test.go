@@ -23,7 +23,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -53,9 +53,9 @@ var _ = When("create default backstage", func() {
 			Skip("Skipped for non-Openshift cluster")
 		}
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				Route: &bsv1alpha1.Route{
+		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				Route: &bsv1.Route{
 					//Host:      "localhost",
 					//Enabled:   ptr.To(true),
 					Subdomain: "test",
@@ -64,7 +64,7 @@ var _ = When("create default backstage", func() {
 		}, "")
 
 		Eventually(func() error {
-			found := &bsv1alpha1.Backstage{}
+			found := &bsv1.Backstage{}
 			return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 		}, time.Minute, time.Second).Should(Succeed())
 

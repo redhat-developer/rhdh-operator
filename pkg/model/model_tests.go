@@ -27,22 +27,22 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 )
 
 // testBackstageObject it is a helper object to simplify testing model component allowing to customize and isolate testing configuration
 // usual sequence of creating testBackstageObject contains such a steps:
-// createBackstageTest(bsv1alpha1.Backstage).
+// createBackstageTest(bsv1.Backstage).
 // withDefaultConfig(useDef bool)
 // addToDefaultConfig(key, fileName)
 type testBackstageObject struct {
-	backstage      bsv1alpha1.Backstage
+	backstage      bsv1.Backstage
 	externalConfig ExternalConfig
 	scheme         *runtime.Scheme
 }
 
 // initialises testBackstageObject object
-func createBackstageTest(bs bsv1alpha1.Backstage) *testBackstageObject {
+func createBackstageTest(bs bsv1.Backstage) *testBackstageObject {
 	ec := ExternalConfig{
 		RawConfig:           map[string]string{},
 		AppConfigs:          map[string]corev1.ConfigMap{},
@@ -50,7 +50,7 @@ func createBackstageTest(bs bsv1alpha1.Backstage) *testBackstageObject {
 		ExtraEnvConfigMaps:  map[string]corev1.ConfigMap{},
 	}
 	b := &testBackstageObject{backstage: bs, externalConfig: ec, scheme: runtime.NewScheme()}
-	utilruntime.Must(bsv1alpha1.AddToScheme(b.scheme))
+	utilruntime.Must(bsv1.AddToScheme(b.scheme))
 	return b
 }
 

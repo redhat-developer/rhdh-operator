@@ -17,7 +17,7 @@ package controller
 import (
 	"context"
 	"os"
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 	"testing"
 
@@ -30,15 +30,15 @@ import (
 func updateConfigMap(t *testing.T) BackstageReconciler {
 	ctx := context.TODO()
 
-	bs := v1alpha1.Backstage{
+	bs := v1alpha2.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs1",
 			Namespace: "ns1",
 		},
-		Spec: v1alpha1.BackstageSpec{
-			Application: &v1alpha1.Application{
-				AppConfig: &v1alpha1.AppConfig{
-					ConfigMaps: []v1alpha1.ObjectKeyRef{{Name: "cm1"}},
+		Spec: v1alpha2.BackstageSpec{
+			Application: &v1alpha2.Application{
+				AppConfig: &v1alpha2.AppConfig{
+					ConfigMaps: []v1alpha2.ObjectKeyRef{{Name: "cm1"}},
 				},
 			},
 		},

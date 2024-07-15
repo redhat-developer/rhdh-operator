@@ -15,7 +15,7 @@
 package model
 
 import (
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,7 +44,7 @@ func (p *SecretEnvs) Object() client.Object {
 	return p.Secret
 }
 
-func addSecretEnvs(spec v1alpha1.BackstageSpec, deployment *appsv1.Deployment) error {
+func addSecretEnvs(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment) error {
 
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.Secrets == nil {
 		return nil
@@ -73,7 +73,7 @@ func (p *SecretEnvs) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) addToModel(model *BackstageModel, _ v1alpha1.Backstage) (bool, error) {
+func (p *SecretEnvs) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (bool, error) {
 	if p.Secret != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -82,7 +82,7 @@ func (p *SecretEnvs) addToModel(model *BackstageModel, _ v1alpha1.Backstage) (bo
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) validate(_ *BackstageModel, _ v1alpha1.Backstage) error {
+func (p *SecretEnvs) validate(_ *BackstageModel, _ v1alpha2.Backstage) error {
 	return nil
 }
 

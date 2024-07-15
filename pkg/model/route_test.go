@@ -24,20 +24,20 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultRoute(t *testing.T) {
-	bs := bsv1alpha1.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				Route: &bsv1alpha1.Route{},
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				Route: &bsv1.Route{},
 			},
 		},
 	}
@@ -63,14 +63,14 @@ func TestDefaultRoute(t *testing.T) {
 }
 
 func TestSpecifiedRoute(t *testing.T) {
-	bs := bsv1alpha1.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				Route: &bsv1alpha1.Route{
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				Route: &bsv1.Route{
 					Enabled: ptr.To(true),
 					Host:    "TestSpecifiedRoute",
 					//TLS:     nil,
@@ -109,14 +109,14 @@ func TestSpecifiedRoute(t *testing.T) {
 func TestDisabledRoute(t *testing.T) {
 
 	// Route.Enabled = false
-	bs := bsv1alpha1.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				Route: &bsv1alpha1.Route{
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				Route: &bsv1.Route{
 					Enabled: ptr.To(false),
 					Host:    "TestSpecifiedRoute",
 					//TLS:     nil,
@@ -141,12 +141,12 @@ func TestDisabledRoute(t *testing.T) {
 
 func TestExcludedRoute(t *testing.T) {
 	// No route configured
-	bs := bsv1alpha1.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		//Spec: bsv1alpha1.BackstageSpec{ //	//Application: &bsv1alpha1.Application{},
+		//Spec: bsv1.BackstageSpec{ //	//Application: &bsv1.Application{},
 		//},
 	}
 
@@ -165,14 +165,14 @@ func TestExcludedRoute(t *testing.T) {
 
 func TestEnabledRoute(t *testing.T) {
 	// Route is enabled by default if configured
-	bs := bsv1alpha1.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				Route: &bsv1alpha1.Route{},
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				Route: &bsv1.Route{},
 			},
 		},
 	}

@@ -26,7 +26,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 

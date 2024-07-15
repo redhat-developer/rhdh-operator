@@ -20,7 +20,7 @@ import (
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -44,16 +44,16 @@ var (
 	//	StringData: map[string]string{"conf2.yaml": ""},
 	//}
 
-	secretFilesTestBackstage = bsv1alpha1.Backstage{
+	secretFilesTestBackstage = bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				ExtraFiles: &bsv1alpha1.ExtraFiles{
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				ExtraFiles: &bsv1.ExtraFiles{
 					MountPath: "/my/path",
-					Secrets:   []bsv1alpha1.ObjectKeyRef{},
+					Secrets:   []bsv1.ObjectKeyRef{},
 				},
 			},
 		},
@@ -82,10 +82,10 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1alpha1.ObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
-	*sf = append(*sf, bsv1alpha1.ObjectKeyRef{Name: "secret2", Key: "conf.yaml"})
+	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret2", Key: "conf.yaml"})
 	// https://issues.redhat.com/browse/RHIDP-2246 - mounting secret/CM with dot in the name
-	*sf = append(*sf, bsv1alpha1.ObjectKeyRef{Name: "secret.dot", Key: "conf3.yaml"})
+	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret.dot", Key: "conf3.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -111,7 +111,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1alpha1.ObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)

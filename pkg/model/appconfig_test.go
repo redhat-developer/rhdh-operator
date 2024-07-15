@@ -19,7 +19,7 @@ import (
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -54,16 +54,16 @@ var (
 		Data: map[string]string{"conf31.yaml": "", "conf32.yaml": ""},
 	}
 
-	appConfigTestBackstage = bsv1alpha1.Backstage{
+	appConfigTestBackstage = bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1alpha1.BackstageSpec{
-			Application: &bsv1alpha1.Application{
-				AppConfig: &bsv1alpha1.AppConfig{
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				AppConfig: &bsv1.AppConfig{
 					MountPath:  "/my/path",
-					ConfigMaps: []bsv1alpha1.ObjectKeyRef{},
+					ConfigMaps: []bsv1.ObjectKeyRef{},
 				},
 			},
 		},
@@ -97,11 +97,11 @@ func TestSpecifiedAppConfig(t *testing.T) {
 
 	bs := *appConfigTestBackstage.DeepCopy()
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1alpha1.ObjectKeyRef{Name: appConfigTestCm.Name})
+		bsv1.ObjectKeyRef{Name: appConfigTestCm.Name})
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1alpha1.ObjectKeyRef{Name: appConfigTestCm2.Name})
+		bsv1.ObjectKeyRef{Name: appConfigTestCm2.Name})
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1alpha1.ObjectKeyRef{Name: appConfigTestCm3.Name, Key: "conf31.yaml"})
+		bsv1.ObjectKeyRef{Name: appConfigTestCm3.Name, Key: "conf31.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	testObj.externalConfig.AppConfigs = map[string]corev1.ConfigMap{appConfigTestCm.Name: appConfigTestCm, appConfigTestCm2.Name: appConfigTestCm2,
@@ -127,7 +127,7 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 
 	bs := *appConfigTestBackstage.DeepCopy()
 	cms := &bs.Spec.Application.AppConfig.ConfigMaps
-	*cms = append(*cms, bsv1alpha1.ObjectKeyRef{Name: appConfigTestCm.Name})
+	*cms = append(*cms, bsv1.ObjectKeyRef{Name: appConfigTestCm.Name})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
 

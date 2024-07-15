@@ -17,7 +17,7 @@ package model
 import (
 	"strconv"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +56,7 @@ func (b *DbSecret) setObject(obj client.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1alpha1.Backstage) (bool, error) {
+func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 
 	// do not add if specified
 	if backstage.Spec.IsAuthSecretSpecified() {
@@ -78,7 +78,7 @@ func (b *DbSecret) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) validate(model *BackstageModel, backstage bsv1alpha1.Backstage) error {
+func (b *DbSecret) validate(model *BackstageModel, backstage bsv1.Backstage) error {
 
 	pswd, _ := utils.GeneratePassword(24)
 

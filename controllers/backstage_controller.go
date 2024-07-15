@@ -41,7 +41,7 @@ import (
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
-	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"

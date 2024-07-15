@@ -15,7 +15,7 @@
 package model
 
 import (
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,10 +45,10 @@ type RuntimeObject interface {
 	EmptyObject() client.Object
 	// adds runtime object to the model
 	// returns false if the object was not added to the model (not configured)
-	addToModel(model *BackstageModel, backstage bsv1alpha1.Backstage) (bool, error)
+	addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error)
 	// at this stage all the information is updated
 	// set the final references validates the object at the end of initialization
-	validate(model *BackstageModel, backstage bsv1alpha1.Backstage) error
+	validate(model *BackstageModel, backstage bsv1.Backstage) error
 	// sets object name, labels and other necessary meta information
 	setMetaInfo(backstageName string)
 }

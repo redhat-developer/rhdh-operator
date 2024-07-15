@@ -20,7 +20,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -60,7 +60,7 @@ func (b *DbStatefulSet) setObject(obj client.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1alpha1.Backstage) (bool, error) {
+func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if b.statefulSet == nil {
 		if model.localDbEnabled {
 			return false, fmt.Errorf("LocalDb StatefulSet not configured, make sure there is db-statefulset.yaml.yaml in default or raw configuration")
@@ -90,14 +90,15 @@ func (b *DbStatefulSet) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbStatefulSet) validate(model *BackstageModel, backstage bsv1alpha1.Backstage) error {
+func (b *DbStatefulSet) validate(model *BackstageModel, backstage bsv1.Backstage) error {
 
 	// point ServiceName to localDb
 	b.statefulSet.Spec.ServiceName = model.LocalDbService.service.Name
 
-	if backstage.Spec.Application != nil {
+	if backstage.Spec.Application != nil && backstage.Spec.Application.ImagePullSecrets != nil {
 		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
 	}
+
 	if backstage.Spec.IsAuthSecretSpecified() {
 		utils.SetDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
 	} else if model.LocalDbSecret != nil {

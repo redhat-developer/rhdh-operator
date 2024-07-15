@@ -24,7 +24,7 @@ import (
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,7 +39,7 @@ var _ = When("create default backstage", func() {
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1alpha1.BackstageSpec{}, "")
+		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			deploy := &appsv1.Deployment{}

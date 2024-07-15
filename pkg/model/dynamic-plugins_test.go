@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,16 +29,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testDynamicPluginsBackstage = bsv1alpha1.Backstage{
+var testDynamicPluginsBackstage = bsv1.Backstage{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "bs",
 		Namespace: "ns123",
 	},
-	Spec: bsv1alpha1.BackstageSpec{
-		Database: &bsv1alpha1.Database{
+	Spec: bsv1.BackstageSpec{
+		Database: &bsv1.Database{
 			EnableLocalDb: ptr.To(false),
 		},
-		Application: &bsv1alpha1.Application{},
+		Application: &bsv1.Application{},
 	},
 }
 

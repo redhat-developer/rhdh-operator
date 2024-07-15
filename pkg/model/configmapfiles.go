@@ -17,7 +17,7 @@ package model
 import (
 	appsv1 "k8s.io/api/apps/v1"
 
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha1"
+	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -40,7 +40,7 @@ func init() {
 	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{})
 }
 
-func addConfigMapFiles(spec v1alpha1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addConfigMapFiles(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
 		return
@@ -80,7 +80,7 @@ func (p *ConfigMapFiles) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ v1alpha1.Backstage) (bool, error) {
+func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (bool, error) {
 	if p.ConfigMap != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -89,7 +89,7 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ v1alpha1.Backstage)
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapFiles) validate(_ *BackstageModel, _ v1alpha1.Backstage) error {
+func (p *ConfigMapFiles) validate(_ *BackstageModel, _ v1alpha2.Backstage) error {
 	return nil
 }
 
