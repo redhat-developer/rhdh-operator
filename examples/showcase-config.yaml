@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: showcase-config
 data:
-  deploy: |-
+  deployment.yaml: |-
     apiVersion: apps/v1
     kind: Deployment
     metadata:
