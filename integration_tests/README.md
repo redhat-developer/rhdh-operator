@@ -1,5 +1,5 @@
 
-How to run Integration Tests
+**How to run Integration Tests**
 
 - For development (controller will reconsile internally)
   - As a part of the whole testing suite just:
@@ -27,7 +27,7 @@ For example to run specific test(s) you can use something like:
 
 `make integration-test ARGS='--focus "my favorite test"'`
 
-NOTE:
+**NOTE:**
 
 Some tests are Openshift specific only and skipped in a local envtest and bare k8s cluster.
 

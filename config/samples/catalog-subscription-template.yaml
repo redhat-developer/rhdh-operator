@@ -7,5 +7,5 @@ spec:
   installPlanApproval: Automatic
   name: backstage-operator
   source: backstage-operator
-  sourceNamespace: openshift-marketplace
+  sourceNamespace: {{OLM_NAMESPACE}}
   startingCSV: backstage-operator.v{{VERSION}}
