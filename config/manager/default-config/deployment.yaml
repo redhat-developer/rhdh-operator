@@ -38,7 +38,8 @@ spec:
           command:
             - ./install-dynamic-plugins.sh
             - /dynamic-plugins-root
-          image: quay.io/janus-idp/backstage-showcase:latest # will be replaced with the actual image quay.io/janus-idp/backstage-showcase:next
+          # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
+          image: quay.io/janus-idp/backstage-showcase:next
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
@@ -65,7 +66,7 @@ spec:
       containers:
         - name: backstage-backend
           # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-          image: quay.io/janus-idp/backstage-showcase:latest
+          image: quay.io/janus-idp/backstage-showcase:next
           imagePullPolicy: IfNotPresent
           args:
             - "--config"

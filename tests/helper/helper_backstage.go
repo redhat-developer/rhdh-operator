@@ -20,8 +20,9 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 	"strings"
+
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,9 +30,36 @@ import (
 )
 
 type ApiEndpointTest struct {
+	BearerTokenRetrievalFn func(baseUrl string) (string, error)
 	Endpoint               string
 	ExpectedHttpStatusCode int
 	BodyMatcher            types.GomegaMatcher
+}
+
+// BackstageAuthRefreshResponse is the struct of the response returned by the '/api/auth/:user/refresh' API endpoint.
+//
+// Example:
+//
+//	{
+//	   "backstageIdentity": {
+//	       "expiresInSeconds": 3600,
+//	       "identity": {
+//	           "ownershipEntityRefs": [
+//	               "user:development/guest"
+//	           ],
+//	           "type": "user",
+//	           "userEntityRef": "user:development/guest"
+//	       },
+//	       "token": "eyJ0..."
+//	   },
+//	   "profile": {}
+//	}
+type BackstageAuthRefreshResponse struct {
+	BackstageIdentity BackstageIdentity `json:"backstageIdentity,omitempty"`
+}
+
+type BackstageIdentity struct {
+	Token string `json:"token,omitempty"`
 }
 
 func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus string) {
@@ -111,20 +139,12 @@ func GetBackstageRouteHost(ns string, crName string) (string, error) {
 	return fmt.Sprintf("%s.%s", subDomain, ingressDomain), err
 }
 
+// unauthenticated endpoints
 var defaultApiEndpointTests = []ApiEndpointTest{
 	{
 		Endpoint:               "/",
 		ExpectedHttpStatusCode: 200,
 		BodyMatcher:            ContainSubstring("You need to enable JavaScript to run this app"),
-	},
-	{
-		Endpoint:               "/api/dynamic-plugins-info/loaded-plugins",
-		ExpectedHttpStatusCode: 200,
-		BodyMatcher: SatisfyAll(
-			ContainSubstring("@janus-idp/backstage-scaffolder-backend-module-quay-dynamic"),
-			ContainSubstring("@janus-idp/backstage-scaffolder-backend-module-regex-dynamic"),
-			ContainSubstring("roadiehq-scaffolder-backend-module-utils-dynamic"),
-		),
 	},
 }
 
@@ -133,6 +153,7 @@ func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpoin
 	fmt.Fprintln(GinkgoWriter, host)
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(host).ShouldNot(BeEmpty())
+	baseUrl := fmt.Sprintf("https://%s", host)
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -142,17 +163,31 @@ func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpoin
 	httpClient := &http.Client{Transport: tr}
 
 	performTest := func(tt ApiEndpointTest) {
-		url := fmt.Sprintf("https://%s/%s", host, strings.TrimPrefix(tt.Endpoint, "/"))
+		url := fmt.Sprintf("%s/%s", baseUrl, strings.TrimPrefix(tt.Endpoint, "/"))
+
+		req, reqErr := http.NewRequest("GET", url, nil)
+		g.Expect(reqErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while building request to GET %q", url))
+
+		req.Header.Add("Accept", "application/json")
+
+		if tt.BearerTokenRetrievalFn != nil {
+			bearerToken, tErr := tt.BearerTokenRetrievalFn(baseUrl)
+			g.Expect(tErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while retrieving bearer token, context: %q", tt.Endpoint))
+			if bearerToken != "" {
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", bearerToken))
+			}
+		}
+
 		fmt.Fprintf(GinkgoWriter, "--> GET %q\n", url)
-		resp, rErr := httpClient.Get(url)
+		resp, rErr := httpClient.Do(req)
 		g.Expect(rErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while trying to GET %q", url))
 		defer resp.Body.Close()
-
-		g.Expect(resp.StatusCode).Should(Equal(tt.ExpectedHttpStatusCode), "context: "+tt.Endpoint)
 		body, rErr := io.ReadAll(resp.Body)
 		g.Expect(rErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while trying to read response body from 'GET %q'", url))
+		bodyStr := string(body)
+		g.Expect(resp.StatusCode).Should(Equal(tt.ExpectedHttpStatusCode), fmt.Sprintf("context: %s\n===Response body===\n%s", tt.Endpoint, bodyStr))
 		if tt.BodyMatcher != nil {
-			g.Expect(string(body)).Should(tt.BodyMatcher, "context: "+tt.Endpoint)
+			g.Expect(bodyStr).Should(tt.BodyMatcher, "context: "+tt.Endpoint)
 		}
 	}
 	allTests := append(defaultApiEndpointTests, tests...)

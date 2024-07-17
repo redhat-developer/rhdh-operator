@@ -13,9 +13,13 @@ jobs:
       fail-fast: false
       matrix:
         branch: [ main, 1.2.x, 1.1.x ]
-    name: E2E Tests - ${{ matrix.branch }}
+        test_upgrade: [ 'true', 'false' ]
+        exclude:
+          - branch: 1.1.x # Testing upgrade from 1.1.x
+            test_upgrade: 'true'
+    name: 'E2E Tests - ${{ matrix.branch }} - upgrade=${{ matrix.test_upgrade }}'
     concurrency:
-      group: ${{ github.workflow }}-${{ matrix.branch }}
+      group: '${{ github.workflow }}-${{ matrix.branch }}-${{ matrix.test_upgrade }}'
       cancel-in-progress: true
     env:
       CONTAINER_ENGINE: podman
@@ -49,20 +53,17 @@ jobs:
 
       - name: Start Minikube
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: medyagh/setup-minikube@317d92317e473a10540357f1f4b2878b80ee7b95 # v0.0.16
-        with:
-          addons: ingress
+        uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
 
       - name: Run E2E tests (Operator Upgrade path)
-        # Testing upgrade from 1.1.x
-        if: ${{ matrix.branch != '1.1.x' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ matrix.test_upgrade == 'true' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
           IMG: ${{ env.OPERATOR_IMAGE }}
         run: make test-e2e-upgrade
 
       - name: Run E2E tests
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ matrix.test_upgrade == 'false' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
           IMG: ${{ env.OPERATOR_IMAGE }}

@@ -47,10 +47,16 @@ data:
     backend:
       auth:
         externalAccess:
-            - type: legacy
-              options:
-                subject: legacy-default-config
-                secret: "${BACKEND_SECRET}"
+          - type: legacy
+            options:
+              subject: legacy-default-config
+              secret: "${BACKEND_SECRET}"
+    auth:
+      environment: development
+      providers:
+        guest:
+          # using the guest user to query the '/api/dynamic-plugins-info/loaded-plugins' endpoint.
+          dangerouslyAllowOutsideDevelopment: true
 ---
 apiVersion: v1
 kind: Secret
@@ -128,7 +134,7 @@ data:
                     initialDelay: { seconds: 15}
       - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
         pluginConfig:
-          # Reference documentation http://backstage.io/docs/features/techdocs/configuration
+          # Reference documentation https://backstage.io/docs/features/techdocs/configuration
           # Note: After experimenting with basic setup, use CI/CD to generate docs
           # and an external cloud storage when deploying TechDocs for production use-case.
           # https://backstage.io/docs/features/techdocs/how-to-guides#how-to-migrate-from-techdocs-basic-to-recommended-deployment-approach
