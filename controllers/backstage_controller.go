@@ -75,7 +75,7 @@ type BackstageReconciler struct {
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=configmaps;secrets;services,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="",resources=persistentvolumes;persistentvolumeclaims,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=persistentvolumes;persistentvolumeclaims,verbs=create;delete;get;list;watch;patch
 //+kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
 //+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
 
@@ -162,6 +162,20 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 				}
 			} else {
 				lg.V(1).Info("create secret ", objDispName(obj), obj.Object().GetName())
+				continue
+			}
+
+		} else if _, ok := obj.Object().(*corev1.PersistentVolumeClaim); ok {
+			if err := r.Create(ctx, obj.Object()); err != nil {
+				if !errors.IsAlreadyExists(err) {
+					return fmt.Errorf("failed to create persistentVolumeClaim: %w", err)
+				}
+				//if AuditLogPvc - nothing to do, it is not for update
+				if _, ok := obj.(*model.AuditLogPvc); ok {
+					continue
+				}
+			} else {
+				lg.V(1).Info("create persistentVolumeClaim ", objDispName(obj), obj.Object().GetName())
 				continue
 			}
 

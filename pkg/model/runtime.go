@@ -52,6 +52,8 @@ type BackstageModel struct {
 	LocalDbService     *DbService
 	LocalDbSecret      *DbSecret
 
+	localAuditLogPvc *AuditLogPvc
+
 	route *BackstageRoute
 
 	RuntimeObjects []RuntimeObject

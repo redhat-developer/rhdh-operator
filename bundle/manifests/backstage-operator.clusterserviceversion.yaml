@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Seamless Upgrades
-    createdAt: "2024-08-12T08:32:42Z"
+    createdAt: "2024-08-19T20:13:23Z"
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.36.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -71,8 +71,11 @@ spec:
           - persistentvolumeclaims
           - persistentvolumes
           verbs:
+          - create
+          - delete
           - get
           - list
+          - patch
           - watch
         - apiGroups:
           - apps

@@ -15,6 +15,17 @@ data:
                   subject: legacy-default-config
                   # This is a default value, which you should change by providing your own app-config
                   secret: "pl4s3Ch4ng3M3"
+  audit-log-pvc.yaml: |
+    kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: audit-log-pvc # will be replaced
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
   db-secret.yaml: |-
     apiVersion: v1
     kind: Secret
@@ -159,11 +170,11 @@ data:
       replicas: 1
       selector:
         matchLabels:
-          rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
       template:
         metadata:
           labels:
-            rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+            rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
         spec:
           automountServiceAccountToken: false
           # if securityContext not present in AKS/EKS, the error is like this:
@@ -188,6 +199,9 @@ data:
                 secretName: dynamic-plugins-npmrc
             - emptyDir: {}
               name: npmcacache
+            - name: audit-log-data
+              persistentVolumeClaim:
+                claimName: audit-log-pvc # placeholder for audit log pvc name
           initContainers:
             - name: install-dynamic-plugins
               command:
@@ -203,7 +217,7 @@ data:
                   type: RuntimeDefault
                 capabilities:
                   drop:
-                   - ALL
+                    - ALL
               env:
                 - name: NPM_CONFIG_USERCONFIG
                   value: /opt/app-root/src/.npmrc.dynamic-plugins
@@ -270,6 +284,8 @@ data:
               volumeMounts:
                 - mountPath: /opt/app-root/src/dynamic-plugins-root
                   name: dynamic-plugins-root
+                - mountPath: /var/log/audit
+                  name: audit-log-data
               resources:
                 requests:
                   cpu: 250m

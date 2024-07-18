@@ -16,17 +16,14 @@ package model
 
 import (
 	"context"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"testing"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
-	"k8s.io/utils/ptr"
-
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/stretchr/testify/assert"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 var deploymentTestBackstage = bsv1.Backstage{
@@ -161,12 +158,13 @@ spec:
 
 	// volumes
 	// dynamic-plugins-root, dynamic-plugins-npmrc, my-vol
-	assert.Equal(t, 3, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 4, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
 	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[0].Name)
+	assert.Equal(t, "audit-log-data", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[2].Name)
 	// overrides StorageClassName
 	assert.Equal(t, "special", *model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
 	// adds new volume
-	assert.Equal(t, "my-vol", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[2].Name)
+	assert.Equal(t, "my-vol", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[3].Name)
 }
 
 // to remove when stop supporting v1alpha1
@@ -196,4 +194,22 @@ spec:
 	assert.Equal(t, "backstage-backend", model.backstageDeployment.container().Name)
 	assert.Equal(t, "deployment-image", model.backstageDeployment.container().Image)
 	assert.Equal(t, int32(3), *model.backstageDeployment.deployment.Spec.Replicas)
+}
+
+func TestSetAuditLogClaimName(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	testObj := createBackstageTest(bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, true, testObj.scheme)
+	assert.NoError(t, err)
+
+	for _, v := range model.backstageDeployment.podSpec().Volumes {
+		if v.Name == "audit-log-data" {
+			if v.PersistentVolumeClaim.ClaimName != AuditLogPvcDefaultName(bs.Name) {
+				t.Errorf("wanted %s, got %s", AuditLogPvcDefaultName(bs.Name), v.PersistentVolumeClaim.ClaimName)
+			}
+		}
+	}
 }

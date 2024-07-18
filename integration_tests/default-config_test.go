@@ -97,7 +97,10 @@ var _ = When("create default backstage", func() {
 			By("mounting Volume defined in default app-config")
 			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(model.AppConfigDefaultName(backstageName))).
 				To(BeAddedAsVolumeToPodSpec(deploy.Spec.Template.Spec))
-
+				
+			By("creating a persistent volume claim for the audit log")
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name:fmt.Sprintf("%s-audit-log", backstageName)}, &corev1.PersistentVolumeClaim{})
+			g.Expect(err).ShouldNot(HaveOccurred())
 		}, 5*time.Minute, time.Second).Should(Succeed())
 
 		if *testEnv.UseExistingCluster {

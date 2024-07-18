@@ -27,13 +27,14 @@ const ExtConfigSyncLabel = "rhdh.redhat.com/ext-config-sync"
 const BackstageNameAnnotation = "rhdh.redhat.com/backstage-name"
 
 type ExternalConfig struct {
-	RawConfig           map[string]string
-	AppConfigs          map[string]corev1.ConfigMap
-	ExtraFileConfigMaps map[string]corev1.ConfigMap
-	ExtraFileSecrets    map[string]corev1.Secret
-	ExtraEnvConfigMaps  map[string]corev1.ConfigMap
-	ExtraEnvSecrets     map[string]corev1.Secret
-	DynamicPlugins      corev1.ConfigMap
+	RawConfig              map[string]string
+	AppConfigs             map[string]corev1.ConfigMap
+	ExtraFileConfigMaps    map[string]corev1.ConfigMap
+	ExtraFileSecrets       map[string]corev1.Secret
+	ExtraEnvConfigMaps     map[string]corev1.ConfigMap
+	ExtraEnvSecrets        map[string]corev1.Secret
+	DynamicPlugins         corev1.ConfigMap
+	PersistentVolumeClaims map[string]corev1.PersistentVolumeClaim
 
 	syncedContent []byte
 }
@@ -41,13 +42,14 @@ type ExternalConfig struct {
 func NewExternalConfig() ExternalConfig {
 
 	return ExternalConfig{
-		RawConfig:           map[string]string{},
-		AppConfigs:          map[string]corev1.ConfigMap{},
-		ExtraFileConfigMaps: map[string]corev1.ConfigMap{},
-		ExtraFileSecrets:    map[string]corev1.Secret{},
-		ExtraEnvConfigMaps:  map[string]corev1.ConfigMap{},
-		ExtraEnvSecrets:     map[string]corev1.Secret{},
-		DynamicPlugins:      corev1.ConfigMap{},
+		RawConfig:              map[string]string{},
+		AppConfigs:             map[string]corev1.ConfigMap{},
+		ExtraFileConfigMaps:    map[string]corev1.ConfigMap{},
+		ExtraFileSecrets:       map[string]corev1.Secret{},
+		ExtraEnvConfigMaps:     map[string]corev1.ConfigMap{},
+		ExtraEnvSecrets:        map[string]corev1.Secret{},
+		DynamicPlugins:         corev1.ConfigMap{},
+		PersistentVolumeClaims: map[string]corev1.PersistentVolumeClaim{},
 
 		syncedContent: []byte{},
 	}

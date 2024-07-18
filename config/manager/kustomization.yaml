@@ -21,4 +21,5 @@ configMapGenerator:
   - default-config/route.yaml
   - default-config/secret-envs.yaml
   - default-config/service.yaml
+  - default-config/audit-log-pvc.yaml
   name: default-config

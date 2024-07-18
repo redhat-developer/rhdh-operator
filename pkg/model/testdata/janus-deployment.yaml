@@ -28,6 +28,9 @@ spec:
             defaultMode: 420
             optional: true
             secretName: dynamic-plugins-npmrc
+        - name: audit-log-data 
+          persistentVolumeClaim: 
+            claimName: fooClaim
       initContainers:
         - command:
             - ./install-dynamic-plugins.sh
@@ -83,6 +86,3 @@ spec:
           volumeMounts:
             - mountPath: /opt/app-root/src/dynamic-plugins-root
               name: dynamic-plugins-root
-
-
-

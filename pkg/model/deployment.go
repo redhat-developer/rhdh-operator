@@ -127,6 +127,8 @@ func (b *BackstageDeployment) validate(model *BackstageModel, backstage bsv1.Bac
 		return err
 	}
 
+	b.setAuditLogClaimName(b.podSpec(), backstage.Name)
+
 	//DbSecret
 	if backstage.Spec.IsAuthSecretSpecified() {
 		utils.SetDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
@@ -181,6 +183,7 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -222,6 +225,16 @@ func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) {
 	if extraEnvs != nil {
 		for _, e := range extraEnvs.Envs {
 			b.addContainerEnvVar(e)
+		}
+	}
+}
+
+// setAuditLogClaimName sets the persistentVolumeClaim name in the backstage deployment
+// for the volume named 'audit-log-data'
+func (b *BackstageDeployment) setAuditLogClaimName(podSpec *corev1.PodSpec, bsName string) {
+	for k, v := range b.deployment.Spec.Template.Spec.Volumes {
+		if v.Name == "audit-log-data" {
+			podSpec.Volumes[k].PersistentVolumeClaim.ClaimName = AuditLogPvcDefaultName(bsName)
 		}
 	}
 }

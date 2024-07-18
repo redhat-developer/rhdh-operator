@@ -93,7 +93,7 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
 	//vol-default-dynamic-plugins
-	assert.Equal(t, 3, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 4, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
