@@ -275,6 +275,8 @@ type TLS struct {
 	// chain. Do not include a CA certificate. The secret referenced should
 	// be present in the same namespace as that of the Route.
 	// Forbidden when `certificate` is set.
+	// Note that securing Routes with external certificates in TLS secrets is a Technology Preview feature in OpenShift,
+	// and requires enabling the `RouteExternalCertificate` OpenShift Feature Gate and might not be functionally complete.
 	// +optional
 	ExternalCertificateSecretName string `json:"externalCertificateSecretName,omitempty"`
 
