@@ -62,7 +62,7 @@ ENVTEST_K8S_VERSION = 1.25.0
 # with set of Backstage Configuration YAML manifests
 # to use other config - add a directory with config,
 # use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
-PROFILE ?= default
+PROFILE ?= rhdh
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))

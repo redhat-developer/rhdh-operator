@@ -16,6 +16,7 @@ package integration_tests
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
@@ -33,9 +34,18 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = When("create default backstage", func() {
+var _ = When("create default rhdh", func() {
 
 	It("creates runtime objects", func() {
+
+		ev, found := os.LookupEnv("PROFILE")
+		if !found {
+			ev = "rhdh"
+		}
+
+		if ev != "rhdh" {
+			Skip("Skipped for not rhdh config")
+		}
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
