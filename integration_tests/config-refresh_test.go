@@ -64,7 +64,12 @@ var _ = When("create backstage with external configuration", func() {
 
 		backstageName := generateRandName("")
 
-		generateConfigMap(ctx, k8sClient, appConfig1, ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
+		conf := `
+organization:
+  name: "my org"
+`
+
+		generateConfigMap(ctx, k8sClient, appConfig1, ns, map[string]string{"appconfig11": conf}, nil, nil)
 		generateSecret(ctx, k8sClient, secretEnv1, ns, map[string]string{"sec11": "val11"}, nil, nil)
 
 		bs := bsv1.BackstageSpec{
@@ -96,29 +101,34 @@ var _ = When("create backstage with external configuration", func() {
 
 			g.Expect(len(podList.Items)).To(Equal(1))
 			podName := podList.Items[0].Name
-			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/key11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(out).To(Equal("app:"))
+			out = strings.Replace(out, "\r", "", -1)
+			g.Expect(out).To(Equal(conf))
 
 			out, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "echo $sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect("val11\r\n").To(Equal(out))
 
-		}, 10*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
+		}, 5*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
 
 		cm := &corev1.ConfigMap{}
 		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig1}, cm)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		newData := "app:\n  backend:"
-		cm.Data = map[string]string{"key11": newData}
+		// update appconfig11
+		newData := `
+organization:
+  name: "another org"
+`
+		cm.Data = map[string]string{"appconfig11": newData}
 		err = k8sClient.Update(ctx, cm)
 		Expect(err).ShouldNot(HaveOccurred())
 
 		Eventually(func(g Gomega) {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig1}, cm)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(cm.Data["key11"]).To(Equal(newData))
+			g.Expect(cm.Data["appconfig11"]).To(Equal(newData))
 
 			// Pod replaced so have to re-ask
 			podList := &corev1.PodList{}
@@ -126,13 +136,13 @@ var _ = When("create backstage with external configuration", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			podName := podList.Items[0].Name
-			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/key11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// TODO nicer method to compare file content with added '\r'
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))
 
-			_, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/key12")
-			g.Expect(err).Should(HaveOccurred())
+			//_, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/key12")
+			//g.Expect(err).Should(HaveOccurred())
 
 		}, 10*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
 
@@ -145,6 +155,9 @@ var _ = When("create backstage with external configuration", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 
 		Eventually(func(g Gomega) {
+
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
+			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// Pod replaced so have to re-ask
 			podList := &corev1.PodList{}

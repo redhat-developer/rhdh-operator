@@ -49,13 +49,6 @@ func generateConfigMap(ctx context.Context, k8sClient client.Client, name string
 }
 
 func generateSecret(ctx context.Context, k8sClient client.Client, name, namespace string, data, labels, annotations map[string]string) string {
-	if data == nil {
-		data = map[string]string{}
-	}
-
-	for _, v := range data {
-		data[v] = fmt.Sprintf("value-%s", v)
-	}
 	Expect(k8sClient.Create(ctx, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,

@@ -20,6 +20,8 @@ import (
 	"os"
 	"strconv"
 
+	"k8s.io/client-go/util/retry"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -143,40 +145,47 @@ func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx con
 
 	lg := log.FromContext(ctx)
 
-	if err := r.Get(ctx, types.NamespacedName{Name: objectName, Namespace: ns}, obj); err != nil {
-		if _, ok := obj.(*corev1.Secret); ok && errors.IsForbidden(err) {
-			return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
+	// use RetryOnConflict to avoid possible Conflict error which may be caused mostly by other call of this function
+	// https://pkg.go.dev/k8s.io/client-go/util/retry#RetryOnConflict.
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+
+		if err := r.Get(ctx, types.NamespacedName{Name: objectName, Namespace: ns}, obj); err != nil {
+			if _, ok := obj.(*corev1.Secret); ok && errors.IsForbidden(err) {
+				return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
+			}
+			return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
 		}
-		return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
-	}
 
-	if err := config.AddToSyncedConfig(obj); err != nil {
-		return fmt.Errorf("failed to add to synced %s: %s", obj.GetName(), err)
-	}
-
-	if obj.GetLabels() == nil {
-		obj.SetLabels(map[string]string{})
-	}
-	if obj.GetAnnotations() == nil {
-		obj.SetAnnotations(map[string]string{})
-	}
-
-	autoSync := true
-	autoSyncStr, ok := os.LookupEnv(AutoSyncEnvVar)
-	if ok {
-		autoSync, _ = strconv.ParseBool(autoSyncStr)
-	}
-
-	if obj.GetLabels()[model.ExtConfigSyncLabel] == "" || obj.GetAnnotations()[model.BackstageNameAnnotation] == "" ||
-		obj.GetLabels()[model.ExtConfigSyncLabel] != strconv.FormatBool(autoSync) {
-
-		obj.GetLabels()[model.ExtConfigSyncLabel] = strconv.FormatBool(autoSync)
-		obj.GetAnnotations()[model.BackstageNameAnnotation] = backstageName
-		if err := r.Update(ctx, obj); err != nil {
-			return fmt.Errorf("failed to update external config %s: %s", objectName, err)
+		if err := config.AddToSyncedConfig(obj); err != nil {
+			return fmt.Errorf("failed to add to synced %s: %s", obj.GetName(), err)
 		}
-		lg.V(1).Info(fmt.Sprintf("update external config %s with label %s=%s and annotation %s=%s", obj.GetName(), model.ExtConfigSyncLabel, strconv.FormatBool(autoSync), model.BackstageNameAnnotation, backstageName))
-	}
 
-	return nil
+		if obj.GetLabels() == nil {
+			obj.SetLabels(map[string]string{})
+		}
+		if obj.GetAnnotations() == nil {
+			obj.SetAnnotations(map[string]string{})
+		}
+
+		autoSync := true
+		autoSyncStr, ok := os.LookupEnv(AutoSyncEnvVar)
+		if ok {
+			autoSync, _ = strconv.ParseBool(autoSyncStr)
+		}
+
+		if obj.GetLabels()[model.ExtConfigSyncLabel] == "" || obj.GetAnnotations()[model.BackstageNameAnnotation] == "" ||
+			obj.GetLabels()[model.ExtConfigSyncLabel] != strconv.FormatBool(autoSync) {
+
+			obj.GetLabels()[model.ExtConfigSyncLabel] = strconv.FormatBool(autoSync)
+			obj.GetAnnotations()[model.BackstageNameAnnotation] = backstageName
+			if err := r.Update(ctx, obj); err != nil {
+				return err
+			}
+			lg.V(1).Info(fmt.Sprintf("update external config %s with label %s=%s and annotation %s=%s", obj.GetName(), model.ExtConfigSyncLabel, strconv.FormatBool(autoSync), model.BackstageNameAnnotation, backstageName))
+		}
+
+		return nil
+
+	})
+	return err
 }

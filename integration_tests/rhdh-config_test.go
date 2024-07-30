@@ -60,7 +60,7 @@ var _ = When("create default backstage", func() {
 			g.Expect(initCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
 			g.Expect(initCont.VolumeMounts[1].SubPath).To(Equal(".npmrc"))
 			g.Expect(initCont.VolumeMounts[2].MountPath).To(Equal("/opt/app-root/src/.npm/_cacache"))
-			g.Expect(initCont.VolumeMounts[2].SubPath).To(BeEmpty())	
+			g.Expect(initCont.VolumeMounts[2].SubPath).To(BeEmpty())
 			g.Expect(initCont.VolumeMounts[3].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins.yaml"))
 			g.Expect(initCont.VolumeMounts[3].SubPath).To(Equal("dynamic-plugins.yaml"))
 			g.Expect(initCont.VolumeMounts[3].Name).

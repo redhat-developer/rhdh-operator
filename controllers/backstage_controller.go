@@ -301,7 +301,7 @@ func (r *BackstageReconciler) requestByLabel(ctx context.Context, object client.
 
 	backstageName := object.GetAnnotations()[model.BackstageNameAnnotation]
 	if backstageName == "" {
-		lg.V(1).Info(fmt.Sprintf("warning: %s annotation is not defined for %s, Backstage instances will not be reconciled in this loop", model.BackstageNameAnnotation, object.GetName()))
+		//lg.V(1).Info(fmt.Sprintf("warning: %s annotation is not defined for %s, Backstage instances will not be reconciled in this loop", model.BackstageNameAnnotation, object.GetName()))
 		return []reconcile.Request{}
 	}
 
