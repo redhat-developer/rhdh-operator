@@ -129,6 +129,8 @@ jobs:
             skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}
             skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION%-*}
           done
+        env:
+          GH_TOKEN: ${{ secrets.RHDHBOT_TOKEN }}
       - name: Comment image links in PR
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
