@@ -33,12 +33,12 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# quay.io/janus-idp/operator-bundle:$VERSION and quay.io/janus-idp/operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/janus-idp/operator
+# quay.io/rhdh/rhdh-operator-bundle:$VERSION and quay.io/rhdh/iib:$VERSION.
+IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
+BUNDLE_IMG ?= quay.io/rhdh/rhdh-operator-bundle:$(VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -337,7 +337,7 @@ bundle-push: ## Push bundle image to registry
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(VERSION)
+CATALOG_IMG ?= quay.io/rhdh/iib:$(VERSION)
 
 # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
