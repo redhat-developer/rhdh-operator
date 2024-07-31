@@ -108,7 +108,7 @@ jobs:
 
           # now copy images from local cache to quay, using 0.0.1-next-f00cafe, 0.0.1-next, and next tags
           for image in rhdh-rhel9-operator rhdh-operator-bundle iib; do
-            podman push quay.io/rhdh/${image}:upstream-${VERSION} -q
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:${VERSION} quay.io/rhdh/${image}:upstream-${VERSION}
             skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}-${{ env.SHORT_SHA }}
             skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${latestNext}
           done
