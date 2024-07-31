@@ -112,3 +112,5 @@ jobs:
             skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}-${{ env.SHORT_SHA }}
             skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${latestNext}
           done
+        env:
+          GH_TOKEN: ${{ secrets.RHDHBOT_TOKEN }}
