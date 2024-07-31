@@ -13,11 +13,11 @@ spec:
         rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
     spec:
       initContainers:
-         - image: 'quay.io/janus-idp/backstage-showcase:next'
+         - image: 'quay.io/rhdh/rhdh-hub-rhel9:next'
            name: install-dynamic-plugins
       containers:
         - name: backstage-backend    # placeholder for 'backstage-backend'
-          image: quay.io/janus-idp/backstage-showcase:next
+          image: quay.io/rhdh/rhdh-hub-rhel9:next
         - name: sidecar
           image: busybox
 
