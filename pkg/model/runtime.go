@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"sort"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -74,29 +74,18 @@ func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
 	m.RuntimeObjects = append(m.RuntimeObjects, object)
 }
 
+// sort objects so DbStatefulSet and BackstageDeployment become the last in the list
 func (m *BackstageModel) sortRuntimeObjects() {
-	// works with Go 1.18+
-	sort.Slice(m.RuntimeObjects, func(i, j int) bool {
-		_, ok1 := m.RuntimeObjects[i].(*DbStatefulSet)
-		_, ok2 := m.RuntimeObjects[j].(*BackstageDeployment)
-		if ok1 || ok2 {
-			return false
-		}
-		return true
 
-	})
-
-	// this does not work for Go 1.20
-	// so image-build fails
-	//slices.SortFunc(m.RuntimeObjects,
-	//	func(a, b RuntimeObject) int {
-	//		_, ok1 := b.(*DbStatefulSet)
-	//		_, ok2 := b.(*BackstageDeployment)
-	//		if ok1 || ok2 {
-	//			return -1
-	//		}
-	//		return 1
-	//	})
+	slices.SortFunc(m.RuntimeObjects,
+		func(a, b RuntimeObject) int {
+			_, ok1 := b.(*DbStatefulSet)
+			_, ok2 := b.(*BackstageDeployment)
+			if ok1 || ok2 {
+				return -1
+			}
+			return 1
+		})
 }
 
 // Registers config object
