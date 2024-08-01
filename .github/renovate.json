@@ -186,7 +186,6 @@
       "matchUpdateTypes": [
         "patch"
       ],
-      "rangeStrategy": "bump",
       "automerge": false
     },
     {
