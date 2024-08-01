@@ -1,16 +1,5 @@
 # Backstage Operator
 
-## DEPRECATION WARNING
-
-As of August 2024, this repo is deprecated and read-only.
-
-Please continue to work on this project in the following places:
-
-* Code has moved to https://github.com/redhat-developer/rhdh-operator
-* Issues can be reported at https://issues.redhat.com/browse/RHIDP
-* CI images can be found at https://quay.io/repository/rhdh/rhdh-rhel9-operator?tab=info
-
-
 ## The Goal
 The Goal of [Backstage](https://backstage.io) Operator project is creating Kubernetes Operator for configuring, installing and synchronizing Backstage instance on Kubernetes/OpenShift. 
 The initial target is in support of Red Hat's assemblies of Backstage - specifically supporting [dynamic-plugins](https://github.com/janus-idp/backstage-showcase/blob/main/showcase-docs/dynamic-plugins.md) on OpenShift. This includes [Red Hat Developer Hub (RHDH)](https://developers.redhat.com/rhdh) but may be flexible enough to install any compatible Backstage instance on Kubernetes. See additional information under [Configuration](docs/configuration.md).
