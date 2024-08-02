@@ -199,13 +199,21 @@ var _ = When("create default backstage", func() {
 		err = k8sClient.Update(ctx, update)
 		Expect(err).To(Not(HaveOccurred()))
 
-		// Patching StatefulSets is done by the reconciler in two passes: first deleting the StatefulSet first, then recreating it in the next reconcilation.
-		for i := 0; i < 2; i++ {
-			_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
-				NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
-			})
-			Expect(err).To(Not(HaveOccurred()))
-		}
+		_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+		})
+		Expect(err).To(Not(HaveOccurred()))
+
+		// Patching StatefulSets is done by the reconciler in two passes: first deleting the StatefulSet, then recreating it in the next reconcilation.
+		// to make next reconciliation happen (forcing ReconcileAny is not working on a real cluster)
+		update.SetAnnotations(map[string]string{"name": "value"})
+		err = k8sClient.Update(ctx, update)
+		Expect(err).To(Not(HaveOccurred()))
+
+		_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
+		})
+		Expect(err).To(Not(HaveOccurred()))
 
 		Eventually(func(g Gomega) {
 			By("replacing StatefulSet")
