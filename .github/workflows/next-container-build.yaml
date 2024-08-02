@@ -113,4 +113,5 @@ jobs:
             skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${latestNext}
           done
         env:
-          GH_TOKEN: ${{ secrets.RHDH_COMMUNITY_BOT_TOKEN }}
+          # to avoid throttling on RHD org, use GH token
+          GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
