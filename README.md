@@ -63,6 +63,12 @@ Output:
 
 The telemetry data collection feature is enabled by default. The default configuration uses image with backstage-plugin-analytics-provider-segment plugin enabled and configured. To disable this and to learn what data is being collected, see https://github.com/janus-idp/backstage-showcase/blob/main/showcase-docs/getting-started.md#telemetry-collection 
 
+## Contributing and reporting issues
+
+To report issues against this chart, please use JIRA: https://issues.redhat.com/browse/RHIDP
+
+Contributions are welcome! 
+
 ## License
 
 Copyright 2023 Red Hat Inc.
