@@ -120,17 +120,17 @@ jobs:
 
           set -ex
 
-          # build 3 container images with a 14d expiry
+          # build 4 container images with a 14d expiry
           CONTAINER_ENGINE=${CONTAINER_ENGINE} VERSION=${VERSION} make lint release-build
 
           # now copy images from local cache to quay, using 0.0.1-pr-123-f00cafe and 0.0.1-pr-123 tags
-          for image in rhdh-rhel9-operator rhdh-operator-bundle iib; do
-            podman push -q quay.io/rhdh/${image}:${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION%-*}
+          for image in operator operator-bundle operator-catalog; do
+            podman push -q quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION%-*}
           done
         env:
-          GH_TOKEN: ${{ secrets.RHDHBOT_TOKEN }}
+          GH_TOKEN: ${{ secrets.RHDH_COMMUNITY_BOT_TOKEN }}
       - name: Comment image links in PR
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
@@ -141,5 +141,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'PR images are available:<br/><ol><li>https://quay.io/rhdh/rhdh-rhel9-operator:upstream-${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh/rhdh-operator-bundle:upstream-${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh/iib:upstream-${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
+              body: 'PR images are available:<br/><ol><li>https://quay.io/rhdh-community/operator:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh-community/operator-bundle:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh-community/operator-catalog:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
             })

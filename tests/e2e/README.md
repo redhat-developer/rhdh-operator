@@ -54,10 +54,10 @@ This should work on any Kubernetes or OpenShift cluster:
 
 ```shell
 # if the tag is already published and available at the default location: quay.io/rhdh/rhdh-rhel9-operator
-$ make test-e2e VERSION=0.2.0-3d1c1e0
+$ make test-e2e VERSION=0.3.0-3d1c1e0
 
 # or you can override the full image repo name
-$ make test-e2e IMG=my.registry.example.com/operator:0.2.0-3d1c1e0
+$ make test-e2e IMG=my.registry.example.com/operator:0.3.0-3d1c1e0
 ```
 
 Note that `VERSION` and `IMG` override the respective variables declared in the project [`Makefile`](../../Makefile).
