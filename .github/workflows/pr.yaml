@@ -58,10 +58,19 @@ jobs:
       - name: build
         run: make lint
 
-      - name: test
+      - name: Start Minikube
+        uses: medyagh/setup-minikube@latest
+
+      - name: Run controller
+        run: make install run &
+
+      - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
         run: make test
+
+      - name: Integration test
+        run: make integration-test USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: Run Gosec Security Scanner
         run: make gosec
