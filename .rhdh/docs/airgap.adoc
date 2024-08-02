@@ -44,7 +44,7 @@ $ sudo yum install httpd-tools
 
 **Procedure**
 
-. Download and execute the mirroring script to install a custom Operator catalog and mirror the related images: `prepare-restricted-environment.sh` (link:https://github.com/janus-idp/operator/blob/main/.rhdh/scripts/prepare-restricted-environment.sh[source])
+. Download and execute the mirroring script to install a custom Operator catalog and mirror the related images: `prepare-restricted-environment.sh` (link:https://github.com/redhat-developer/rhdh-operator/blob/main/.rhdh/scripts/prepare-restricted-environment.sh[source])
 +
 [source,console]
 ----

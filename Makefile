@@ -60,7 +60,6 @@ ENVTEST_K8S_VERSION = 1.25.0
 # it has to be defined as a set of YAML files inside ./config/manager/$(CONF_DIR) directory
 # to use other config - add a directory with config and run 'CONF_DIR=<dir-name> make ...'
 # TODO find better place than ./config/manager (but not ./config/overlays) ?
-# TODO it works only for make run, needs supporting make deploy as well https://github.com/janus-idp/operator/issues/47
 CONF_DIR ?= default-config
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
