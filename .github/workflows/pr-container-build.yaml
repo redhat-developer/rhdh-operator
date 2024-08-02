@@ -125,10 +125,12 @@ jobs:
 
           # now copy images from local cache to quay, using 0.0.1-pr-123-f00cafe and 0.0.1-pr-123 tags
           for image in rhdh-rhel9-operator rhdh-operator-bundle iib; do
-            podman push quay.io/rhdh/${image}:upstream-${VERSION} -q
+            podman push -q quay.io/rhdh/${image}:${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}
             skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}
             skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION%-*}
           done
+        env:
+          GH_TOKEN: ${{ secrets.RHDHBOT_TOKEN }}
       - name: Comment image links in PR
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
