@@ -59,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.ref }}
@@ -102,7 +102,7 @@ jobs:
       - name: Login to quay.io
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}
@@ -120,15 +120,18 @@ jobs:
 
           set -ex
 
-          # build 3 container images with a 14d expiry
+          # build 4 container images with a 14d expiry
           CONTAINER_ENGINE=${CONTAINER_ENGINE} VERSION=${VERSION} make lint release-build
 
           # now copy images from local cache to quay, using 0.0.1-pr-123-f00cafe and 0.0.1-pr-123 tags
-          for image in rhdh-rhel9-operator rhdh-operator-bundle iib; do
-            podman push quay.io/rhdh/${image}:upstream-${VERSION} -q
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION%-*}
+          for image in operator operator-bundle operator-catalog; do
+            podman push -q quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION%-*}
           done
+        env:
+          # to avoid throttling on RHD org, use GH token
+          GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
       - name: Comment image links in PR
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
@@ -139,5 +142,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'PR images are available:<br/><ol><li>https://quay.io/rhdh/rhdh-rhel9-operator:upstream-${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh/rhdh-operator-bundle:upstream-${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh/iib:upstream-${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
+              body: 'PR images are available:<br/><ol><li>https://quay.io/rhdh-community/operator:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh-community/operator-bundle:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh-community/operator-catalog:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
             })

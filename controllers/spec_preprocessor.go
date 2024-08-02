@@ -156,10 +156,6 @@ func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx con
 			return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
 		}
 
-		if err := config.AddToSyncedConfig(obj); err != nil {
-			return fmt.Errorf("failed to add to synced %s: %s", obj.GetName(), err)
-		}
-
 		if obj.GetLabels() == nil {
 			obj.SetLabels(map[string]string{})
 		}
@@ -182,6 +178,10 @@ func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx con
 				return err
 			}
 			lg.V(1).Info(fmt.Sprintf("update external config %s with label %s=%s and annotation %s=%s", obj.GetName(), model.ExtConfigSyncLabel, strconv.FormatBool(autoSync), model.BackstageNameAnnotation, backstageName))
+		}
+
+		if err := config.AddToSyncedConfig(obj); err != nil {
+			return fmt.Errorf("failed to add to synced %s: %s", obj.GetName(), err)
 		}
 
 		return nil
