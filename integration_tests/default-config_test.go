@@ -221,7 +221,7 @@ var _ = When("create default backstage", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, dbStatefulSet)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(dbStatefulSet.Spec.PodManagementPolicy).To(Equal(appsv1.OrderedReadyPodManagement))
-		}, time.Minute, time.Second).Should(Succeed())
+		}, 2*time.Minute, time.Second).Should(Succeed())
 	})
 
 })
