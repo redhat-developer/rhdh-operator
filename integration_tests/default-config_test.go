@@ -206,9 +206,11 @@ var _ = When("create default backstage", func() {
 
 		// Patching StatefulSets is done by the reconciler in two passes: first deleting the StatefulSet, then recreating it in the next reconcilation.
 		// to make next reconciliation happen (forcing ReconcileAny is not working on a real cluster)
+		Expect(update.GetAnnotations()["name"]).To(BeEmpty())
 		update.SetAnnotations(map[string]string{"name": "value"})
 		err = k8sClient.Update(ctx, update)
 		Expect(err).To(Not(HaveOccurred()))
+		Expect(update.GetAnnotations()["name"]).NotTo(BeEmpty())
 
 		_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
 			NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
@@ -221,7 +223,7 @@ var _ = When("create default backstage", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, dbStatefulSet)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(dbStatefulSet.Spec.PodManagementPolicy).To(Equal(appsv1.OrderedReadyPodManagement))
-		}, 2*time.Minute, time.Second).Should(Succeed())
+		}, time.Minute, time.Second).Should(Succeed())
 	})
 
 })
