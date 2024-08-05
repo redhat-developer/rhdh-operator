@@ -125,6 +125,14 @@ organization:
 		err = k8sClient.Update(ctx, cm)
 		Expect(err).ShouldNot(HaveOccurred())
 
+		sec := &corev1.Secret{}
+		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
+		Expect(err).ShouldNot(HaveOccurred())
+		newEnv := "val22"
+		sec.StringData = map[string]string{"sec11": newEnv}
+		err = k8sClient.Update(ctx, sec)
+		Expect(err).ShouldNot(HaveOccurred())
+
 		Eventually(func(g Gomega) {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig1}, cm)
 			g.Expect(err).ShouldNot(HaveOccurred())
@@ -141,34 +149,12 @@ organization:
 			// TODO nicer method to compare file content with added '\r'
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))
 
-			//_, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/key12")
-			//g.Expect(err).Should(HaveOccurred())
-
-		}, 10*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
-
-		sec := &corev1.Secret{}
-		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
-		Expect(err).ShouldNot(HaveOccurred())
-		newEnv := "val22"
-		sec.StringData = map[string]string{"sec11": newEnv}
-		err = k8sClient.Update(ctx, sec)
-		Expect(err).ShouldNot(HaveOccurred())
-
-		Eventually(func(g Gomega) {
-
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			// Pod replaced so have to re-ask
-			podList := &corev1.PodList{}
-			err = k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+			out2, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "echo $sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
-
-			podName := podList.Items[0].Name
-
-			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "echo $sec11")
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(fmt.Sprintf("%s%s", newEnv, "\r\n")).To(Equal(out))
+			g.Expect(fmt.Sprintf("%s%s", newEnv, "\r\n")).To(Equal(out2))
 
 		}, 10*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
 
