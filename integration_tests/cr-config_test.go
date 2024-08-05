@@ -305,4 +305,3 @@ var _ = When("create backstage with CR configured", func() {
 // If no such a key - no reaction, it is just not included
 
 // mounting/injecting secret by key only
-
