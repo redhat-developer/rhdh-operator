@@ -16,7 +16,6 @@ package integration_tests
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
@@ -38,13 +37,8 @@ var _ = When("create default rhdh", func() {
 
 	It("creates runtime objects", func() {
 
-		ev, found := os.LookupEnv("PROFILE")
-		if !found {
-			ev = "rhdh"
-		}
-
-		if ev != "rhdh" {
-			Skip("Skipped for not rhdh config")
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
 		}
 
 		ctx := context.Background()
