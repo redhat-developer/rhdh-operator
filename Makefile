@@ -129,12 +129,12 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && rm -r $(LOCALBIN)/default-config/* && cp config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
+	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && rm -r $(LOCALBIN)/default-config/* && cp config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
+	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 
@@ -146,7 +146,7 @@ build: generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet build ## Run a controller from your host.
-	cd $(LOCALBIN) && mkdir -p default-config && rm -r default-config/* && cp ../config/profile/$(PROFILE)/default-config/* default-config && ./manager
+	cd $(LOCALBIN) && mkdir -p default-config && rm -fr default-config/* && cp ../config/profile/$(PROFILE)/default-config/* default-config && ./manager
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
