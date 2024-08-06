@@ -26,7 +26,9 @@
         "docker"
       ],
       "matchUpdateTypes": [
-        "pin","pinDigest", "digest"
+        "pin",
+        "pinDigest",
+        "digest"
       ],
       "automerge": false
     },
@@ -49,18 +51,19 @@
       "matchDatasources": [
         "go"
       ],
-      "matchPackagePrefixes": [
-        "k8s.io/api",
-        "k8s.io/apimachinery",
-        "k8s.io/client-go"
-      ],
       "matchUpdateTypes": [
-        "minor", "patch"
+        "minor",
+        "patch"
       ],
       "baseBranches": [
         "main"
       ],
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": [
+        "k8s.io/api{/,}**",
+        "k8s.io/apimachinery{/,}**",
+        "k8s.io/client-go{/,}**"
+      ]
     },
     {
       "description": "k8s go: patch updates only in 1.y.x",
@@ -69,18 +72,18 @@
       "matchDatasources": [
         "go"
       ],
-      "matchPackagePrefixes": [
-        "k8s.io/api",
-        "k8s.io/apimachinery",
-        "k8s.io/client-go"
-      ],
       "matchUpdateTypes": [
         "patch"
       ],
       "baseBranches": [
         "/^1\\..*\\.x/"
       ],
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": [
+        "k8s.io/api{/,}**",
+        "k8s.io/apimachinery{/,}**",
+        "k8s.io/client-go{/,}**"
+      ]
     },
     {
       "description": "ginkgo: minor and patch updates in main",
@@ -89,16 +92,17 @@
       "matchDatasources": [
         "go"
       ],
-      "matchPackagePrefixes": [
-        "github.com/onsi/ginkgo/v2"
-      ],
       "matchUpdateTypes": [
-        "minor", "patch"
+        "minor",
+        "patch"
       ],
       "baseBranches": [
         "main"
       ],
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": [
+        "github.com/onsi/ginkgo/v2{/,}**"
+      ]
     },
     {
       "description": "ginkgo: patch updates only in 1.y.x",
@@ -107,16 +111,16 @@
       "matchDatasources": [
         "go"
       ],
-      "matchPackagePrefixes": [
-        "github.com/onsi/ginkgo/v2"
-      ],
       "matchUpdateTypes": [
         "patch"
       ],
       "baseBranches": [
         "/^1\\..*\\.x/"
       ],
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": [
+        "github.com/onsi/ginkgo/v2{/,}**"
+      ]
     },
     {
       "description": "gomega: minor and patch updates in main",
@@ -125,16 +129,17 @@
       "matchDatasources": [
         "go"
       ],
-      "matchPackagePrefixes": [
-	      "github.com/onsi/gomega"
-      ],
       "matchUpdateTypes": [
-        "minor", "patch"
+        "minor",
+        "patch"
       ],
       "baseBranches": [
         "main"
       ],
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": [
+        "github.com/onsi/gomega{/,}**"
+      ]
     },
     {
       "description": "gomega: patch updates only in 1.y.x",
@@ -143,16 +148,16 @@
       "matchDatasources": [
         "go"
       ],
-      "matchPackagePrefixes": [
-	      "github.com/onsi/gomega"
-      ],
       "matchUpdateTypes": [
         "patch"
       ],
       "baseBranches": [
         "/^1\\..*\\.x/"
       ],
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": [
+        "github.com/onsi/gomega{/,}**"
+      ]
     },
     {
       "description": "Do NOT generate PRs for major go dependency updates ",
@@ -195,12 +200,12 @@
         "github-runners"
       ],
       "matchUpdateTypes": [
-        "minor","patch"
+        "minor",
+        "patch"
       ],
       "matchCurrentVersion": "!/^0/",
       "automerge": true
     }
-
   ],
   "vulnerabilityAlerts": {
     "enabled": true,
