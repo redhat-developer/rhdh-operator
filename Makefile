@@ -316,7 +316,7 @@ endif
 bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPSDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPSDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle $(BUNDLE_GEN_FLAGS)
 	$(OPSDK) bundle validate ./bundle
 	mv -f bundle.Dockerfile docker/bundle.Dockerfile
 	$(MAKE) fmt_license
