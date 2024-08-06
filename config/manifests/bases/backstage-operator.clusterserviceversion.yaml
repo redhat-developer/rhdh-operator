@@ -1,0 +1,19 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata: {}
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Backstage is the Schema for the backstages API
+      displayName: Backstage
+      kind: Backstage
+      name: backstages.rhdh.redhat.com
+      version: v1alpha2
+  displayName: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  provider: {}
+  version: 0.0.0
