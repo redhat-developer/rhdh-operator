@@ -18,7 +18,7 @@ which provides a reconcile function responsible for synchronizing resources unti
 * Available local or remote Kubernetes cluster with cluster admin privileges. For instance **minikube**. See [Instaling minkube](https://kubernetes.io/docs/tasks/tools/#minikube).
 * A copy of the Backstage Operator sources:
 ```sh
-git clone https://github.com/janus-idp/operator
+git clone https://github.com/redhat-developer/rhdh-operator
 ```
 
 ### Local Tests

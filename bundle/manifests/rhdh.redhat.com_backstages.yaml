@@ -260,7 +260,11 @@ spec:
                               serving certificate, not a certificate chain. Do not
                               include a CA certificate. The secret referenced should
                               be present in the same namespace as that of the Route.
-                              Forbidden when `certificate` is set.
+                              Forbidden when `certificate` is set. Note that securing
+                              Routes with external certificates in TLS secrets is
+                              a Technology Preview feature in OpenShift, and requires
+                              enabling the `RouteExternalCertificate` OpenShift Feature
+                              Gate and might not be functionally complete.
                             type: string
                           key:
                             description: key provides key file contents
@@ -622,7 +626,11 @@ spec:
                               serving certificate, not a certificate chain. Do not
                               include a CA certificate. The secret referenced should
                               be present in the same namespace as that of the Route.
-                              Forbidden when `certificate` is set.
+                              Forbidden when `certificate` is set. Note that securing
+                              Routes with external certificates in TLS secrets is
+                              a Technology Preview feature in OpenShift, and requires
+                              enabling the `RouteExternalCertificate` OpenShift Feature
+                              Gate and might not be functionally complete.
                             type: string
                           key:
                             description: key provides key file contents

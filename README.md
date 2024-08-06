@@ -17,7 +17,7 @@ Both **kubectl** and **minikube** must be installed. See [tools](https://kuberne
 
 1.  Get your copy of Operator from GitHub: 
 ```sh
-git clone https://github.com/janus-idp/operator
+git clone https://github.com/redhat-developer/rhdh-operator
 ```
 2. Deploy Operator on the minikube cluster:
 ```sh
@@ -69,6 +69,12 @@ Forwarding from [::1]:17007 -> 7007
 ## Telemetry data collection
 
 The telemetry data collection feature is enabled by default. The default configuration uses image with backstage-plugin-analytics-provider-segment plugin enabled and configured. To disable this and to learn what data is being collected, see https://github.com/janus-idp/backstage-showcase/blob/main/showcase-docs/getting-started.md#telemetry-collection 
+
+## Contributing and reporting issues
+
+To report issues against this chart, please use JIRA: https://issues.redhat.com/browse/RHIDP
+
+Contributions are welcome! 
 
 ## License
 

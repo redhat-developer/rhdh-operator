@@ -4,5 +4,5 @@ resources:
 - manager.yaml
 images:
 - name: controller
-  newName: quay.io/janus-idp/operator
+  newName: quay.io/rhdh-community/operator
   newTag: 0.3.0

@@ -14,7 +14,7 @@ WARNING: The procedure below will not work properly on OpenShift clusters with h
 [source,console]
 ----
 cd /tmp
-curl -sSLO https://raw.githubusercontent.com/janus-idp/operator/main/.rhdh/scripts/install-rhdh-catalog-source.sh
+curl -sSLO https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/.rhdh/scripts/install-rhdh-catalog-source.sh
 chmod +x install-rhdh-catalog-source.sh
 
 # install catalog source and operator subscription, for the latest stable RC or GA from 1.yy.x branch

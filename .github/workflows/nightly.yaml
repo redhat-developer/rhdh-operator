@@ -24,7 +24,7 @@ jobs:
     env:
       CONTAINER_ENGINE: podman
     steps:
-      - uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4 # default branch will be checked out by default on scheduled workflows
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4 # default branch will be checked out by default on scheduled workflows
         with:
           fetch-depth: 0
 
@@ -33,7 +33,7 @@ jobs:
         run: git switch ${{ matrix.branch }}
 
       - name: Setup Go
-        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
         with:
           go-version-file: 'go.mod'
 

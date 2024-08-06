@@ -61,10 +61,6 @@ func (e *ExternalConfig) GetHash() string {
 
 func (e *ExternalConfig) AddToSyncedConfig(content client.Object) error {
 
-	if content.GetLabels()[ExtConfigSyncLabel] == "" || content.GetAnnotations()[BackstageNameAnnotation] == "" {
-		return nil
-	}
-
 	d, err := json.Marshal(content)
 	if err != nil {
 		return err
