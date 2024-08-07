@@ -219,7 +219,7 @@ var _ = When("create default backstage", func() {
 
 		// TODO: Temporarily comment this section out, more investigations needed
 		// By some reason it fails ONLY HERE with "Message: "statefulsets.apps \"backstage-psql-test-backstage-jr9h7\" not found","
-		// Works pretty well locally
+		// Works mostly well locally, but not all the time still
 		//Eventually(func(g Gomega) {
 		//	By("replacing StatefulSet")
 		//	dbStatefulSet := &appsv1.StatefulSet{}

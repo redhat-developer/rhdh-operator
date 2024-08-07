@@ -106,7 +106,7 @@ func main() {
 
 	isOpenShift, err := isOpenshift()
 	if err != nil {
-		setupLog.Error(err, "unable to detect if a cluster is OpenShift")
+		setupLog.Error(err, "unable to detect if a cluster is OpenShift. Make sure your cluster is running and accessible")
 		os.Exit(1)
 	}
 

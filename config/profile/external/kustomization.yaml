@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Adds namespace to all resources.
+namespace: backstage-system
+
+namePrefix: backstage-
+
+resources:
+- ../../crd
+- ../../rbac
+- ../../manager
+
+patches:
+- path: manager_auth_proxy_patch.yaml
+  target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: controller-manager

@@ -73,10 +73,16 @@ jobs:
         if: ${{ env.CHANGES != '' }}
         run: make test
 
-      - name: Integration test
+      - name: Generic Integration test
+        # run this stage only if there are changes that match the includes and not the excludes
+        # perform it on backstage.io for speed
+        if: ${{ env.CHANGES != '' }}
+        run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
+
+      - name: RHDH specific Integration test
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
-        run: make integration-test USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
+        run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: Run Gosec Security Scanner
         run: make gosec

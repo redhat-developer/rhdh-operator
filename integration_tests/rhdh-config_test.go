@@ -33,9 +33,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = When("create default backstage", func() {
+var _ = When("create default rhdh", func() {
 
 	It("creates runtime objects", func() {
+
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
+		}
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)

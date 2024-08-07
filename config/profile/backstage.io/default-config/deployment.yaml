@@ -1,0 +1,35 @@
+# kubernetes/backstage.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+spec:
+  selector:
+    matchLabels:
+      app: backstage
+  template:
+    metadata:
+      labels:
+        app: backstage
+    spec:
+      containers:
+        - name: backstage-backend
+          image: ghcr.io/backstage/backstage:1.28.4
+          imagePullPolicy: IfNotPresent
+          command:
+            - "node"
+            - "packages/backend"
+            - "--no-node-snapshot"
+          args:
+            - "--config"
+            - "app-config.yaml"
+            - "--config"
+            - "app-config.production.yaml"
+          ports:
+            - name: http
+              containerPort: 7007
+#          envFrom:
+#            - secretRef:
+#                name: postgres-secrets
+#            - secretRef:
+#                name: backstage-secrets

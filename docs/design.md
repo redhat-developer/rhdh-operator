@@ -1,3 +1,15 @@
+
+------
+
+
+As it is described in Design doc (TODO), Backstage CR's desired state is defined using layered configuration approach, which means:
+- By default each newly created Backstage CR uses Operator scope Default Configuration
+- Which can be fully or partially overriden for particular CR instance using ConfigMap with the name pointed in BackstageCR.spec.RawConfig
+- Which in turn can be customized by other BackstageCR.spec fields (see Backstage API doc)
+
+--------
+
+
 # Backstage Operator Design [WIP]
 
 The goal of Backstage Operator is to deploy Backstage workload to the Kubernetes namespace and keep this workload synced with the desired state defined by configuration. 
