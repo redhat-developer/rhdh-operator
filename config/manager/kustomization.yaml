@@ -5,7 +5,7 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/janus-idp/operator
-  newTag: 0.1.2
+  newTag: 0.3.0@sha256:42a97d28747ddad316dca01e9ae937d76f0eed197b26a175faf152883ca0646e
 
 generatorOptions:
   disableNameSuffixHash: true
