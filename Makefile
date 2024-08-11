@@ -210,7 +210,7 @@ deployment-manifest: manifests kustomize ## Generate manifest to deploy operator
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/profile/$(PROFILE) | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Build Dependencies
 
@@ -314,9 +314,9 @@ endif
 # Build a bundle image using the 'operator-sdk' tool
 .PHONY: bundle
 bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPSDK) generate kustomize manifests -q
+	#$(OPSDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle $(BUNDLE_GEN_FLAGS)
+	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	$(OPSDK) bundle validate ./bundle
 	mv -f bundle.Dockerfile docker/bundle.Dockerfile
 	$(MAKE) fmt_license

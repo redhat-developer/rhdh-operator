@@ -150,42 +150,168 @@ data:
             resources:
               requests:
                 storage: 1Gi
-  deployment.yaml: |-
-    # kubernetes/backstage.yaml
+  deployment.yaml: |
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: backstage
+      name: backstage # placeholder for 'backstage-<cr-name>'
     spec:
+      replicas: 1
       selector:
         matchLabels:
-          app: backstage
+          rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
       template:
         metadata:
           labels:
-            app: backstage
+            rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
         spec:
+          automountServiceAccountToken: false
+          # if securityContext not present in AKS/EKS, the error is like this:
+          #Error: EACCES: permission denied, open '/dynamic-plugins-root/backstage-plugin-scaffolder-backend-module-github-dynamic-0.2.2.tgz'
+          # fsGroup doesn not work for Openshift
+          #securityContext:
+          #   fsGroup: 1001
+          volumes:
+            - ephemeral:
+                volumeClaimTemplate:
+                  spec:
+                    accessModes:
+                      - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: 2Gi
+              name: dynamic-plugins-root
+            - name: dynamic-plugins-npmrc
+              secret:
+                defaultMode: 420
+                optional: true
+                secretName: dynamic-plugins-npmrc
+            - emptyDir: {}
+              name: npmcacache
+          initContainers:
+            - name: install-dynamic-plugins
+              command:
+                - ./install-dynamic-plugins.sh
+                - /dynamic-plugins-root
+              # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
+              image: quay.io/rhdh/rhdh-hub-rhel9:next
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                seccompProfile:
+                  type: RuntimeDefault
+                capabilities:
+                  drop:
+                   - ALL
+              env:
+                - name: NPM_CONFIG_USERCONFIG
+                  value: /opt/app-root/src/.npmrc.dynamic-plugins
+              volumeMounts:
+                - mountPath: /dynamic-plugins-root
+                  name: dynamic-plugins-root
+                - mountPath: /opt/app-root/src/.npmrc.dynamic-plugins
+                  name: dynamic-plugins-npmrc
+                  readOnly: true
+                  subPath: .npmrc
+                - mountPath: /opt/app-root/src/.npm/_cacache
+                  name: npmcacache
+              workingDir: /opt/app-root/src
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 1000m
+                  memory: 2.5Gi
+                  ephemeral-storage: 5Gi
           containers:
             - name: backstage-backend
-              image: ghcr.io/backstage/backstage:1.28.4
+              # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
+              image: quay.io/rhdh/rhdh-hub-rhel9:next
               imagePullPolicy: IfNotPresent
-              command:
-                - "node"
-                - "packages/backend"
-                - "--no-node-snapshot"
               args:
                 - "--config"
-                - "app-config.yaml"
-                - "--config"
-                - "app-config.production.yaml"
+                - "dynamic-plugins-root/app-config.dynamic-plugins.yaml"
+              securityContext:
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthcheck
+                  port: 7007
+                  scheme: HTTP
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                successThreshold: 2
+                timeoutSeconds: 2
+              livenessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthcheck
+                  port: 7007
+                  scheme: HTTP
+                initialDelaySeconds: 60
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 2
               ports:
-                - name: http
+                - name: backend
                   containerPort: 7007
-    #          envFrom:
-    #            - secretRef:
-    #                name: postgres-secrets
-    #            - secretRef:
-    #                name: backstage-secrets
+              env:
+                - name: APP_CONFIG_backend_listen_port
+                  value: "7007"
+              volumeMounts:
+                - mountPath: /opt/app-root/src/dynamic-plugins-root
+                  name: dynamic-plugins-root
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 1000m
+                  memory: 2.5Gi
+                  ephemeral-storage: 5Gi
+  dynamic-plugins.yaml: |-
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: default-dynamic-plugins #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name
+    data:
+      "dynamic-plugins.yaml": |
+        includes:
+          - dynamic-plugins.default.yaml
+        plugins: []
+  route.yaml: |-
+    apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name: route # placeholder for 'backstage-<cr-name>'
+    spec:
+      port:
+        targetPort: http-backend
+      path: /
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+      to:
+        kind: Service
+        name:  # placeholder for 'backstage-<cr-name>'
+  secret-envs.yaml: |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: backend-auth-secret
+    stringData:
+      # generated with the command below (from https://janus-idp.io/docs/auth/service-to-service-auth/#setup):
+      # node -p 'require("crypto").randomBytes(24).toString("base64")'
+      BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK" # notsecret
   service.yaml: |-
     apiVersion: v1
     kind: Service
@@ -201,4 +327,4 @@ data:
           targetPort: backend
 kind: ConfigMap
 metadata:
-  name: backstage-default-config
+  name: rhdh-default-config

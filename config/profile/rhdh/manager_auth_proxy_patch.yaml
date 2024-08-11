@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
+  namespace: operator
 spec:
   template:
     spec:
@@ -31,6 +31,7 @@ spec:
           capabilities:
             drop:
               - "ALL"
+        #image: registry.redhat.io/openshift4/ose-kube-rbac-proxy:v4.12
         image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
         args:
         - "--secure-listen-address=0.0.0.0:8443"
