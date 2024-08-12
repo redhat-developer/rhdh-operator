@@ -53,8 +53,7 @@ endif
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25.0
+
 
 # Profile directory: subdirectory of ./config/profile
 # In terms of Kustomize it is overlay directory
@@ -229,15 +228,17 @@ ADDLICENSE ?= $(LOCALBIN)/addlicense
 GOSEC ?= $(LOCALBIN)/gosec
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.11.3
-GOLANGCI_LINT_VERSION ?= v1.55.2
-GOIMPORTS_VERSION ?= v0.15.0
+KUSTOMIZE_VERSION ?= v5.4.2
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
+GOLANGCI_LINT_VERSION ?= v1.59.1
+GOIMPORTS_VERSION ?= v0.16.1
 ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
-OPM_VERSION ?= v1.36.0
-OPERATOR_SDK_VERSION ?= v1.33.0
-GOSEC_VERSION ?= v2.18.2
+OPM_VERSION ?= v1.45.0
+OPERATOR_SDK_VERSION ?= v1.36.0
+GOSEC_VERSION ?= v2.20.0
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION = 1.28.0
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
