@@ -47,12 +47,8 @@ spec:
   - name: Backstage Operator
     url: https://github.com/redhat-developer/rhdh-operator
   maintainers:
-  - email: asoro@redhat.com
-    name: Armel Soro
-  - email: cdaley@redhat.com
-    name: Corey Daley
-  - email: gazarenk@redhat.com
-    name: Gennady Azarenkov
+  - email: rhdh-bot@redhat.com
+    name: Red Hat Developer Bot
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:
