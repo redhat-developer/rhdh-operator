@@ -303,8 +303,8 @@ spec:
   - name: Backstage Operator
     url: https://github.com/redhat-developer/rhdh-operator
   maintainers:
-  - email: rhdh-bot@redhat.com
-    name: Red Hat Developer Bot
+  - email: rhdh-notifications@redhat.com
+    name: Red Hat Developer Team
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:

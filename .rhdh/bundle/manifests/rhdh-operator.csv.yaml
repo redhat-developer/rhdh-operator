@@ -349,8 +349,8 @@ spec:
   - name: RHDH Operator (Downstream)
     url: https://gitlab.cee.redhat.com/rhidp/rhdh/
   maintainers:
-  - email: rhdh-bot@redhat.com
-    name: Red Hat Developer Bot
+  - email: rhdh-notifications@redhat.com
+    name: Red Hat Developer Team
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:
