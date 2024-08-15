@@ -349,14 +349,8 @@ spec:
   - name: RHDH Operator (Downstream)
     url: https://gitlab.cee.redhat.com/rhidp/rhdh/
   maintainers:
-  - email: asoro@redhat.com
-    name: Armel Soro
-  - email: cdaley@redhat.com
-    name: Corey Daley
-  - email: gazarenk@redhat.com
-    name: Gennady Azarenkov
-  - email: nboldt@redhat.com
-    name: Nick Boldt
+  - email: rhdh-notifications@redhat.com
+    name: Red Hat Developer Team
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:
