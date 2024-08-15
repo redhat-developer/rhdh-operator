@@ -240,9 +240,9 @@ func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client
 
 	// needed for openshift.Route only, Openshift yells otherwise
 	obj.Object().SetResourceVersion(baseObject.GetResourceVersion())
-	if objectKind, ok := obj.Object().(schema.ObjectKind); ok {
-		objectKind.SetGroupVersionKind(baseObject.GetObjectKind().GroupVersionKind())
-	}
+	//if objectKind, ok := obj.Object().(schema.ObjectKind); ok {
+	//	objectKind.SetGroupVersionKind(baseObject.GetObjectKind().GroupVersionKind())
+	//}
 
 	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: FIELD_MANAGER}); err != nil {
 		return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
