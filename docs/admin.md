@@ -1,50 +1,49 @@
 # Administrator Guide
 
-## Backstage Operator configuration
+This guide is intended for the Backstage Operator administrator who:
 
-### Context
+* Possesses sufficient knowledge and rights to configure Kubernetes clusters and cluster-scoped objects.
+* Has acquired enough understanding to configure and support the Backstage Operator (with the assistance of this document).
+* Is not necessarily an expert in Backstage functionality and configuration.
 
-As it is described in Design doc (TODO), Backstage CR's desired state is defined using layered configuration approach, which means:
-- By default each newly created Backstage CR uses Operator scope Default Configuration
-- Which can be fully or partially overriden for particular CR instance using ConfigMap with the name pointed in BackstageCR.spec.RawConfig 
-- Which in turn can be customized by other BackstageCR.spec fields (see Backstage API doc)
+## Deployment
 
-Cluster Administrator may want to customize Default Configuration due to internal preferences/limitations, for example:
-- Preferences/restrictions for Backstage and|or PostgreSQL images due to  Airgapped environment.
-- Existed Taints and Tolerations policy, so Backstage Pods have to be configured with certain tolerations restrictions.
-- ...
+## Default Backstage instance configuration
 
-Default Configuration is implemented as a ConfigMap called *backstage-default-config*, deployed on *backstage-system* namespace and mounted to Backstage controller container as a */default-config* directory.
-This config map contains the set of keys/values which maps to file names/contents in the */default-config*.
-These files contain yaml manifests of objects used by Backstage controller as an initial desired state of Backstage CR according to Backstage Operator configuration model:
+The Backstage Operator operates at the cluster level, enabling management of multiple Backstage instances (Custom Resources).
+
+Each Backstage Custom Resource (CR) governs the creation, modification, and deletion of a set of Kubernetes objects.
+
+The default shape of these objects is configured at the Operator level using YAML files containing Kubernetes manifests.
+
+Default Configuration is implemented as a ConfigMap named backstage-default-config, deployed within the specified Kubernetes namespace and mounted to the /default-config directory of the Backstage controller container.
 
 ![Backstage Default ConfigMap and CR](images/backstage_admin_configmap_and_cr.jpg)
- 
 
-Mapping of configMap keys (yaml files) to runtime objects (NOTE: for the time (Dec 20'23) it is a subject of change):
+Here is the description of default configuration files:
 
-| Key/File name                  | k8s/OCP Kind       | Mandatory*     | version | Notes                                           |
-|--------------------------------|--------------------|----------------|---------|-------------------------------------------------|
-| deployment.yaml                | appsv1.Deployment  | Yes            | all     | Backstage deployment                            |
-| service.yaml                   | corev1.Service     | Yes            | all     | Backstage Service                               |
-| db-statefulset.yaml            | appsv1.Statefulset | For DB enabled | all     | PostgreSQL StatefulSet                          |    
-| db-service.yaml                | corev1.Service     | For DB enabled | all     | PostgreSQL Service                              |
-| db-secret.yaml                 | corev1.Secret      | For DB enabled | all     | Secret to connect Backstage to PSQL             |
-| route.yaml                     | openshift.Route    | No (for OCP)   | all     | Route exposing Backstage service                |
-| app-config.yaml                | corev1.ConfigMap   | No             | 0.2.0   | Backstage app-config.yaml                       |
-| configmap-files.yaml           | corev1.ConfigMap   | No             | 0.2.0   | Backstage config file inclusions from configMap |
-| configmap-envs.yaml            | corev1.ConfigMap   | No             | 0.2.0   | Backstage env variables from configMap          |
-| secret-files.yaml              | corev1.Secret      | No             | 0.2.0   | Backstage config file inclusions from Secret    |
-| secret-envs.yaml               | corev1.Secret      | No             | 0.2.0   | Backstage env variables from Secret             |
-| dynamic-plugins.yaml           | corev1.ConfigMap   | No             | 0.2.0   | dynamic-plugins config *                        |
-| dynamic-plugins-configmap.yaml | corev1.ConfigMap   | No             | 0.1.0   | dynamic-plugins config *                        |
-| backend-auth-configmap.yaml    | corev1.ConfigMap   | No             | 0.1.0   | backend auth config                             |
+| Key/File name                  | Object Kind        | Object Name                         | Mandatory(*) | Version | Notes                                           
+|--------------------------------|--------------------|-------------------------------------|--------------|---------|-------------------------------------------------|
+| deployment.yaml                | appsv1.Deployment  | backstage-<cr-name>                 | Yes          | >=0.1.x | Backstage deployment                            |
+| service.yaml                   | corev1.Service     | backstage-<cr-name>                 | Yes          | >=0.1.x | Backstage Service                               |
+| db-statefulset.yaml            | appsv1.Statefulset | backstage-psql-<cr-name>            | For local DB | >=0.1.x | PostgreSQL StatefulSet                          |
+| db-service.yaml                | corev1.Service     | backstage-psql-<cr-name>            | For local DB | >=0.1.x | PostgreSQL Service                              |
+| db-secret.yaml                 | corev1.Secret      | backstage-psql-secret-<cr-name>     | For local DB | >=0.1.x | Secret to connect Backstage to PGSQL            |
+| route.yaml                     | openshift.Route    | backstage-<cr-name>                 | No (for OCP) | >=0.1.x | Route exposing Backstage service                |
+| app-config.yaml                | corev1.ConfigMap   | backstage-appconfig-<cr-name>       | No           | >=0.2.x | Backstage app-config.yaml                       |
+| configmap-files.yaml           | corev1.ConfigMap   | backstage-files-<cr-name>           | No           | >=0.2.x | Backstage config file inclusions from configMap |
+| configmap-envs.yaml            | corev1.ConfigMap   | backstage-envs-<cr-name>            | No           | >=0.2.x | Backstage env variables from configMap          |
+| secret-files.yaml              | corev1.Secret      | backstage-files-<cr-name>           | No           | >=0.2.x | Backstage config file inclusions from Secret    |
+| secret-envs.yaml               | corev1.Secret      | backstage-envs-<cr-name>            | No           | >=0.2.x | Backstage env variables from Secret             |
+| dynamic-plugins.yaml           | corev1.ConfigMap   | backstage-dynamic-plugins-<cr-name> | No           | >=0.2.x | dynamic-plugins config                          |
+| dynamic-plugins-configmap.yaml | corev1.ConfigMap   | backstage-<cr-name>                 | No           | 0.1.x   | dynamic-plugins config                          |
+| backend-auth-configmap.yaml    | corev1.ConfigMap   | backstage-<cr-name>                 | No           | 0.1.x   | app-config.yaml with backend auth config        |
 
+Meanings of **Mandatory** column: 
+- **Yes** - has to be configured, deployment will fail otherwise
+- **For local DB** - has to be configured if spec.enableLocalDb=true
+- **No** - optional configuration
 
-NOTES: 
- - Mandatory means it is needed to be present in either (or both) Default and CR Raw Configuration.
- - dynamic-plugins.yaml is a fragment of app-config.yaml provided with RHDH, which is mounted into a dedicated initContainer. 
- - items marked as version 0.0.1 are not supported in version 0.0.2 
 ### Operator Bundle configuration 
 
 With Backstage Operator's Makefile you can generate bundle descriptor using *make bundle* command
@@ -99,6 +98,6 @@ you will need to configure your cluster or network to allow these images to be p
 For the list of related images deployed by the Operator, see the `RELATED_IMAGE_*` env vars or `relatedImages` section of the [CSV](../bundle/manifests/backstage-operator.clusterserviceversion.yaml).
 See also https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html
 
-#### Custom Backstage Image
 
-You can use the Backstage Operator to deploy a backstage application with your custom backstage image by setting the field `spec.application.image` in your Backstage CR. This is at your own risk and it is your responsibility to ensure that the image is from trusted sources, and has been tested and validated for security compliance.
+Installing Operator on Openshift cluster
+https://docs.openshift.com/container-platform/4.15/operators/admin/olm-adding-operators-to-cluster.html 
