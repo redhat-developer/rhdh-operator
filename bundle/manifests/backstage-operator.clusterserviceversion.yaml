@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Seamless Upgrades
-    createdAt: "2024-08-19T20:25:42Z"
+    createdAt: "2024-08-20T14:16:06Z"
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.36.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -75,7 +75,6 @@ spec:
           - delete
           - get
           - list
-          - patch
           - watch
         - apiGroups:
           - apps
