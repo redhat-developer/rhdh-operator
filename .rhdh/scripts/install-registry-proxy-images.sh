@@ -19,7 +19,7 @@
 set -e
 
 # Variables
-REMOTE_REGISTRY="quay.io"
+REMOTE_REGISTRY="quay.io/rhdh"
 LOCAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
 NAMESPACE="openshift-marketplace"
 CATALOG_NAME="my-catalog-source"
@@ -91,10 +91,10 @@ for manifest in $(jq -r '.manifests[].digest' "$WORKDIR/iib/index.json"); do
   fi
 done
 
-if [[ ${#images[@]} -eq 0 ]]; then
-    echo "[ERROR] No images found in IIB. Exiting."
-    exit 1
-fi
+# if [[ ${#images[@]} -eq 0 ]]; then
+#     echo "[ERROR] No images found in IIB. Exiting."
+#     exit 1
+# fi
 
 
 # Step 3: Convert image references to quay.io equivalents
