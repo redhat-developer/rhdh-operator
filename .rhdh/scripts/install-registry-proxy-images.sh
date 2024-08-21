@@ -13,60 +13,122 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-# This script automates the installation of registry-proxy images onto an airgapped Kubernetes cluster. It pulls images locally, tags them for the local registry-proxy, pushes them into the cluster, and performs the catalog source installation.
+# Ensure you have skopeo, podman, jq, yq, opm, and oc installed and configured.
+# This script assumes access to a connected environment for pulling images from quay.io.
 
 set -e
 
-# Define variables
-REGISTRY_PROXY_URL=${1:-"registry-proxy.engineering.redhat.com"}
-TARGET_NAMESPACE=${2:-"my-namespace"}
-CATALOG_SOURCE_FILE=${3:-"catalog-source.yaml"}
+# Variables
+REMOTE_REGISTRY="quay.io"
+LOCAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
+NAMESPACE="openshift-marketplace"
+CATALOG_NAME="my-catalog-source"
+IIB_IMAGE="registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9"
+WORKDIR="/tmp/iib_extract"
 
-# Function to pull image and get the SHA
-pull_and_get_sha() {
-  local image_ref=$1
-  # Pull the image (using :latest or other tags if necessary)
-  podman pull "$image_ref"
-  # Get the SHA reference from the image
-  podman inspect --format '{{index .RepoDigests 0}}' "$image_ref"
-}
+mkdir -p "$WORKDIR"
 
-# Function to tag and push image
-tag_and_push_image() {
-  local image_ref=$1
-  local sha_ref=$2
+# Step 1: Pull the IIB image and extract catalog information
+echo "Pulling IIB image and extracting catalog information..."
+skopeo copy --all "docker://$IIB_IMAGE" "oci:$WORKDIR/iib"
 
-  # Extract the image name from the reference (e.g., quay.io/rhdh/rhdh-hub-rhel9)
-  local image_name=$(basename "$image_ref")
+# Unpack the OCI image
+cd "$WORKDIR"
+echo "Listing contents of blobs/sha256/ for debugging..."
+ls -R "$WORKDIR/iib/blobs/sha256/"
 
-  # Create a unique tag using a short SHA (12 characters)
-  local short_sha=$(echo "$sha_ref" | cut -d':' -f2 | cut -c1-12)
-  local tagged_image="${REGISTRY_PROXY_URL}/${image_name}:sha-${short_sha}"
+# Attempt to inspect index.json to locate manifests
+echo "Inspecting index.json..."
+indexJson="$WORKDIR/iib/index.json"
+if [[ -f $indexJson ]]; then
+    manifests=$(jq -r '.manifests[].digest' "$indexJson")
+    echo "Found the following manifests: $manifests"
+    
+    # Check if we can find the catalog.json or similar file within the manifests
+    for manifest in $manifests; do
+        echo "Checking manifest: $manifest"
+        manifestDir="$WORKDIR/iib/blobs/sha256/${manifest#*:}"
+        
+        # Find and extract any tar files associated with the manifest
+        tar_files=$(find "$manifestDir" -type f -name "*.tar")
+        for tar_file in $tar_files; do
+            echo "Extracting $tar_file..."
+            tar -xf "$tar_file" -C "$WORKDIR"
+        done
+        
+        # Attempt to locate catalog.json or other relevant files
+        potentialJson=$(find "$WORKDIR" -name "*.json" -print -quit)
+        if [[ -n $potentialJson ]]; then
+            echo "Found potential JSON file: $potentialJson"
+            jq '.' "$potentialJson"
+        fi
+    done
+else
+    echo "[ERROR] Could not find index.json. Exiting."
+    exit 1
+fi
 
-  # Tag and push the image
-  podman tag "$sha_ref" "$tagged_image"
-  oc image mirror "$tagged_image" "$tagged_image" --insecure=true -n "$TARGET_NAMESPACE"
-}
+# Step 2: Extract image references from the unpacked catalog JSON
+echo "Extracting image references from IIB..."
 
-# List of images
-IMAGE_REFERENCES=(
-  "quay.io/rhdh/rhdh-hub-rhel9:latest"
-  "quay.io/rhdh/rhdh-rhel9-operator:latest"
-  "registry.redhat.io/openshift4/ose-kube-rbac-proxy:latest"
-  "registry.redhat.io/rhel9/postgresql-15:latest"
-)
-
-# Pull, tag, and push images
-for image_ref in "${IMAGE_REFERENCES[@]}"; do
-  # Pull the image and get the full SHA reference
-  sha_ref=$(pull_and_get_sha "$image_ref")
-
-  # Tag and push the image to the registry proxy
-  tag_and_push_image "$image_ref" "$sha_ref"
+# Iterate over manifest digests in index.json
+for manifest in $(jq -r '.manifests[].digest' "$WORKDIR/iib/index.json"); do
+  # Construct the file path without the 'sha256:' prefix
+  manifest_json="$WORKDIR/iib/blobs/sha256/${manifest#sha256:}"
+  
+  echo "Checking manifest: $manifest_json"
+  
+  # Check if the file exists before attempting to parse it
+  if [[ -f "$manifest_json" ]]; then
+    # Extract potential image references (adjust jq path based on manifest structure)
+    image_references=$(jq -r '.. | objects | select(has("config") or has("layers")) | .config.digest // empty' "$manifest_json")
+    
+    if [[ -n $image_references ]]; then
+      images+=($image_references)
+    fi
+  else
+    echo "[WARNING] Manifest file $manifest_json does not exist. Skipping..."
+  fi
 done
 
-# Apply catalog source installation (use the provided or default catalog source file)
-oc apply -f "$CATALOG_SOURCE_FILE" -n "$TARGET_NAMESPACE"
+if [[ ${#images[@]} -eq 0 ]]; then
+    echo "[ERROR] No images found in IIB. Exiting."
+    exit 1
+fi
 
-echo "Registry-proxy images successfully pushed into the cluster!"
 
+# Step 3: Convert image references to quay.io equivalents
+echo "Converting image references to quay.io equivalents..."
+quay_images=()
+for image in "${images[@]}"; do
+    quay_image="${REMOTE_REGISTRY}/$(echo $image | sed 's#.*rhdh/#rhdh/#')"
+    quay_images+=("$quay_image")
+done
+
+# Step 4: Pull images from quay.io and push to local OpenShift registry
+echo "Pulling and pushing images..."
+for quay_image in "${quay_images[@]}"; do
+    local_image="$LOCAL_REGISTRY/$NAMESPACE/$(echo $quay_image | cut -d'/' -f2-)"
+    echo "Copying $quay_image to $local_image..."
+    skopeo copy --all "docker://$quay_image" "docker://$local_image"
+done
+
+# Step 5: Create CatalogSource in OpenShift
+echo "Creating CatalogSource..."
+cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: $CATALOG_NAME
+  namespace: $NAMESPACE
+spec:
+  sourceType: grpc
+  image: $LOCAL_REGISTRY/$NAMESPACE/$(echo $IIB_IMAGE | sed 's#.*rhdh/#rhdh/#')
+  displayName: Custom Catalog Source
+  publisher: Red Hat
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+
+echo "CatalogSource $CATALOG_NAME has been created and is using images from the local registry."
