@@ -52,7 +52,7 @@ jobs:
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //") # 0.1.0
-          echo "OPERATOR_IMAGE=quay.io/janus-idp/operator:${BASE_VERSION}-${SHORT_SHA}" >> $GITHUB_ENV
+          echo "OPERATOR_IMAGE=quay.io/rhdh-community/operator:${BASE_VERSION}-${SHORT_SHA}" >> $GITHUB_ENV
 
       - name: Wait until image exists in registry or timeout is reached
         # run this stage only if there are changes that match the includes and not the excludes

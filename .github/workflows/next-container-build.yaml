@@ -108,7 +108,7 @@ jobs:
 
           # now copy images from local cache to quay, using 0.0.1-next-f00cafe, 0.0.1-next, and next tags
           for image in operator operator-bundle operator-catalog; do
-            podman push quay.io/janus-idp/${image}:${VERSION} -q
-            skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:${VERSION}-${{ env.SHORT_SHA }}
-            skopeo --insecure-policy copy --all docker://quay.io/janus-idp/${image}:${VERSION} docker://quay.io/janus-idp/${image}:${latestNext}
+            podman push quay.io/rhdh-community/${image}:${VERSION} -q
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}-${{ env.SHORT_SHA }}
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${latestNext}
           done
