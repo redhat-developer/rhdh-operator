@@ -122,7 +122,7 @@ spec:
        pod: backstage
    spec:
      containers:
-       - name: sidecar 
+       - name: sidecar
          image: my-image:1.0.0
        - name: backstage-backend
          resources:
@@ -160,13 +160,13 @@ spec:
 	assert.Equal(t, "257Mi", model.backstageDeployment.container().Resources.Requests.Memory().String())
 
 	// volumes
-	// dynamic-plugins-root, dynamic-plugins-npmrc, my-vol
-	assert.Equal(t, 3, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
+	// dynamic-plugins-root, dynamic-plugins-npmrc, dynamic-plugins-auth, my-vol
+	assert.Equal(t, 4, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
 	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[0].Name)
 	// overrides StorageClassName
 	assert.Equal(t, "special", *model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
 	// adds new volume
-	assert.Equal(t, "my-vol", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[2].Name)
+	assert.Equal(t, "my-vol", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[3].Name)
 }
 
 // to remove when stop supporting v1alpha1
