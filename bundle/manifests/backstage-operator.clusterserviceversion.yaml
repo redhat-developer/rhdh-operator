@@ -299,7 +299,7 @@ spec:
   - RHDH
   links:
   - name: Backstage Operator
-    url: https://github.com/janus-idp/operator
+    url: https://github.com/redhat-developer/rhdh-operator
   maintainers:
   - email: asoro@redhat.com
     name: Armel Soro

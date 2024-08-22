@@ -17,7 +17,7 @@ Both **kubectl** and **minikube** must be installed. See [tools](https://kuberne
 
 1.  Get your copy of Operator from GitHub: 
 ```sh
-git clone https://github.com/janus-idp/operator
+git clone https://github.com/redhat-developer/rhdh-operator
 ```
 2. Deploy Operator on the minikube cluster:
 ```sh
