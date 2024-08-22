@@ -33,12 +33,12 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# quay.io/janus-idp/operator-bundle:$VERSION and quay.io/janus-idp/operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/janus-idp/operator
+# quay.io/rhdh-community/operator-bundle:$VERSION and quay.io/rhdh-community/operator-catalog:$VERSION.
+IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
+BUNDLE_IMG ?= quay.io/rhdh-community/operator-bundle:$(VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -321,9 +321,9 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 	$(MAKE) fmt_license
 
 ## to update the CSV with a new tagged version of the operator:
-## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
+## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
 ## or 
-## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
+## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh-community/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
 	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
@@ -337,7 +337,7 @@ bundle-push: ## Push bundle image to registry
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(VERSION)
+CATALOG_IMG ?= quay.io/rhdh-community/operator-catalog:$(VERSION)
 
 # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
