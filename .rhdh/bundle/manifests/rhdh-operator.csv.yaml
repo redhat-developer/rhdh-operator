@@ -27,7 +27,7 @@ metadata:
       developer portal for adopters who are just starting out.
     operatorframework.io/suggested-namespace: rhdh-operator
     operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.33.0
+    operators.operatorframework.io/builder: operator-sdk-v1.36.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     # Infrastructure Feature Test annotations - must be strings, not booleans - see https://issues.redhat.com/browse/RHIDP-294
     features.operators.openshift.io/disconnected: "true"
@@ -241,6 +241,8 @@ spec:
                 - --health-probe-bind-address=:8081
                 - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
+                command:
+                - /manager
                 env:
                 - name: OPERATOR_NAME
                   value: rhdh-operator
@@ -248,12 +250,10 @@ spec:
                   valueFrom:
                     fieldRef:
                      fieldPath: metadata.name
-                - name: RELATED_IMAGE_backstage
-                  value: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9:1.3
                 - name: RELATED_IMAGE_postgresql
                   value: registry.redhat.io/rhel9/postgresql-15:latest
-                command:
-                - /manager
+                - name: RELATED_IMAGE_backstage
+                  value: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9:1.3
                 image: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-rhel9-operator:1.3
                 livenessProbe:
                   httpGet:
@@ -345,18 +345,12 @@ spec:
   - name: Documentation
     url: https://access.redhat.com/documentation/en-us/red_hat_developer_hub
   - name: Backstage Operator (Upstream)
-    url: https://github.com/janus-idp/operator
+    url: https://github.com/redhat-developer/rhdh-operator
   - name: RHDH Operator (Downstream)
     url: https://gitlab.cee.redhat.com/rhidp/rhdh/
   maintainers:
-  - email: asoro@redhat.com
-    name: Armel Soro
-  - email: cdaley@redhat.com
-    name: Corey Daley
-  - email: gazarenk@redhat.com
-    name: Gennady Azarenkov
-  - email: nboldt@redhat.com
-    name: Nick Boldt
+  - email: rhdh-notifications@redhat.com
+    name: Red Hat Developer Team
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:
