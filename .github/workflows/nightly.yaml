@@ -40,7 +40,7 @@ jobs:
           if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]; then
             latestNext="latest" 
           fi
-          echo "OPERATOR_IMAGE=quay.io/janus-idp/operator:${latestNext}" >> $GITHUB_ENV
+          echo "OPERATOR_IMAGE=quay.io/rhdh-community/operator:${latestNext}" >> $GITHUB_ENV
 
       - name: Start Minikube
         uses: medyagh/setup-minikube@317d92317e473a10540357f1f4b2878b80ee7b95 # v0.0.16

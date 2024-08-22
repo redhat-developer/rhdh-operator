@@ -337,7 +337,7 @@ spec:
   - name: Documentation
     url: https://access.redhat.com/documentation/en-us/red_hat_developer_hub
   - name: Backstage Operator (Upstream)
-    url: https://github.com/janus-idp/operator
+    url: https://github.com/redhat-developer/rhdh-operator
   - name: RHDH Operator (Downstream)
     url: https://gitlab.cee.redhat.com/rhidp/rhdh/
   maintainers:
