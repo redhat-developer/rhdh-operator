@@ -38,7 +38,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
         with:
           fetch-depth: 0
 
@@ -79,7 +79,7 @@ jobs:
       - name: Login to quay.io
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}
@@ -103,14 +103,15 @@ jobs:
 
           set -ex
 
-          # build 3 container images with a 14d expiry
+          # build 4 container images with a 14d expiry
           CONTAINER_ENGINE=${CONTAINER_ENGINE} VERSION=${VERSION} make release-build
 
           # now copy images from local cache to quay, using 0.0.1-next-f00cafe, 0.0.1-next, and next tags
-          for image in rhdh-rhel9-operator rhdh-operator-bundle iib; do
-            podman push -q quay.io/rhdh/${image}:${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${VERSION}-${{ env.SHORT_SHA }}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh/${image}:upstream-${VERSION} docker://quay.io/rhdh/${image}:upstream-${latestNext}
+          for image in operator operator-bundle operator-catalog; do
+            podman push -q quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}-${{ env.SHORT_SHA }}
+            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${latestNext}
           done
         env:
-          GH_TOKEN: ${{ secrets.RHDHBOT_TOKEN }}
+          # to avoid throttling on RHD org, use GH token
+          GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}

@@ -950,7 +950,7 @@ spec:
               value: quay.io/fedora/postgresql-15:latest
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh/rhdh-hub-rhel9:next
-          # TODO(asoro): Default image is 'quay.io/rhdh/rhdh-rhel9-operator:0.1.3' on 1.1.x,
+          # TODO(asoro): Default image is 'quay.io/rhdh-community/operator:0.1.3' on 1.1.x,
           # but replaced by the one from RHDH, because the Janus-IDP image expires after 14d if not updated.
           image: quay.io/rhdh/rhdh-rhel9-operator:1.1
           livenessProbe:

@@ -33,12 +33,12 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# quay.io/rhdh/rhdh-operator-bundle:$VERSION and quay.io/rhdh/iib:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator
+# quay.io/rhdh-community/operator-bundle:$VERSION and quay.io/rhdh-community/operator-catalog:$VERSION.
+IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= quay.io/rhdh/rhdh-operator-bundle:$(VERSION)
+BUNDLE_IMG ?= quay.io/rhdh-community/operator-bundle:$(VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
@@ -53,14 +53,12 @@ endif
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25.0
+
 
 # Default Backstage config directory to use
 # it has to be defined as a set of YAML files inside ./config/manager/$(CONF_DIR) directory
 # to use other config - add a directory with config and run 'CONF_DIR=<dir-name> make ...'
 # TODO find better place than ./config/manager (but not ./config/overlays) ?
-# TODO it works only for make run, needs supporting make deploy as well https://github.com/janus-idp/operator/issues/47
 CONF_DIR ?= default-config
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -228,22 +226,24 @@ ADDLICENSE ?= $(LOCALBIN)/addlicense
 GOSEC ?= $(LOCALBIN)/gosec
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.11.3
-GOLANGCI_LINT_VERSION ?= v1.55.2
-GOIMPORTS_VERSION ?= v0.15.0
+KUSTOMIZE_VERSION ?= v5.4.2
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
+GOLANGCI_LINT_VERSION ?= v1.59.1
+GOIMPORTS_VERSION ?= v0.16.1
 ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
-OPM_VERSION ?= v1.36.0
-OPERATOR_SDK_VERSION ?= v1.33.0
-GOSEC_VERSION ?= v2.18.2
+OPM_VERSION ?= v1.45.0
+OPERATOR_SDK_VERSION ?= v1.36.0
+GOSEC_VERSION ?= v2.20.0
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION = 1.28.0
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
 GOSEC_OUTPUT_FILE ?= gosec.sarif
 
 GINKGO ?= $(LOCALBIN)/ginkgo
-GINKGO_VERSION ?= v2.17.1
+GINKGO_VERSION ?= v2.19.1
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -321,9 +321,9 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 	$(MAKE) fmt_license
 
 ## to update the CSV with a new tagged version of the operator:
-## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
+## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
 ## or 
-## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
+## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh-community/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
 	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
@@ -337,7 +337,7 @@ bundle-push: ## Push bundle image to registry
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= quay.io/rhdh/iib:$(VERSION)
+CATALOG_IMG ?= quay.io/rhdh-community/operator-catalog:$(VERSION)
 
 # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
