@@ -41,7 +41,7 @@ IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
 BUNDLE_IMG ?= quay.io/rhdh-community/operator-bundle:$(VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
-BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) --output-dir bundle/$(PROFILE) $(BUNDLE_METADATA_OPTS)
 
 # USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
 # You can enable this value if you would like to use SHA Based Digests
@@ -318,7 +318,7 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 	#$(OPSDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
-	$(OPSDK) bundle validate ./bundle
+	$(OPSDK) bundle validate ./bundle/$(PROFILE)
 	mv -f bundle.Dockerfile docker/bundle.Dockerfile
 	$(MAKE) fmt_license
 
