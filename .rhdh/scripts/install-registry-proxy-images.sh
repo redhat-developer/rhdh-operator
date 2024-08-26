@@ -34,7 +34,7 @@ skopeo copy --all "docker://$IIB_IMAGE" "oci:$WORKDIR/iib"
 
 # Unpack the OCI image
 cd "$WORKDIR"
-echo "Listing contents of blobs/sha256/ for debugging..."gity
+echo "Listing contents of blobs/sha256/ for debugging..."
 ls -R "$WORKDIR/iib/blobs/sha256/"
 
 # Attempt to inspect index.json to locate manifests
