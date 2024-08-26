@@ -23,7 +23,7 @@ REMOTE_REGISTRY="quay.io/rhdh"
 LOCAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
 NAMESPACE="openshift-marketplace"
 CATALOG_NAME="my-catalog-source"
-IIB_IMAGE="registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9"
+IIB_IMAGE="quay.io/repository/rhdh/iib"
 WORKDIR="/tmp/iib_extract"
 
 mkdir -p "$WORKDIR"
