@@ -1,4 +1,4 @@
-# Backstage Operator Design [WIP]
+# Backstage Operator Design
 
 The goal of Backstage Operator is to deploy Backstage workload to the Kubernetes namespace and keep this workload synced with the desired state defined by configuration. 
 
