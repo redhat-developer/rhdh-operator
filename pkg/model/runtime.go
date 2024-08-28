@@ -126,8 +126,6 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		// if present, backstageObject's default configuration will be overridden
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {
-			// to replace default and not merge
-			//obj = backstageObject.EmptyObject()
 			if err := utils.ReadYaml([]byte(overlay), obj); err != nil {
 				return nil, fmt.Errorf("failed to read overlay value for the key %s, reason: %s", conf.Key, err)
 			} else {
