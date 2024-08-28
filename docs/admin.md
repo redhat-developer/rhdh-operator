@@ -41,7 +41,7 @@ Here is the description of default configuration files:
 
 Meanings of **Mandatory** column: 
 - **Yes** - has to be configured, deployment will fail otherwise
-- **For local DB** - has to be configured if spec.enableLocalDb=true
+- **For local DB** - has to be configured if `spec.enableLocalDb` is `true` (or unset) in the Backstage CR.
 - **No** - optional configuration
 
 ### Operator Bundle configuration 
