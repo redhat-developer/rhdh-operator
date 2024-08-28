@@ -308,6 +308,7 @@ For example, the following specification fragment will:
   - Set an additional volume named **my-volume** and mount it to **/my/path** of the Backstage container.
   - Set the CPU request for Backstage containers to 250m.
   - Set the label **my=true** for the Backstage Pod.
+  - Adds another **my-sidecar** container
 
   **Note:** It is assumed that the Backstage container name as defined in the default configuration is **backstage-backend**.
   
@@ -329,6 +330,8 @@ spec:
                 resources:
                   requests:
                     cpu: 250m
+              - name: my-sidecar
+                image: quay.io/my-org/my-sidecar:latest
             volumes:
               - ephemeral:
                   volumeClaimTemplate:
