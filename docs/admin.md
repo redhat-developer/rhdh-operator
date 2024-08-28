@@ -99,5 +99,6 @@ For the list of related images deployed by the Operator, see the `RELATED_IMAGE_
 See also https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html
 
 
-Installing Operator on Openshift cluster
+### Installing Operator on Openshift cluster
+
 https://docs.openshift.com/container-platform/4.15/operators/admin/olm-adding-operators-to-cluster.html 
