@@ -8,7 +8,7 @@ This guide is intended for the Backstage Operator administrator who:
 
 ## Deployment
 
-## Default Backstage instance configuration
+### Default Backstage instance configuration
 
 The Backstage Operator operates at the cluster level, enabling management of multiple Backstage instances (Custom Resources).
 
