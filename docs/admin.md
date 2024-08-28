@@ -16,7 +16,7 @@ Each Backstage Custom Resource (CR) governs the creation, modification, and dele
 
 The default shape of these objects is configured at the Operator level using YAML files containing Kubernetes manifests.
 
-Default Configuration is implemented as a ConfigMap named backstage-default-config, deployed within the specified Kubernetes namespace and mounted to the /default-config directory of the Backstage controller container.
+Default Configuration is implemented as a ConfigMap named `backstage-default-config`, deployed within the Kubernetes namespace where the operator is installed (usually `backstage-system` or `rhdh-operator`). This ConfigMap is mounted to the `/default-config` directory of the Backstage controller container.
 
 ![Backstage Default ConfigMap and CR](images/backstage_admin_configmap_and_cr.jpg)
 
