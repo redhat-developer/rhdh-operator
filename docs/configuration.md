@@ -135,7 +135,7 @@ In this example, additional app-config is defined in the ConfigMaps called **my-
   /my/path/my-app-config.yaml
   ```
 
-The ConfigMap key/value defines the file name and content, and these app-configs will be applied in the same order as they are declared in the CR. Therefore, as per this example, two ConfigMaps should be created in the namespace as a prerequisite. Then the Operator will create the files `/my/path/app-config1.yaml` and `/my/path/app-config2.yaml`, adding them to the end of the Backstage command-line arguments as follows:
+The ConfigMap key/value defines the file name and content, and this app-config will be applied as the last in the **-app-config** arguments sequence. Therefore, as per this example, the ConfigMap should be created in the namespace as a prerequisite. Then the Operator will create the file `/my/path/my-app-config.yaml` and add it to the end of the Backstage command-line arguments as follows:
 
   ```
   -app-config /my/path/my-app-config.yaml
@@ -325,6 +325,8 @@ spec:
   ```
   
   Here, the user can specify some of the OpenShift Route specifications fields. The names of the Backstage `spec.application.route` fields correspond to the names of Route specifications fields and follow the same default rules if not specified.
+
+  Also note that securing Routes with external certificates in TLS secrets (via the `spec.application.route.tls.externalCertificateSecretName` CR field) is a Technology Preview feature in OpenShift. It requires enabling the `RouteExternalCertificate` OpenShift Feature Gate and might not be functionally complete. See [Creating a route with externally managed certificate](https://docs.openshift.com/container-platform/4.16/networking/routes/secured-routes.html#nw-ingress-route-secret-load-external-cert_secured-routes) for more details.
   
   ### Deployment Configuration
   
