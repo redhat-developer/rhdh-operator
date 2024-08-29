@@ -20,7 +20,7 @@ metadata:
     categories: Developer Tools
     certified: 'true'
     containerImage: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-rhel9-operator:1.2
-    createdAt: "2023-03-20T16:11:34Z"
+    createdAt: "2024-08-29T14:11:34Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of an external database, and can
       help streamline the process of setting up a self-managed internal
@@ -42,8 +42,9 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
     support: Red Hat
-    skipRange: '>=1.0.0 <1.2.4'
-  name: rhdh-operator.v1.2.4
+    skipRange: '>=1.0.0 <1.2.3'
+    olm.substitutesFor: rhdh-operator.v1.2.3
+  name: rhdh-operator.v1.2.3+0.1724954931.p
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -354,5 +355,5 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 1.2.4
+  version: 1.2.3+0.1724954931.p
   replaces: rhdh-operator.v1.1.1
