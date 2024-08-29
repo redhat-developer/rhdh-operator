@@ -8,7 +8,7 @@ This guide is intended for the Backstage Operator administrator who:
 
 ## Deployment
 
-## Default Backstage instance configuration
+### Default Backstage instance configuration
 
 The Backstage Operator operates at the cluster level, enabling management of multiple Backstage instances (Custom Resources).
 
@@ -16,7 +16,7 @@ Each Backstage Custom Resource (CR) governs the creation, modification, and dele
 
 The default shape of these objects is configured at the Operator level using YAML files containing Kubernetes manifests.
 
-Default Configuration is implemented as a ConfigMap named backstage-default-config, deployed within the specified Kubernetes namespace and mounted to the /default-config directory of the Backstage controller container.
+Default Configuration is implemented as a ConfigMap named `backstage-default-config`, deployed within the Kubernetes namespace where the operator is installed (usually `backstage-system` or `rhdh-operator`). This ConfigMap is mounted to the `/default-config` directory of the Backstage controller container.
 
 ![Backstage Default ConfigMap and CR](images/backstage_admin_configmap_and_cr.jpg)
 
@@ -41,7 +41,7 @@ Here is the description of default configuration files:
 
 Meanings of **Mandatory** column: 
 - **Yes** - has to be configured, deployment will fail otherwise
-- **For local DB** - has to be configured if spec.enableLocalDb=true
+- **For local DB** - has to be configured if `spec.enableLocalDb` is `true` (or unset) in the Backstage CR.
 - **No** - optional configuration
 
 ### Operator Bundle configuration 
@@ -99,5 +99,6 @@ For the list of related images deployed by the Operator, see the `RELATED_IMAGE_
 See also https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html
 
 
-Installing Operator on Openshift cluster
+### Installing Operator on Openshift cluster
+
 https://docs.openshift.com/container-platform/4.15/operators/admin/olm-adding-operators-to-cluster.html 

@@ -6,9 +6,9 @@ The Backstage Operator supports three configuration levels: Default, Raw, and Cu
 
 ## Default Configuration
   
-  The Default Configuration defines the structure of all Backstage instances within a cluster. It consists of a set of YAML manifests that define Kubernetes resources for a Backstage instance. This configuration is located in the `*-default-configuration` ConfigMap in the Backstage operator namespace (usually called **backstage-system** or **backstage-operator**). For more details, refer to the [Admin Guide](admin.md).
+  The Default Configuration defines the structure of all Backstage instances within a cluster. It consists of a set of YAML manifests that define Kubernetes resources for a Backstage instance. This configuration is located in the `*-default-config` ConfigMap in the Backstage operator namespace (usually called **backstage-system** or **rhdh-operator**). For more details, refer to the [Admin Guide](admin.md).
   
-  You can see examples of default configurations as part of the [Operator Profiles](../config/profile) in the **default-config** directory.
+  You can see examples of default configurations in the [`default-config`](../config/manager/default-config) directory.
   
   ### Metadata Generation
   
@@ -300,6 +300,8 @@ spec:
   
   Here, the user can specify some of the OpenShift Route specifications fields. The names of the Backstage `spec.application.route` fields correspond to the names of Route specifications fields and follow the same default rules if not specified.
   
+  Also note that securing Routes with external certificates in TLS secrets (via the `spec.application.route.tls.externalCertificateSecretName` CR field) is a Technology Preview feature in OpenShift. It requires enabling the `RouteExternalCertificate` OpenShift Feature Gate and might not be functionally complete. See [Creating a route with externally managed certificate](https://docs.openshift.com/container-platform/4.16/networking/routes/secured-routes.html#nw-ingress-route-secret-load-external-cert_secured-routes) for more details.
+
   ### Deployment Configuration
   
   Since **v1alpha2** (Operator version **0.3.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object.
