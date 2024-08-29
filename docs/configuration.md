@@ -6,7 +6,7 @@ The Backstage Operator supports three configuration levels: Default, Raw, and Cu
 
 ## Default Configuration
   
-  The Default Configuration defines the structure of all Backstage instances within a cluster. It consists of a set of YAML manifests that define Kubernetes resources for a Backstage instance. This configuration is located in the `*-default-configuration` ConfigMap in the Backstage operator namespace (usually called **backstage-system** or **backstage-operator**). For more details, refer to the [Admin Guide](admin.md).
+  The Default Configuration defines the structure of all Backstage instances within a cluster. It consists of a set of YAML manifests that define Kubernetes resources for a Backstage instance. This configuration is located in the `*-default-config` ConfigMap in the Backstage operator namespace (usually called **backstage-system** or **rhdh-operator**). For more details, refer to the [Admin Guide](admin.md).
   
   You can see examples of default configurations in the [`default-config`](../config/manager/default-config) directory.
   
