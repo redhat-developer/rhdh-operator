@@ -21,11 +21,11 @@ metadata:
         }
       ]
     capabilities: Seamless Upgrades
-    createdAt: "2024-08-29T00:06:37Z"
+    createdAt: "2024-08-29T00:36:30Z"
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.36.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-    skipRange: '>=0.0.1 <0.4.0'
+    skipRange: '>=0.0.1 <0.3.0'
   name: backstage-operator.v0.4.0
   namespace: placeholder
 spec:
