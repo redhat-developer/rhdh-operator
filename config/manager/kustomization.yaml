@@ -5,7 +5,7 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/rhdh-community/operator
-  newTag: 0.3.0
+  newTag: 0.4.0
 
 generatorOptions:
   disableNameSuffixHash: true
