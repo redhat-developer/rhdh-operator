@@ -3,7 +3,7 @@ module redhat-developer/red-hat-developer-hub-operator
 go 1.20
 
 require (
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.4.2
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
 	github.com/openshift/api v0.0.0-20231121202920-a295b8c5f513
