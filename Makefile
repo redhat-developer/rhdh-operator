@@ -228,7 +228,7 @@ GOSEC ?= $(LOCALBIN)/gosec
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.2
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
-GOLANGCI_LINT_VERSION ?= v1.59.1
+GOLANGCI_LINT_VERSION ?= v1.60.3
 GOIMPORTS_VERSION ?= v0.16.1
 ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
@@ -445,5 +445,3 @@ show-img:
 
 show-container-engine:
 	@echo -n $(CONTAINER_ENGINE)
-
-
