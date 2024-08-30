@@ -1,6 +1,6 @@
 module redhat-developer/red-hat-developer-hub-operator
 
-go 1.22.0
+go 1.22.6
 
 toolchain go1.23.0
 
