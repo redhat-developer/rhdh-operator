@@ -118,7 +118,7 @@ gosec: addgosec ## run the gosec scanner for non-test files in this repo
 
 .PHONY: lint
 lint: golangci-lint ## Run the linter on the codebase
-	$(GOLANGCI_LINT) run ./... --timeout 15m
+	$(GOLANGCI_LINT) run ./... --timeout 15m --verbose
 
 .PHONY: vet
 vet: ## Run go vet against code.
