@@ -23,7 +23,7 @@ REMOTE_REGISTRY="quay.io/rhdh"
 LOCAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
 NAMESPACE="openshift-marketplace"
 CATALOG_NAME="my-catalog-source"
-IIB_IMAGE="quay.io/repository/rhdh/iib"
+IIB_IMAGE="quay.io/rhdh/iib:latest-v4.14-x86_64"
 WORKDIR="/tmp/iib_extract"
 
 mkdir -p "$WORKDIR"
@@ -44,23 +44,29 @@ if [[ -f $indexJson ]]; then
     manifests=$(jq -r '.manifests[].digest' "$indexJson")
     echo "Found the following manifests: $manifests"
     
-    # Check if we can find the catalog.json or similar file within the manifests
+    # Initialize an array to hold image references
+    images=()
+    
+    # Check each manifest for image references
     for manifest in $manifests; do
         echo "Checking manifest: $manifest"
         manifestDir="$WORKDIR/iib/blobs/sha256/${manifest#*:}"
         
-        # Find and extract any tar files associated with the manifest
+        # Extract tar files associated with the manifest
         tar_files=$(find "$manifestDir" -type f -name "*.tar")
         for tar_file in $tar_files; do
             echo "Extracting $tar_file..."
             tar -xf "$tar_file" -C "$WORKDIR"
         done
         
-        # Attempt to locate catalog.json or other relevant files
+        # Attempt to locate and extract image references
         potentialJson=$(find "$WORKDIR" -name "*.json" -print -quit)
         if [[ -n $potentialJson ]]; then
             echo "Found potential JSON file: $potentialJson"
-            jq '.' "$potentialJson"
+            image_references=$(jq -r '.. | objects | select(has("config") or has("layers")) | .config.digest // empty' "$potentialJson")
+            if [[ -n $image_references ]]; then
+                images+=($image_references)
+            fi
         fi
     done
 else
@@ -68,52 +74,29 @@ else
     exit 1
 fi
 
-# Step 2: Extract image references from the unpacked catalog JSON
-echo "Extracting image references from IIB..."
-
-# Iterate over manifest digests in index.json
-for manifest in $(jq -r '.manifests[].digest' "$WORKDIR/iib/index.json"); do
-  # Construct the file path without the 'sha256:' prefix
-  manifest_json="$WORKDIR/iib/blobs/sha256/${manifest#sha256:}"
-  
-  echo "Checking manifest: $manifest_json"
-  
-  # Check if the file exists before attempting to parse it
-  if [[ -f "$manifest_json" ]]; then
-    # Extract potential image references (adjust jq path based on manifest structure)
-    image_references=$(jq -r '.. | objects | select(has("config") or has("layers")) | .config.digest // empty' "$manifest_json")
-    
-    if [[ -n $image_references ]]; then
-      images+=($image_references)
-    fi
-  else
-    echo "[WARNING] Manifest file $manifest_json does not exist. Skipping..."
-  fi
-done
-
-# if [[ ${#images[@]} -eq 0 ]]; then
-#     echo "[ERROR] No images found in IIB. Exiting."
-#     exit 1
-# fi
-
-
-# Step 3: Convert image references to quay.io equivalents
-echo "Converting image references to quay.io equivalents..."
+# Step 2: Convert image references to Quay.io equivalents
+echo "Converting image references to Quay.io equivalents..."
 quay_images=()
 for image in "${images[@]}"; do
-    quay_image="${REMOTE_REGISTRY}/$(echo $image | sed 's#.*rhdh/#rhdh/#')"
+    # Construct a valid Quay.io image path
+    # Ensure the format is correct for the Quay.io repository
+    quay_image="${REMOTE_REGISTRY}/rhdh/${image#sha256:}"
+    echo "Mapping to Quay.io image: $quay_image"
     quay_images+=("$quay_image")
 done
 
-# Step 4: Pull images from quay.io and push to local OpenShift registry
+# Step 3: Pull images from Quay.io and push to local OpenShift registry
 echo "Pulling and pushing images..."
 for quay_image in "${quay_images[@]}"; do
-    local_image="$LOCAL_REGISTRY/$NAMESPACE/$(echo $quay_image | cut -d'/' -f2-)"
+    local_image="$LOCAL_REGISTRY/$NAMESPACE/$(basename $quay_image)"
     echo "Copying $quay_image to $local_image..."
-    skopeo copy --all "docker://$quay_image" "docker://$local_image"
+    skopeo copy --all "docker://$quay_image" "docker://$local_image" || {
+        echo "[ERROR] Failed to copy $quay_image. Exiting."
+        exit 1
+    }
 done
 
-# Step 5: Create CatalogSource in OpenShift
+# Step 4: Create CatalogSource in OpenShift
 echo "Creating CatalogSource..."
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -123,7 +106,7 @@ metadata:
   namespace: $NAMESPACE
 spec:
   sourceType: grpc
-  image: $LOCAL_REGISTRY/$NAMESPACE/$(echo $IIB_IMAGE | sed 's#.*rhdh/#rhdh/#')
+  image: $LOCAL_REGISTRY/$NAMESPACE/$(basename $IIB_IMAGE)
   displayName: Custom Catalog Source
   publisher: Red Hat
   updateStrategy:
