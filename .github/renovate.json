@@ -63,7 +63,8 @@
         "k8s.io/api{/,}**",
         "k8s.io/apimachinery{/,}**",
         "k8s.io/client-go{/,}**",
-        "sigs.k8s.io{/,}**"
+        "sigs.k8s.io{/,}**",
+        "github.com/openshift{/,}**"
       ]
     },
     {
@@ -84,7 +85,8 @@
         "k8s.io/api{/,}**",
         "k8s.io/apimachinery{/,}**",
         "k8s.io/client-go{/,}**",
-        "sigs.k8s.io{/,}**"
+        "sigs.k8s.io{/,}**",
+        "github.com/openshift{/,}**"
       ]
     },
     {
