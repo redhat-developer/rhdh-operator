@@ -330,10 +330,11 @@ spec:
   
   ### Deployment Configuration
   
-  Since **v1alpha2** (Operator version **0.3.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object.
+  Since **v1alpha2** (Operator version **0.3.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
 
 For example, the following specification fragment will:
   - Set an additional volume named **my-volume** and mount it to **/my/path** of the Backstage container.
+  - Replace existed **dynamic-plugins-root** volume 
   - Set the CPU request for Backstage containers to 250m.
   - Set the label **my=true** for the Backstage Pod.
   - Adds another **my-sidecar** container
@@ -366,6 +367,10 @@ spec:
                     spec:
                       storageClassName: "special"
                 name: my-volume
+              - $patch: replace
+                name: dynamic-plugins-root
+                persistentVolumeClaim:
+                  claimName: dynamic-plugins-root
   ```
 
 ### Database Configuration
