@@ -17,6 +17,3 @@ spec:
       containers:
         - name: bs1
           image: busybox
-      initContainers:
-        - name: install-dynamic-plugins
-          image: busybox

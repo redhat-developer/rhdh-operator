@@ -17,7 +17,6 @@ package model
 import (
 	"context"
 	"fmt"
-
 	"testing"
 
 	"k8s.io/utils/ptr"
