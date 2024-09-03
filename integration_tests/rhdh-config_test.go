@@ -114,7 +114,7 @@ var _ = When("create default backstage", func() {
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			var bsvolume corev1.Volume
+			var bsvolume *corev1.Volume
 			for _, v := range deploy.Spec.Template.Spec.Volumes {
 
 				if v.Name == "dynamic-plugins-root" {
