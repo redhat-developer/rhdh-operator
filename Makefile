@@ -198,12 +198,12 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/profile/$(PROFILE) | kubectl apply -f -
 
 .PHONY: deployment-manifest
 deployment-manifest: manifests kustomize ## Generate manifest to deploy operator.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/profile/$(PROFILE) > rhdh-operator-${VERSION}.yaml
 	@echo "Generated operator script rhdh-operator-${VERSION}.yaml"
 
@@ -316,10 +316,10 @@ endif
 .PHONY: bundle
 bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
 	#$(OPSDK) generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
+	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	$(OPSDK) bundle validate ./bundle/$(PROFILE)
-	mv -f bundle.Dockerfile docker/bundle.Dockerfile
+	mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile #docker/bundle.Dockerfile
 	$(MAKE) fmt_license
 
 ## to update the CSV with a new tagged version of the operator:
@@ -328,7 +328,7 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 ## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh-community/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
+	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f ./bundle/$(PROFILE)/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
 
 .PHONY: bundle-push
 bundle-push: ## Push bundle image to registry
