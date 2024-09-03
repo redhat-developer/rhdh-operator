@@ -6,8 +6,6 @@ This guide is intended for the Backstage Operator administrator who:
 * Has acquired enough understanding to configure and support the Backstage Operator (with the assistance of this document).
 * Is not necessarily an expert in Backstage functionality and configuration.
 
-## Deployment
-
 ## Default Backstage instance configuration
 
 The Backstage Operator operates at the cluster level, enabling management of multiple Backstage instances (Custom Resources).
@@ -16,36 +14,10 @@ Each Backstage Custom Resource (CR) governs the creation, modification, and dele
 
 The default shape of these objects is configured at the Operator level using YAML files containing Kubernetes manifests.
 
-Default Configuration is implemented as a ConfigMap named backstage-default-config, deployed within the specified Kubernetes namespace and mounted to the /default-config directory of the Backstage controller container.
+Default Configuration is implemented as a ConfigMap named `backstage-default-config`, deployed within the Kubernetes namespace where the operator is installed (usually `backstage-system` or `rhdh-operator`). This ConfigMap is mounted to the `/default-config` directory of the Backstage controller container.
 
-![Backstage Default ConfigMap and CR](images/backstage_admin_configmap_and_cr.jpg)
+See [Configuration](configuration.md) -> Default Configuration for more details.
 
-Here is the description of default configuration files:
-
-| Key/File name                  | k8s/OCP Kind       | Mandatory(*) | version | Notes                                           |
-|--------------------------------|--------------------|--------------|---------|-------------------------------------------------|
-| deployment.yaml                | appsv1.Deployment  | Yes          | >=0.1.x | Backstage deployment                            |
-| service.yaml                   | corev1.Service     | Yes          | >=0.1.x | Backstage Service                               |
-| db-statefulset.yaml            | appsv1.Statefulset | For local DB | >=0.1.x | PostgreSQL StatefulSet                          |    
-| db-service.yaml                | corev1.Service     | For local DB | >=0.1.x | PostgreSQL Service                              |
-| db-secret.yaml                 | corev1.Secret      | For local DB | >=0.1.x | Secret to connect Backstage to PGSQL            |
-| route.yaml                     | openshift.Route    | No (for OCP) | >=0.1.x | Route exposing Backstage service                |
-| app-config.yaml                | corev1.ConfigMap   | No           | >=0.2.x | Backstage app-config.yaml                       |
-| configmap-files.yaml           | corev1.ConfigMap   | No           | >=0.2.x | Backstage config file inclusions from configMap |
-| configmap-envs.yaml            | corev1.ConfigMap   | No           | >=0.2.x | Backstage env variables from configMap          |
-| secret-files.yaml              | corev1.Secret      | No           | >=0.2.x | Backstage config file inclusions from Secret    |
-| secret-envs.yaml               | corev1.Secret      | No           | >=0.2.x | Backstage env variables from Secret             |
-| dynamic-plugins.yaml           | corev1.ConfigMap   | No           | >=0.2.x | dynamic-plugins config                          |
-| dynamic-plugins-configmap.yaml | corev1.ConfigMap   | No           | 0.1.x   | dynamic-plugins config                          |
-| backend-auth-configmap.yaml    | corev1.ConfigMap   | No           | 0.1.x   | app-config.yaml with backend auth config        |
-
-Meanings of **Mandatory** column: 
-- **Yes** - has to be configured, deployment will fail otherwise
-- **For local DB** - has to be configured if spec.enableLocalDb=true
-- **No** - optional configuration
-
-## RBAC
-  
 ### Operator Bundle configuration 
 
 With Backstage Operator's Makefile you can generate bundle descriptor using *make bundle* command
@@ -101,5 +73,5 @@ For the list of related images deployed by the Operator, see the `RELATED_IMAGE_
 See also https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html
 
 
-Installing Operator on Openshift cluster
+### Installing Operator on Openshift cluster
 https://docs.openshift.com/container-platform/4.15/operators/admin/olm-adding-operators-to-cluster.html 
