@@ -143,3 +143,41 @@ func TestAddToModel(t *testing.T) {
 	assert.Equal(t, testService, *rm.backstageService)
 	assert.Equal(t, testService, *rm.RuntimeObjects[0].(*BackstageService))
 }
+
+func TestRawConfig(t *testing.T) {
+	bs := v1alpha2.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bs",
+			Namespace: "ns123",
+		},
+	}
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	serviceYaml := `apiVersion: v1
+kind: Service
+metadata:
+ labels:
+    raw: true
+spec:
+ ports:
+   - port: 8080`
+
+	extConfig := ExternalConfig{
+		RawConfig: map[string]string{
+			"service.yaml": serviceYaml,
+		},
+	}
+
+	// No raw config
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageService)
+	assert.Equal(t, "true", model.backstageService.Object().GetLabels()["default"])
+	assert.Empty(t, model.backstageService.Object().GetLabels()["raw"])
+
+	// Put raw config
+	model, err = InitObjects(context.TODO(), bs, extConfig, true, false, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageService)
+	assert.Equal(t, "true", model.backstageService.Object().GetLabels()["raw"])
+	assert.Empty(t, model.backstageService.Object().GetLabels()["default"])
+}
