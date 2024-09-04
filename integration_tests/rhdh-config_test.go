@@ -118,7 +118,7 @@ var _ = When("create default backstage", func() {
 			for _, v := range deploy.Spec.Template.Spec.Volumes {
 
 				if v.Name == "dynamic-plugins-root" {
-					bsvolume = v
+					bsvolume = &v
 					break
 				}
 			}
