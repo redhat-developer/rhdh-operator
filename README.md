@@ -17,7 +17,7 @@ Both **kubectl** and **minikube** must be installed. See [tools](https://kuberne
 
 1.  Get your copy of Operator from GitHub: 
 ```sh
-git clone https://github.com/janus-idp/operator
+git clone https://github.com/redhat-developer/rhdh-operator
 ```
 2. Deploy Operator on the minikube cluster:
 ```sh
@@ -54,10 +54,9 @@ Output:
 
 ## More documentation
 
-- [Openshift deployment](docs/openshift.md)
 - [Configuration](docs/configuration.md)
 - [Developer Guide](docs/developer.md)
-- [Operator Design](docs/developer.md)
+- [Operator Design](docs/design.md)
 
 ## Telemetry data collection
 
@@ -65,7 +64,8 @@ The telemetry data collection feature is enabled by default. The default configu
 
 ## Contributing and reporting issues
 
-To report issues against this chart, please use JIRA: https://issues.redhat.com/browse/RHIDP
+To report issues against this repository, please use JIRA: https://issues.redhat.com/browse/RHIDP with Component: **Operator**
+To browse the issues you can use this [Query](https://issues.redhat.com/issues/?filter=-4&jql=project%20%3D%20%22Red%20Hat%20Internal%20Developer%20Platform%22%20%20AND%20component%20%3D%20Operator%20AND%20resolution%20%3D%20Unresolved%20ORDER%20BY%20status%2C%20priority%2C%20updated%20%20%20%20DESC).
 
 Contributions are welcome! 
 

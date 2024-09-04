@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.3.0
+VERSION ?= 0.4.0
 
 # Using docker or podman to build and push images
 CONTAINER_ENGINE ?= docker
@@ -53,14 +53,12 @@ endif
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25.0
+
 
 # Default Backstage config directory to use
 # it has to be defined as a set of YAML files inside ./config/manager/$(CONF_DIR) directory
 # to use other config - add a directory with config and run 'CONF_DIR=<dir-name> make ...'
 # TODO find better place than ./config/manager (but not ./config/overlays) ?
-# TODO it works only for make run, needs supporting make deploy as well https://github.com/janus-idp/operator/issues/47
 CONF_DIR ?= default-config
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -228,22 +226,24 @@ ADDLICENSE ?= $(LOCALBIN)/addlicense
 GOSEC ?= $(LOCALBIN)/gosec
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.11.3
-GOLANGCI_LINT_VERSION ?= v1.55.2
-GOIMPORTS_VERSION ?= v0.15.0
+KUSTOMIZE_VERSION ?= v5.4.2
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
+GOLANGCI_LINT_VERSION ?= v1.59.1
+GOIMPORTS_VERSION ?= v0.16.1
 ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
-OPM_VERSION ?= v1.36.0
-OPERATOR_SDK_VERSION ?= v1.33.0
-GOSEC_VERSION ?= v2.18.2
+OPM_VERSION ?= v1.45.0
+OPERATOR_SDK_VERSION ?= v1.36.0
+GOSEC_VERSION ?= v2.20.0
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION = 1.28.0
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
 GOSEC_OUTPUT_FILE ?= gosec.sarif
 
 GINKGO ?= $(LOCALBIN)/ginkgo
-GINKGO_VERSION ?= v2.17.1
+GINKGO_VERSION ?= v2.19.1
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
