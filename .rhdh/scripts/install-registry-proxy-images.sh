@@ -16,16 +16,48 @@
 # Ensure you have skopeo, podman, jq, yq, opm, and oc installed and configured.
 # This script assumes access to a connected environment for pulling images from quay.io.
 
-set -e
-
-# Variables
+# Set the default namespace and other configuration
+NAMESPACE="openshift-marketplace"       # Namespace for the CatalogSource
+OPERATOR_NAMESPACE="rhdh-operator"      # Namespace for the Subscription and OperatorGroup
+OLM_CHANNEL="fast"
 REMOTE_REGISTRY="quay.io/rhdh"
 LOCAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
-NAMESPACE="openshift-marketplace"
 CATALOG_NAME="my-catalog-source"
-IIB_IMAGE="quay.io/rhdh/iib:latest-v4.14-x86_64"
 WORKDIR="/tmp/iib_extract"
+OPERATOR_NAME="rhdh"
 
+# Dynamically get the OCP version and architecture
+OCP_VER="v$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
+OCP_ARCH="$(oc version -o json | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
+
+# Normalize architecture if necessary
+if [[ $OCP_ARCH == "amd64" ]]; then
+  OCP_ARCH="x86_64"
+fi
+
+# Construct the image tag dynamically based on the OCP version and architecture
+IIB_IMAGE="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}"
+
+# Echo the image being used for logging/debugging purposes
+echo "[INFO] Using iib from image $IIB_IMAGE"
+
+# Minimum requirements check
+if [[ ! $(command -v oc) ]]; then
+  echo "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
+  exit 1
+fi
+if [[ ! $(command -v jq) ]]; then
+  echo "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
+  exit 1
+fi
+
+# Check we're logged into a cluster
+if ! oc whoami > /dev/null 2>&1; then
+  echo "Not logged into an OpenShift cluster"
+  exit 1
+fi
+
+# Create the working directory
 mkdir -p "$WORKDIR"
 
 # Step 1: Pull the IIB image and extract catalog information
@@ -37,36 +69,25 @@ cd "$WORKDIR"
 echo "Listing contents of blobs/sha256/ for debugging..."
 ls -R "$WORKDIR/iib/blobs/sha256/"
 
-# Attempt to inspect index.json to locate manifests
-echo "Inspecting index.json..."
+# Inspect index.json to locate manifests
 indexJson="$WORKDIR/iib/index.json"
 if [[ -f $indexJson ]]; then
     manifests=$(jq -r '.manifests[].digest' "$indexJson")
     echo "Found the following manifests: $manifests"
     
-    # Initialize an array to hold image references
     images=()
     
-    # Check each manifest for image references
     for manifest in $manifests; do
         echo "Checking manifest: $manifest"
         manifestDir="$WORKDIR/iib/blobs/sha256/${manifest#*:}"
         
-        # Extract tar files associated with the manifest
-        tar_files=$(find "$manifestDir" -type f -name "*.tar")
-        for tar_file in $tar_files; do
-            echo "Extracting $tar_file..."
-            tar -xf "$tar_file" -C "$WORKDIR"
-        done
-        
-        # Attempt to locate and extract image references
-        potentialJson=$(find "$WORKDIR" -name "*.json" -print -quit)
-        if [[ -n $potentialJson ]]; then
-            echo "Found potential JSON file: $potentialJson"
-            image_references=$(jq -r '.. | objects | select(has("config") or has("layers")) | .config.digest // empty' "$potentialJson")
-            if [[ -n $image_references ]]; then
-                images+=($image_references)
-            fi
+        manifestJson="$manifestDir/manifest.json"
+        if [[ -f $manifestJson ]]; then
+            layers=$(jq -r '.[].layers[].digest' "$manifestJson")
+            config=$(jq -r '.[].config.digest' "$manifestJson")
+            images+=($layers $config)
+        else
+            echo "[WARNING] No manifest.json found for $manifest"
         fi
     done
 else
@@ -78,27 +99,36 @@ fi
 echo "Converting image references to Quay.io equivalents..."
 quay_images=()
 for image in "${images[@]}"; do
-    # Construct a valid Quay.io image path
-    # Ensure the format is correct for the Quay.io repository
-    quay_image="${REMOTE_REGISTRY}/rhdh/${image#sha256:}"
-    echo "Mapping to Quay.io image: $quay_image"
+    quay_image="${REMOTE_REGISTRY}/$(basename ${image#sha256:})"
     quay_images+=("$quay_image")
 done
 
 # Step 3: Pull images from Quay.io and push to local OpenShift registry
-echo "Pulling and pushing images..."
 for quay_image in "${quay_images[@]}"; do
     local_image="$LOCAL_REGISTRY/$NAMESPACE/$(basename $quay_image)"
-    echo "Copying $quay_image to $local_image..."
     skopeo copy --all "docker://$quay_image" "docker://$local_image" || {
         echo "[ERROR] Failed to copy $quay_image. Exiting."
         exit 1
     }
 done
 
-# Step 4: Create CatalogSource in OpenShift
+# Step 4: Apply ImageContentSourcePolicy
+echo "Creating ImageContentSourcePolicy..."
+oc apply -f - <<EOF
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: quay-registry
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${REMOTE_REGISTRY}
+    source: quay.io
+EOF
+
+# Step 5: Create CatalogSource in OpenShift
 echo "Creating CatalogSource..."
-cat <<EOF | oc apply -f -
+oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -114,4 +144,36 @@ spec:
       interval: 15m
 EOF
 
-echo "CatalogSource $CATALOG_NAME has been created and is using images from the local registry."
+# Step 6: Create OperatorGroup and Subscription
+if ! oc get namespace "$OPERATOR_NAMESPACE" > /dev/null 2>&1; then
+    oc create namespace "$OPERATOR_NAMESPACE"
+fi
+
+echo "Creating OperatorGroup..."
+oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: $OPERATOR_NAME-operator-group
+  namespace: $OPERATOR_NAMESPACE
+spec:
+  targetNamespaces:
+  - $OPERATOR_NAMESPACE
+EOF
+
+echo "Creating Subscription for the RHDH 1.3 CI Operator..."
+oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: $OPERATOR_NAME
+  namespace: $OPERATOR_NAMESPACE
+spec:
+  channel: $OLM_CHANNEL
+  installPlanApproval: Automatic
+  name: $OPERATOR_NAME
+  source: $CATALOG_NAME
+  sourceNamespace: $NAMESPACE
+EOF
+
+echo "RHDH 1.3 CI Operator has been deployed from the cached images."
