@@ -243,7 +243,7 @@ GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#o
 GOSEC_OUTPUT_FILE ?= gosec.sarif
 
 GINKGO ?= $(LOCALBIN)/ginkgo
-GINKGO_VERSION ?= v2.19.1
+GINKGO_VERSION ?= v2.20.1
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize

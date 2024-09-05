@@ -280,7 +280,7 @@ var _ = When("create backstage with CR configured", func() {
 			var bsvolume corev1.Volume
 			for _, v := range deploy.Spec.Template.Spec.Volumes {
 
-				if v.Name == "dynamic-plugins-root" {
+				if v.Name == "my-volume" {
 					bsvolume = v
 					break
 				}
