@@ -18,5 +18,5 @@ spec:
                         - ReadWriteOnce
                       resources:
                         requests:
-                          storage: 1M
-                name: dynamic-plugins-root
+                          storage: 2Gi
+                name: my-volume
