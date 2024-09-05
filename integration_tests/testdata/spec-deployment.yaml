@@ -14,4 +14,9 @@ spec:
                   volumeClaimTemplate:
                     spec:
                       storageClassName: "special"
-                name: dynamic-plugins-root
+                      accessModes:
+                        - ReadWriteOnce
+                      resources:
+                        requests:
+                          storage: 2Gi
+                name: my-volume

@@ -1,0 +1,13 @@
+apiVersion: rhdh.redhat.com/v1alpha2
+kind: Backstage
+spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            volumes:
+              - $patch: replace
+                name: dynamic-plugins-root
+                persistentVolumeClaim:
+                  claimName: dynamic-plugins-root-pvc
