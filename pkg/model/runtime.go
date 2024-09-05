@@ -22,8 +22,6 @@ import (
 	"reflect"
 	"slices"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -57,11 +55,6 @@ type BackstageModel struct {
 	RuntimeObjects []RuntimeObject
 
 	ExternalConfig ExternalConfig
-}
-
-type SpecifiedConfigMap struct {
-	ConfigMap corev1.ConfigMap
-	Key       string
 }
 
 func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
@@ -114,6 +107,8 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
 		var obj = backstageObject.EmptyObject()
+
+		// read default configuration
 		if err := utils.ReadYamlFile(utils.DefFile(conf.Key), obj); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
@@ -122,7 +117,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 			backstageObject.setObject(obj)
 		}
 
-		// reading configuration defined in BackstageCR.Spec.RawConfigContent ConfigMap
+		// read configuration defined in BackstageCR.Spec.RawConfigContent ConfigMap
 		// if present, backstageObject's default configuration will be overridden
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {

@@ -18,11 +18,17 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -91,6 +97,59 @@ func ReadYamlFile(path string, object interface{}) error {
 		return fmt.Errorf("failed to read YAML file: %w", err)
 	}
 	return ReadYaml(b, object)
+}
+
+// ReadYaml reads and unmarshalls yaml with multiple object of the same type
+func ReadYamls(manifest []byte, templ client.Object, scheme runtime.Scheme) ([]client.Object, error) {
+
+	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
+
+	objects := []client.Object{}
+
+	for {
+		// make a new object from template
+		obj := reflect.New(reflect.ValueOf(templ).Elem().Type()).Interface().(client.Object)
+		err := dec.Decode(obj)
+
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode YAML: %w", err)
+		}
+
+		gvks, _, err := scheme.ObjectKinds(obj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to obtain object Kind: %w", err)
+		}
+
+		found := false
+		for _, gvk := range gvks {
+			if obj.GetObjectKind().GroupVersionKind() == gvk {
+				objects = append(objects, obj)
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return nil, fmt.Errorf("GroupVersionKind not match, found: %v, expected: %v", obj.GetObjectKind().GroupVersionKind(), gvks)
+		}
+
+	}
+	return objects, nil
+}
+
+func ReadYamlFiles(path string, templ client.Object, scheme runtime.Scheme) ([]client.Object, error) {
+	fpath := filepath.Clean(path)
+	if _, err := os.Stat(fpath); err != nil {
+		return nil, err
+	}
+	b, err := os.ReadFile(fpath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read YAML file: %w", err)
+	}
+	return ReadYamls(b, templ, scheme)
 }
 
 func DefFile(key string) string {
