@@ -54,7 +54,7 @@ RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH=
 
 # Install openssl for FIPS support
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
-FROM registry.access.redhat.com/ubi9-minimal:9.4-1227@sha256:35a12657ce1bcb2b7667f4e6e0147186c1e0172cc43ece5452ab85afd6532791 AS runtime
+FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1725849298@sha256:efadc50470c32141c257341694c6312234c0700e0407ed2a60c8b5c26b6af6fc AS runtime
 RUN microdnf update --setopt=install_weak_deps=0 -y && microdnf install -y openssl; microdnf clean -y all
 
 # Upstream sources
