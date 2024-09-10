@@ -16,164 +16,185 @@
 # Ensure you have skopeo, podman, jq, yq, opm, and oc installed and configured.
 # This script assumes access to a connected environment for pulling images from quay.io.
 
-# Set the default namespace and other configuration
-NAMESPACE="openshift-marketplace"       # Namespace for the CatalogSource
-OPERATOR_NAMESPACE="rhdh-operator"      # Namespace for the Subscription and OperatorGroup
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+NAMESPACE_CATALOGSOURCE="openshift-marketplace"
+NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
-REMOTE_REGISTRY="quay.io/rhdh"
-LOCAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
-CATALOG_NAME="my-catalog-source"
-WORKDIR="/tmp/iib_extract"
-OPERATOR_NAME="rhdh"
+OCP_VER=""
+OCP_ARCH=""
 
-# Dynamically get the OCP version and architecture
-OCP_VER="v$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
-OCP_ARCH="$(oc version -o json | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
+errorf() {
+    echo -e "${RED}$1${NC}"
+}
 
-# Normalize architecture if necessary
-if [[ $OCP_ARCH == "amd64" ]]; then
-  OCP_ARCH="x86_64"
-fi
+infof() {
+    echo -e "${GREEN}$1${NC}"
+}
 
-# Construct the image tag dynamically based on the OCP version and architecture
-IIB_IMAGE="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}"
+usage() {
+    echo "
+    Usage:
+      $0 [OPTIONS] [IMAGES]
 
-# Echo the image being used for logging/debugging purposes
-echo "[INFO] Using iib from image $IIB_IMAGE"
+    Options:
+      --latest                     : Install from iib quay.io/rhdh/iib:latest-\$OCP_VER-\$OCP_ARCH [default]
+      --next                       : Install from iib quay.io/rhdh/iib:next-\$OCP_VER-\$OCP_ARCH
+      --install-operator <NAME>     : Install operator named \$NAME after creating CatalogSource
+      IMAGES                        : List of image references (optional)
 
-# Minimum requirements check
-if [[ ! $(command -v oc) ]]; then
-  echo "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
-  exit 1
-fi
-if [[ ! $(command -v jq) ]]; then
-  echo "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
-  exit 1
-fi
+    Example:
+      $0 --install-operator rhdh quay.io/rhdh/rhdh-hub-rhel9:1.4 quay.io/rhdh/rhdh-operator-bundle:1.3
+    "
+}
 
-# Check we're logged into a cluster
-if ! oc whoami > /dev/null 2>&1; then
-  echo "Not logged into an OpenShift cluster"
-  exit 1
-fi
+# Ensure the minimum required tools are available
+for cmd in oc jq skopeo; do
+    if ! command -v $cmd &>/dev/null; then
+        errorf "Please install $cmd"
+        exit 1
+    fi
+done
 
-# Create the working directory
-mkdir -p "$WORKDIR"
-
-# Step 1: Pull the IIB image and extract catalog information
-echo "Pulling IIB image and extracting catalog information..."
-skopeo copy --all "docker://$IIB_IMAGE" "oci:$WORKDIR/iib"
-
-# Unpack the OCI image
-cd "$WORKDIR"
-echo "Listing contents of blobs/sha256/ for debugging..."
-ls -R "$WORKDIR/iib/blobs/sha256/"
-
-# Inspect index.json to locate manifests
-indexJson="$WORKDIR/iib/index.json"
-if [[ -f $indexJson ]]; then
-    manifests=$(jq -r '.manifests[].digest' "$indexJson")
-    echo "Found the following manifests: $manifests"
-    
-    images=()
-    
-    for manifest in $manifests; do
-        echo "Checking manifest: $manifest"
-        manifestDir="$WORKDIR/iib/blobs/sha256/${manifest#*:}"
-        
-        manifestJson="$manifestDir/manifest.json"
-        if [[ -f $manifestJson ]]; then
-            layers=$(jq -r '.[].layers[].digest' "$manifestJson")
-            config=$(jq -r '.[].config.digest' "$manifestJson")
-            images+=($layers $config)
-        else
-            echo "[WARNING] No manifest.json found for $manifest"
-        fi
-    done
-else
-    echo "[ERROR] Could not find index.json. Exiting."
+# Ensure logged into an OpenShift cluster
+if ! oc whoami &>/dev/null; then
+    errorf "Not logged into an OpenShift cluster"
     exit 1
 fi
 
-# Step 2: Convert image references to Quay.io equivalents
-echo "Converting image references to Quay.io equivalents..."
-quay_images=()
-for image in "${images[@]}"; do
-    quay_image="${REMOTE_REGISTRY}/$(basename ${image#sha256:})"
-    quay_images+=("$quay_image")
+# Get OCP version and architecture
+OCP_VER="v$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e 's#([0-9]+\.[0-9]+)\..+#\1#')"
+OCP_ARCH="$(oc version -o json | jq -r '.serverVersion.platform' | sed -r -e 's#linux/##')"
+[[ $OCP_ARCH == "amd64" ]] && OCP_ARCH="x86_64"
+
+# Default IIB source
+UPSTREAM_IIB="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}"
+
+# Parse arguments
+TO_INSTALL=""
+IMAGES=()
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        '--install-operator') TO_INSTALL="$2"; shift ;;
+        '--next') UPSTREAM_IIB="quay.io/rhdh/iib:next-${OCP_VER}-${OCP_ARCH}" ;;
+        '--latest') UPSTREAM_IIB="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}" ;;
+        '-h'|'--help') usage; exit 0 ;;
+        *) IMAGES+=("$1") ;;
+    esac
+    shift
 done
 
-# Step 3: Pull images from Quay.io and push to local OpenShift registry
-for quay_image in "${quay_images[@]}"; do
-    local_image="$LOCAL_REGISTRY/$NAMESPACE/$(basename $quay_image)"
-    skopeo copy --all "docker://$quay_image" "docker://$local_image" || {
-        echo "[ERROR] Failed to copy $quay_image. Exiting."
-        exit 1
-    }
+# If no images were provided, default to IIB
+if [ ${#IMAGES[@]} -eq 0 ]; then
+    IMAGES+=("$UPSTREAM_IIB")
+fi
+
+# Enable and get the internal registry route dynamically
+infof "[INFO] Enabling default route for internal registry if not already enabled..."
+oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
+
+infof "[INFO] Retrieving internal registry route..."
+INTERNAL_REGISTRY=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+
+if [[ -z "$INTERNAL_REGISTRY" ]]; then
+    errorf "[ERROR] Unable to retrieve internal registry route."
+    exit 1
+fi
+
+infof "[INFO] Using internal registry: ${INTERNAL_REGISTRY}"
+
+# Authenticate using the external route for image registry
+infof "[INFO] Authenticating to the external registry route..."
+REGISTRY_URL="${INTERNAL_REGISTRY}"  # Remove the https:// part
+oc registry login --registry=${REGISTRY_URL} --to=/tmp/pull-secret.json
+
+# Pull and push images to the internal registry
+for IMAGE in "${IMAGES[@]}"; do
+    # Convert to quay.io equivalent if needed
+    QUAY_IMAGE="${IMAGE/registry.redhat.io/quay.io}"
+
+    infof "[INFO] Checking if image ${IMAGE} exists..."
+    if ! skopeo inspect docker://"${IMAGE}" &>/dev/null; then
+        infof "[INFO] Image ${IMAGE} not found in registry.redhat.io. Checking quay.io..."
+
+        # Try quay.io if not found in registry.redhat.io
+        if ! skopeo inspect docker://"${QUAY_IMAGE}" &>/dev/null; then
+            errorf "[ERROR] Image not found in quay.io or registry.redhat.io: ${QUAY_IMAGE}"
+            exit 2
+        else
+            IMAGE="${QUAY_IMAGE}"
+        fi
+    fi
+
+    # Pull the image locally
+    infof "[INFO] Pulling image: ${IMAGE}"
+    skopeo copy docker://"${IMAGE}" dir:/tmp/"${IMAGE##*/}"
+
+    # Push to the airgapped cluster using registry-proxy
+    LOCAL_IMAGE="${INTERNAL_REGISTRY}/rhdh-operator/$(basename ${IMAGE})"  # Add your namespace here
+    infof "[INFO] Pushing image to cluster: ${LOCAL_IMAGE}"
+    skopeo copy --authfile /tmp/pull-secret.json dir:/tmp/"${IMAGE##*/}" docker://${LOCAL_IMAGE}
 done
 
-# Step 4: Apply ImageContentSourcePolicy
-echo "Creating ImageContentSourcePolicy..."
-oc apply -f - <<EOF
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
-metadata:
-  name: quay-registry
-spec:
-  repositoryDigestMirrors:
-  - mirrors:
-    - ${REMOTE_REGISTRY}
-    source: quay.io
-EOF
+# Clean up only the temporary directories you created
+for IMAGE in "${IMAGES[@]}"; do
+    rm -rf /tmp/"${IMAGE##*/}"
+done
 
-# Step 5: Create CatalogSource in OpenShift
-echo "Creating CatalogSource..."
-oc apply -f - <<EOF
+# Create a temporary directory for YAMLs
+TMPDIR=$(mktemp -d)
+trap 'rm -fr "$TMPDIR"' EXIT
+
+# Set up CatalogSource for the IIB image
+infof "[INFO] Creating CatalogSource..."
+cat <<EOF > "$TMPDIR/catalogsource.yml"
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: $CATALOG_NAME
-  namespace: $NAMESPACE
+  name: rhdh-catalogsource
+  namespace: ${NAMESPACE_CATALOGSOURCE}
 spec:
   sourceType: grpc
-  image: $LOCAL_REGISTRY/$NAMESPACE/$(basename $IIB_IMAGE)
-  displayName: Custom Catalog Source
-  publisher: Red Hat
-  updateStrategy:
-    registryPoll:
-      interval: 15m
+  image: ${UPSTREAM_IIB}
+  publisher: IIB testing Red Hat Developer Hub
+  displayName: IIB testing catalog Red Hat Developer Hub
 EOF
 
-# Step 6: Create OperatorGroup and Subscription
-if ! oc get namespace "$OPERATOR_NAMESPACE" > /dev/null 2>&1; then
-    oc create namespace "$OPERATOR_NAMESPACE"
-fi
+oc apply -f "$TMPDIR/catalogsource.yml"
 
-echo "Creating OperatorGroup..."
-oc apply -f - <<EOF
+# Optional: Install the operator if specified
+if [[ -n "$TO_INSTALL" ]]; then
+    infof "[INFO] Installing Operator: ${TO_INSTALL}"
+
+    # Create OperatorGroup
+    cat <<EOF > "$TMPDIR/operatorgroup.yml"
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: $OPERATOR_NAME-operator-group
-  namespace: $OPERATOR_NAMESPACE
-spec:
-  targetNamespaces:
-  - $OPERATOR_NAMESPACE
+  name: ${TO_INSTALL}-operatorgroup
+  namespace: ${NAMESPACE_SUBSCRIPTION}
 EOF
+    oc apply -f "$TMPDIR/operatorgroup.yml"
 
-echo "Creating Subscription for the RHDH 1.3 CI Operator..."
-oc apply -f - <<EOF
+    # Create Subscription
+    cat <<EOF > "$TMPDIR/subscription.yml"
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: $OPERATOR_NAME
-  namespace: $OPERATOR_NAMESPACE
+  name: ${TO_INSTALL}
+  namespace: ${NAMESPACE_SUBSCRIPTION}
 spec:
-  channel: $OLM_CHANNEL
+  channel: ${OLM_CHANNEL}
+  name: ${TO_INSTALL}
+  source: rhdh-catalogsource
+  sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
   installPlanApproval: Automatic
-  name: $OPERATOR_NAME
-  source: $CATALOG_NAME
-  sourceNamespace: $NAMESPACE
 EOF
+    oc apply -f "$TMPDIR/subscription.yml"
+fi
 
-echo "RHDH 1.3 CI Operator has been deployed from the cached images."
+infof "[INFO] Completed successfully!"
