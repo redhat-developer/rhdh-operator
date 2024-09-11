@@ -23,9 +23,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"reflect"
 	"regexp"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -79,28 +82,8 @@ func BackstageDbAppLabelValue(backstageName string) string {
 	return fmt.Sprintf("backstage-psql-%s", backstageName)
 }
 
-func ReadYaml(manifest []byte, object interface{}) error {
-	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
-	if err := dec.Decode(object); err != nil {
-		return fmt.Errorf("failed to decode YAML: %w", err)
-	}
-	return nil
-}
-
-func ReadYamlFile(path string, object interface{}) error {
-	fpath := filepath.Clean(path)
-	if _, err := os.Stat(fpath); err != nil {
-		return err
-	}
-	b, err := os.ReadFile(fpath)
-	if err != nil {
-		return fmt.Errorf("failed to read YAML file: %w", err)
-	}
-	return ReadYaml(b, object)
-}
-
-// ReadYaml reads and unmarshalls yaml with multiple object of the same type
-func ReadYamls(manifest []byte, templ client.Object, scheme runtime.Scheme) ([]client.Object, error) {
+// ReadYamls reads and unmarshalls yaml with potentially multiple objects of the same type
+func ReadYamls(manifest []byte, templ runtime.Object, scheme runtime.Scheme) (runtime.Object, error) {
 
 	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
 
@@ -137,10 +120,22 @@ func ReadYamls(manifest []byte, templ client.Object, scheme runtime.Scheme) ([]c
 		}
 
 	}
-	return objects, nil
+
+	var ret runtime.Object
+	if len(objects) == 1 {
+		ret = objects[0]
+	} else if len(objects) > 1 {
+		ret = &multiobject.MultiObject{
+			Items: objects,
+			// any object is ok as GVK is the same
+			ObjectKind: objects[0].GetObjectKind(),
+		}
+	}
+
+	return ret, nil
 }
 
-func ReadYamlFiles(path string, templ client.Object, scheme runtime.Scheme) ([]client.Object, error) {
+func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) (runtime.Object, error) {
 	fpath := filepath.Clean(path)
 	if _, err := os.Stat(fpath); err != nil {
 		return nil, err
@@ -150,6 +145,14 @@ func ReadYamlFiles(path string, templ client.Object, scheme runtime.Scheme) ([]c
 		return nil, fmt.Errorf("failed to read YAML file: %w", err)
 	}
 	return ReadYamls(b, templ, scheme)
+}
+
+func GetObjectKind(object client.Object, scheme runtime.Scheme) (schema.GroupVersionKind, error) {
+	gvks, _, err := scheme.ObjectKinds(object)
+	if err != nil {
+		return schema.GroupVersionKind{}, fmt.Errorf("failed to obtain object Kind: %w", err)
+	}
+	return gvks[0], nil
 }
 
 func DefFile(key string) string {

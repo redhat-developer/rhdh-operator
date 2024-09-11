@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"slices"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -83,7 +85,7 @@ func (m *BackstageModel) sortRuntimeObjects() {
 
 // Registers config object
 func registerConfig(key string, factory ObjectFactory) {
-	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory /*, need: need*/})
+	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory})
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
@@ -106,10 +108,8 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		var obj = backstageObject.EmptyObject()
-
-		// read default configuration
-		if err := utils.ReadYamlFile(utils.DefFile(conf.Key), obj); err != nil {
+		var templ = backstageObject.EmptyObject()
+		if obj, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), templ, *scheme); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}
@@ -122,9 +122,11 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {
 			// to replace default, not merge
-			obj = backstageObject.EmptyObject()
-			if err := utils.ReadYaml([]byte(overlay), obj); err != nil {
-				return nil, fmt.Errorf("failed to read overlay value for the key %s, reason: %s", conf.Key, err)
+			templ = backstageObject.EmptyObject()
+			if obj, err := utils.ReadYamls([]byte(overlay), templ, *scheme); err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
+				}
 			} else {
 				backstageObject.setObject(obj)
 			}
@@ -134,7 +136,8 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		if added, err := backstageObject.addToModel(model, backstage); err != nil {
 			return nil, fmt.Errorf("failed to initialize backstage, reason: %s", err)
 		} else if added {
-			setMetaInfo(backstageObject, backstage, ownsRuntime, scheme)
+			//setMetaInfo(backstageObject, backstage, ownsRuntime, scheme)
+			backstageObject.setMetaInfo(backstage, scheme)
 		}
 	}
 
@@ -153,18 +156,20 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 }
 
 // Every RuntimeObject.setMetaInfo should as minimum call this
-func setMetaInfo(modelObject RuntimeObject, backstage bsv1.Backstage, ownsRuntime bool, scheme *runtime.Scheme) {
-	modelObject.setMetaInfo(backstage.Name)
-	modelObject.Object().SetNamespace(backstage.Namespace)
-	modelObject.Object().SetLabels(utils.SetKubeLabels(modelObject.Object().GetLabels(), backstage.Name))
+func setMetaInfo(clientObj client.Object, backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	//modelObject.setMetaInfo(backstage.Name)
+	//clientObj := modelObject.Object().(client.Object)
 
-	if ownsRuntime {
-		if err := controllerutil.SetControllerReference(&backstage, modelObject.Object(), scheme); err != nil {
-			//error should never have happened,
-			//otherwise the Operator has invalid (not a runtime.Object) or non-registered type.
-			//In both cases it will fail before this place
-			panic(err)
-		}
+	clientObj.SetNamespace(backstage.Namespace)
+	clientObj.SetLabels(utils.SetKubeLabels(clientObj.GetLabels(), backstage.Name))
+
+	//if ownsRuntime {
+	if err := controllerutil.SetControllerReference(&backstage, clientObj, scheme); err != nil {
+		//error should never have happened,
+		//otherwise the Operator has invalid (not a runtime.Object) or non-registered type.
+		//In both cases it will fail before this place
+		panic(err)
 	}
+	//}
 
 }

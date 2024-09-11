@@ -17,11 +17,12 @@ package model
 import (
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type DbSecretFactory struct{}
@@ -43,12 +44,12 @@ func DbSecretDefaultName(backstageName string) string {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) Object() client.Object {
+func (b *DbSecret) Object() runtime.Object {
 	return b.secret
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) setObject(obj client.Object) {
+func (b *DbSecret) setObject(obj runtime.Object) {
 	b.secret = nil
 	if obj != nil {
 		b.secret = obj.(*corev1.Secret)
@@ -73,7 +74,7 @@ func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) EmptyObject() client.Object {
+func (b *DbSecret) EmptyObject() runtime.Object {
 	return &corev1.Secret{}
 }
 
@@ -95,6 +96,7 @@ func (b *DbSecret) validate(model *BackstageModel, backstage bsv1.Backstage) err
 	return nil
 }
 
-func (b *DbSecret) setMetaInfo(backstageName string) {
-	b.secret.SetName(DbSecretDefaultName(backstageName))
+func (b *DbSecret) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	b.secret.SetName(DbSecretDefaultName(backstage.Name))
+	setMetaInfo(b.secret, backstage, scheme)
 }

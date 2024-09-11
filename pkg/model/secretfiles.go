@@ -17,14 +17,15 @@ package model
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type SecretFilesFactory struct{}
@@ -43,7 +44,7 @@ func init() {
 	registerConfig("secret-files.yaml", SecretFilesFactory{})
 }
 
-func addSecretFiles(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment) error {
+func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
 		return nil
@@ -73,11 +74,11 @@ func addSecretFiles(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment) 
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) Object() client.Object {
+func (p *SecretFiles) Object() runtime.Object {
 	return p.Secret
 }
 
-func (p *SecretFiles) setObject(obj client.Object) {
+func (p *SecretFiles) setObject(obj runtime.Object) {
 	p.Secret = nil
 	if obj != nil {
 		p.Secret = obj.(*corev1.Secret)
@@ -85,12 +86,12 @@ func (p *SecretFiles) setObject(obj client.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) EmptyObject() client.Object {
+func (p *SecretFiles) EmptyObject() runtime.Object {
 	return &corev1.Secret{}
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (bool, error) {
+func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if p.Secret != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -99,12 +100,13 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (b
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) validate(_ *BackstageModel, _ v1alpha2.Backstage) error {
+func (p *SecretFiles) validate(_ *BackstageModel, _ bsv1.Backstage) error {
 	return nil
 }
 
-func (p *SecretFiles) setMetaInfo(backstageName string) {
-	p.Secret.SetName(utils.GenerateRuntimeObjectName(backstageName, "backstage-files"))
+func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	p.Secret.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files"))
+	setMetaInfo(p.Secret, backstage, scheme)
 }
 
 // implementation of BackstagePodContributor interface

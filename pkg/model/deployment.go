@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 
@@ -32,7 +34,6 @@ import (
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const BackstageImageEnvVar = "RELATED_IMAGE_backstage"
@@ -58,11 +59,12 @@ func DeploymentName(backstageName string) string {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) Object() client.Object {
+func (b *BackstageDeployment) Object() runtime.Object {
 	return b.deployment
 }
 
-func (b *BackstageDeployment) setObject(obj client.Object) {
+// implementation of RuntimeObject interface
+func (b *BackstageDeployment) setObject(obj runtime.Object) {
 	b.deployment = nil
 	if obj != nil {
 		b.deployment = obj.(*appsv1.Deployment)
@@ -70,7 +72,7 @@ func (b *BackstageDeployment) setObject(obj client.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) EmptyObject() client.Object {
+func (b *BackstageDeployment) EmptyObject() runtime.Object {
 	return &appsv1.Deployment{}
 }
 
@@ -137,10 +139,11 @@ func (b *BackstageDeployment) validate(model *BackstageModel, backstage bsv1.Bac
 	return nil
 }
 
-func (b *BackstageDeployment) setMetaInfo(backstageName string) {
-	b.deployment.SetName(DeploymentName(backstageName))
-	utils.GenerateLabel(&b.deployment.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstageName))
-	utils.GenerateLabel(&b.deployment.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageAppLabelValue(backstageName))
+func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	b.deployment.SetName(DeploymentName(backstage.Name))
+	utils.GenerateLabel(&b.deployment.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+	utils.GenerateLabel(&b.deployment.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+	setMetaInfo(b.deployment, backstage, scheme)
 }
 
 func (b *BackstageDeployment) container() *corev1.Container {

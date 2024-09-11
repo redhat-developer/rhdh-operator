@@ -15,12 +15,13 @@
 package model
 
 import (
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ConfigMapEnvsFactory struct{}
@@ -38,7 +39,7 @@ func init() {
 	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{})
 }
 
-func addConfigMapEnvs(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addConfigMapEnvs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
 
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.ConfigMaps == nil {
 		return
@@ -55,11 +56,11 @@ func addConfigMapEnvs(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment
 }
 
 // Object implements RuntimeObject interface
-func (p *ConfigMapEnvs) Object() client.Object {
+func (p *ConfigMapEnvs) Object() runtime.Object {
 	return p.ConfigMap
 }
 
-func (p *ConfigMapEnvs) setObject(obj client.Object) {
+func (p *ConfigMapEnvs) setObject(obj runtime.Object) {
 	p.ConfigMap = nil
 	if obj != nil {
 		p.ConfigMap = obj.(*corev1.ConfigMap)
@@ -67,12 +68,12 @@ func (p *ConfigMapEnvs) setObject(obj client.Object) {
 }
 
 // EmptyObject implements RuntimeObject interface
-func (p *ConfigMapEnvs) EmptyObject() client.Object {
+func (p *ConfigMapEnvs) EmptyObject() runtime.Object {
 	return &corev1.ConfigMap{}
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (bool, error) {
+func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if p.ConfigMap != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -81,12 +82,13 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ v1alpha2.Backstage) 
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) validate(_ *BackstageModel, _ v1alpha2.Backstage) error {
+func (p *ConfigMapEnvs) validate(_ *BackstageModel, _ bsv1.Backstage) error {
 	return nil
 }
 
-func (p *ConfigMapEnvs) setMetaInfo(backstageName string) {
-	p.ConfigMap.SetName(utils.GenerateRuntimeObjectName(backstageName, "backstage-envs"))
+func (p *ConfigMapEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	p.ConfigMap.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs"))
+	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
 // implementation of BackstagePodContributor interface

@@ -17,13 +17,14 @@ package model
 import (
 	"path/filepath"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	appsv1 "k8s.io/api/apps/v1"
 
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type AppConfigFactory struct{}
@@ -71,12 +72,12 @@ func addAppConfigs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) Object() client.Object {
+func (b *AppConfig) Object() runtime.Object {
 	return b.ConfigMap
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) setObject(obj client.Object) {
+func (b *AppConfig) setObject(obj runtime.Object) {
 	b.ConfigMap = nil
 	if obj != nil {
 		b.ConfigMap = obj.(*corev1.ConfigMap)
@@ -84,7 +85,7 @@ func (b *AppConfig) setObject(obj client.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) EmptyObject() client.Object {
+func (b *AppConfig) EmptyObject() runtime.Object {
 	return &corev1.ConfigMap{}
 }
 
@@ -102,8 +103,9 @@ func (b *AppConfig) validate(_ *BackstageModel, _ bsv1.Backstage) error {
 	return nil
 }
 
-func (b *AppConfig) setMetaInfo(backstageName string) {
-	b.ConfigMap.SetName(AppConfigDefaultName(backstageName))
+func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	b.ConfigMap.SetName(AppConfigDefaultName(backstage.Name))
+	setMetaInfo(b.ConfigMap, backstage, scheme)
 }
 
 // implementation of BackstagePodContributor interface

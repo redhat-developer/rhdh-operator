@@ -15,7 +15,10 @@
 package utils
 
 import (
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"testing"
+
+	openshift "github.com/openshift/api/route/v1"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -94,8 +97,9 @@ spec:
 	objects, err := ReadYamls([]byte(y), &corev1.PersistentVolumeClaim{}, *util_test_scheme)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(objects))
-	assert.Equal(t, "pvc1", objects[0].GetName())
+	mo := objects.(*multiobject.MultiObject)
+	assert.Equal(t, 2, len(mo.Items))
+	assert.Equal(t, "pvc1", mo.Items[0].(*corev1.PersistentVolumeClaim).GetName())
 
 }
 
@@ -124,5 +128,18 @@ data:`
 
 	// Kind not match for second, PersistentVolumeClaim expected
 	assert.EqualError(t, err, "GroupVersionKind not match, found: /v1, Kind=ConfigMap, expected: [/v1, Kind=PersistentVolumeClaim]")
+
+}
+
+func TestGetObjectKind(t *testing.T) {
+
+	objk, err := GetObjectKind(&corev1.PersistentVolumeClaim{}, *util_test_scheme)
+	assert.NoError(t, err)
+	assert.Equal(t, "PersistentVolumeClaim", objk.Kind)
+	assert.Equal(t, "v1", objk.Version)
+
+	// should fail since openshift scheme is not registered for this test
+	objk, err = GetObjectKind(&openshift.Route{}, *util_test_scheme)
+	assert.Error(t, err)
 
 }

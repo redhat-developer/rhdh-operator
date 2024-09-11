@@ -17,6 +17,7 @@ package model
 import (
 	"context"
 	"fmt"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"testing"
 
 	"k8s.io/utils/ptr"
@@ -57,13 +58,14 @@ func TestInitDefaultDeploy(t *testing.T) {
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 
+	bsDeployment := model.backstageDeployment
+
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
-	assert.Equal(t, DeploymentName(bs.Name), model.backstageDeployment.Object().GetName())
-	assert.Equal(t, "ns123", model.backstageDeployment.Object().GetNamespace())
-	assert.Equal(t, 2, len(model.backstageDeployment.Object().GetLabels()))
+	assert.Equal(t, DeploymentName(bs.Name), bsDeployment.deployment.GetName())
+	assert.Equal(t, "ns123", bsDeployment.deployment.GetNamespace())
+	assert.Equal(t, 2, len(bsDeployment.deployment.GetLabels()))
 
-	bsDeployment := model.backstageDeployment
 	assert.NotNil(t, bsDeployment.deployment.Spec.Template.Spec.Containers[0])
 
 	bsService := model.backstageService
@@ -171,13 +173,30 @@ spec:
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageService)
-	assert.Equal(t, "true", model.backstageService.Object().GetLabels()["default"])
-	assert.Empty(t, model.backstageService.Object().GetLabels()["raw"])
+	assert.Equal(t, "true", model.backstageService.service.GetLabels()["default"])
+	assert.Empty(t, model.backstageService.service.GetLabels()["raw"])
 
 	// Put raw config
 	model, err = InitObjects(context.TODO(), bs, extConfig, true, false, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageService)
-	assert.Equal(t, "true", model.backstageService.Object().GetLabels()["raw"])
-	assert.Empty(t, model.backstageService.Object().GetLabels()["default"])
+	assert.Equal(t, "true", model.backstageService.service.GetLabels()["raw"])
+	assert.Empty(t, model.backstageService.service.GetLabels()["default"])
+}
+
+func TestMultiobject(t *testing.T) {
+	bs := v1alpha2.Backstage{}
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+	found := false
+	for _, ro := range model.RuntimeObjects {
+		if pvcs, ok := ro.(*BackstagePvcs); ok {
+			items := pvcs.Object().(*multiobject.MultiObject).Items
+			assert.Equal(t, 2, len(items))
+			found = true
+		}
+	}
+	assert.True(t, found)
 }

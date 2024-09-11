@@ -17,8 +17,9 @@ package model
 import (
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	appsv1 "k8s.io/api/apps/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // Registered Object configuring Backstage runtime model
@@ -38,11 +39,11 @@ type ObjectFactory interface {
 // Abstraction for the model Backstage object taking part in deployment
 type RuntimeObject interface {
 	// Object underlying Kubernetes object
-	Object() client.Object
+	Object() runtime.Object
 	// setObject sets object
-	setObject(obj client.Object)
+	setObject(object runtime.Object)
 	// EmptyObject an empty object the same kind as Object
-	EmptyObject() client.Object
+	EmptyObject() runtime.Object
 	// adds runtime object to the model
 	// returns false if the object was not added to the model (not configured)
 	addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error)
@@ -50,7 +51,7 @@ type RuntimeObject interface {
 	// set the final references validates the object at the end of initialization
 	validate(model *BackstageModel, backstage bsv1.Backstage) error
 	// sets object name, labels and other necessary meta information
-	setMetaInfo(backstageName string)
+	setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme)
 }
 
 // BackstagePodContributor contributing to the pod as an Environment variables or mounting file/directory.
