@@ -318,9 +318,7 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 	#$(OPSDK) generate kustomize manifests -q
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
-	$(OPSDK) bundle validate ./bundle/$(PROFILE)
-  mkdir -p docker/$(PROFILE)
-	mv -f bundle.Dockerfile docker/$(PROFILE)/bundle.Dockerfile
+	$(OPSDK) bundle validate ./bundle/$(PROFILE) mkdir -p docker/$(PROFILE)	mv -f bundle.Dockerfile docker/$(PROFILE)/bundle.Dockerfile
 	$(MAKE) fmt_license
 
 ## to update the CSV with a new tagged version of the operator:
