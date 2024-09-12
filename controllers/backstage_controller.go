@@ -160,7 +160,7 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 		case *multiobject.MultiObject:
 			mo := obj.Object().(*multiobject.MultiObject)
 			for _, singleObject := range mo.Items {
-				if err := r.applyPayload(ctx, singleObject.(client.Object), obj.EmptyObject().(client.Object), createOnly); err != nil {
+				if err := r.applyPayload(ctx, singleObject, obj.EmptyObject().(client.Object), createOnly); err != nil {
 					return err
 				}
 			}
@@ -176,7 +176,6 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 
 	lg := log.FromContext(ctx)
 
-	//baseObject := obj.EmptyObject()
 	// do not read Secrets
 	if _, ok := obj.(*corev1.Secret); ok {
 		// try to create
@@ -184,10 +183,6 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 			if !errors.IsAlreadyExists(err) {
 				return fmt.Errorf("failed to create secret: %w", err)
 			}
-			//if DBSecret - nothing to do, it is not for update
-			//if _, ok := obj.(*model.DbSecret); ok {
-			//	return nil
-			//}
 			if createOnly {
 				return nil
 			}
