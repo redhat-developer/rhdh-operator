@@ -43,7 +43,7 @@ metadata:
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
     support: Red Hat
     skipRange: '>=1.0.0 <1.4.0'
-  name: rhdh-operator.v1.3.0
+  name: rhdh-operator.v1.4.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
