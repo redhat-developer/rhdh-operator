@@ -329,7 +329,7 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 ## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh-community/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f ./bundle/$(PROFILE)/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
+	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f docker/$(PROFILE)/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
 
 .PHONY: bundle-push
 bundle-push: ## Push bundle image to registry
