@@ -72,11 +72,6 @@ spec:
         - /manager
         args:
         - --leader-elect
-        env:
-        - name: RELATED_IMAGE_postgresql
-          value: quay.io/fedora/postgresql-15:latest
-        - name: RELATED_IMAGE_backstage
-          value: quay.io/rhdh/rhdh-hub-rhel9:next
         image: controller:latest
         name: manager
         securityContext:

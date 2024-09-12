@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/name: service
     app.kubernetes.io/part-of: backstage-operator
     control-plane: controller-manager
-  name: backstage-operator-controller-manager-metrics-service
+  name: rhdh-controller-manager-metrics-service
 spec:
   ports:
   - name: https

@@ -335,4 +335,4 @@ data:
           targetPort: backend
 kind: ConfigMap
 metadata:
-  name: backstage-default-config
+  name: rhdh-default-config

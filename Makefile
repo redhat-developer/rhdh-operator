@@ -41,7 +41,7 @@ IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
 BUNDLE_IMG ?= quay.io/rhdh-community/operator-bundle:$(VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
-BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) --output-dir bundle/$(PROFILE) $(BUNDLE_METADATA_OPTS)
 
 # USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
 # You can enable this value if you would like to use SHA Based Digests
@@ -55,11 +55,13 @@ endif
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 
 
-# Default Backstage config directory to use
-# it has to be defined as a set of YAML files inside ./config/manager/$(CONF_DIR) directory
-# to use other config - add a directory with config and run 'CONF_DIR=<dir-name> make ...'
-# TODO find better place than ./config/manager (but not ./config/overlays) ?
-CONF_DIR ?= default-config
+# Profile directory: subdirectory of ./config/profile
+# In terms of Kustomize it is overlay directory
+# It also usually contains default-config directory
+# with set of Backstage Configuration YAML manifests
+# to use other config - add a directory with config,
+# use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
+PROFILE ?= rhdh
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -126,12 +128,12 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && cp config/manager/$(CONF_DIR)/* $(LOCALBIN)/default-config
+	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && cp config/manager/$(CONF_DIR)/* $(LOCALBIN)/default-config
+	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 
@@ -143,7 +145,7 @@ build: generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet build ## Run a controller from your host.
-	cd $(LOCALBIN) && mkdir -p default-config && cp ../config/manager/$(CONF_DIR)/* default-config && ./manager
+	cd $(LOCALBIN) && mkdir -p default-config && rm -fr default-config/* && cp ../config/profile/$(PROFILE)/default-config/* default-config && ./manager
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
@@ -196,18 +198,18 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/profile/$(PROFILE) | kubectl apply -f -
 
 .PHONY: deployment-manifest
 deployment-manifest: manifests kustomize ## Generate manifest to deploy operator.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/default > rhdh-operator-${VERSION}.yaml
+	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/profile/$(PROFILE) > rhdh-operator-${VERSION}.yaml
 	@echo "Generated operator script rhdh-operator-${VERSION}.yaml"
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/profile/$(PROFILE) | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Build Dependencies
 
@@ -243,7 +245,7 @@ GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#o
 GOSEC_OUTPUT_FILE ?= gosec.sarif
 
 GINKGO ?= $(LOCALBIN)/ginkgo
-GINKGO_VERSION ?= v2.19.1
+GINKGO_VERSION ?= v2.20.1
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -313,11 +315,11 @@ endif
 # Build a bundle image using the 'operator-sdk' tool
 .PHONY: bundle
 bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPSDK) generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPSDK) generate bundle $(BUNDLE_GEN_FLAGS)
-	$(OPSDK) bundle validate ./bundle
-	mv -f bundle.Dockerfile docker/bundle.Dockerfile
+	#$(OPSDK) generate kustomize manifests -q
+	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
+	$(OPSDK) bundle validate ./bundle/$(PROFILE)
+	mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 	$(MAKE) fmt_license
 
 ## to update the CSV with a new tagged version of the operator:
@@ -326,7 +328,7 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 ## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh-community/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f docker/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
+	$(CONTAINER_ENGINE) build --platform $(PLATFORM) -f bundle/$(PROFILE)/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
 
 .PHONY: bundle-push
 bundle-push: ## Push bundle image to registry

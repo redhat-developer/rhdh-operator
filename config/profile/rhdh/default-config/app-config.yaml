@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-backstage-config-cm1 # placeholder for <bs>-default-appconfig
+data:
+  default.app-config.yaml: |
+    backend:
+      auth:
+        externalAccess:
+          - type: legacy
+            options:
+              subject: legacy-default-config
+              # This is a default value, which you should change by providing your own app-config
+              secret: "pl4s3Ch4ng3M3"

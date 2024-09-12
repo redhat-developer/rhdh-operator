@@ -232,21 +232,6 @@ func NewTestBackstageReconciler(namespace string) *TestBackstageReconciler {
 	}, namespace: namespace}
 }
 
-//func (t *TestBackstageReconciler) ReconcileLocalCluster(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-//
-//	if !*testEnv.UseExistingCluster {
-//		// Ignore requests for other namespaces, if specified.
-//		// To overcome a limitation of EnvTest about namespace deletion.
-//		// More details on https://book.kubebuilder.io/reference/envtest.html#namespace-usage-limitation
-//		if t.namespace != "" && req.Namespace != t.namespace {
-//			return ctrl.Result{}, nil
-//		}
-//		return t.Reconcile(ctx, req)
-//	} else {
-//		return ctrl.Result{}, nil
-//	}
-//}
-
 func (t *TestBackstageReconciler) ReconcileAny(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Ignore if USE_EXISTING_CLUSTER = true and USE_EXISTING_CONTROLLER=true
 	// Ignore requests for other namespaces, if specified.
@@ -267,6 +252,15 @@ func isOpenshiftCluster() bool {
 	} else {
 		return false
 	}
+}
+
+func isProfile(profile string) bool {
+	ev, found := os.LookupEnv("PROFILE")
+	if !found {
+		// We take "rhdh" profile as default
+		ev = "rhdh"
+	}
+	return profile == ev
 }
 
 func controllerMessage() string {

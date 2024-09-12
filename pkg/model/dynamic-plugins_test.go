@@ -148,6 +148,23 @@ func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	assert.Empty(t, bs.Spec.Application.DynamicPluginsConfigMapName)
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true)
+
+	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+
+	assert.NoError(t, err)
+	for _, obj := range m.RuntimeObjects {
+		if _, ok := obj.(*DynamicPlugins); ok {
+			assert.Fail(t, "Model contains DynamicPlugins object")
+		}
+	}
+}
+
 func initContainer(model *BackstageModel) *corev1.Container {
 	for _, v := range model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers {
 		if v.Name == dynamicPluginInitContainerName {
