@@ -39,18 +39,25 @@ you can check if the Operand pods are up by running
 ```sh
 kubectl get pods -n <your-namespace>
 It should be something like:
-NAME                         READY   STATUS    RESTARTS   AGE
-backstage-85fc4657b5-lqk6r   1/1     Running   0          78s
-backstage-psql-bs1-0         1/1     Running   0          79s
+NAME                             READY   STATUS    RESTARTS      AGE
+backstage-bs1-6c98c4dd6d-9wbgg   1/1     Running   3 (34m ago)   34m
+backstage-psql-bs1-0             1/1     Running   0             34m
 
 ```
-4. Tunnel Backstage Service and get URL for access Backstage
+
+5. Port forward Backstage pod/port (destination port is **17007** in this example) and get URL for access Backstage.
+Backstage-pod-name has a following pattern: **backstage-<name-of-CR>-<random-sequence>**
+Taking previous item, your backstage-pod-name would be `backstage-bs1-6c98c4dd6d-9wbgg`
+
 ```sh
 minikube service -n <your-namespace> backstage --url
+kubectl port-forward -n <your-namespace> <backstage-pod-name> 17007:7007
+
 Output:
->http://127.0.0.1:53245
+Forwarding from 127.0.0.1:17007 -> 7007
+Forwarding from [::1]:17007 -> 7007
 ```
-5. Access your Backstage instance in your browser using this URL. 
+5. Access your Backstage instance in a browser using http://localhost:17007
 
 ## More documentation
 

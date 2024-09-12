@@ -57,17 +57,29 @@ make uninstall
 
 You can run your controller standalone (this will run in the foreground, so switch to a new terminal if you want to leave it running)
 This way you can see controllers log just in your terminal window which is quite convenient for debugging.
+
 ```sh
-make [install] run
+make [PROFILE=<configuration-profile>] [install] run
 ```
 
 You can use it for manual and automated ([such as](../integration_tests/README.md) `USE_EXISTING_CLUSTER=true make integration-test`) tests efficiently, but, note, RBAC is not working with this kind of deployment.
 
 ### Deploy operator to the real cluster
 
-For development, most probably, you will need to specify the image you build and push:
+#### Configuration Profiles
+
+Since v0.3.0 Operator has a facility to support different predefined runtime configurations, we call it Configuration Profile.
+You can see them as a subdirectories of /config/profile: 
+
+* **default** (default as for v0.3.0) - OOTB supporting Red Hat Developer Hub runtime
+* **backstage.io** - bare backstage image
+* **external** - empty profile you can feed your configuration from outside (instructions TBD)
+
+#### Deploy
+
+To deploy the Operator directly to current cluster use:
 ```sh
-make deploy [IMG=<your-registry>/backstage-operator[:tag]]
+make deploy [PROFILE=<configuration-profile>] [IMG=<your-registry>/backstage-operator[:tag]]
 ```
 
 To undeploy the controller from the cluster:
