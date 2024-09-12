@@ -357,4 +357,4 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   version: 1.4.0
-  replaces: rhdh-operator.v1.2.0
+  replaces: rhdh-operator.v1.1.1
