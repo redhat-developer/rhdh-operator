@@ -138,7 +138,7 @@ In this example, additional app-config is defined in the ConfigMaps called **my-
 The ConfigMap key/value defines the file name and content, and this app-config will be applied as the last in the **-app-config** arguments sequence. Therefore, as per this example, the ConfigMap should be created in the namespace as a prerequisite. Then the Operator will create the file `/my/path/my-app-config.yaml` and add it to the end of the Backstage command-line arguments as follows:
 
 ```
--app-config /my/path/my-app-config.yaml
+--config /my/path/my-app-config.yaml
 ```
 
 **Note**: It is possible to define several **app-config** files inside one ConfigMap (even if there are no visible reasons for it) but since it is a Map, the order of how they are applied is not guaranteed. 
