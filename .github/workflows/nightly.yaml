@@ -69,7 +69,7 @@ jobs:
       - name: Start Minikube
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
-        uses: medyagh/setup-minikube@606b71970c783154fe49b711486c717f5780f485 # v0.0.15
+        uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
         with:
           addons: ingress
 
