@@ -13,20 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-# Ensure you have skopeo, podman, jq, yq, opm, and oc installed and configured.
-# This script assumes access to a connected environment for pulling images from quay.io.
+# Script to preload images and install RHDH operator on an air-gapped OpenShift cluster without using ICSP.
+# The script ensures all necessary images are preloaded into the internal registry.
 
 set -e
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
-
-NAMESPACE_CATALOGSOURCE="openshift-marketplace"
-NAMESPACE_SUBSCRIPTION="rhdh-operator"
-OLM_CHANNEL="fast"
-OCP_VER=""
-OCP_ARCH=""
 
 errorf() {
     echo -e "${RED}$1${NC}"
@@ -39,16 +33,16 @@ infof() {
 usage() {
     echo "
     Usage:
-      $0 [OPTIONS] [IMAGES]
+      $0 [OPTIONS]
 
     Options:
-      --latest                     : Install from iib quay.io/rhdh/iib:latest-\$OCP_VER-\$OCP_ARCH [default]
-      --next                       : Install from iib quay.io/rhdh/iib:next-\$OCP_VER-\$OCP_ARCH
-      --install-operator <NAME>     : Install operator named \$NAME after creating CatalogSource
-      IMAGES                        : List of image references (optional)
+      --latest                     : Install from the latest IIB [default]
+      --next                       : Install from the next IIB
+      --install-operator <NAME>     : Install operator named <NAME> after creating CatalogSource
 
-    Example:
-      $0 --install-operator rhdh quay.io/rhdh/rhdh-hub-rhel9:1.4 quay.io/rhdh/rhdh-operator-bundle:1.3
+    Examples:
+      $0 --install-operator rhdh          # Install latest operator version
+      $0 --next --install-operator rhdh   # Install next version (from IIB 'next' tag)
     "
 }
 
@@ -76,125 +70,47 @@ UPSTREAM_IIB="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}"
 
 # Parse arguments
 TO_INSTALL=""
-IMAGES=()
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         '--install-operator') TO_INSTALL="$2"; shift ;;
         '--next') UPSTREAM_IIB="quay.io/rhdh/iib:next-${OCP_VER}-${OCP_ARCH}" ;;
         '--latest') UPSTREAM_IIB="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}" ;;
         '-h'|'--help') usage; exit 0 ;;
-        *) IMAGES+=("$1") ;;
+        *) errorf "[ERROR] Unknown parameter: $1"; usage; exit 1 ;;
     esac
     shift
 done
 
-# If no images were provided, default to IIB
-if [ ${#IMAGES[@]} -eq 0 ]; then
-    IMAGES+=("$UPSTREAM_IIB")
-fi
+infof "[INFO] Using IIB image: ${UPSTREAM_IIB}"
 
-# Enable and get the internal registry route dynamically
-infof "[INFO] Enabling default route for internal registry if not already enabled..."
-oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
+# Call prepare-restricted-environment.sh to preload images
+infof "[INFO] Preloading images into the internal registry..."
+"${PWD}/prepare-restricted-environment.sh" --prod_operator_index "${UPSTREAM_IIB}" --prod_operator_version "${OCP_VER}"
 
-infof "[INFO] Retrieving internal registry route..."
-INTERNAL_REGISTRY=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+# Ensure all required images are in the internal registry
+# Optionally, enhance this part of the script to resolve missing images and copy them from quay.io
 
-if [[ -z "$INTERNAL_REGISTRY" ]]; then
-    errorf "[ERROR] Unable to retrieve internal registry route."
-    exit 1
-fi
+# Example logic for resolving missing images using skopeo (if needed)
+# This is assuming you want to add this functionality within your script
+resolve_missing_images() {
+    local image="$1"
+    local internal_image="$2"
 
-infof "[INFO] Using internal registry: ${INTERNAL_REGISTRY}"
+    # Try to resolve the image from quay.io if not found in the internal registry
+    if ! skopeo inspect docker://"${image}" &>/dev/null; then
+        infof "[INFO] Attempting to resolve ${image} from quay.io..."
+        quay_image="${image/registry.redhat.io/quay.io}"
 
-# Authenticate using the external route for image registry
-infof "[INFO] Authenticating to the external registry route..."
-REGISTRY_URL="${INTERNAL_REGISTRY}"  # Remove the https:// part
-oc registry login --registry=${REGISTRY_URL} --to=/tmp/pull-secret.json
-
-# Pull and push images to the internal registry
-for IMAGE in "${IMAGES[@]}"; do
-    # Convert to quay.io equivalent if needed
-    QUAY_IMAGE="${IMAGE/registry.redhat.io/quay.io}"
-
-    infof "[INFO] Checking if image ${IMAGE} exists..."
-    if ! skopeo inspect docker://"${IMAGE}" &>/dev/null; then
-        infof "[INFO] Image ${IMAGE} not found in registry.redhat.io. Checking quay.io..."
-
-        # Try quay.io if not found in registry.redhat.io
-        if ! skopeo inspect docker://"${QUAY_IMAGE}" &>/dev/null; then
-            errorf "[ERROR] Image not found in quay.io or registry.redhat.io: ${QUAY_IMAGE}"
-            exit 2
+        if skopeo inspect docker://"${quay_image}" &>/dev/null; then
+            infof "[INFO] Resolved ${image} to ${quay_image}"
+            skopeo copy --authfile "${TMPDIR}/pull-secret.json" --dest-tls-verify=false --all docker://"${quay_image}" docker://"${internal_image}"
         else
-            IMAGE="${QUAY_IMAGE}"
+            errorf "[ERROR] Could not resolve image: ${image}"
         fi
     fi
+}
 
-    # Pull the image locally
-    infof "[INFO] Pulling image: ${IMAGE}"
-    skopeo copy docker://"${IMAGE}" dir:/tmp/"${IMAGE##*/}"
-
-    # Push to the airgapped cluster using registry-proxy
-    LOCAL_IMAGE="${INTERNAL_REGISTRY}/rhdh-operator/$(basename ${IMAGE})"  # Add your namespace here
-    infof "[INFO] Pushing image to cluster: ${LOCAL_IMAGE}"
-    skopeo copy --authfile /tmp/pull-secret.json dir:/tmp/"${IMAGE##*/}" docker://${LOCAL_IMAGE}
-done
-
-# Clean up only the temporary directories you created
-for IMAGE in "${IMAGES[@]}"; do
-    rm -rf /tmp/"${IMAGE##*/}"
-done
-
-# Create a temporary directory for YAMLs
-TMPDIR=$(mktemp -d)
-trap 'rm -fr "$TMPDIR"' EXIT
-
-# Set up CatalogSource for the IIB image
-infof "[INFO] Creating CatalogSource..."
-cat <<EOF > "$TMPDIR/catalogsource.yml"
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: rhdh-catalogsource
-  namespace: ${NAMESPACE_CATALOGSOURCE}
-spec:
-  sourceType: grpc
-  image: ${UPSTREAM_IIB}
-  publisher: IIB testing Red Hat Developer Hub
-  displayName: IIB testing catalog Red Hat Developer Hub
-EOF
-
-oc apply -f "$TMPDIR/catalogsource.yml"
-
-# Optional: Install the operator if specified
-if [[ -n "$TO_INSTALL" ]]; then
-    infof "[INFO] Installing Operator: ${TO_INSTALL}"
-
-    # Create OperatorGroup
-    cat <<EOF > "$TMPDIR/operatorgroup.yml"
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: ${TO_INSTALL}-operatorgroup
-  namespace: ${NAMESPACE_SUBSCRIPTION}
-EOF
-    oc apply -f "$TMPDIR/operatorgroup.yml"
-
-    # Create Subscription
-    cat <<EOF > "$TMPDIR/subscription.yml"
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: ${TO_INSTALL}
-  namespace: ${NAMESPACE_SUBSCRIPTION}
-spec:
-  channel: ${OLM_CHANNEL}
-  name: ${TO_INSTALL}
-  source: rhdh-catalogsource
-  sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
-  installPlanApproval: Automatic
-EOF
-    oc apply -f "$TMPDIR/subscription.yml"
-fi
-
-infof "[INFO] Completed successfully!"
+# Install the CatalogSource and Operator Subscription
+infof "[INFO] Installing CatalogSource and Operator..."
+"${PWD}/install-rhdh-catalog-source.sh" --install-operator "${TO_INSTALL}" --latest
+infof "[INFO] Installation completed successfully!"
