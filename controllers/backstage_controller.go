@@ -233,7 +233,6 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 func objDispName(obj client.Object, scheme *runtime.Scheme) string {
 	gvk := utils.GetObjectKind(obj, scheme)
 	return fmt.Sprintf("%s", gvk)
-	//return reflect.TypeOf(obj).String()
 }
 
 func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client.Object, obj client.Object) error {
