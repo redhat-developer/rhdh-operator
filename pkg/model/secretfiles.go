@@ -17,6 +17,8 @@ package model
 import (
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -86,7 +88,7 @@ func (p *SecretFiles) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) EmptyObject() runtime.Object {
+func (p *SecretFiles) EmptyObject() client.Object {
 	return &corev1.Secret{}
 }
 

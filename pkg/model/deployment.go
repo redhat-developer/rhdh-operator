@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"os"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
@@ -72,7 +74,7 @@ func (b *BackstageDeployment) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) EmptyObject() runtime.Object {
+func (b *BackstageDeployment) EmptyObject() client.Object {
 	return &appsv1.Deployment{}
 }
 

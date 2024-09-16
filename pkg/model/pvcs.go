@@ -20,6 +20,8 @@ import (
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -50,7 +52,7 @@ func (b *BackstagePvcs) setObject(object runtime.Object) {
 	b.pvcs = object.(*multiobject.MultiObject)
 }
 
-func (b *BackstagePvcs) EmptyObject() runtime.Object {
+func (b *BackstagePvcs) EmptyObject() client.Object {
 	//return &multiobject.MultiObject{ObjectKind: b.pvcs.GetObjectKind()}
 	//return &multiobject.MultiObject{}
 	return &corev1.PersistentVolumeClaim{}

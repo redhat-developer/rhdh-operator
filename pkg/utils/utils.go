@@ -147,12 +147,12 @@ func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) (ru
 	return ReadYamls(b, templ, scheme)
 }
 
-func GetObjectKind(object client.Object, scheme runtime.Scheme) (schema.GroupVersionKind, error) {
+func GetObjectKind(object client.Object, scheme *runtime.Scheme) *schema.GroupVersionKind {
 	gvks, _, err := scheme.ObjectKinds(object)
 	if err != nil {
-		return schema.GroupVersionKind{}, fmt.Errorf("failed to obtain object Kind: %w", err)
+		return nil
 	}
-	return gvks[0], nil
+	return &gvks[0]
 }
 
 func DefFile(key string) string {

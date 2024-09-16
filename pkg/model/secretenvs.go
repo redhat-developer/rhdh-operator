@@ -18,6 +18,8 @@ import (
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -69,7 +71,7 @@ func (p *SecretEnvs) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) EmptyObject() runtime.Object {
+func (p *SecretEnvs) EmptyObject() client.Object {
 	return &corev1.Secret{}
 }
 

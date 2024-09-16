@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
-	"reflect"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -147,20 +147,20 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 
 	for _, obj := range objects {
 
-		createOnly := false
+		immutable := false
 		if _, ok := obj.(*model.DbSecret); ok {
-			createOnly = true
+			immutable = true
 		}
 
 		switch v := obj.Object().(type) {
 		case client.Object:
-			if err := r.applyPayload(ctx, obj.Object().(client.Object), obj.EmptyObject().(client.Object), createOnly); err != nil {
+			if err := r.applyPayload(ctx, obj.Object().(client.Object), obj.EmptyObject(), immutable); err != nil {
 				return err
 			}
 		case *multiobject.MultiObject:
 			mo := obj.Object().(*multiobject.MultiObject)
 			for _, singleObject := range mo.Items {
-				if err := r.applyPayload(ctx, singleObject, obj.EmptyObject().(client.Object), createOnly); err != nil {
+				if err := r.applyPayload(ctx, singleObject, obj.EmptyObject(), immutable); err != nil {
 					return err
 				}
 			}
@@ -187,7 +187,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 				return nil
 			}
 		} else {
-			lg.V(1).Info("create secret ", objDispName(obj), obj.GetName())
+			lg.V(1).Info("create secret ", objDispName(obj, r.Scheme), obj.GetName())
 			return nil
 		}
 
@@ -201,7 +201,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 				return fmt.Errorf("failed to create object %w", err)
 			}
 
-			lg.V(1).Info("create object ", objDispName(obj), obj.GetName())
+			lg.V(1).Info("create object ", objDispName(obj, r.Scheme), obj.GetName())
 			return nil
 		}
 	}
@@ -209,7 +209,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 	if err := r.patchObject(ctx, baseObject, obj); err != nil {
 		lg.V(1).Info(
 			"failed to patch object => trying to delete it (and losing any custom labels/annotations on it) so it can be recreated upon next reconciliation...",
-			objDispName(obj), obj.GetName(),
+			objDispName(obj, r.Scheme), obj.GetName(),
 			"cause", err,
 		)
 		// Some resources like StatefulSets allow patching a limited set of fields. A FieldValueForbidden error is returned.
@@ -221,17 +221,19 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 			return fmt.Errorf("failed to delete object %s so it can be recreated: %w", obj, err)
 		}
 		lg.V(1).Info("deleted object. If you had set any custom labels/annotations on it manually, you will need to add them again",
-			objDispName(obj), obj.GetName(),
+			objDispName(obj, r.Scheme), obj.GetName(),
 		)
 	} else {
-		lg.V(1).Info("patch object ", objDispName(obj), obj.GetName())
+		lg.V(1).Info("patch object ", objDispName(obj, r.Scheme), obj.GetName())
 	}
 
 	return nil
 }
 
-func objDispName(obj client.Object) string {
-	return reflect.TypeOf(obj).String()
+func objDispName(obj client.Object, scheme *runtime.Scheme) string {
+	gvk := utils.GetObjectKind(obj, scheme)
+	return fmt.Sprintf("%s", gvk)
+	//return reflect.TypeOf(obj).String()
 }
 
 func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client.Object, obj client.Object) error {
@@ -267,7 +269,7 @@ func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client
 	}
 
 	if err := r.Patch(ctx, obj, client.MergeFrom(baseObject)); err != nil {
-		return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
+		return fmt.Errorf("failed to patch object %s: %w", objDispName(obj, r.Scheme), err)
 	}
 
 	return nil

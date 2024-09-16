@@ -17,6 +17,8 @@ package model
 import (
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
@@ -68,7 +70,7 @@ func (b *BackstageService) addToModel(model *BackstageModel, _ bsv1.Backstage) (
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) EmptyObject() runtime.Object {
+func (b *BackstageService) EmptyObject() client.Object {
 	return &corev1.Service{}
 }
 

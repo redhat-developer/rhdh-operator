@@ -17,6 +17,8 @@ package model
 import (
 	"path/filepath"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -85,7 +87,7 @@ func (b *AppConfig) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) EmptyObject() runtime.Object {
+func (b *AppConfig) EmptyObject() client.Object {
 	return &corev1.ConfigMap{}
 }
 

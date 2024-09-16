@@ -133,13 +133,13 @@ data:`
 
 func TestGetObjectKind(t *testing.T) {
 
-	objk, err := GetObjectKind(&corev1.PersistentVolumeClaim{}, *util_test_scheme)
-	assert.NoError(t, err)
+	objk := GetObjectKind(&corev1.PersistentVolumeClaim{}, util_test_scheme)
+	assert.NotNil(t, objk)
 	assert.Equal(t, "PersistentVolumeClaim", objk.Kind)
 	assert.Equal(t, "v1", objk.Version)
 
 	// should fail since openshift scheme is not registered for this test
-	objk, err = GetObjectKind(&openshift.Route{}, *util_test_scheme)
-	assert.Error(t, err)
+	objk = GetObjectKind(&openshift.Route{}, util_test_scheme)
+	assert.Nil(t, objk)
 
 }

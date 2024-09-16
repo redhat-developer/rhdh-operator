@@ -17,6 +17,8 @@ package model
 import (
 	"strconv"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
@@ -74,7 +76,7 @@ func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) EmptyObject() runtime.Object {
+func (b *DbSecret) EmptyObject() client.Object {
 	return &corev1.Secret{}
 }
 

@@ -18,6 +18,8 @@ import (
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	openshift "github.com/openshift/api/route/v1"
@@ -97,7 +99,7 @@ func (b *BackstageRoute) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) EmptyObject() runtime.Object {
+func (b *BackstageRoute) EmptyObject() client.Object {
 	return &openshift.Route{}
 }
 

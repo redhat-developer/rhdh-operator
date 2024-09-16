@@ -157,19 +157,14 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 
 // Every RuntimeObject.setMetaInfo should as minimum call this
 func setMetaInfo(clientObj client.Object, backstage bsv1.Backstage, scheme *runtime.Scheme) {
-	//modelObject.setMetaInfo(backstage.Name)
-	//clientObj := modelObject.Object().(client.Object)
 
 	clientObj.SetNamespace(backstage.Namespace)
 	clientObj.SetLabels(utils.SetKubeLabels(clientObj.GetLabels(), backstage.Name))
 
-	//if ownsRuntime {
 	if err := controllerutil.SetControllerReference(&backstage, clientObj, scheme); err != nil {
 		//error should never have happened,
 		//otherwise the Operator has invalid (not a runtime.Object) or non-registered type.
 		//In both cases it will fail before this place
 		panic(err)
 	}
-	//}
-
 }
