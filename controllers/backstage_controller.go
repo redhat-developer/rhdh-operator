@@ -173,27 +173,28 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 				continue
 			}
 
-		} else {
-			//if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
-			//	return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
-			//}
-			//lg.V(1).Info("patch object ", objDispName(obj), obj.Object().GetName())
-
-			//if err := r.Get(ctx, types.NamespacedName{Name: obj.Object().GetName(), Namespace: obj.Object().GetNamespace()}, baseObject); err != nil {
-			//
-			//
-			//	if !errors.IsNotFound(err) {
-			//		return fmt.Errorf("failed to get object: %w", err)
-			//	}
-			//
-			//	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
-			//		return fmt.Errorf("failed to create object %w", err)
-			//	}
-			//
-			//	lg.V(1).Info("create object ", objDispName(obj), obj.Object().GetName())
-			//	continue
-			//}
 		}
+		//else {
+		//if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+		//	return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
+		//}
+		//lg.V(1).Info("patch object ", objDispName(obj), obj.Object().GetName())
+
+		//if err := r.Get(ctx, types.NamespacedName{Name: obj.Object().GetName(), Namespace: obj.Object().GetNamespace()}, baseObject); err != nil {
+		//
+		//
+		//	if !errors.IsNotFound(err) {
+		//		return fmt.Errorf("failed to get object: %w", err)
+		//	}
+		//
+		//	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+		//		return fmt.Errorf("failed to create object %w", err)
+		//	}
+		//
+		//	lg.V(1).Info("create object ", objDispName(obj), obj.Object().GetName())
+		//	continue
+		//}
+		//}
 
 		if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
 			return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
