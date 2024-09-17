@@ -89,17 +89,16 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 	}
 	b.deployment.Spec.Template.ObjectMeta.Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.GetHash()
 
-	if err := b.setDeployment(backstage); err != nil {
-		return false, err
-	}
-
 	model.backstageDeployment = b
 	model.setRuntimeObject(b)
 
 	// override image with env var
-	// [GA] Do we need this feature?
 	if os.Getenv(BackstageImageEnvVar) != "" {
 		b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
+	}
+
+	if err := b.setDeployment(backstage); err != nil {
+		return false, err
 	}
 
 	return true, nil

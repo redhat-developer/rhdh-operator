@@ -16,6 +16,7 @@ package model
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -167,6 +168,35 @@ spec:
 	assert.Equal(t, "special", *model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
 	// adds new volume
 	assert.Equal(t, "my-vol", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[3].Name)
+}
+
+func TestImageInCRPrevailsOnEnvVar(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+ template:
+   spec:
+     containers:
+       - name: backstage-backend
+         image: cr-image
+`),
+	}
+
+	os.Setenv(BackstageImageEnvVar, "envvar-image")
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bsv1.Backstage{}, testObj.externalConfig, true, true, testObj.scheme)
+	assert.NoError(t, err)
+	// make sure env var works
+	assert.Equal(t, "envvar-image", model.backstageDeployment.container().Image)
+
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, true, true, testObj.scheme)
+	assert.NoError(t, err)
+	// make sure image defined in CR overrides
+	assert.Equal(t, "cr-image", model.backstageDeployment.container().Image)
 }
 
 // to remove when stop supporting v1alpha1
