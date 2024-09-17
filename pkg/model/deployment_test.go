@@ -184,7 +184,7 @@ spec:
 `),
 	}
 
-	os.Setenv(BackstageImageEnvVar, "envvar-image")
+	t.Setenv(BackstageImageEnvVar, "envvar-image")
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
