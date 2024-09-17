@@ -243,7 +243,7 @@ func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client
 	}
 
 	// needed for openshift.Route only, Openshift yells otherwise
-	obj.Object().SetResourceVersion(baseObject.GetResourceVersion())
+	//obj.Object().SetResourceVersion(baseObject.GetResourceVersion())
 	//if objectKind, ok := obj.Object().(schema.ObjectKind); ok {
 	//	objectKind.SetGroupVersionKind(baseObject.GetObjectKind().GroupVersionKind())
 	//}
