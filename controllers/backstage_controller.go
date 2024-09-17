@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+	"reflect"
 
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -187,7 +188,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 				return nil
 			}
 		} else {
-			lg.V(1).Info("create secret ", objDispName(obj, r.Scheme), obj.GetName())
+			lg.V(1).Info("create secret ", objDispKind(obj, r.Scheme), obj.GetName())
 			return nil
 		}
 
@@ -201,7 +202,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 				return fmt.Errorf("failed to create object %w", err)
 			}
 
-			lg.V(1).Info("create object ", objDispName(obj, r.Scheme), obj.GetName())
+			lg.V(1).Info("create object ", objDispKind(obj, r.Scheme), obj.GetName())
 			return nil
 		}
 	}
@@ -209,7 +210,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 	if err := r.patchObject(ctx, baseObject, obj); err != nil {
 		lg.V(1).Info(
 			"failed to patch object => trying to delete it (and losing any custom labels/annotations on it) so it can be recreated upon next reconciliation...",
-			objDispName(obj, r.Scheme), obj.GetName(),
+			objDispKind(obj, r.Scheme), obj.GetName(),
 			"cause", err,
 		)
 		// Some resources like StatefulSets allow patching a limited set of fields. A FieldValueForbidden error is returned.
@@ -221,18 +222,21 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 			return fmt.Errorf("failed to delete object %s so it can be recreated: %w", obj, err)
 		}
 		lg.V(1).Info("deleted object. If you had set any custom labels/annotations on it manually, you will need to add them again",
-			objDispName(obj, r.Scheme), obj.GetName(),
+			objDispKind(obj, r.Scheme), obj.GetName(),
 		)
 	} else {
-		lg.V(1).Info("patch object ", objDispName(obj, r.Scheme), obj.GetName())
+		lg.V(1).Info("patch object ", objDispKind(obj, r.Scheme), obj.GetName())
 	}
 
 	return nil
 }
 
-func objDispName(obj client.Object, scheme *runtime.Scheme) string {
+func objDispKind(obj client.Object, scheme *runtime.Scheme) string {
 	gvk := utils.GetObjectKind(obj, scheme)
-	return fmt.Sprintf("%s", gvk)
+	if gvk == nil {
+		return fmt.Sprintf("Unknown kind for: %s", reflect.TypeOf(obj).String())
+	}
+	return gvk.String()
 }
 
 func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client.Object, obj client.Object) error {
@@ -268,7 +272,7 @@ func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client
 	}
 
 	if err := r.Patch(ctx, obj, client.MergeFrom(baseObject)); err != nil {
-		return fmt.Errorf("failed to patch object %s: %w", objDispName(obj, r.Scheme), err)
+		return fmt.Errorf("failed to patch object %s: %w", objDispKind(obj, r.Scheme), err)
 	}
 
 	return nil
