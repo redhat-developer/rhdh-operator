@@ -3,10 +3,10 @@ kind: Backstage
 metadata:
   labels:
     app.kubernetes.io/name: backstage
-    app.kubernetes.io/instance: backstage-sample
-    app.kubernetes.io/part-of: backstage-operator
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: backstage-operator
+#    app.kubernetes.io/instance: backstage-sample
+#    app.kubernetes.io/part-of: backstage-operator
+#    app.kubernetes.io/managed-by: kustomize
+#    app.kubernetes.io/created-by: backstage-operator
   name: backstage-sample
-spec:
+#spec:
   # TODO(user): Add fields here

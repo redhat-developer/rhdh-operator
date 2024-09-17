@@ -95,12 +95,12 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⚠️ <b>Files changed in bundle generation!</b><br/><br/>Those changes to the operator bundle manifests should have been pushed automatically to your PR branch.<br/>You might also need to manually update the [`.rhdh/bundle/manifests/rhdh-operator.csv.yaml`](${{ env.GH_BLOB_VIEWER_BASE_URL }}/.rhdh/bundle/manifests/rhdh-operator.csv.yaml) CSV file accordingly.'
+              body: '⚠️ <b>Files changed in bundle generation!</b><br/><br/>Those changes to the operator bundle manifests should have been pushed automatically to your PR branch.<br/>You might also need to manually update the [`.rhdh/bundle/manifests/rhdh-operator.clusterserviceversion.yaml`](${{ env.GH_BLOB_VIEWER_BASE_URL }}/.rhdh/bundle/manifests/rhdh-operator.clusterserviceversion.yaml) CSV file accordingly.'
             })
 
       - name: Check if the CSV for RHDH needs to be updated
         run: |
           echo "Checking that the RBAC roles of the downstream RHDH operator are not out of sync with the upstream CSV..."
           diff -U 1 \
-            <(yq '.spec.install.spec.clusterPermissions' bundle/manifests/backstage-operator.clusterserviceversion.yaml | grep -v 'serviceAccountName: ') \
-            <(yq '.spec.install.spec.clusterPermissions' .rhdh/bundle/manifests/rhdh-operator.csv.yaml | grep -v 'serviceAccountName: ')
+            <(yq '.spec.install.spec.clusterPermissions' bundle/rhdh/manifests/backstage-operator.clusterserviceversion.yaml | grep -v 'serviceAccountName: ') \
+            <(yq '.spec.install.spec.clusterPermissions' .rhdh/bundle/manifests/rhdh-operator.clusterserviceversion.yaml | grep -v 'serviceAccountName: ')

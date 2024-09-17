@@ -1,0 +1,204 @@
+apiVersion: v1
+data:
+  app-config.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: my-backstage-config-cm1 # placeholder for <bs>-default-appconfig
+    data:
+      default.app-config.yaml: |
+        backend:
+          auth:
+            externalAccess:
+              - type: legacy
+                options:
+                  subject: legacy-default-config
+                  # This is a default value, which you should change by providing your own app-config
+                  secret: "pl4s3Ch4ng3M3"
+  db-secret.yaml: |-
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: postgres-secrets # will be replaced
+    type: Opaque
+    #stringData:
+    #  POSTGRES_PASSWORD:
+    #  POSTGRES_PORT: "5432"
+    #  POSTGRES_USER: postgres
+    #  POSTGRESQL_ADMIN_PASSWORD: admin123
+    #  POSTGRES_HOST: bs1-db-service    #placeholder <crname>-db-service
+  db-service.yaml: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: backstage-psql # placeholder for 'backstage-psql-<cr-name>' .NOTE: For the time it is static and linked to Secret-> postgres-secrets -> OSTGRES_HOST
+    spec:
+      selector:
+        rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+      clusterIP: None
+      ports:
+        - port: 5432
+  db-statefulset.yaml: |-
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+    spec:
+      podManagementPolicy: OrderedReady
+      replicas: 1
+      selector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+      serviceName: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
+      template:
+        metadata:
+          labels:
+            rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+        spec:
+          # fsGroup does not work for Openshift
+          # AKS/EKS does not work w/o it
+          #securityContext:
+          #  fsGroup: 26
+          automountServiceAccountToken: false
+          ## https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+          ## The optional .spec.persistentVolumeClaimRetentionPolicy field controls if and how PVCs are deleted during the lifecycle of a StatefulSet.
+          ## You must enable the StatefulSetAutoDeletePVC feature gate on the API server and the controller manager to use this field.
+    #      persistentVolumeClaimRetentionPolicy:
+    #        whenDeleted: Retain
+    #        whenScaled: Retain
+          containers:
+            - env:
+                - name: POSTGRESQL_PORT_NUMBER
+                  value: "5432"
+                - name: POSTGRESQL_VOLUME_DIR
+                  value: /var/lib/pgsql/data
+                - name: PGDATA
+                  value: /var/lib/pgsql/data/userdata
+              image: quay.io/fedora/postgresql-15:latest # will be replaced with the actual image
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                # runAsUser:26 does not work for Openshift but looks work for AKS/EKS
+                # runAsUser: 26
+                runAsGroup: 0
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                seccompProfile:
+                  type: RuntimeDefault
+                capabilities:
+                  drop:
+                    - ALL
+              livenessProbe:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - exec pg_isready -U ${POSTGRES_USER} -h 127.0.0.1 -p 5432
+                failureThreshold: 6
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 5
+              name: postgresql
+              ports:
+                - containerPort: 5432
+                  name: tcp-postgresql
+                  protocol: TCP
+              readinessProbe:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - -e
+                    - |
+                      exec pg_isready -U ${POSTGRES_USER} -h 127.0.0.1 -p 5432
+                failureThreshold: 6
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 5
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 250m
+                  memory: 1024Mi
+                  ephemeral-storage: 20Mi
+              volumeMounts:
+                - mountPath: /dev/shm
+                  name: dshm
+                - mountPath: /var/lib/pgsql/data
+                  name: data
+          restartPolicy: Always
+          serviceAccountName: default
+          volumes:
+            - emptyDir:
+                medium: Memory
+              name: dshm
+      updateStrategy:
+        rollingUpdate:
+          partition: 0
+        type: RollingUpdate
+      volumeClaimTemplates:
+        - apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+  deployment.yaml: |-
+    # kubernetes/backstage.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: backstage
+    spec:
+      selector:
+        matchLabels:
+          app: backstage
+      template:
+        metadata:
+          labels:
+            app: backstage
+        spec:
+          containers:
+            - name: backstage-backend
+              image: ghcr.io/backstage/backstage:1.28.4
+              imagePullPolicy: IfNotPresent
+              command:
+                - "node"
+                - "packages/backend"
+                - "--no-node-snapshot"
+              args:
+                - "--config"
+                - "app-config.yaml"
+                - "--config"
+                - "app-config.production.yaml"
+              ports:
+                - name: http
+                  containerPort: 7007
+    #          envFrom:
+    #            - secretRef:
+    #                name: postgres-secrets
+    #            - secretRef:
+    #                name: backstage-secrets
+  service.yaml: |-
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: backstage # placeholder for 'backstage-<cr-name>'
+    spec:
+      type: ClusterIP
+      selector:
+        rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+      ports:
+        - name: http-backend
+          port: 80
+          targetPort: backend
+kind: ConfigMap
+metadata:
+  name: backstage-default-config

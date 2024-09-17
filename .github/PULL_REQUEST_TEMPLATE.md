@@ -15,7 +15,7 @@ Please explain the changes you made here.
 
 - [ ] Tests
 - [ ] Documentation
-- [ ] If the bundle manifests have been updated, make sure to review the [`rhdh-operator.csv.yaml`](../.rhdh/bundle/manifests/rhdh-operator.csv.yaml) file accordingly
+- [ ] If the bundle manifests have been updated, make sure to review the [`rhdh-operator.clusterserviceversion.yaml`](../.rhdh/bundle/manifests/rhdh-operator.clusterserviceversion.yaml) file accordingly
 
 ## How to test changes / Special notes to the reviewer
 <!--
