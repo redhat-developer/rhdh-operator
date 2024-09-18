@@ -22,6 +22,7 @@ on:
     - main
     - rhdh-1.[0-9]+
     - 1.[0-9]+.x
+    - release-1.[0-9]+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}
