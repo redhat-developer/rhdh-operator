@@ -169,7 +169,7 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 		if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
 			return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
 		}
-		lg.V(1).Info("patch object ", objDispName(obj), obj.Object().GetName())
+		lg.V(1).Info("apply object ", objDispName(obj), obj.Object().GetName())
 
 		////baseObject := obj.EmptyObject()
 		//// do not read Secrets
