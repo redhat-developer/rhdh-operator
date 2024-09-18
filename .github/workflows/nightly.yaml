@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [ main, 1.2.x, 1.1.x ]
+        branch: [ main, 1.3.x, 1.2.x, 1.1.x ]
         test_upgrade: [ 'true', 'false' ]
         exclude:
           - branch: 1.1.x # Testing upgrade from 1.1.x
