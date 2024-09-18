@@ -154,26 +154,43 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 
 	for _, obj := range objects {
 
-		//baseObject := obj.EmptyObject()
-		// do not read Secrets
-		if _, ok := obj.Object().(*corev1.Secret); ok {
-			// try to create. patch will not work here as it does not throw errors.IsAlreadyExists
+		//DBSecret is immutable, try to create and go further if found
+		if _, ok := obj.(*model.DbSecret); ok {
 			if err := r.Create(ctx, obj.Object(), &client.CreateOptions{FieldManager: BackstageFieldManager}); err != nil {
-				//r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{BackstageFieldManager: BackstageFieldManager});
-
 				if !errors.IsAlreadyExists(err) {
 					return fmt.Errorf("failed to create secret: %w", err)
 				}
-				//if DBSecret - nothing to do, it is not for update
-				if _, ok := obj.(*model.DbSecret); ok {
-					continue
-				}
-			} else {
-				lg.V(1).Info("create secret ", objDispName(obj), obj.Object().GetName())
 				continue
 			}
-
+			lg.V(1).Info("create db secret ", objDispName(obj), obj.Object().GetName())
+			continue
 		}
+
+		if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+			return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
+		}
+		lg.V(1).Info("patch object ", objDispName(obj), obj.Object().GetName())
+
+		////baseObject := obj.EmptyObject()
+		//// do not read Secrets
+		//if _, ok := obj.Object().(*corev1.Secret); ok {
+		//	// try to create. patch will not work here as it does not throw errors.IsAlreadyExists
+		//	if err := r.Create(ctx, obj.Object(), &client.CreateOptions{FieldManager: BackstageFieldManager}); err != nil {
+		//		//r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{BackstageFieldManager: BackstageFieldManager});
+		//
+		//		if !errors.IsAlreadyExists(err) {
+		//			return fmt.Errorf("failed to create secret: %w", err)
+		//		}
+		//		//if DBSecret - nothing to do, it is not for update
+		//		if _, ok := obj.(*model.DbSecret); ok {
+		//			continue
+		//		}
+		//	} else {
+		//		lg.V(1).Info("create secret ", objDispName(obj), obj.Object().GetName())
+		//		continue
+		//	}
+		//
+		//}
 		//else {
 		//if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
 		//	return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
@@ -195,11 +212,6 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 		//	continue
 		//}
 		//}
-
-		if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
-			return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
-		}
-		lg.V(1).Info("patch object ", objDispName(obj), obj.Object().GetName())
 
 		//if err := r.patchObject(ctx, baseObject, obj); err != nil {
 		//	lg.V(1).Info(
