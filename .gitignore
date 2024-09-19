@@ -36,6 +36,8 @@ gosec.sarif
 catalog_mirror.log
 manifests-rhdh-index-*
 rhdh-operator-*.yaml
+# manifests used for the upgrade path E2E tests
+!tests/e2e/testdata/rhdh-operator-*.yaml
 rhdh-disconnected-install/
 rhdh-disconnected-install.Dockerfile
 
