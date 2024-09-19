@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# for main branch, use next tags; for 1.x branches, use :latest tags
+# for main branch, use next tags; for 1.y branches, use :latest tags
 name: Build and push operator, bundle, and catalog images
 
 on:
@@ -21,6 +21,7 @@ on:
       - main
       - rhdh-1.[0-9]+
       - 1.[0-9]+.x
+      - release-1.[0-9]+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -94,7 +95,7 @@ jobs:
 
           export CONTAINER_ENGINE=podman
           latestNext="next"
-          # for main branch, use next tags; for 1.x branches, use :latest tags
+          # for main branch, use next tags; for 1.y branches, use :latest tags
           if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]; then
             latestNext="latest" 
           fi

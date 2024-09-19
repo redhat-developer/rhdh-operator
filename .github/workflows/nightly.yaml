@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: [ main, 1.2.x, 1.1.x ]
+        branch: [ main, release-1.3, 1.2.x, 1.1.x ]
         test_upgrade: [ 'true', 'false' ]
         exclude:
           - branch: 1.1.x # Testing upgrade from 1.1.x
@@ -55,10 +55,11 @@ jobs:
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
 
-      - name: Run E2E tests (Operator Upgrade path)
+      - name: Run E2E tests (RHDH Operator Upgrade path)
         if: ${{ matrix.test_upgrade == 'true' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
+          PROFILE: 'rhdh'
           IMG: ${{ env.OPERATOR_IMAGE }}
         run: make test-e2e-upgrade
 
