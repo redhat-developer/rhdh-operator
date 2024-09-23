@@ -13,7 +13,8 @@
 # limitations under the License.
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
-FROM registry.access.redhat.com/ubi9/go-toolset:1.21.11-7@sha256:d128c3d36878251f039606f144ef2608746c3203708b722295e6c571df1d8613 AS builder
+# https://registry.access.redhat.com/ubi9/go-toolset
+FROM registry.access.redhat.com/ubi9/go-toolset:1.21.11-9 AS builder
 # hadolint ignore=DL3002
 USER 0
 ENV GOPATH=/go/
@@ -54,7 +55,8 @@ RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH=
 
 # Install openssl for FIPS support
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
-FROM registry.access.redhat.com/ubi9-minimal:9.4-1194@sha256:104cf11d890aeb7dd5728b7d7732e175a0e4018f1bb00d2faebcc8f6bf29bd52 AS runtime
+# https://registry.access.redhat.com/ubi9/ubi-minimal
+FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1725849298@sha256:efadc50470c32141c257341694c6312234c0700e0407ed2a60c8b5c26b6af6fc AS runtime
 RUN microdnf update --setopt=install_weak_deps=0 -y && microdnf install -y openssl; microdnf clean -y all
 
 # Upstream sources

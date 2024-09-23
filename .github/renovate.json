@@ -13,11 +13,15 @@
   ],
   "baseBranches": [
     "main",
+    "/^release-1\\..*/",
     "/^1\\..*\\.x/"
   ],
   "constraints": {
     "go": "1.21"
   },
+  "kustomize": {
+    "enabled": false
+  },   
   "packageRules": [
     {
       "description": "Do NOT generate PRs to pin or apply digests to dockerfiles",
@@ -45,8 +49,8 @@
       "pinDigests": false
     },
     {
-      "description": "k8s go: minor and patch updates in main",
-      "enabled": true,
+      "description": "k8s go: minor and patch updates in main (suspended till UBI w/ go 1.22)",
+      "enabled": false,
       "groupName": "k8s-go main",
       "matchDatasources": [
         "go"
@@ -62,13 +66,15 @@
       "matchPackageNames": [
         "k8s.io/api{/,}**",
         "k8s.io/apimachinery{/,}**",
-        "k8s.io/client-go{/,}**"
+        "k8s.io/client-go{/,}**",
+        "sigs.k8s.io{/,}**",
+        "github.com/openshift{/,}**"
       ]
     },
     {
-      "description": "k8s go: patch updates only in 1.y.x",
-      "enabled": true,
-      "groupName": "k8s-go 1.y.x",
+      "description": "k8s go: patch updates only in 1.y (suspended till UBI w/ go 1.22)",
+      "enabled": false,
+      "groupName": "k8s-go 1.y",
       "matchDatasources": [
         "go"
       ],
@@ -76,13 +82,16 @@
         "patch"
       ],
       "baseBranches": [
+        "/^release-1\\..*/",
         "/^1\\..*\\.x/"
       ],
       "automerge": false,
       "matchPackageNames": [
         "k8s.io/api{/,}**",
         "k8s.io/apimachinery{/,}**",
-        "k8s.io/client-go{/,}**"
+        "k8s.io/client-go{/,}**",
+        "sigs.k8s.io{/,}**",
+        "github.com/openshift{/,}**"
       ]
     },
     {
@@ -105,9 +114,9 @@
       ]
     },
     {
-      "description": "ginkgo: patch updates only in 1.y.x",
+      "description": "ginkgo: patch updates only in 1.y",
       "enabled": true,
-      "groupName": "ginkgo 1.y.x",
+      "groupName": "ginkgo 1.y",
       "matchDatasources": [
         "go"
       ],
@@ -115,6 +124,7 @@
         "patch"
       ],
       "baseBranches": [
+        "/^release-1\\..*/",
         "/^1\\..*\\.x/"
       ],
       "automerge": false,
@@ -142,9 +152,9 @@
       ]
     },
     {
-      "description": "gomega: patch updates only in 1.y.x",
+      "description": "gomega: patch updates only in 1.y",
       "enabled": true,
-      "groupName": "gomega 1.y.x",
+      "groupName": "gomega 1.y",
       "matchDatasources": [
         "go"
       ],
@@ -152,6 +162,7 @@
         "patch"
       ],
       "baseBranches": [
+        "/^release-1\\..*/",
         "/^1\\..*\\.x/"
       ],
       "automerge": false,

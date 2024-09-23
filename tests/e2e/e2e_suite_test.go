@@ -38,7 +38,7 @@ const (
 	defaultDeployTestMode = ""
 )
 
-var _namespace = "backstage-system"
+var _namespace = "rhdh-operator"
 var testMode = os.Getenv("BACKSTAGE_OPERATOR_TEST_MODE")
 
 // Run E2E tests using the Ginkgo runner.

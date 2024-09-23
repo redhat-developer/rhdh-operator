@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Adds namespace to all resources.
+namespace: rhdh-operator
+
+# Value of this field is prepended to the
+# names of all resources, e.g. a deployment named
+# "wordpress" becomes "alices-wordpress".
+# Note that it should also match with the prefix (text before '-') of the namespace
+# field above.
+namePrefix: rhdh-
+
+resources:
+- ../../crd
+- ../../rbac
+- manager.yaml
+#  - ../../manager
+
+patches:
+- path: manager_auth_proxy_patch.yaml
+  target:
+    group: apps
+    kind: Deployment
+    name: controller-manager
+    version: v1
+
+
+images:
+- name: controller
+  newName: quay.io/rhdh-community/operator
+  newTag: 0.4.0
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+- files:
+  - default-config/app-config.yaml
+  - default-config/db-secret.yaml
+  - default-config/db-service.yaml
+  - default-config/db-statefulset.yaml
+  - default-config/deployment.yaml
+  - default-config/dynamic-plugins.yaml
+  - default-config/route.yaml
+  - default-config/secret-envs.yaml
+  - default-config/service.yaml
+  name: default-config

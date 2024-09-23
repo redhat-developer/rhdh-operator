@@ -28,6 +28,11 @@ spec:
             defaultMode: 420
             optional: true
             secretName: dynamic-plugins-npmrc
+        - name: dynamic-plugins-registry-auth
+          secret:
+            defaultMode: 416
+            optional: true
+            secretName: dynamic-plugins-registry-auth
       initContainers:
         - command:
             - ./install-dynamic-plugins.sh
@@ -45,6 +50,9 @@ spec:
               name: dynamic-plugins-npmrc
               readOnly: true
               subPath: .npmrc
+            - mountPath: /opt/app-root/src/.config/containers
+              name: dynamic-plugins-registry-auth
+              readOnly: true
           workingDir: /opt/app-root/src
 
       containers:

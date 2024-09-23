@@ -52,8 +52,8 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 		const managerPodLabel = "control-plane=controller-manager"
 		const crName = "my-backstage-app"
 
-		// 0.1.3 is the version of the operator in the 1.1.x branch
-		var fromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "backstage-operator-0.1.3.yaml")
+		// 0.1 is the version of the operator in the 1.1.x branch
+		var fromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "rhdh-operator-1.1.yaml")
 
 		BeforeEach(func() {
 			if testMode != defaultDeployTestMode {

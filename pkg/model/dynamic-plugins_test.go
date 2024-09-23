@@ -92,15 +92,17 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	assert.NotNil(t, model.backstageDeployment)
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
+	//dynamic-plugins-auth
 	//vol-default-dynamic-plugins
-	assert.Equal(t, 3, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 4, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
+	//dynamic-plugins-auth
 	//vol-default-dynamic-plugins
-	assert.Equal(t, 3, len(ic.VolumeMounts))
+	assert.Equal(t, 4, len(ic.VolumeMounts))
 
 }
 
@@ -127,9 +129,10 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 	assert.NotNil(t, ic)
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
+	//dynamic-plugins-auth
 	//vol-dplugin
-	assert.Equal(t, 3, len(ic.VolumeMounts))
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("dplugin"), ic.VolumeMounts[2].Name)
+	assert.Equal(t, 4, len(ic.VolumeMounts))
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("dplugin"), ic.VolumeMounts[3].Name)
 }
 
 func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
@@ -143,6 +146,23 @@ func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
 	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
 
 	assert.Error(t, err)
+}
+
+func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	assert.Empty(t, bs.Spec.Application.DynamicPluginsConfigMapName)
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true)
+
+	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+
+	assert.NoError(t, err)
+	for _, obj := range m.RuntimeObjects {
+		if _, ok := obj.(*DynamicPlugins); ok {
+			assert.Fail(t, "Model contains DynamicPlugins object")
+		}
+	}
 }
 
 func initContainer(model *BackstageModel) *corev1.Container {
