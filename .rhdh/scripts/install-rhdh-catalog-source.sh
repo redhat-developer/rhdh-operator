@@ -235,3 +235,13 @@ spec:
   source: ${CATALOGSOURCE_NAME}
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 " > "$TMPDIR"/Subscription.yml && oc apply -f "$TMPDIR"/Subscription.yml
+
+CLUSTER_ROUTER_BASE=$(oc get route console -n openshift-console -o=jsonpath='{.spec.host}' | sed 's/^[^.]*\.//')
+echo "
+
+To install, go to:
+https://console-openshift-console.${CLUSTER_ROUTER_BASE}/catalog/ns/rhdh-operator?catalogType=OperatorBackedService
+
+Once deployed, Developer Hub will be available at
+https://redhat-developer-hub-rhdh-operator.${CLUSTER_ROUTER_BASE}
+"
