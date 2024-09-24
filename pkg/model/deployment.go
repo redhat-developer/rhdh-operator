@@ -53,7 +53,7 @@ type BackstageDeployment struct {
 }
 
 func init() {
-	registerConfig("deployment.yaml", BackstageDeploymentFactory{})
+	registerConfig("deployment.yaml", BackstageDeploymentFactory{}, false)
 }
 
 func DeploymentName(backstageName string) string {

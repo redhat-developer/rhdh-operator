@@ -39,7 +39,7 @@ type SecretEnvs struct {
 }
 
 func init() {
-	registerConfig("secret-envs.yaml", SecretEnvsFactory{})
+	registerConfig("secret-envs.yaml", SecretEnvsFactory{}, false)
 }
 
 // implementation of RuntimeObject interface

@@ -15,7 +15,6 @@
 package utils
 
 import (
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"testing"
 
 	openshift "github.com/openshift/api/route/v1"
@@ -97,9 +96,9 @@ spec:
 	objects, err := ReadYamls([]byte(y), &corev1.PersistentVolumeClaim{}, *util_test_scheme)
 
 	assert.NoError(t, err)
-	mo := objects.(*multiobject.MultiObject)
-	assert.Equal(t, 2, len(mo.Items))
-	assert.Equal(t, "pvc1", mo.Items[0].(*corev1.PersistentVolumeClaim).GetName())
+
+	assert.Equal(t, 2, len(objects))
+	assert.Equal(t, "pvc1", objects[0].(*corev1.PersistentVolumeClaim).GetName())
 
 }
 
@@ -126,7 +125,7 @@ data:`
 
 	_, err := ReadYamls([]byte(y), &corev1.PersistentVolumeClaim{}, *util_test_scheme)
 
-	// Kind not match for second, PersistentVolumeClaim expected
+	// Kind not match for the second item, PersistentVolumeClaim expected
 	assert.EqualError(t, err, "GroupVersionKind not match, found: /v1, Kind=ConfigMap, expected: [/v1, Kind=PersistentVolumeClaim]")
 
 }

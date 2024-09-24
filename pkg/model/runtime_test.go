@@ -200,3 +200,34 @@ func TestMultiobject(t *testing.T) {
 	}
 	assert.True(t, found)
 }
+
+func TestSingleMultiobject(t *testing.T) {
+	bs := v1alpha2.Backstage{}
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "single-pvc.yaml")
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+	found := false
+	for _, ro := range model.RuntimeObjects {
+		if pvcs, ok := ro.(*BackstagePvcs); ok {
+			items := pvcs.Object().(*multiobject.MultiObject).Items
+			assert.Equal(t, 1, len(items))
+			found = true
+		}
+	}
+	assert.True(t, found)
+}
+
+func TestSingleFailedWithMultiDefinition(t *testing.T) {
+	bs := v1alpha2.Backstage{}
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "multi-service-err.yaml")
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	assert.EqualError(t, err, "failed to initialize object: multiple objects not expected for: service.yaml")
+}
+
+func TestInvalidObjectKind(t *testing.T) {
+	bs := v1alpha2.Backstage{}
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "invalid-service-type.yaml")
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	assert.EqualError(t, err, "failed to read default value for the key service.yaml, reason: GroupVersionKind not match, found: /v1, Kind=Deployment, expected: [/v1, Kind=Service]")
+}

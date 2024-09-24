@@ -83,7 +83,7 @@ func (b *BackstageRoute) setRoute(specified *bsv1.Route) {
 }
 
 func init() {
-	registerConfig("route.yaml", BackstageRouteFactory{})
+	registerConfig("route.yaml", BackstageRouteFactory{}, false)
 }
 
 // implementation of RuntimeObject interface

@@ -38,7 +38,7 @@ type DbService struct {
 }
 
 func init() {
-	registerConfig("db-service.yaml", DbServiceFactory{})
+	registerConfig("db-service.yaml", DbServiceFactory{}, false)
 }
 
 func DbServiceName(backstageName string) string {

@@ -38,7 +38,7 @@ type ConfigMapFiles struct {
 }
 
 func init() {
-	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{})
+	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false)
 }
 
 func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {

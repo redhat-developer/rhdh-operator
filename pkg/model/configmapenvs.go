@@ -38,7 +38,7 @@ type ConfigMapEnvs struct {
 }
 
 func init() {
-	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{})
+	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, false)
 }
 
 func addConfigMapEnvs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {

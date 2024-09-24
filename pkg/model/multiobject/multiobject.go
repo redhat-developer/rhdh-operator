@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// MultiObject implements runtime.Object interface to make it used in the model along with client.Object
 type MultiObject struct {
 	ObjectKind schema.ObjectKind
 	Items      []client.Object

@@ -33,7 +33,7 @@ func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
 }
 
 func init() {
-	registerConfig("pvcs.yaml", BackstagePvcsFactory{})
+	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true)
 }
 
 type BackstagePvcs struct {
@@ -53,8 +53,6 @@ func (b *BackstagePvcs) setObject(object runtime.Object) {
 }
 
 func (b *BackstagePvcs) EmptyObject() client.Object {
-	//return &multiobject.MultiObject{ObjectKind: b.pvcs.GetObjectKind()}
-	//return &multiobject.MultiObject{}
 	return &corev1.PersistentVolumeClaim{}
 }
 

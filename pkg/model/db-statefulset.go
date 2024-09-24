@@ -43,7 +43,7 @@ type DbStatefulSet struct {
 }
 
 func init() {
-	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{})
+	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false)
 }
 
 func DbStatefulSetName(backstageName string) string {

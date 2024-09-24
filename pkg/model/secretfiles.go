@@ -43,7 +43,7 @@ type SecretFiles struct {
 }
 
 func init() {
-	registerConfig("secret-files.yaml", SecretFilesFactory{})
+	registerConfig("secret-files.yaml", SecretFilesFactory{}, false)
 }
 
 func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) error {

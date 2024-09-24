@@ -24,6 +24,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 )
 
+type ObjectConfigOptions struct {
+	Multiple bool
+}
+
 // Registered Object configuring Backstage runtime model
 type ObjectConfig struct {
 	// Factory to create the object
@@ -31,6 +35,8 @@ type ObjectConfig struct {
 	// Unique key identifying the "kind" of Object which also is the name of config file.
 	// For example: "deployment.yaml" containing configuration of Backstage Deployment
 	Key string
+	// Single or multiple object
+	Multiple bool
 }
 
 // Interface for Runtime Objects factory method

@@ -45,7 +45,7 @@ type AppConfig struct {
 }
 
 func init() {
-	registerConfig("app-config.yaml", AppConfigFactory{})
+	registerConfig("app-config.yaml", AppConfigFactory{}, false)
 }
 
 func AppConfigDefaultName(backstageName string) string {

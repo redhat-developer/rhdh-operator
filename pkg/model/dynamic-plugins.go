@@ -44,7 +44,7 @@ type DynamicPlugins struct {
 }
 
 func init() {
-	registerConfig("dynamic-plugins.yaml", DynamicPluginsFactory{})
+	registerConfig("dynamic-plugins.yaml", DynamicPluginsFactory{}, false)
 }
 
 func DynamicPluginsDefaultName(backstageName string) string {

@@ -38,7 +38,7 @@ type BackstageService struct {
 }
 
 func init() {
-	registerConfig("service.yaml", BackstageServiceFactory{})
+	registerConfig("service.yaml", BackstageServiceFactory{}, false)
 }
 
 func ServiceName(backstageName string) string {

@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"reflect"
 	"slices"
 
@@ -84,8 +85,8 @@ func (m *BackstageModel) sortRuntimeObjects() {
 }
 
 // Registers config object
-func registerConfig(key string, factory ObjectFactory) {
-	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory})
+func registerConfig(key string, factory ObjectFactory, multiple bool) {
+	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory, Multiple: multiple})
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
@@ -109,26 +110,34 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
 		var templ = backstageObject.EmptyObject()
-		if obj, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), templ, *scheme); err != nil {
+		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), templ, *scheme); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}
 		} else {
-			backstageObject.setObject(obj)
+			if obj, err := adjustObject(conf, objs); err != nil {
+				return nil, fmt.Errorf("failed to initialize object: %w", err)
+			} else {
+				backstageObject.setObject(obj)
+			}
 		}
 
 		// read configuration defined in BackstageCR.Spec.RawConfigContent ConfigMap
 		// if present, backstageObject's default configuration will be overridden
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {
-			// to replace default, not merge
+			// new object to replace default, not merge
 			templ = backstageObject.EmptyObject()
-			if obj, err := utils.ReadYamls([]byte(overlay), templ, *scheme); err != nil {
+			if objs, err := utils.ReadYamls([]byte(overlay), templ, *scheme); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
 					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 				}
 			} else {
-				backstageObject.setObject(obj)
+				if obj, err := adjustObject(conf, objs); err != nil {
+					return nil, fmt.Errorf("failed to initialize object: %w", err)
+				} else {
+					backstageObject.setObject(obj)
+				}
 			}
 		}
 
@@ -167,4 +176,23 @@ func setMetaInfo(clientObj client.Object, backstage bsv1.Backstage, scheme *runt
 		//In both cases it will fail before this place
 		panic(err)
 	}
+}
+
+func adjustObject(objectConfig ObjectConfig, objects []client.Object) (runtime.Object, error) {
+	if len(objects) == 0 {
+		return nil, nil
+	}
+	if !objectConfig.Multiple {
+		if len(objects) > 1 {
+			return nil, fmt.Errorf("multiple objects not expected for: %s", objectConfig.Key)
+		}
+		return objects[0], nil
+	}
+
+	return &multiobject.MultiObject{
+		Items: objects,
+		// any object is ok as GVK is the same
+		ObjectKind: objects[0].GetObjectKind(),
+	}, nil
+
 }

@@ -23,7 +23,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"reflect"
 	"regexp"
 	"strings"
@@ -83,7 +82,7 @@ func BackstageDbAppLabelValue(backstageName string) string {
 }
 
 // ReadYamls reads and unmarshalls yaml with potentially multiple objects of the same type
-func ReadYamls(manifest []byte, templ runtime.Object, scheme runtime.Scheme) (runtime.Object, error) {
+func ReadYamls(manifest []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
 
 	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
 
@@ -101,41 +100,16 @@ func ReadYamls(manifest []byte, templ runtime.Object, scheme runtime.Scheme) (ru
 			return nil, fmt.Errorf("failed to decode YAML: %w", err)
 		}
 
-		gvks, _, err := scheme.ObjectKinds(obj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to obtain object Kind: %w", err)
+		if err := checkObjectKind(obj, &scheme); err != nil {
+			return nil, err
 		}
-
-		found := false
-		for _, gvk := range gvks {
-			if obj.GetObjectKind().GroupVersionKind() == gvk {
-				objects = append(objects, obj)
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			return nil, fmt.Errorf("GroupVersionKind not match, found: %v, expected: %v", obj.GetObjectKind().GroupVersionKind(), gvks)
-		}
-
+		objects = append(objects, obj)
 	}
 
-	var ret runtime.Object
-	if len(objects) == 1 {
-		ret = objects[0]
-	} else if len(objects) > 1 {
-		ret = &multiobject.MultiObject{
-			Items: objects,
-			// any object is ok as GVK is the same
-			ObjectKind: objects[0].GetObjectKind(),
-		}
-	}
-
-	return ret, nil
+	return objects, nil
 }
 
-func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) (runtime.Object, error) {
+func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
 	fpath := filepath.Clean(path)
 	if _, err := os.Stat(fpath); err != nil {
 		return nil, err
@@ -145,6 +119,22 @@ func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) (ru
 		return nil, fmt.Errorf("failed to read YAML file: %w", err)
 	}
 	return ReadYamls(b, templ, scheme)
+}
+
+func checkObjectKind(object client.Object, scheme *runtime.Scheme) error {
+	gvks, _, err := scheme.ObjectKinds(object)
+	if err != nil {
+		return fmt.Errorf("failed to obtain object Kind: %w", err)
+	}
+
+	for _, gvk := range gvks {
+		if object.GetObjectKind().GroupVersionKind() == gvk {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("GroupVersionKind not match, found: %v, expected: %v", object.GetObjectKind().GroupVersionKind(), gvks)
+
 }
 
 func GetObjectKind(object client.Object, scheme *runtime.Scheme) *schema.GroupVersionKind {
