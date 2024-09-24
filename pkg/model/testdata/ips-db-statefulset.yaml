@@ -13,6 +13,9 @@ spec:
         rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
       name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
     spec:
+      imagePullSecrets:
+        - name: ips-db1
+        - name: ips-db2
       automountServiceAccountToken: false
       containers:
         - image: quay.io/fedora/postgresql-15:latest

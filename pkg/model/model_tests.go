@@ -19,6 +19,9 @@ import (
 	"os"
 	"path/filepath"
 
+	openshift "github.com/openshift/api/route/v1"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -51,6 +54,8 @@ func createBackstageTest(bs bsv1.Backstage) *testBackstageObject {
 	}
 	b := &testBackstageObject{backstage: bs, externalConfig: ec, scheme: runtime.NewScheme()}
 	utilruntime.Must(bsv1.AddToScheme(b.scheme))
+	utilruntime.Must(clientgoscheme.AddToScheme(b.scheme))
+	utilruntime.Must(openshift.Install(b.scheme))
 	return b
 }
 

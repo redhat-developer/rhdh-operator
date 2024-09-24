@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"k8s.io/apimachinery/pkg/util/yaml"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
@@ -112,4 +114,24 @@ func executeRemoteCommand(ctx context.Context, podNamespace, podName, container,
 	}
 
 	return buf.String(), errBuf.String(), nil
+}
+
+func ReadYaml(manifest []byte, object interface{}) error {
+	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
+	if err := dec.Decode(object); err != nil {
+		return fmt.Errorf("failed to decode YAML: %w", err)
+	}
+	return nil
+}
+
+func ReadYamlFile(path string, object interface{}) error {
+	fpath := filepath.Clean(path)
+	if _, err := os.Stat(fpath); err != nil {
+		return err
+	}
+	b, err := os.ReadFile(fpath)
+	if err != nil {
+		return fmt.Errorf("failed to read YAML file: %w", err)
+	}
+	return ReadYaml(b, object)
 }

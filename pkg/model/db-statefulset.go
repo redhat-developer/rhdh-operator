@@ -18,13 +18,16 @@ import (
 	"fmt"
 	"os"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"k8s.io/apimachinery/pkg/runtime"
+
 	corev1 "k8s.io/api/core/v1"
 
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const LocalDbImageEnvVar = "RELATED_IMAGE_postgresql"
@@ -40,7 +43,7 @@ type DbStatefulSet struct {
 }
 
 func init() {
-	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{})
+	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false)
 }
 
 func DbStatefulSetName(backstageName string) string {
@@ -48,11 +51,11 @@ func DbStatefulSetName(backstageName string) string {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbStatefulSet) Object() client.Object {
+func (b *DbStatefulSet) Object() runtime.Object {
 	return b.statefulSet
 }
 
-func (b *DbStatefulSet) setObject(obj client.Object) {
+func (b *DbStatefulSet) setObject(obj runtime.Object) {
 	b.statefulSet = nil
 	if obj != nil {
 		b.statefulSet = obj.(*appsv1.StatefulSet)
@@ -107,10 +110,11 @@ func (b *DbStatefulSet) validate(model *BackstageModel, backstage bsv1.Backstage
 	return nil
 }
 
-func (b *DbStatefulSet) setMetaInfo(backstageName string) {
-	b.statefulSet.SetName(DbStatefulSetName(backstageName))
-	utils.GenerateLabel(&b.statefulSet.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstageName))
-	utils.GenerateLabel(&b.statefulSet.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstageName))
+func (b *DbStatefulSet) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	b.statefulSet.SetName(DbStatefulSetName(backstage.Name))
+	utils.GenerateLabel(&b.statefulSet.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
+	utils.GenerateLabel(&b.statefulSet.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
+	setMetaInfo(b.statefulSet, backstage, scheme)
 }
 
 // returns DB container
