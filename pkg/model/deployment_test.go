@@ -16,7 +16,6 @@ package model
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -184,7 +183,7 @@ spec:
 `),
 	}
 
-	os.Setenv(BackstageImageEnvVar, "envvar-image")
+	t.Setenv(BackstageImageEnvVar, "envvar-image")
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 

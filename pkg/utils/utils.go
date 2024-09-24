@@ -18,11 +18,19 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -73,24 +81,68 @@ func BackstageDbAppLabelValue(backstageName string) string {
 	return fmt.Sprintf("backstage-psql-%s", backstageName)
 }
 
-func ReadYaml(manifest []byte, object interface{}) error {
+// ReadYamls reads and unmarshalls yaml with potentially multiple objects of the same type
+func ReadYamls(manifest []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
+
 	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
-	if err := dec.Decode(object); err != nil {
-		return fmt.Errorf("failed to decode YAML: %w", err)
+
+	objects := []client.Object{}
+
+	for {
+		// make a new object from template
+		obj := reflect.New(reflect.ValueOf(templ).Elem().Type()).Interface().(client.Object)
+		err := dec.Decode(obj)
+
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode YAML: %w", err)
+		}
+
+		if err := checkObjectKind(obj, &scheme); err != nil {
+			return nil, err
+		}
+		objects = append(objects, obj)
 	}
-	return nil
+
+	return objects, nil
 }
 
-func ReadYamlFile(path string, object interface{}) error {
+func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
 	fpath := filepath.Clean(path)
 	if _, err := os.Stat(fpath); err != nil {
-		return err
+		return nil, err
 	}
 	b, err := os.ReadFile(fpath)
 	if err != nil {
-		return fmt.Errorf("failed to read YAML file: %w", err)
+		return nil, fmt.Errorf("failed to read YAML file: %w", err)
 	}
-	return ReadYaml(b, object)
+	return ReadYamls(b, templ, scheme)
+}
+
+func checkObjectKind(object client.Object, scheme *runtime.Scheme) error {
+	gvks, _, err := scheme.ObjectKinds(object)
+	if err != nil {
+		return fmt.Errorf("failed to obtain object Kind: %w", err)
+	}
+
+	for _, gvk := range gvks {
+		if object.GetObjectKind().GroupVersionKind() == gvk {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("GroupVersionKind not match, found: %v, expected: %v", object.GetObjectKind().GroupVersionKind(), gvks)
+
+}
+
+func GetObjectKind(object client.Object, scheme *runtime.Scheme) *schema.GroupVersionKind {
+	gvks, _, err := scheme.ObjectKinds(object)
+	if err != nil {
+		return nil
+	}
+	return &gvks[0]
 }
 
 func DefFile(key string) string {

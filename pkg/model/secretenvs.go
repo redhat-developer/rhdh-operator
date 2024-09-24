@@ -15,13 +15,16 @@
 package model
 
 import (
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type SecretEnvsFactory struct{}
@@ -36,15 +39,15 @@ type SecretEnvs struct {
 }
 
 func init() {
-	registerConfig("secret-envs.yaml", SecretEnvsFactory{})
+	registerConfig("secret-envs.yaml", SecretEnvsFactory{}, false)
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) Object() client.Object {
+func (p *SecretEnvs) Object() runtime.Object {
 	return p.Secret
 }
 
-func addSecretEnvs(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment) error {
+func addSecretEnvs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) error {
 
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.Secrets == nil {
 		return nil
@@ -60,7 +63,7 @@ func addSecretEnvs(spec v1alpha2.BackstageSpec, deployment *appsv1.Deployment) e
 	return nil
 }
 
-func (p *SecretEnvs) setObject(obj client.Object) {
+func (p *SecretEnvs) setObject(obj runtime.Object) {
 	p.Secret = nil
 	if obj != nil {
 		p.Secret = obj.(*corev1.Secret)
@@ -73,7 +76,7 @@ func (p *SecretEnvs) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (bool, error) {
+func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if p.Secret != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -82,12 +85,13 @@ func (p *SecretEnvs) addToModel(model *BackstageModel, _ v1alpha2.Backstage) (bo
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) validate(_ *BackstageModel, _ v1alpha2.Backstage) error {
+func (p *SecretEnvs) validate(_ *BackstageModel, _ bsv1.Backstage) error {
 	return nil
 }
 
-func (p *SecretEnvs) setMetaInfo(backstageName string) {
-	p.Secret.SetName(utils.GenerateRuntimeObjectName(backstageName, "backstage-envs"))
+func (p *SecretEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	p.Secret.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs"))
+	setMetaInfo(p.Secret, backstage, scheme)
 }
 
 // implementation of BackstagePodContributor interface

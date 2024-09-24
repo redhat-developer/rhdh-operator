@@ -17,11 +17,14 @@ package model
 import (
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"k8s.io/apimachinery/pkg/runtime"
+
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type BackstageServiceFactory struct{}
@@ -35,7 +38,7 @@ type BackstageService struct {
 }
 
 func init() {
-	registerConfig("service.yaml", BackstageServiceFactory{})
+	registerConfig("service.yaml", BackstageServiceFactory{}, false)
 }
 
 func ServiceName(backstageName string) string {
@@ -43,11 +46,11 @@ func ServiceName(backstageName string) string {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) Object() client.Object {
+func (b *BackstageService) Object() runtime.Object {
 	return b.service
 }
 
-func (b *BackstageService) setObject(obj client.Object) {
+func (b *BackstageService) setObject(obj runtime.Object) {
 	b.service = nil
 	if obj != nil {
 		b.service = obj.(*corev1.Service)
@@ -76,7 +79,8 @@ func (b *BackstageService) validate(_ *BackstageModel, _ bsv1.Backstage) error {
 	return nil
 }
 
-func (b *BackstageService) setMetaInfo(backstageName string) {
-	b.service.SetName(ServiceName(backstageName))
-	utils.GenerateLabel(&b.service.Spec.Selector, BackstageAppLabel, utils.BackstageAppLabelValue(backstageName))
+func (b *BackstageService) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	b.service.SetName(ServiceName(backstage.Name))
+	utils.GenerateLabel(&b.service.Spec.Selector, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+	setMetaInfo(b.service, backstage, scheme)
 }

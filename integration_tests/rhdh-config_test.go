@@ -107,7 +107,7 @@ var _ = When("create default rhdh", func() {
 		ns := createNamespace(ctx)
 		bs2 := &bsv1.Backstage{}
 
-		err := utils.ReadYamlFile("testdata/rhdh-replace-dynaplugin-root.yaml", bs2)
+		err := ReadYamlFile("testdata/rhdh-replace-dynaplugin-root.yaml", bs2)
 		Expect(err).To(Not(HaveOccurred()))
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bs2.Spec, "")
