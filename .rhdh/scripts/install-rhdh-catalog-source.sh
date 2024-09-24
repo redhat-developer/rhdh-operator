@@ -242,6 +242,26 @@ echo "
 To install, go to:
 https://console-openshift-console.${CLUSTER_ROUTER_BASE}/catalog/ns/rhdh-operator?catalogType=OperatorBackedService
 
+Or run this:
+
+echo \"apiVersion: rhdh.redhat.com/v1alpha2
+kind: Backstage
+metadata:
+  name: developer-hub
+  namespace: rhdh-operator
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+    extraFiles:
+      mountPath: /opt/app-root/src
+    replicas: 1
+    route:
+      enabled: true
+  database:
+    enableLocalDb: true
+\" | oc apply -f-
+
 Once deployed, Developer Hub will be available at
 https://redhat-developer-hub-rhdh-operator.${CLUSTER_ROUTER_BASE}
 "
