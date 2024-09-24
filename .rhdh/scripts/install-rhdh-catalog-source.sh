@@ -263,5 +263,5 @@ spec:
 \" | oc apply -f-
 
 Once deployed, Developer Hub will be available at
-https://redhat-developer-hub-rhdh-operator.${CLUSTER_ROUTER_BASE}
+https://backstage-developer-hub-rhdh-operator.${CLUSTER_ROUTER_BASE}
 "
