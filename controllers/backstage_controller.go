@@ -17,6 +17,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 	"reflect"
 
 	"k8s.io/utils/ptr"
@@ -150,135 +152,54 @@ func errorAndStatus(backstage *bs.Backstage, msg string, err error) error {
 
 func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.RuntimeObject) error {
 
-	lg := log.FromContext(ctx)
-
 	for _, obj := range objects {
-
-		//DBSecret is immutable, try to create and go further if found
-		if _, ok := obj.(*model.DbSecret); ok {
-			if err := r.Create(ctx, obj.Object(), &client.CreateOptions{FieldManager: BackstageFieldManager}); err != nil {
-				if !errors.IsAlreadyExists(err) {
-					return fmt.Errorf("failed to create secret: %w", err)
-				}
-				continue
+		switch v := obj.Object().(type) {
+		case client.Object:
+			_, immutable := obj.(*model.DbSecret)
+			if err := r.applyPayload(ctx, obj.Object().(client.Object), immutable); err != nil {
+				return err
 			}
-			lg.V(1).Info("create db secret ", objDispName(obj), obj.Object().GetName())
-			continue
+		case *multiobject.MultiObject:
+			mo := obj.Object().(*multiobject.MultiObject)
+			for _, singleObject := range mo.Items {
+				if err := r.applyPayload(ctx, singleObject, false); err != nil {
+					return err
+				}
+			}
+		default:
+			return fmt.Errorf("unknown type %T! it should not happen normally", v)
 		}
-
-		if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
-			return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
-		}
-		lg.V(1).Info("apply object ", objDispName(obj), obj.Object().GetName())
-
-		////baseObject := obj.EmptyObject()
-		//// do not read Secrets
-		//if _, ok := obj.Object().(*corev1.Secret); ok {
-		//	// try to create. patch will not work here as it does not throw errors.IsAlreadyExists
-		//	if err := r.Create(ctx, obj.Object(), &client.CreateOptions{FieldManager: BackstageFieldManager}); err != nil {
-		//		//r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{BackstageFieldManager: BackstageFieldManager});
-		//
-		//		if !errors.IsAlreadyExists(err) {
-		//			return fmt.Errorf("failed to create secret: %w", err)
-		//		}
-		//		//if DBSecret - nothing to do, it is not for update
-		//		if _, ok := obj.(*model.DbSecret); ok {
-		//			continue
-		//		}
-		//	} else {
-		//		lg.V(1).Info("create secret ", objDispName(obj), obj.Object().GetName())
-		//		continue
-		//	}
-		//
-		//}
-		//else {
-		//if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
-		//	return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
-		//}
-		//lg.V(1).Info("patch object ", objDispName(obj), obj.Object().GetName())
-
-		//if err := r.Get(ctx, types.NamespacedName{Name: obj.Object().GetName(), Namespace: obj.Object().GetNamespace()}, baseObject); err != nil {
-		//
-		//
-		//	if !errors.IsNotFound(err) {
-		//		return fmt.Errorf("failed to get object: %w", err)
-		//	}
-		//
-		//	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
-		//		return fmt.Errorf("failed to create object %w", err)
-		//	}
-		//
-		//	lg.V(1).Info("create object ", objDispName(obj), obj.Object().GetName())
-		//	continue
-		//}
-		//}
-
-		//if err := r.patchObject(ctx, baseObject, obj); err != nil {
-		//	lg.V(1).Info(
-		//		"failed to patch object => trying to delete it (and losing any custom labels/annotations on it) so it can be recreated upon next reconciliation...",
-		//		objDispName(obj), obj.Object().GetName(),
-		//		"cause", err,
-		//	)
-		//	// Some resources like StatefulSets allow patching a limited set of fields. A FieldValueForbidden error is returned.
-		//	// Some other resources like Services do not support updating the primary/secondary clusterIP || ipFamily. A FieldValueInvalid error is returned.
-		//	// That's why we are trying to delete them first, taking care of orphaning the dependents so that they can be retained.
-		//	// They will be recreated at the next reconciliation.
-		//	// If they cannot be recreated at the next reconciliation, the expected error will be returned.
-		//	if err = r.Delete(ctx, baseObject, client.PropagationPolicy(metav1.DeletePropagationOrphan)); err != nil {
-		//		return fmt.Errorf("failed to delete object %s so it can be recreated: %w", obj.Object(), err)
-		//	}
-		//	lg.V(1).Info("deleted object. If you had set any custom labels/annotations on it manually, you will need to add them again",
-		//		objDispName(obj), obj.Object().GetName(),
-		//	)
-		//} else {
-		//	lg.V(1).Info("patch object ", objDispName(obj), obj.Object().GetName())
-		//}
 	}
 	return nil
 }
 
-func objDispName(obj model.RuntimeObject) string {
-	return reflect.TypeOf(obj.Object()).String()
+func objDispKind(obj client.Object, scheme *runtime.Scheme) string {
+	gvk := utils.GetObjectKind(obj, scheme)
+	if gvk == nil {
+		return fmt.Sprintf("Unknown kind for: %s", reflect.TypeOf(obj).String())
+	}
+	return gvk.String()
 }
 
-//func (r *BackstageReconciler) patchObject(ctx context.Context, baseObject client.Object, obj model.RuntimeObject) error {
-//
-//	//lg := log.FromContext(ctx)
-//
-//	// restore labels and annotations
-//	if baseObject.GetLabels() != nil {
-//		if obj.Object().GetLabels() == nil {
-//			obj.Object().SetLabels(map[string]string{})
-//		}
-//		for name, value := range baseObject.GetLabels() {
-//			if obj.Object().GetLabels()[name] == "" {
-//				obj.Object().GetLabels()[name] = value
-//			}
-//		}
-//	}
-//	if baseObject.GetAnnotations() != nil {
-//		if obj.Object().GetAnnotations() == nil {
-//			obj.Object().SetAnnotations(map[string]string{})
-//		}
-//		for name, value := range baseObject.GetAnnotations() {
-//			if obj.Object().GetAnnotations()[name] == "" {
-//				obj.Object().GetAnnotations()[name] = value
-//			}
-//		}
-//	}
-//
-//	// needed for openshift.Route only, Openshift yells otherwise
-//	//obj.Object().SetResourceVersion(baseObject.GetResourceVersion())
-//	//if objectKind, ok := obj.Object().(schema.ObjectKind); ok {
-//	//	objectKind.SetGroupVersionKind(baseObject.GetObjectKind().GroupVersionKind())
-//	//}
-//
-//	if err := r.Patch(ctx, obj.Object(), client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
-//		return fmt.Errorf("failed to patch object %s: %w", objDispName(obj), err)
-//	}
-//
-//	return nil
-//}
+func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Object, immutable bool) error {
+	lg := log.FromContext(ctx)
+	if immutable {
+		if err := r.Create(ctx, obj, &client.CreateOptions{FieldManager: BackstageFieldManager}); err != nil {
+			if !errors.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to create object: %w", err)
+			}
+		} else {
+			lg.V(1).Info("create object ", objDispKind(obj, r.Scheme), obj.GetName())
+		}
+		return nil
+	}
+
+	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+		return fmt.Errorf("failed to apply object %s: %w", objDispKind(obj, r.Scheme), err)
+	}
+	lg.V(1).Info("apply object ", objDispKind(obj, r.Scheme), obj.GetName())
+	return nil
+}
 
 func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Backstage) error {
 

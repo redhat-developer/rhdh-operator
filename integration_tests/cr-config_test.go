@@ -255,7 +255,7 @@ var _ = When("create backstage with CR configured", func() {
 
 		bs2 := &bsv1.Backstage{}
 
-		err := utils.ReadYamlFile("testdata/spec-deployment.yaml", bs2)
+		err := ReadYamlFile("testdata/spec-deployment.yaml", bs2)
 		Expect(err).To(Not(HaveOccurred()))
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bs2.Spec, "")

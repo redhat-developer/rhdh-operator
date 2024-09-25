@@ -19,10 +19,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"reflect"
 	"slices"
 
-	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -59,11 +60,6 @@ type BackstageModel struct {
 	ExternalConfig ExternalConfig
 }
 
-type SpecifiedConfigMap struct {
-	ConfigMap corev1.ConfigMap
-	Key       string
-}
-
 func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
 	for i, obj := range m.RuntimeObjects {
 		if reflect.TypeOf(obj) == reflect.TypeOf(object) {
@@ -89,8 +85,8 @@ func (m *BackstageModel) sortRuntimeObjects() {
 }
 
 // Registers config object
-func registerConfig(key string, factory ObjectFactory) {
-	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory /*, need: need*/})
+func registerConfig(key string, factory ObjectFactory, multiple bool) {
+	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory, Multiple: multiple})
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
@@ -113,25 +109,35 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		var obj = backstageObject.EmptyObject()
-		if err := utils.ReadYamlFile(utils.DefFile(conf.Key), obj); err != nil {
+		var templ = backstageObject.EmptyObject()
+		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), templ, *scheme); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}
 		} else {
-			backstageObject.setObject(obj)
+			if obj, err := adjustObject(conf, objs); err != nil {
+				return nil, fmt.Errorf("failed to initialize object: %w", err)
+			} else {
+				backstageObject.setObject(obj)
+			}
 		}
 
-		// reading configuration defined in BackstageCR.Spec.RawConfigContent ConfigMap
+		// read configuration defined in BackstageCR.Spec.RawConfigContent ConfigMap
 		// if present, backstageObject's default configuration will be overridden
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {
-			// to replace default, not merge
-			obj = backstageObject.EmptyObject()
-			if err := utils.ReadYaml([]byte(overlay), obj); err != nil {
-				return nil, fmt.Errorf("failed to read overlay value for the key %s, reason: %s", conf.Key, err)
+			// new object to replace default, not merge
+			templ = backstageObject.EmptyObject()
+			if objs, err := utils.ReadYamls([]byte(overlay), templ, *scheme); err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
+				}
 			} else {
-				backstageObject.setObject(obj)
+				if obj, err := adjustObject(conf, objs); err != nil {
+					return nil, fmt.Errorf("failed to initialize object: %w", err)
+				} else {
+					backstageObject.setObject(obj)
+				}
 			}
 		}
 
@@ -139,7 +145,8 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		if added, err := backstageObject.addToModel(model, backstage); err != nil {
 			return nil, fmt.Errorf("failed to initialize backstage, reason: %s", err)
 		} else if added {
-			setMetaInfo(backstageObject, backstage, ownsRuntime, scheme)
+			//setMetaInfo(backstageObject, backstage, ownsRuntime, scheme)
+			backstageObject.setMetaInfo(backstage, scheme)
 		}
 	}
 
@@ -158,18 +165,34 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 }
 
 // Every RuntimeObject.setMetaInfo should as minimum call this
-func setMetaInfo(modelObject RuntimeObject, backstage bsv1.Backstage, ownsRuntime bool, scheme *runtime.Scheme) {
-	modelObject.setMetaInfo(backstage.Name)
-	modelObject.Object().SetNamespace(backstage.Namespace)
-	modelObject.Object().SetLabels(utils.SetKubeLabels(modelObject.Object().GetLabels(), backstage.Name))
+func setMetaInfo(clientObj client.Object, backstage bsv1.Backstage, scheme *runtime.Scheme) {
 
-	if ownsRuntime {
-		if err := controllerutil.SetControllerReference(&backstage, modelObject.Object(), scheme); err != nil {
-			//error should never have happened,
-			//otherwise the Operator has invalid (not a runtime.Object) or non-registered type.
-			//In both cases it will fail before this place
-			panic(err)
-		}
+	clientObj.SetNamespace(backstage.Namespace)
+	clientObj.SetLabels(utils.SetKubeLabels(clientObj.GetLabels(), backstage.Name))
+
+	if err := controllerutil.SetControllerReference(&backstage, clientObj, scheme); err != nil {
+		//error should never have happened,
+		//otherwise the Operator has invalid (not a runtime.Object) or non-registered type.
+		//In both cases it will fail before this place
+		panic(err)
 	}
+}
+
+func adjustObject(objectConfig ObjectConfig, objects []client.Object) (runtime.Object, error) {
+	if len(objects) == 0 {
+		return nil, nil
+	}
+	if !objectConfig.Multiple {
+		if len(objects) > 1 {
+			return nil, fmt.Errorf("multiple objects not expected for: %s", objectConfig.Key)
+		}
+		return objects[0], nil
+	}
+
+	return &multiobject.MultiObject{
+		Items: objects,
+		// any object is ok as GVK is the same
+		ObjectKind: objects[0].GetObjectKind(),
+	}, nil
 
 }

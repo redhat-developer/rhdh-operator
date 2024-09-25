@@ -18,8 +18,11 @@ import (
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
-	openshift "github.com/openshift/api/route/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"k8s.io/apimachinery/pkg/runtime"
+
+	openshift "github.com/openshift/api/route/v1"
 )
 
 type BackstageRouteFactory struct{}
@@ -80,15 +83,15 @@ func (b *BackstageRoute) setRoute(specified *bsv1.Route) {
 }
 
 func init() {
-	registerConfig("route.yaml", BackstageRouteFactory{})
+	registerConfig("route.yaml", BackstageRouteFactory{}, false)
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) Object() client.Object {
+func (b *BackstageRoute) Object() runtime.Object {
 	return b.route
 }
 
-func (b *BackstageRoute) setObject(obj client.Object) {
+func (b *BackstageRoute) setObject(obj runtime.Object) {
 	b.route = nil
 	if obj != nil {
 		b.route = obj.(*openshift.Route)
@@ -142,6 +145,7 @@ func (b *BackstageRoute) validate(model *BackstageModel, _ bsv1.Backstage) error
 	return nil
 }
 
-func (b *BackstageRoute) setMetaInfo(backstageName string) {
-	b.route.SetName(RouteName(backstageName))
+func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	b.route.SetName(RouteName(backstage.Name))
+	setMetaInfo(b.route, backstage, scheme)
 }

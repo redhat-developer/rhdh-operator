@@ -34,7 +34,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	backstageiov1alpha1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	controller "redhat-developer/red-hat-developer-hub-operator/controllers"
 
 	openshift "github.com/openshift/api/route/v1"
@@ -49,7 +49,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(backstageiov1alpha1.AddToScheme(scheme))
+	utilruntime.Must(bsv1.AddToScheme(scheme))
 
 	utilruntime.Must(openshift.Install(scheme))
 	//+kubebuilder:scaffold:scheme
