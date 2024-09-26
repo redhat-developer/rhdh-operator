@@ -196,7 +196,6 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 
 	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
 		return r.tryToFixUpgradeGlitch(ctx, obj, err)
-		//return fmt.Errorf("failed to apply object %s: %w", objDispKind(obj, r.Scheme), err)
 	}
 	lg.V(1).Info("apply object ", objDispKind(obj, r.Scheme), obj.GetName())
 	return nil
