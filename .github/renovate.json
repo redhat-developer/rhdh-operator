@@ -14,7 +14,7 @@
   "baseBranches": [
     "main",
     "/^release-1\\..*/",
-    "/^1\\..*\\.x/"
+    "/^1\\.2\\.x/"
   ],
   "constraints": {
     "go": "1.21"
@@ -83,7 +83,7 @@
       ],
       "baseBranches": [
         "/^release-1\\..*/",
-        "/^1\\..*\\.x/"
+        "/^1\\.2\\.x/"
       ],
       "automerge": false,
       "matchPackageNames": [
@@ -125,7 +125,7 @@
       ],
       "baseBranches": [
         "/^release-1\\..*/",
-        "/^1\\..*\\.x/"
+        "/^1\\.2\\.x/"
       ],
       "automerge": false,
       "matchPackageNames": [
@@ -163,7 +163,7 @@
       ],
       "baseBranches": [
         "/^release-1\\..*/",
-        "/^1\\..*\\.x/"
+        "/^1\\.2\\.x/"
       ],
       "automerge": false,
       "matchPackageNames": [
