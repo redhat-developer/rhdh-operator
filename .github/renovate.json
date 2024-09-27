@@ -13,7 +13,8 @@
   ],
   "baseBranches": [
     "main",
-    "/^1\\..*\\.x/"
+    "/^release-1\\..*/",
+    "/^1\\.2\\.x/"
   ],
   "constraints": {
     "go": "1.21"
@@ -67,9 +68,9 @@
       ]
     },
     {
-      "description": "k8s go: patch updates only in 1.y.x (suspended till UBI w/ go 1.22)",
+      "description": "k8s go: patch updates only in 1.y (suspended till UBI w/ go 1.22)",
       "enabled": false,
-      "groupName": "k8s-go 1.y.x",
+      "groupName": "k8s-go 1.y",
       "matchDatasources": [
         "go"
       ],
@@ -77,7 +78,8 @@
         "patch"
       ],
       "baseBranches": [
-        "/^1\\..*\\.x/"
+        "/^release-1\\..*/",
+        "/^1\\.2\\.x/"
       ],
       "automerge": false,
       "matchPackageNames": [
@@ -107,9 +109,9 @@
       ]
     },
     {
-      "description": "ginkgo: patch updates only in 1.y.x",
+      "description": "ginkgo: patch updates only in 1.y",
       "enabled": true,
-      "groupName": "ginkgo 1.y.x",
+      "groupName": "ginkgo 1.y",
       "matchDatasources": [
         "go"
       ],
@@ -117,7 +119,8 @@
         "patch"
       ],
       "baseBranches": [
-        "/^1\\..*\\.x/"
+        "/^release-1\\..*/",
+        "/^1\\.2\\.x/"
       ],
       "automerge": false,
       "matchPackageNames": [
@@ -144,9 +147,9 @@
       ]
     },
     {
-      "description": "gomega: patch updates only in 1.y.x",
+      "description": "gomega: patch updates only in 1.y",
       "enabled": true,
-      "groupName": "gomega 1.y.x",
+      "groupName": "gomega 1.y",
       "matchDatasources": [
         "go"
       ],
@@ -154,7 +157,8 @@
         "patch"
       ],
       "baseBranches": [
-        "/^1\\..*\\.x/"
+        "/^release-1\\..*/",
+        "/^1\\.2\\.x/"
       ],
       "automerge": false,
       "matchPackageNames": [
