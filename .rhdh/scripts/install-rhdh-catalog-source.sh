@@ -235,3 +235,33 @@ spec:
   source: ${CATALOGSOURCE_NAME}
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 " > "$TMPDIR"/Subscription.yml && oc apply -f "$TMPDIR"/Subscription.yml
+
+CLUSTER_ROUTER_BASE=$(oc get route console -n openshift-console -o=jsonpath='{.spec.host}' | sed 's/^[^.]*\.//')
+echo "
+
+To install, go to:
+https://console-openshift-console.${CLUSTER_ROUTER_BASE}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogType=OperatorBackedService
+
+Or run this:
+
+echo \"apiVersion: rhdh.redhat.com/v1alpha2
+kind: Backstage
+metadata:
+  name: developer-hub
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+    extraFiles:
+      mountPath: /opt/app-root/src
+    replicas: 1
+    route:
+      enabled: true
+  database:
+    enableLocalDb: true
+\" | oc apply -f-
+
+Once deployed, Developer Hub will be available at
+https://backstage-developer-hub-${NAMESPACE_SUBSCRIPTION}.${CLUSTER_ROUTER_BASE}
+"
