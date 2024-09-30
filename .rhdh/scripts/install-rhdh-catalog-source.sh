@@ -248,7 +248,7 @@ echo \"apiVersion: rhdh.redhat.com/v1alpha2
 kind: Backstage
 metadata:
   name: developer-hub
-  namespace: rhdh-operator
+  namespace: ${NAMESPACE_SUBSCRIPTION}
 spec:
   application:
     appConfig:
