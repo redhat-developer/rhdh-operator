@@ -240,7 +240,7 @@ CLUSTER_ROUTER_BASE=$(oc get route console -n openshift-console -o=jsonpath='{.s
 echo "
 
 To install, go to:
-https://console-openshift-console.${CLUSTER_ROUTER_BASE}/catalog/ns/rhdh-operator?catalogType=OperatorBackedService
+https://console-openshift-console.${CLUSTER_ROUTER_BASE}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogType=OperatorBackedService
 
 Or run this:
 
