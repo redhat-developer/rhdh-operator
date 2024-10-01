@@ -316,7 +316,6 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	$(OPSDK) bundle validate ./bundle/$(PROFILE)
 	mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
-	$(MAKE) fmt_license
 
 ## to update the CSV with a new tagged version of the operator:
 ## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
