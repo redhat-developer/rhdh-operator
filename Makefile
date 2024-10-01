@@ -216,7 +216,6 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
-ADDLICENSE ?= $(LOCALBIN)/addlicense
 GOSEC ?= $(LOCALBIN)/gosec
 
 ## Tool Versions
@@ -224,7 +223,6 @@ KUSTOMIZE_VERSION ?= v5.4.2
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
 GOLANGCI_LINT_VERSION ?= v1.59.1
 GOIMPORTS_VERSION ?= v0.16.1
-ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
 OPM_VERSION ?= v1.45.0
 OPERATOR_SDK_VERSION ?= v1.36.0
@@ -264,11 +262,6 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
 $(GOIMPORTS): $(LOCALBIN)
 	test -s $(LOCALBIN)/goimports || GOBIN=$(LOCALBIN) go install golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
-
-.PHONY: addlicense
-addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
-$(ADDLICENSE): $(LOCALBIN)
-	test -s $(LOCALBIN)/addlicense || GOBIN=$(LOCALBIN) go install github.com/google/addlicense@$(ADDLICENSE_VERSION)
 
 .PHONY: addgosec
 addgosec: $(GOSEC) ## Download gosec locally if necessary.
