@@ -101,6 +101,10 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+.PHONY: generate
+generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	$(CONTROLLER_GEN) object paths="./..."
+
 .PHONY: fmt
 fmt: goimports ## Format the code using goimports
 	find . -not -path '*/\.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
@@ -431,5 +435,4 @@ show-img:
 
 show-container-engine:
 	@echo -n $(CONTAINER_ENGINE)
-
 
