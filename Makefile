@@ -109,10 +109,6 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 fmt: goimports ## Format the code using goimports
 	find . -not -path '*/\.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
 
-fmt_license: addlicense ## Ensure the license header is set on all files
-	$(ADDLICENSE) -v -f license_header.txt $$(find . -not -path '*/\.*' -name '*.go')
-	$(ADDLICENSE) -v -f license_header.txt $$(find . -name '*ockerfile')
-
 .PHONY: gosec
 gosec: addgosec ## run the gosec scanner for non-test files in this repo
   	# we let the report content trigger a failure using the GitHub Security features.
