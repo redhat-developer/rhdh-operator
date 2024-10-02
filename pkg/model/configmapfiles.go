@@ -28,7 +28,7 @@ import (
 type ConfigMapFilesFactory struct{}
 
 func (f ConfigMapFilesFactory) newBackstageObject() RuntimeObject {
-	return &ConfigMapFiles{MountPath: defaultMountDir}
+	return &ConfigMapFiles{MountPath: DefaultMountDir}
 }
 
 type ConfigMapFiles struct {
@@ -46,7 +46,7 @@ func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, m
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
 		return
 	}
-	mp := defaultMountDir
+	mp := DefaultMountDir
 	if spec.Application.ExtraFiles.MountPath != "" {
 		mp = spec.Application.ExtraFiles.MountPath
 	}

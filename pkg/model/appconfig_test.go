@@ -86,7 +86,7 @@ func TestDefaultAppConfig(t *testing.T) {
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Contains(t, deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath, defaultMountDir)
+	assert.Contains(t, deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath, DefaultMountDir)
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))

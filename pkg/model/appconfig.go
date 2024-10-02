@@ -33,7 +33,7 @@ type AppConfigFactory struct{}
 
 // factory method to create App Config object
 func (f AppConfigFactory) newBackstageObject() RuntimeObject {
-	return &AppConfig{MountPath: defaultMountDir}
+	return &AppConfig{MountPath: DefaultMountDir}
 }
 
 // structure containing ConfigMap where keys are Backstage ConfigApp file names and vaues are contents of the files
@@ -60,7 +60,7 @@ func addAppConfigs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model
 
 	for _, configMap := range spec.Application.AppConfig.ConfigMaps {
 		cm := model.ExternalConfig.AppConfigs[configMap.Name]
-		mp := defaultMountDir
+		mp := DefaultMountDir
 		if spec.Application.AppConfig.MountPath != "" {
 			mp = spec.Application.AppConfig.MountPath
 		}

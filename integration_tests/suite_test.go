@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -189,6 +190,19 @@ func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1.Backs
 	Expect(err).To(Not(HaveOccurred()))
 
 	return backstageName
+}
+
+func getBackstagePodName(ctx context.Context, ns, backstageName string) (string, error) {
+	podList := &corev1.PodList{}
+	err := k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+	if err != nil {
+		return "", err
+	}
+	if len(podList.Items) != 1 {
+		return "", fmt.Errorf("expected only one Pod, but have %v", podList.Items)
+	}
+
+	return podList.Items[0].Name, nil
 }
 
 func createNamespace(ctx context.Context) string {
