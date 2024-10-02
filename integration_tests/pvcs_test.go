@@ -62,8 +62,8 @@ var _ = When("create backstage PVCs configured", func() {
 	AfterEach(func() {
 		deleteNamespace(ctx, ns)
 		// Clean cluster scope objects
-		k8sClient.Delete(ctx, &corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}})
-		k8sClient.Delete(ctx, &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: scName}})
+		_ = k8sClient.Delete(ctx, &corev1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}})
+		_ = k8sClient.Delete(ctx, &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: scName}})
 	})
 
 	It("creates PV dynamically with configured by default PVC", func() {
