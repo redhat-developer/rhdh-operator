@@ -103,15 +103,11 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object paths="./..."
 
 .PHONY: fmt
 fmt: goimports ## Format the code using goimports
 	find . -not -path '*/\.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
-
-fmt_license: addlicense ## Ensure the license header is set on all files
-	$(ADDLICENSE) -v -f license_header.txt $$(find . -not -path '*/\.*' -name '*.go')
-	$(ADDLICENSE) -v -f license_header.txt $$(find . -name '*ockerfile')
 
 .PHONY: gosec
 gosec: addgosec ## run the gosec scanner for non-test files in this repo
@@ -224,7 +220,6 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
-ADDLICENSE ?= $(LOCALBIN)/addlicense
 GOSEC ?= $(LOCALBIN)/gosec
 
 ## Tool Versions
@@ -232,7 +227,6 @@ KUSTOMIZE_VERSION ?= v5.4.2
 CONTROLLER_TOOLS_VERSION ?= v0.14.0
 GOLANGCI_LINT_VERSION ?= v1.59.1
 GOIMPORTS_VERSION ?= v0.16.1
-ADDLICENSE_VERSION ?= v1.1.1
 # opm and operator-sdk version
 OPM_VERSION ?= v1.45.0
 OPERATOR_SDK_VERSION ?= v1.36.0
@@ -272,11 +266,6 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
 $(GOIMPORTS): $(LOCALBIN)
 	test -s $(LOCALBIN)/goimports || GOBIN=$(LOCALBIN) go install golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
-
-.PHONY: addlicense
-addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
-$(ADDLICENSE): $(LOCALBIN)
-	test -s $(LOCALBIN)/addlicense || GOBIN=$(LOCALBIN) go install github.com/google/addlicense@$(ADDLICENSE_VERSION)
 
 .PHONY: addgosec
 addgosec: $(GOSEC) ## Download gosec locally if necessary.
@@ -320,7 +309,6 @@ bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPSDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	$(OPSDK) bundle validate ./bundle/$(PROFILE)
 	mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
-	$(MAKE) fmt_license
 
 ## to update the CSV with a new tagged version of the operator:
 ## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
@@ -447,5 +435,4 @@ show-img:
 
 show-container-engine:
 	@echo -n $(CONTAINER_ENGINE)
-
 
