@@ -12,7 +12,7 @@ The Default Configuration defines the structure of all Backstage instances withi
 
 ### Default Configuration Files
 
-| Key/File Name               | Object Kind                  | Object Name                         | Mandatory    | Mult| Version | Notes                                                    |
+| Key/File Name               | Object Kind                  | Object Name                         | Mandatory    | Multi| Version | Notes                                                    |
 |-----------------------------|------------------------------|-------------------------------------|--------------|-----|---------|----------------------------------------------------------|
 | deployment.yaml             | appsv1.Deployment            | backstage-<cr-name>                 | Yes          | No  | >=0.1.x | Backstage deployment                                     |
 | service.yaml                | corev1.Service               | backstage-<cr-name>                 | Yes          | No  | >=0.1.x | Backstage Service                                        |
