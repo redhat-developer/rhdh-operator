@@ -58,7 +58,7 @@ For example, Backstage CR named **mybackstage** will create K8s Deployment resou
 
 Since version **0.4.0**, Operator supports multi objects which mean the object type(s) marked as Multi=true in the table above can be declared and added to the model as the list of objects of certain type. To do so multiple objects are added to the yaml file using "---" delimiter.
 
-For example, adding the following code snip to **pvcs.yaml** will cause creating 2 PVCs called **backstage-<cr-name>-myclaim1** and **backstage-<cr-name>-myclaim2** and mounting them to Backstage container accordingly. 
+For example, adding the following code snip to **pvcs.yaml** will cause creating 2 PVCs called **backstage-&lt;cr-name&gt;-myclaim1** and **backstage-&lt;cr-name&gt;-myclaim2** and mounting them to Backstage container accordingly. 
 
 ```yaml
 apiVersion: v1
