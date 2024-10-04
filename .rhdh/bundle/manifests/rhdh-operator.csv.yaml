@@ -43,7 +43,6 @@ metadata:
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
     support: Red Hat
     skipRange: '>=1.0.0 <1.2.5'
-    olm.substitutesFor: rhdh-operator.v1.2.5
   name: rhdh-operator.v1.2.5
   namespace: placeholder
 spec:
