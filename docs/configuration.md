@@ -26,7 +26,7 @@ The Default Configuration defines the structure of all Backstage instances withi
 | secret-files.yaml           | corev1.Secret                | backstage-files-<cr-name>           | No           | No  | >=0.2.x | Backstage config file inclusions from Secret             |
 | secret-envs.yaml            | corev1.Secret                | backstage-envs-<cr-name>            | No           | No  | >=0.2.x | Backstage environment variables from Secret              |
 | dynamic-plugins.yaml        | corev1.ConfigMap             | backstage-dynamic-plugins-<cr-name> | No           | No  | >=0.2.x | Dynamic plugins configuration                            |
-| pvcs.yaml                   | corev1.PersistentVolumeClaim | backstage-<cr-name>-<pvc-name>      | No           | Yes | >=0.4.x | List of PVC objects to be mounted to Backstage container |
+| pvcs.yaml                   | corev1.PersistentVolumeClaim | backstage-&lt;cr-name&gt;-&lt;pvc-name&gt;      | No           | Yes | >=0.4.x | List of PVC objects to be mounted to Backstage container |
 
 **Meanings of "Mandatory" Column:**
 - **Yes** - Must be configured; deployment will fail otherwise.
