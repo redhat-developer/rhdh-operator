@@ -1,17 +1,4 @@
 #!/bin/bash
-#
-#  Copyright (c) 2024 Red Hat, Inc.
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
 
 # Script to preload images and install RHDH operator on an air-gapped OpenShift cluster without using ICSP.
 # The script ensures all necessary images are preloaded into the internal registry.
@@ -70,11 +57,13 @@ UPSTREAM_IIB="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}"
 
 # Parse arguments
 TO_INSTALL=""
+USE_QUAY="false"
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         '--install-operator') TO_INSTALL="$2"; shift ;;
         '--next') UPSTREAM_IIB="quay.io/rhdh/iib:next-${OCP_VER}-${OCP_ARCH}" ;;
         '--latest') UPSTREAM_IIB="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}" ;;
+        '-y'|'--quay') USE_QUAY="true";;
         '-h'|'--help') usage; exit 0 ;;
         *) errorf "[ERROR] Unknown parameter: $1"; usage; exit 1 ;;
     esac
@@ -85,32 +74,73 @@ infof "[INFO] Using IIB image: ${UPSTREAM_IIB}"
 
 # Call prepare-restricted-environment.sh to preload images
 infof "[INFO] Preloading images into the internal registry..."
-"${PWD}/prepare-restricted-environment.sh" --prod_operator_index "${UPSTREAM_IIB}" --prod_operator_version "${OCP_VER}"
+"${PWD}/prepare-restricted-environment.sh" \
+    --prod_operator_index "${UPSTREAM_IIB}" \
+    --prod_operator_version "${OCP_VER}"
 
-# Ensure all required images are in the internal registry
-# Optionally, enhance this part of the script to resolve missing images and copy them from quay.io
+if [ $? -ne 0 ]; then
+    errorf "[ERROR] Failed to preload images using prepare-restricted-environment.sh"
+    exit 1
+fi
 
-# Example logic for resolving missing images using skopeo (if needed)
-# This is assuming you want to add this functionality within your script
-resolve_missing_images() {
-    local image="$1"
-    local internal_image="$2"
+# Extract image details for further processing
+infof "[INFO] Extracting bundle image information from IIB..."
+catalogJson="/tmp/catalog.json"
 
-    # Try to resolve the image from quay.io if not found in the internal registry
-    if ! skopeo inspect docker://"${image}" &>/dev/null; then
-        infof "[INFO] Attempting to resolve ${image} from quay.io..."
-        quay_image="${image/registry.redhat.io/quay.io}"
+# Using skopeo to inspect the image and extract the manifest details
+skopeo inspect "docker://${UPSTREAM_IIB}" --config > "${catalogJson}"
+if [[ ! -f "${catalogJson}" ]]; then
+    errorf "[ERROR] Could not fetch catalog JSON for ${UPSTREAM_IIB}"
+    exit 1
+fi
 
-        if skopeo inspect docker://"${quay_image}" &>/dev/null; then
-            infof "[INFO] Resolved ${image} to ${quay_image}"
-            skopeo copy --authfile "${TMPDIR}/pull-secret.json" --dest-tls-verify=false --all docker://"${quay_image}" docker://"${internal_image}"
-        else
-            errorf "[ERROR] Could not resolve image: ${image}"
-        fi
+# Extract image with SHA from catalog.json
+bundle=$(jq -r '.config.Labels."operators.operatorframework.io.bundle.manifests"' < "${catalogJson}")
+if [[ -z "${bundle}" ]]; then
+    errorf "[ERROR] Could not extract bundle from ${UPSTREAM_IIB}"
+    exit 1
+fi
+infof "[INFO] Bundle Version: ${bundle}"
+
+imageWithSHA=$(jq -r '.config.Labels."operators.operatorframework.io.bundle.mediatype"' < "${catalogJson}")
+if [[ -z "${imageWithSHA}" ]]; then
+    errorf "[ERROR] Could not extract image with SHA from catalog JSON"
+    exit 1
+fi
+infof "[INFO] Bundle Image SHA: ${imageWithSHA}"
+
+# Logic from getTagForSHA.sh to resolve the image tag
+resolve_image_tag() {
+    local imageAndSHA="$1"
+    local result=""
+    
+    if [[ $USE_QUAY == "true" ]]; then
+        result=$(skopeo inspect "docker://quay.io/${imageAndSHA}" 2>/dev/null | jq -r '.Labels.version+"-"+.Labels.release')
+    else
+        result=$(skopeo inspect "docker://${imageAndSHA}" 2>/dev/null | jq -r '.Labels.version+"-"+.Labels.release')
+    fi
+
+    if [[ -n "$result" ]]; then
+        local container=${result}
+        container=$(echo "$container" | sed -r -e "s@:[0-9.]+:@:@")
+        echo "$container"
+    else
+        errorf "[ERROR] Image with SHA not found: ${imageAndSHA}"
+        exit 1
     fi
 }
 
-# Install the CatalogSource and Operator Subscription
+# Resolve the bundle image tag
+bundleContainer=$(resolve_image_tag "${imageWithSHA}")
+infof "[INFO] Resolved Bundle Image Tag: ${bundleContainer}"
+
+# Call install-rhdh-catalog-source.sh to create the catalog source and install the operator
 infof "[INFO] Installing CatalogSource and Operator..."
 "${PWD}/install-rhdh-catalog-source.sh" --install-operator "${TO_INSTALL}" --latest
+
+if [ $? -ne 0 ]; then
+    errorf "[ERROR] Failed to install the operator."
+    exit 1
+fi
+
 infof "[INFO] Installation completed successfully!"
