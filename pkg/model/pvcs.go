@@ -2,9 +2,12 @@ package model
 
 import (
 	"fmt"
+	"path/filepath"
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+
+	appsv1 "k8s.io/api/apps/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -62,7 +65,31 @@ func (b *BackstagePvcs) validate(model *BackstageModel, backstage bsv1.Backstage
 
 func (b *BackstagePvcs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	for _, item := range b.pvcs.Items {
-		item.(*corev1.PersistentVolumeClaim).Name = PvcsName(backstage.Name, item.(*corev1.PersistentVolumeClaim).Name)
-		setMetaInfo(item, backstage, scheme)
+		pvc := item.(*corev1.PersistentVolumeClaim)
+		pvc.Name = PvcsName(backstage.Name, pvc.Name)
+		setMetaInfo(pvc, backstage, scheme)
+	}
+}
+
+// implementation of BackstagePodContributor interface
+func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
+
+	for _, pvc := range b.pvcs.Items {
+		volName := utils.ToRFC1123Label(pvc.GetName())
+		volSrc := corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvc.GetName(),
+			},
+		}
+		deployment.Spec.Template.Spec.Volumes =
+			append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
+
+		c := &deployment.Spec.Template.Spec.Containers[0]
+
+		c.VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
+			Name: volName,
+			// TODO make mountDir flexible?
+			MountPath: filepath.Join(DefaultMountDir, volName),
+		})
 	}
 }

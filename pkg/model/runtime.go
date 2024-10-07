@@ -56,6 +56,15 @@ func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
 	m.RuntimeObjects = append(m.RuntimeObjects, object)
 }
 
+func (m *BackstageModel) getRuntimeObjectByType(object RuntimeObject) RuntimeObject {
+	for _, obj := range m.RuntimeObjects {
+		if reflect.TypeOf(obj) == reflect.TypeOf(object) {
+			return obj
+		}
+	}
+	return nil
+}
+
 // sort objects so DbStatefulSet and BackstageDeployment become the last in the list
 func (m *BackstageModel) sortRuntimeObjects() {
 

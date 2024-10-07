@@ -38,7 +38,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	if bsSpec.RawRuntimeConfig != nil {
 		if bsSpec.RawRuntimeConfig.BackstageConfigName != "" {
 			cm := &corev1.ConfigMap{}
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, bsSpec.RawRuntimeConfig.BackstageConfigName, ns); err != nil {
+			if err := r.checkExternalObject(ctx, cm, bsSpec.RawRuntimeConfig.BackstageConfigName, ns); err != nil {
 				return result, err
 			}
 			for key, value := range cm.Data {
@@ -47,7 +47,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 		}
 		if bsSpec.RawRuntimeConfig.LocalDbConfigName != "" {
 			cm := &corev1.ConfigMap{}
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, bsSpec.RawRuntimeConfig.LocalDbConfigName, ns); err != nil {
+			if err := r.checkExternalObject(ctx, cm, bsSpec.RawRuntimeConfig.LocalDbConfigName, ns); err != nil {
 				return result, err
 			}
 			for key, value := range cm.Data {
@@ -135,11 +135,8 @@ func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx con
 	// https://pkg.go.dev/k8s.io/client-go/util/retry#RetryOnConflict.
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 
-		if err := r.Get(ctx, types.NamespacedName{Name: objectName, Namespace: ns}, obj); err != nil {
-			if _, ok := obj.(*corev1.Secret); ok && errors.IsForbidden(err) {
-				return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
-			}
-			return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
+		if err := r.checkExternalObject(ctx, obj, objectName, ns); err != nil {
+			return err
 		}
 
 		if obj.GetLabels() == nil {
@@ -174,4 +171,14 @@ func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx con
 
 	})
 	return err
+}
+
+func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj client.Object, objectName, ns string) error {
+	if err := r.Get(ctx, types.NamespacedName{Name: objectName, Namespace: ns}, obj); err != nil {
+		if _, ok := obj.(*corev1.Secret); ok && errors.IsForbidden(err) {
+			return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
+		}
+		return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
+	}
+	return nil
 }

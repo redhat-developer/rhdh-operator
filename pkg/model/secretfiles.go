@@ -19,7 +19,7 @@ import (
 type SecretFilesFactory struct{}
 
 func (f SecretFilesFactory) newBackstageObject() RuntimeObject {
-	return &SecretFiles{MountPath: defaultMountDir}
+	return &SecretFiles{MountPath: DefaultMountDir}
 }
 
 type SecretFiles struct {
@@ -37,7 +37,7 @@ func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) erro
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
 		return nil
 	}
-	mp := defaultMountDir
+	mp := DefaultMountDir
 	if spec.Application.ExtraFiles.MountPath != "" {
 		mp = spec.Application.ExtraFiles.MountPath
 	}
