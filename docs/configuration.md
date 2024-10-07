@@ -12,22 +12,21 @@ The Default Configuration defines the structure of all Backstage instances withi
 
 ### Default Configuration Files
 
-| Key/File Name                  | Object Kind        | Object Name                         | Mandatory(*) | Version | Notes                                            |
-|--------------------------------|--------------------|-------------------------------------|--------------|---------|-------------------------------------------------|
-| deployment.yaml                | appsv1.Deployment  | backstage-<cr-name>                 | Yes          | >=0.1.x | Backstage deployment                            |
-| service.yaml                   | corev1.Service     | backstage-<cr-name>                 | Yes          | >=0.1.x | Backstage Service                               |
-| db-statefulset.yaml            | appsv1.StatefulSet | backstage-psql-<cr-name>            | For local DB | >=0.1.x | PostgreSQL StatefulSet                          |
-| db-service.yaml                | corev1.Service     | backstage-psql-<cr-name>            | For local DB | >=0.1.x | PostgreSQL Service                              |
-| db-secret.yaml                 | corev1.Secret      | backstage-psql-secret-<cr-name>     | For local DB | >=0.1.x | Secret to connect Backstage to PGSQL            |
-| route.yaml                     | openshift.Route    | backstage-<cr-name>                 | No (for OCP) | >=0.1.x | Route exposing Backstage service                |
-| app-config.yaml                | corev1.ConfigMap   | backstage-appconfig-<cr-name>       | No           | >=0.2.x | Backstage app-config.yaml                       |
-| configmap-files.yaml           | corev1.ConfigMap   | backstage-files-<cr-name>           | No           | >=0.2.x | Backstage config file inclusions from configMap |
-| configmap-envs.yaml            | corev1.ConfigMap   | backstage-envs-<cr-name>            | No           | >=0.2.x | Backstage environment variables from ConfigMap  |
-| secret-files.yaml              | corev1.Secret      | backstage-files-<cr-name>           | No           | >=0.2.x | Backstage config file inclusions from Secret    |
-| secret-envs.yaml               | corev1.Secret      | backstage-envs-<cr-name>            | No           | >=0.2.x | Backstage environment variables from Secret      |
-| dynamic-plugins.yaml           | corev1.ConfigMap   | backstage-dynamic-plugins-<cr-name> | No           | >=0.2.x | Dynamic plugins configuration                    |
-| dynamic-plugins-configmap.yaml | corev1.ConfigMap   | backstage-<cr-name>                 | No           | 0.1.x   | Dynamic plugins configuration                    |
-| backend-auth-configmap.yaml    | corev1.ConfigMap   | backstage-<cr-name>                 | No           | 0.1.x   | App-config.yaml with backend auth configuration  |
+| Key/File Name               | Object Kind                  | Object Name                         | Mandatory    | Multi| Version | Notes                                                    |
+|-----------------------------|------------------------------|-------------------------------------|--------------|-----|---------|----------------------------------------------------------|
+| deployment.yaml             | appsv1.Deployment            | backstage-<cr-name>                 | Yes          | No  | >=0.1.x | Backstage deployment                                     |
+| service.yaml                | corev1.Service               | backstage-<cr-name>                 | Yes          | No  | >=0.1.x | Backstage Service                                        |
+| db-statefulset.yaml         | appsv1.StatefulSet           | backstage-psql-<cr-name>            | For local DB | No  | >=0.1.x | PostgreSQL StatefulSet                                   |
+| db-service.yaml             | corev1.Service               | backstage-psql-<cr-name>            | For local DB | No  | >=0.1.x | PostgreSQL Service                                       |
+| db-secret.yaml              | corev1.Secret                | backstage-psql-secret-<cr-name>     | For local DB | No  | >=0.1.x | Secret to connect Backstage to PGSQL                     |
+| route.yaml                  | openshift.Route              | backstage-<cr-name>                 | No (for OCP) | No  | >=0.1.x | Route exposing Backstage service                         |
+| app-config.yaml             | corev1.ConfigMap             | backstage-appconfig-<cr-name>       | No           | No  | >=0.2.x | Backstage app-config.yaml                                |
+| configmap-files.yaml        | corev1.ConfigMap             | backstage-files-<cr-name>           | No           | No  | >=0.2.x | Backstage config file inclusions from configMap          |
+| configmap-envs.yaml         | corev1.ConfigMap             | backstage-envs-<cr-name>            | No           | No  | >=0.2.x | Backstage environment variables from ConfigMap           |
+| secret-files.yaml           | corev1.Secret                | backstage-files-<cr-name>           | No           | No  | >=0.2.x | Backstage config file inclusions from Secret             |
+| secret-envs.yaml            | corev1.Secret                | backstage-envs-<cr-name>            | No           | No  | >=0.2.x | Backstage environment variables from Secret              |
+| dynamic-plugins.yaml        | corev1.ConfigMap             | backstage-dynamic-plugins-<cr-name> | No           | No  | >=0.2.x | Dynamic plugins configuration                            |
+| pvcs.yaml                   | corev1.PersistentVolumeClaim | backstage-&lt;cr-name&gt;-&lt;pvc-name&gt;      | No           | Yes | >=0.4.x | List of PVC objects to be mounted to Backstage container |
 
 **Meanings of "Mandatory" Column:**
 - **Yes** - Must be configured; deployment will fail otherwise.
@@ -41,17 +40,39 @@ You can see examples of default configurations as part of the [Operator Profiles
   
 For Backstage to function consistently at runtime, certain metadata values need to be predictable. Therefore, the Operator generates values according to the following rules. Any value for these fields specified in either Default or Raw Configuration will be replaced by the generated values.
 
-- All object `metadata.names` are generated according to the rules defined in the [Configuration table (Object name)](admin.md).
-- In `deployment.yaml`:
+For All the objects **metadata.name** is generated according to the rules defined in the [Default Configuration files](#default-configuration-files), column **Object name**. <cr-name> means a Name of Backstage Custom Resource owning this configuration.
+For example, Backstage CR named **mybackstage** will create K8s Deployment resource called **backstage-mybackstage**. Specific, per-object generated metadata described below.
+
+* deployment.yaml
     - `spec.selector.matchLabels[rhdh.redhat.com/app] = backstage-<cr-name>`
     - `spec.template.metadata.labels[rhdh.redhat.com/app] = backstage-<cr-name>`
-- In `service.yaml`:
+* service.yaml
     - `spec.selector[rhdh.redhat.com/app] = backstage-<cr-name>`
-- In `db-statefulset.yaml`:
+* db-statefulset.yaml
     - `spec.selector.matchLabels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
     - `spec.template.metadata.labels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
-- In `db-service.yaml`:
+* db-service.yaml
     - `spec.selector[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
+
+### Multi objects
+
+Since version **0.4.0**, Operator supports multi objects which mean the object type(s) marked as Multi=true in the table above can be declared and added to the model as the list of objects of certain type. To do so multiple objects are added to the yaml file using "---" delimiter.
+
+For example, adding the following code snip to **pvcs.yaml** will cause creating 2 PVCs called **backstage-&lt;cr-name&gt;-myclaim1** and **backstage-&lt;cr-name&gt;-myclaim2** and mounting them to Backstage container accordingly. 
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim1
+...
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim2
+...
+```
 
 ## Raw Configuration
 

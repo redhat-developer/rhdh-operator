@@ -21,7 +21,7 @@ import (
 
 var _ = When("create default rhdh", func() {
 
-	It("creates runtime objects", func() {
+	It("tests rhdh config", func() {
 
 		if !isProfile("rhdh") {
 			Skip("Skipped for non rhdh config")

@@ -39,10 +39,14 @@ var _ = When("create backstage with external configuration", func() {
 		deleteNamespace(ctx, ns)
 	})
 
-	It("refresh config", func() {
+	It("refreshes config", func() {
 
 		if !*testEnv.UseExistingCluster {
 			Skip("Skipped for not real cluster")
+		}
+
+		if !useExistingController {
+			Skip("Skipped for not real controller")
 		}
 
 		appConfig1 := "app-config1"
@@ -133,6 +137,7 @@ organization:
 			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// TODO nicer method to compare file content with added '\r'
+			// NOTE: it does not work well on envtest, real controller needed
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))
 
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
@@ -140,6 +145,7 @@ organization:
 
 			out2, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "echo $sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
+			// NOTE: it does not work well on envtest, real controller needed
 			g.Expect(fmt.Sprintf("%s%s", newEnv, "\r\n")).To(Equal(out2))
 
 		}, 10*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())

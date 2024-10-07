@@ -25,7 +25,7 @@ import (
 )
 
 const BackstageImageEnvVar = "RELATED_IMAGE_backstage"
-const defaultMountDir = "/opt/app-root/src"
+const DefaultMountDir = "/opt/app-root/src"
 const ExtConfigHashAnnotation = "rhdh.redhat.com/ext-config-hash"
 
 type BackstageDeploymentFactory struct{}
