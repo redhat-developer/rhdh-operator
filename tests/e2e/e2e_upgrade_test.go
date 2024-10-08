@@ -38,8 +38,7 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 		const managerPodLabel = "control-plane=controller-manager"
 		const crName = "my-backstage-app"
 
-		// 0.1 is the version of the operator in the 1.1.x branch
-		var fromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "rhdh-operator-1.1.yaml")
+		var fromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "rhdh-operator-1.2.yaml")
 
 		BeforeEach(func() {
 			if testMode != defaultDeployTestMode {
@@ -71,8 +70,7 @@ metadata:
 			_, err = helper.Run(cmd)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			// Reason is DeployOK in 1.1.x, but was renamed to Deployed in 1.2
-			Eventually(helper.VerifyBackstageCRStatus, time.Minute, time.Second).WithArguments(ns, crName, `"reason":"DeployOK"`).Should(Succeed())
+			Eventually(helper.VerifyBackstageCRStatus, time.Minute, time.Second).WithArguments(ns, crName, `"reason":"Deployed"`).Should(Succeed())
 		})
 
 		AfterEach(func() {
@@ -89,6 +87,27 @@ metadata:
 				EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, 3*time.Second).WithArguments(managerPodLabel).Should(Succeed())
 			})
 
+			fetchOperatorLogs := func() string {
+				return fmt.Sprintf("=== Operator logs ===\n%s\n", getPodLogs(_namespace, managerPodLabel))
+			}
+
+			crLabel := fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName)
+
+			By("ensuring the current operator eventually reconciled through the creation of a new ReplicaSet of the application")
+			Eventually(func(g Gomega) {
+				cmd := exec.Command(helper.GetPlatformTool(), "get",
+					"replicasets", "-l", crLabel,
+					"-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}"+
+						"{{ \"\\n\" }}{{ end }}{{ end }}",
+					"-n", ns,
+				)
+				rsOutput, err := helper.Run(cmd)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				rsNames := helper.GetNonEmptyLines(string(rsOutput))
+				g.Expect(len(rsNames)).Should(BeNumerically(">=", 2),
+					fmt.Sprintf("expected at least 2 Backstage operand ReplicaSets, but got %d", len(rsNames)))
+			}, 3*time.Minute, 3*time.Second).Should(Succeed(), fetchOperatorLogs)
+
 			By("checking the status of the existing CR")
 			Eventually(helper.VerifyBackstageCRStatus, 5*time.Minute, 3*time.Second).WithArguments(ns, crName, `"reason":"Deployed"`).
 				Should(Succeed(), func() string {
@@ -96,7 +115,6 @@ metadata:
 				})
 
 			By("checking the Backstage operand pod")
-			crLabel := fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName)
 			Eventually(func(g Gomega) {
 				// Get pod name
 				cmd := exec.Command(helper.GetPlatformTool(), "get",

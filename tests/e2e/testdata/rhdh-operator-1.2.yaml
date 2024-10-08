@@ -1,6 +1,6 @@
 # /!\ EDIT ONLY IF NECESSARY
 #
-# Generated using `make deployment-manifest` against the 1.1.x branch.
+# Generated using `make deployment-manifest` against the 1.2.x branch.
 # Used to test the upgrade paths of the operator.
 # So this needs to reflect exactly what a user
 # would get if they deploy that version of the operator.
@@ -48,10 +48,10 @@ spec:
           description: Backstage is the Schema for the backstages API
           properties:
             apiVersion:
-              description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
               type: string
             kind:
-              description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
               type: string
             metadata:
               type: object
@@ -84,7 +84,7 @@ spec:
                           type: string
                       type: object
                     dynamicPluginsConfigMapName:
-                      description: "Reference to an existing ConfigMap for Dynamic Plugins. A new one will be generated with the default config if not set. The ConfigMap object must have an existing key named: 'dynamic-plugins.yaml'."
+                      description: 'Reference to an existing ConfigMap for Dynamic Plugins. A new one will be generated with the default config if not set. The ConfigMap object must have an existing key named: ''dynamic-plugins.yaml''.'
                       type: string
                     extraEnvs:
                       description: Extra environment variables
@@ -195,7 +195,7 @@ spec:
                           pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
                           type: string
                         subdomain:
-                          description: "Subdomain is a DNS subdomain that is requested within the ingress controller's domain (as a subdomain). Ignored if Enabled is false. Example: subdomain `frontend` automatically receives the router subdomain `apps.mycluster.com` to have a full hostname `frontend.apps.mycluster.com`."
+                          description: 'Subdomain is a DNS subdomain that is requested within the ingress controller''s domain (as a subdomain). Ignored if Enabled is false. Example: subdomain `frontend` automatically receives the router subdomain `apps.mycluster.com` to have a full hostname `frontend.apps.mycluster.com`.'
                           maxLength: 253
                           pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
                           type: string
@@ -229,7 +229,7 @@ spec:
                       type: boolean
                   type: object
                 rawRuntimeConfig:
-                  description: Raw Runtime Objects configuration. For Advanced scenarios.
+                  description: Raw Runtime RuntimeObjects configuration. For Advanced scenarios.
                   properties:
                     backstageConfig:
                       description: Name of ConfigMap containing Backstage runtime objects configuration
@@ -361,12 +361,14 @@ rules:
       - ""
     resources:
       - configmaps
+      - secrets
       - services
     verbs:
       - create
       - delete
       - get
       - list
+      - patch
       - update
       - watch
   - apiGroups:
@@ -379,32 +381,16 @@ rules:
       - list
       - watch
   - apiGroups:
-      - ""
-    resources:
-      - secrets
-    verbs:
-      - create
-      - delete
-  - apiGroups:
       - apps
     resources:
       - deployments
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - update
-      - watch
-  - apiGroups:
-      - apps
-    resources:
       - statefulsets
     verbs:
       - create
       - delete
       - get
       - list
+      - patch
       - update
       - watch
   - apiGroups:
@@ -443,6 +429,7 @@ rules:
       - delete
       - get
       - list
+      - patch
       - update
       - watch
 ---
@@ -551,40 +538,30 @@ subjects:
 ---
 apiVersion: v1
 data:
-  backend-auth-configmap.yaml: |
+  app-config.yaml: |-
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: # placeholder for '<cr-name>-backend-auth'
+      name: my-backstage-config-cm1 # placeholder for <bs>-default-appconfig
     data:
-      "app-config.backend-auth.default.yaml": |
+      default.app-config.yaml: |
         backend:
           auth:
             keys:
               # This is a default value, which you should change by providing your own app-config
               - secret: "pl4s3Ch4ng3M3"
-  db-secret.yaml: |
+  db-secret.yaml: |-
     apiVersion: v1
     kind: Secret
     metadata:
-      name: # placeholder for 'backstage-psql-secret-<cr-name>'
-    stringData:
-      "POSTGRES_PASSWORD": "rl4s3Fh4ng3M4" # default value, change to your own value
-      "POSTGRES_PORT": "5432"
-      "POSTGRES_USER": "postgres"
-      "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4" # default value, change to your own value
-      "POSTGRES_HOST": "" # set to your Postgres DB host. If the local DB is deployed, set to 'backstage-psql-<cr-name>'
-  db-service-hl.yaml: |
-    apiVersion: v1
-    kind: Service
-    metadata:
-      name: backstage-psql-cr1-hl # placeholder for 'backstage-psql-<cr-name>-hl'
-    spec:
-      selector:
-        rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
-      clusterIP: None
-      ports:
-        - port: 5432
+      name: postgres-secrets # will be replaced
+    type: Opaque
+    #stringData:
+    #  POSTGRES_PASSWORD:
+    #  POSTGRES_PORT: "5432"
+    #  POSTGRES_USER: postgres
+    #  POSTGRESQL_ADMIN_PASSWORD: admin123
+    #  POSTGRES_HOST: bs1-db-service    #placeholder <crname>-db-service
   db-service.yaml: |
     apiVersion: v1
     kind: Service
@@ -593,9 +570,10 @@ data:
     spec:
       selector:
         rhdh.redhat.com/app:  backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
+      clusterIP: None
       ports:
         - port: 5432
-  db-statefulset.yaml: |
+  db-statefulset.yaml: |-
     apiVersion: apps/v1
     kind: StatefulSet
     metadata:
@@ -611,15 +589,18 @@ data:
         metadata:
           labels:
             rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
-          name: backstage-db-cr1 # placeholder for 'backstage-psql-<cr-name>'
         spec:
+          # fsGroup does not work for Openshift
+          # AKS/EKS does not work w/o it
+          #securityContext:
+          #  fsGroup: 26
           automountServiceAccountToken: false
           ## https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
           ## The optional .spec.persistentVolumeClaimRetentionPolicy field controls if and how PVCs are deleted during the lifecycle of a StatefulSet.
           ## You must enable the StatefulSetAutoDeletePVC feature gate on the API server and the controller manager to use this field.
-    #      persistentVolumeClaimRetentionPolicy:
-    #        whenDeleted: Retain
-    #        whenScaled: Retain
+          #      persistentVolumeClaimRetentionPolicy:
+          #        whenDeleted: Retain
+          #        whenScaled: Retain
           containers:
             - env:
                 - name: POSTGRESQL_PORT_NUMBER
@@ -628,13 +609,12 @@ data:
                   value: /var/lib/pgsql/data
                 - name: PGDATA
                   value: /var/lib/pgsql/data/userdata
-              envFrom:
-                - secretRef:
-                    name: <POSTGRESQL_SECRET>  # will be replaced with 'backstage-psql-secrets-<cr-name>'
-              # image will be replaced by the value of the `RELATED_IMAGE_postgresql` env var, if set
-              image: quay.io/fedora/postgresql-15:latest
+              image: quay.io/fedora/postgresql-15:latest # will be replaced with the actual image
               imagePullPolicy: IfNotPresent
               securityContext:
+                # runAsUser:26 does not work for Openshift but looks work for AKS/EKS
+                # runAsUser: 26
+                runAsGroup: 0
                 runAsNonRoot: true
                 allowPrivilegeEscalation: false
                 seccompProfile:
@@ -685,8 +665,6 @@ data:
                 - mountPath: /var/lib/pgsql/data
                   name: data
           restartPolicy: Always
-          securityContext: {}
-          serviceAccount: default
           serviceAccountName: default
           volumes:
             - emptyDir:
@@ -711,7 +689,7 @@ data:
     apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name:  # placeholder for 'backstage-<cr-name>'
+      name: backstage # placeholder for 'backstage-<cr-name>'
     spec:
       replicas: 1
       selector:
@@ -723,6 +701,11 @@ data:
             rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
         spec:
           automountServiceAccountToken: false
+          # if securityContext not present in AKS/EKS, the error is like this:
+          #Error: EACCES: permission denied, open '/dynamic-plugins-root/backstage-plugin-scaffolder-backend-module-github-dynamic-0.2.2.tgz'
+          # fsGroup doesn not work for Openshift
+          #securityContext:
+          #   fsGroup: 1001
           volumes:
             - ephemeral:
                 volumeClaimTemplate:
@@ -738,18 +721,19 @@ data:
                 defaultMode: 420
                 optional: true
                 secretName: dynamic-plugins-npmrc
-
           initContainers:
-            - command:
+            - name: install-dynamic-plugins
+              command:
                 - ./install-dynamic-plugins.sh
                 - /dynamic-plugins-root
+              image: quay.io/janus-idp/backstage-showcase:latest # will be replaced with the actual image quay.io/janus-idp/backstage-showcase:next
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
               env:
                 - name: NPM_CONFIG_USERCONFIG
                   value: /opt/app-root/src/.npmrc.dynamic-plugins
-              # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-              image: quay.io/janus-idp/backstage-showcase:latest
-              imagePullPolicy: IfNotPresent
-              name: install-dynamic-plugins
               volumeMounts:
                 - mountPath: /dynamic-plugins-root
                   name: dynamic-plugins-root
@@ -759,13 +743,13 @@ data:
                   subPath: .npmrc
               workingDir: /opt/app-root/src
               resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
                 limits:
                   cpu: 1000m
                   memory: 2.5Gi
                   ephemeral-storage: 5Gi
-                requests:
-                  cpu: 125m
-                  memory: 128Mi
           containers:
             - name: backstage-backend
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
@@ -774,6 +758,9 @@ data:
               args:
                 - "--config"
                 - "dynamic-plugins-root/app-config.dynamic-plugins.yaml"
+              securityContext:
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
               readinessProbe:
                 failureThreshold: 3
                 httpGet:
@@ -800,27 +787,22 @@ data:
               env:
                 - name: APP_CONFIG_backend_listen_port
                   value: "7007"
-              envFrom:
-                - secretRef:
-                    name: <POSTGRESQL_SECRET>  # will be replaced with 'backstage-psql-secrets-<cr-name>'
-              #            - secretRef:
-              #                name: backstage-secrets
               volumeMounts:
                 - mountPath: /opt/app-root/src/dynamic-plugins-root
                   name: dynamic-plugins-root
               resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
                 limits:
                   cpu: 1000m
                   memory: 2.5Gi
                   ephemeral-storage: 5Gi
-                requests:
-                  cpu: 125m
-                  memory: 128Mi
-  dynamic-plugins-configmap.yaml: |-
+  dynamic-plugins.yaml: |-
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: # placeholder for '<cr-name>-dynamic-plugins'
+      name: default-dynamic-plugins #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name
     data:
       "dynamic-plugins.yaml": |
         includes:
@@ -830,7 +812,7 @@ data:
     apiVersion: route.openshift.io/v1
     kind: Route
     metadata:
-      name:  # placeholder for 'backstage-<cr-name>'
+      name: route # placeholder for 'backstage-<cr-name>'
     spec:
       port:
         targetPort: http-backend
@@ -841,11 +823,20 @@ data:
       to:
         kind: Service
         name:  # placeholder for 'backstage-<cr-name>'
+  secret-envs.yaml: |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: backend-auth-secret
+    stringData:
+      # generated with the command below (from https://janus-idp.io/docs/auth/service-to-service-auth/#setup):
+      # node -p 'require("crypto").randomBytes(24).toString("base64")'
+      BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK" # notsecret
   service.yaml: |-
     apiVersion: v1
     kind: Service
     metadata:
-      name:  # placeholder for 'backstage-<cr-name>'
+      name: backstage # placeholder for 'backstage-<cr-name>'
     spec:
       type: ClusterIP
       selector:
@@ -957,10 +948,8 @@ spec:
             - name: RELATED_IMAGE_postgresql
               value: quay.io/fedora/postgresql-15:latest
             - name: RELATED_IMAGE_backstage
-              value: quay.io/rhdh/rhdh-hub-rhel9:1.1
-          # TODO(asoro): Default image is 'quay.io/rhdh-community/operator:0.1.3' on 1.1.x,
-          # but replaced by the one from RHDH, because the Janus-IDP image expires after 14d if not updated.
-          image: quay.io/rhdh/rhdh-rhel9-operator:1.1
+              value: quay.io/rhdh/rhdh-hub-rhel9:1.2
+          image: quay.io/rhdh/rhdh-rhel9-operator:1.2
           livenessProbe:
             httpGet:
               path: /healthz
@@ -978,10 +967,10 @@ spec:
             limits:
               cpu: 500m
               ephemeral-storage: 20Mi
-              memory: 1024Mi
+              memory: 1Gi
             requests:
               cpu: 10m
-              memory: 64Mi
+              memory: 128Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
