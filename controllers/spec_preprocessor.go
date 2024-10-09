@@ -14,7 +14,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
@@ -112,6 +112,17 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 				return result, err
 			}
 			result.ExtraEnvSecrets[secret.Name] = *secret
+		}
+	}
+
+	// Process PVCFiles
+	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.Pvcs != nil {
+		for _, ep := range bsSpec.Application.ExtraFiles.Pvcs {
+			pvc := &corev1.PersistentVolumeClaim{}
+			if err := r.checkExternalObject(ctx, pvc, ep.Name, ns); err != nil {
+				return result, err
+			}
+			result.ExtraPvcs[pvc.Name] = *pvc
 		}
 	}
 

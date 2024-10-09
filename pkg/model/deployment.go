@@ -17,7 +17,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
@@ -115,6 +115,8 @@ func (b *BackstageDeployment) validate(model *BackstageModel, backstage bsv1.Bac
 	if err := addDynamicPlugins(backstage.Spec, b.deployment, model); err != nil {
 		return err
 	}
+
+	addPvc(backstage.Spec, b.deployment, model)
 
 	//DbSecret
 	if backstage.Spec.IsAuthSecretSpecified() {

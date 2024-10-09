@@ -203,7 +203,7 @@ data:
     base64-encoded-content
 ```
 
-These files can be mounted to the Backstage container as follows:
+These objects can be mounted to the Backstage container as follows:
 
 ```yaml
 spec:
@@ -231,6 +231,57 @@ In our example, the following files will be mounted:
 ```
 
 **Note:** To limit read access to Secrets by the Operator Service Account (for security reasons), we only support mounting files from Secrets if a key is specified.
+
+##### PersistentVolumeClaims
+
+Since **v1alpha3** (Operator version **0.4.0**), it is also possible to mount directory from pre-created [PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) using **spec.application.extraFiles.pvcs** field. PersistentVolumeClaims are mounted as a directory to the container's path defined as following:
+* **spec.application.extraFiles.pvcs[].mountPath** if defined
+* Otherwise **spec.application.extraFiles.mountPath**/<pvc-name> 
+* And if nothing defined it falls to default path (**/opt/app-root/src**)
+
+For example, consider the following objects in the namespace:
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim2
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+```
+These objects can be mounted to the Backstage container as follows:
+
+```yaml
+spec:
+  application:
+    extraFiles:
+      mountPath: /my/path
+      pods:
+        - name: myclaim1
+        - name: myclaim2
+          mountPath: /vol/my/claim
+```
+As a result, the following directories will be mounted:
+
+```
+/my/path/myclaim1
+/vol/my/claim
+```
 
 #### Extra Environment Variables
 
