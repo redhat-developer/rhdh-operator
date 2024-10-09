@@ -16,13 +16,14 @@ package model
 
 import (
 	"context"
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	"path/filepath"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,15 +43,67 @@ func TestDefaultPvcs(t *testing.T) {
 
 	obj := model.getRuntimeObjectByType(&BackstagePvcs{})
 	assert.NotNil(t, obj)
-	assert.Equal(t, utils.GetObjectKind(&v1.PersistentVolumeClaim{}, testObj.scheme).Kind, obj.Object().GetObjectKind().GroupVersionKind().Kind)
+	assert.Equal(t, utils.GetObjectKind(&corev1.PersistentVolumeClaim{}, testObj.scheme).Kind, obj.Object().GetObjectKind().GroupVersionKind().Kind)
 	mv, ok := obj.Object().(*multiobject.MultiObject)
 	assert.True(t, ok)
 	assert.Equal(t, 2, len(mv.Items))
 	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), mv.Items[0].GetName())
+	assert.Equal(t, "myclaim1", mv.Items[0].GetAnnotations()[ConfiguredNameAnnotation])
 
 	// PVC volumes created and mounted to backstage container
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Volumes))
 	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), model.backstageDeployment.podSpec().Volumes[0].Name)
 	assert.Equal(t, 2, len(model.backstageDeployment.container().VolumeMounts))
 	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), model.backstageDeployment.container().VolumeMounts[0].Name)
+}
+
+func TestSpecifiedPvcs(t *testing.T) {
+
+	pvc1 := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "my-pvc1",
+		},
+	}
+
+	pvc2 := corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "my-pvc2",
+		},
+	}
+
+	bs := bsv1.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pvc",
+		},
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				ExtraFiles: &bsv1.ExtraFiles{
+					Pvcs: []bsv1.PvcRef{
+						{
+							Name: "my-pvc1",
+						},
+						{
+							Name:      "my-pvc2",
+							MountPath: "/my/pvc/path",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	testObj.externalConfig.ExtraPvcs = map[string]corev1.PersistentVolumeClaim{"my-pvc1": pvc1, "my-pvc2": pvc2}
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, true, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+	d := model.backstageDeployment
+	assert.Equal(t, 2, len(d.podSpec().Volumes))
+	assert.Equal(t, 2, len(d.container().VolumeMounts))
+	assert.Equal(t, "my-pvc1", d.container().VolumeMounts[0].Name)
+	assert.Equal(t, filepath.Join(DefaultMountDir, "my-pvc1"), d.container().VolumeMounts[0].MountPath)
+	assert.Equal(t, "my-pvc2", d.container().VolumeMounts[1].Name)
+	assert.Equal(t, "/my/pvc/path", d.container().VolumeMounts[1].MountPath)
 }

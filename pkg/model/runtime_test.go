@@ -3,13 +3,13 @@ package model
 import (
 	"context"
 	"fmt"
+
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"testing"
 
 	"k8s.io/utils/ptr"
 
-	"redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -28,13 +28,13 @@ func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
 // NOTE: to make it work locally env var LOCALBIN should point to the directory where default-config folder located
 func TestInitDefaultDeploy(t *testing.T) {
 
-	bs := v1alpha2.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: v1alpha2.BackstageSpec{
-			Database: &v1alpha2.Database{
+		Spec: bsv1.BackstageSpec{
+			Database: &bsv1.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
@@ -90,13 +90,13 @@ func TestIfEmptyObjectIsValid(t *testing.T) {
 
 func TestAddToModel(t *testing.T) {
 
-	bs := v1alpha2.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: v1alpha2.BackstageSpec{
-			Database: &v1alpha2.Database{
+		Spec: bsv1.BackstageSpec{
+			Database: &bsv1.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
@@ -133,7 +133,7 @@ func TestAddToModel(t *testing.T) {
 }
 
 func TestRawConfig(t *testing.T) {
-	bs := v1alpha2.Backstage{
+	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
@@ -171,7 +171,7 @@ spec:
 }
 
 func TestMultiobject(t *testing.T) {
-	bs := v1alpha2.Backstage{}
+	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 	assert.NoError(t, err)
@@ -188,7 +188,7 @@ func TestMultiobject(t *testing.T) {
 }
 
 func TestSingleMultiobject(t *testing.T) {
-	bs := v1alpha2.Backstage{}
+	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "single-pvc.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 	assert.NoError(t, err)
@@ -205,14 +205,14 @@ func TestSingleMultiobject(t *testing.T) {
 }
 
 func TestSingleFailedWithMultiDefinition(t *testing.T) {
-	bs := v1alpha2.Backstage{}
+	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "multi-service-err.yaml")
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 	assert.EqualError(t, err, "failed to initialize object: multiple objects not expected for: service.yaml")
 }
 
 func TestInvalidObjectKind(t *testing.T) {
-	bs := v1alpha2.Backstage{}
+	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "invalid-service-type.yaml")
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 	assert.EqualError(t, err, "failed to read default value for the key service.yaml, reason: GroupVersionKind not match, found: /v1, Kind=Deployment, expected: [/v1, Kind=Service]")

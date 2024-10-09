@@ -35,7 +35,7 @@ import (
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -116,13 +116,14 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim2"))).
 				To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
 
-			podName, err := getBackstagePodName(ctx, ns, backstageName)
-			g.Expect(err).ShouldNot(HaveOccurred())
-			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", fmt.Sprintf("test -d %s", path))
+			pod, err := getBackstagePod(ctx, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-		}, time.Minute, time.Second).Should(Succeed(), controllerMessage())
+			// check if mounted directory is there
+			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, "backstage-backend", fmt.Sprintf("test -d %s", path))
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
 	})
 
 	It("bounds configured by default PVC with precreated PV", func() {
@@ -196,15 +197,119 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1"))).
 				To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
 
-			podName, err := getBackstagePodName(ctx, ns, backstageName)
+			pod, err := getBackstagePod(ctx, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(pod.Spec.Containers[0].Name).To(Equal("backstage-backend"))
+
+			// check if mounted directory is there
+			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, "backstage-backend", fmt.Sprintf("test -d %s", path))
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
+
+	})
+
+	It("creates specified PVCs and mounts to container", func() {
+
+		if !*testEnv.UseExistingCluster {
+			Skip("Skipped for not real cluster")
+		}
+
+		pvc1 := corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-pvc1",
+				Namespace: ns,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		}
+		err := k8sClient.Create(ctx, &pvc1)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		pvc2 := corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-pvc2",
+				Namespace: ns,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
+			},
+		}
+		err = k8sClient.Create(ctx, &pvc2)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		pvcCm := generateConfigMap(ctx, k8sClient, "pvc-conf", ns,
+			map[string]string{"pvcs.yaml": readTestYamlFile("raw-pvcs.yaml")}, nil, nil)
+
+		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				ExtraFiles: &bsv1.ExtraFiles{
+					Pvcs: []bsv1.PvcRef{
+						{
+							Name: "my-pvc1",
+						},
+						{
+							Name:      "my-pvc2",
+							MountPath: "/my/pvc2/path",
+						},
+					},
+				},
+			},
+			RawRuntimeConfig: &bsv1.RuntimeConfig{
+				BackstageConfigName: pvcCm,
+			},
+		}, "")
+
+		Eventually(func(g Gomega) {
+
+			pvc := &corev1.PersistentVolumeClaim{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim1")}, pvc)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim2")}, pvc)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "my-pvc1"}, pvc)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			pvc2 := &corev1.PersistentVolumeClaim{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "my-pvc2"}, pvc2)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			// check if added to deployment
+			depl := &appsv1.Deployment{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			path := filepath.Join(model.DefaultMountDir, "my-pvc1")
+			g.Expect(path).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[0]))
+			g.Expect("my-pvc1").To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
+
+			path2 := "/my/pvc2/path"
+			g.Expect(path2).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[0]))
+			g.Expect("my-pvc2").To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
+
+			pod, err := getBackstagePod(ctx, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", fmt.Sprintf("test -d %s", path))
+			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, "backstage-backend", fmt.Sprintf("test -d %s", path))
+			g.Expect(err).ShouldNot(HaveOccurred())
+			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, "backstage-backend", fmt.Sprintf("test -d %s", path2))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-		}, time.Minute, time.Second).Should(Succeed(), controllerMessage())
-
+		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
 	})
 
 })

@@ -6,7 +6,7 @@ import (
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

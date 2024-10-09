@@ -44,6 +44,13 @@ func GenerateLabel(labels *map[string]string, name string, value string) {
 	(*labels)[name] = value
 }
 
+func AddAnnotation(object client.Object, name string, value string) {
+	if object.GetAnnotations() == nil {
+		object.SetAnnotations(map[string]string{})
+	}
+	object.GetAnnotations()[name] = value
+}
+
 // GenerateRuntimeObjectName generates name using BackstageCR name and objectType which is ConfigObject Key without '.yaml' (like 'deployment')
 func GenerateRuntimeObjectName(backstageCRName string, objectType string) string {
 	return fmt.Sprintf("%s-%s", objectType, backstageCRName)
