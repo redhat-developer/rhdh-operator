@@ -11,6 +11,7 @@ set -e
 #   --prod_operator_version "v1.1.0" \
 #   --helper_mirror_registry_storage "30Gi" \
 #   --use_existing_mirror_registry "$MY_MIRROR_REGISTRY"
+#   --use_image_content_source_policy "false"
 while [ $# -gt 0 ]; do
   if [[ $1 == *"--"* ]]; then
     param="${1/--/}"
@@ -23,7 +24,7 @@ done
 # set -x
 
 # Operators
-declare prod_operator_index="${prod_operator_index:?Must set --prod_operator_index: for OCP 4.12, use registry.redhat.io/redhat/redhat-operator-index:v4.12 or quay.io/rhdh/iib:latest-v4.14-x86_64}"
+declare prod_operator_index="${prod_operator_index:?Must set --prod_operator_index: for OCP 4.14, use registry.redhat.io/redhat/redhat-operator-index:v4.14 or quay.io/rhdh/iib:latest-v4.14-x86_64}"
 declare prod_operator_package_name="rhdh"
 declare prod_operator_bundle_name="rhdh-operator"
 declare prod_operator_version="${prod_operator_version:?Must set --prod_operator_version: for fast or fast-1.y channels, use v1.1.0, v1.1.1, etc.}"
@@ -34,6 +35,9 @@ declare helper_mirror_registry_storage=${helper_mirror_registry_storage:-"30Gi"}
 
 declare my_catalog=${prod_operator_package_name}-disconnected-install
 declare k8s_resource_name=${my_catalog}
+
+#options
+declare use_image_content_source_policy=${use_image_content_source_policy:-"true"}
 
 # Check we're logged into a cluster
 if ! oc whoami > /dev/null 2>&1; then
@@ -218,8 +222,9 @@ EOF
       --to="${registry_url}/${ocp_local_repo}" \
       --to-release-image="${registry_url}/${ocp_local_repo}:${OCP_VER}-${OCP_ARCH}" \
       --insecure=true > /tmp/oc-adm-release-mirror__mirror-registry.out
-    echo "  creating ImageContentSourcePolicy for OCP release images: imagecontentsourcepolicy/ocp-release ..." >&2
-    cat <<EOF | oc apply -f - >&2
+    if [[ $use_image_content_source_policy == "true" ]]; then
+      echo "  creating ImageContentSourcePolicy for OCP release images: imagecontentsourcepolicy/ocp-release ..." >&2
+      cat <<EOF | oc apply -f - >&2
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:
@@ -235,7 +240,7 @@ spec:
     - "${registry_url}/${ocp_local_repo}"
     source: "quay.io/openshift-release-dev/ocp-v${OCP_VER_MAJOR}.0-art-dev"
 EOF
-
+    fi
     echo "[INFO] Cleaning up temporary files ..." >&2
     rm -f /tmp/my-global-pull-secret-for-mirror-reg.yaml /tmp/oc-adm-release-mirror__mirror-registry.out >&2
 
@@ -299,23 +304,38 @@ echo "[INFO] Mirroring related images to the $my_registry registry."
 while IFS= read -r line
 do
   public_image=$(echo "${line}" | cut -d '=' -f1)
-  if [[ "$prod_operator_index" != registry.redhat.io/redhat/redhat-operator-index* ]] && [[ "$public_image" == registry.redhat.io/rhdh/* ]]; then
-    if ! skopeo inspect "docker://$public_image" &> /dev/null; then
+  if [[ "$prod_operator_index" != registry.redhat.io/redhat/redhat-operator-index* ]]; then
+    if [[ "$public_image" == registry.redhat.io/rhdh/* ]]; then
+      if ! skopeo inspect "docker://$public_image" --raw &> /dev/null; then
+        # likely CI build, which is not public yet
+        echo "  Replacing non-public CI image $public_image ..."
+        public_image=${public_image/registry.redhat.io\/rhdh/quay.io\/rhdh}
+        echo "    => $public_image"
+      fi
+    elif [[ "$public_image" == registry-proxy.engineering.redhat.com/rh-osbs/* ]]; then
       # likely CI build, which is not public yet
       echo "  Replacing non-public CI image $public_image ..."
-      public_image=${public_image/registry.redhat.io\/rhdh/quay.io\/rhdh}
+      public_image=${public_image/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}
       echo "    => $public_image"
     fi
   fi
   private_image=$(echo "${line}" | cut -d '=' -f2)
-  echo "[INFO] Mirroring ${public_image}"
+  if [[ "$private_image" != "$public_image" ]]; then
+    echo "[INFO] Mirroring $private_image as $public_image"
+  else
+    echo "[INFO] Mirroring ${public_image}"
+  fi
   skopeo copy --dest-tls-verify=false --preserve-digests --all "docker://$public_image" "docker://$private_image"
 done < "${MANIFESTS_FOLDER}/mapping.txt"
 
-echo "[INFO] Creating CatalogSource and ImageContentSourcePolicy"
+echo "[INFO] Creating CatalogSource"
 # shellcheck disable=SC2002
 cat "${MANIFESTS_FOLDER}/catalogSource.yaml" | sed 's|name: .*|name: '${k8s_resource_name}'|' | oc apply -f -
-# shellcheck disable=SC2002
-cat "${MANIFESTS_FOLDER}/imageContentSourcePolicy.yaml" | sed 's|name: .*|name: '${k8s_resource_name}'|' | oc apply -f -
+
+if [[ $use_image_content_source_policy == "true" ]]; then
+  echo "[INFO] Creating ImageContentSourcePolicy"
+  # shellcheck disable=SC2002
+  cat "${MANIFESTS_FOLDER}/imageContentSourcePolicy.yaml" | sed 's|name: .*|name: '${k8s_resource_name}'|' | oc apply -f -
+fi
 
 echo "[INFO] Catalog $my_operator_index deployed to the $my_registry registry."
