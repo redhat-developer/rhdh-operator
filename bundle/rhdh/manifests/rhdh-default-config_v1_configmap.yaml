@@ -296,19 +296,6 @@ data:
         includes:
           - dynamic-plugins.default.yaml
         plugins: []
-  pvcs.yaml: |-
-    apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: myclaim1
-    spec:
-      accessModes:
-        - ReadWriteOnce
-      volumeMode: Filesystem
-      resources:
-        requests:
-          storage: 1Gi
-    #  storageClassName: slow
   route.yaml: |-
     apiVersion: route.openshift.io/v1
     kind: Route
