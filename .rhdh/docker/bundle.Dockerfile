@@ -1,4 +1,5 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest as builder-runner
+USER 1001
 
 FROM scratch
 
