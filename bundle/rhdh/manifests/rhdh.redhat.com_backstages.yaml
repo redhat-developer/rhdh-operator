@@ -829,10 +829,6 @@ spec:
                                 Name of the object
                                 We support only ConfigMaps and Secrets.
                               type: string
-                            withSubPath:
-                              default: true
-                              description: Whether subPath is used to mount
-                              type: boolean
                           required:
                           - name
                           type: object
@@ -871,10 +867,6 @@ spec:
                                 Name of the object
                                 We support only ConfigMaps and Secrets.
                               type: string
-                            withSubPath:
-                              default: true
-                              description: Whether subPath is used to mount
-                              type: boolean
                           required:
                           - name
                           type: object
@@ -914,10 +906,6 @@ spec:
                                 Name of the object
                                 We support only ConfigMaps and Secrets.
                               type: string
-                            withSubPath:
-                              default: true
-                              description: Whether subPath is used to mount
-                              type: boolean
                           required:
                           - name
                           type: object
@@ -948,10 +936,6 @@ spec:
                                 Name of the object
                                 We support only ConfigMaps and Secrets.
                               type: string
-                            withSubPath:
-                              default: true
-                              description: Whether subPath is used to mount
-                              type: boolean
                           required:
                           - name
                           type: object
@@ -998,10 +982,6 @@ spec:
                                 Name of the object
                                 We support only ConfigMaps and Secrets.
                               type: string
-                            withSubPath:
-                              default: true
-                              description: Whether subPath is used to mount
-                              type: boolean
                           required:
                           - name
                           type: object
