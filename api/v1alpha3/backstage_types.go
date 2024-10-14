@@ -190,7 +190,7 @@ type ObjectKeyRef struct {
 	// Whether subPath is used to mount
 	// +optional
 	//+kubebuilder:default=true
-	WithSubPath *bool `json:"withSubPath"`
+	//WithSubPath *bool `json:"withSubPath"`
 }
 
 type PvcRef struct {
