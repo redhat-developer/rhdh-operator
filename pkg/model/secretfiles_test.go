@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"k8s.io/utils/ptr"
+
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
@@ -14,22 +16,6 @@ import (
 )
 
 var (
-	//secretFilesTestSecret = corev1.Secret{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name:      "secret1",
-	//		Namespace: "ns123",
-	//	},
-	//	StringData: map[string]string{"conf.yaml": ""},
-	//}
-	//
-	//secretFilesTestSecret2 = corev1.Secret{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name:      "secret2",
-	//		Namespace: "ns123",
-	//	},
-	//	StringData: map[string]string{"conf2.yaml": ""},
-	//}
-
 	secretFilesTestBackstage = bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
@@ -69,7 +55,7 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
-	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret2", Key: "conf.yaml"})
+	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret2", Key: "conf.yaml", MountPath: "/custom/path", WithSubPath: ptr.To(false)})
 	// https://issues.redhat.com/browse/RHIDP-2246 - mounting secret/CM with dot in the name
 	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret.dot", Key: "conf3.yaml"})
 
@@ -90,6 +76,10 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret1"), deployment.podSpec().Volumes[0].Name)
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret2"), deployment.podSpec().Volumes[1].Name)
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret.dot"), deployment.podSpec().Volumes[2].Name)
+
+	assert.Equal(t, deployment.container().VolumeMounts[0].SubPath, "conf.yaml")
+	assert.Equal(t, deployment.container().VolumeMounts[1].SubPath, "")
+	assert.Equal(t, deployment.container().VolumeMounts[1].MountPath, "/custom/path")
 
 }
 

@@ -1,8 +1,11 @@
 package model
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
@@ -18,19 +21,20 @@ func (f ConfigMapFilesFactory) newBackstageObject() RuntimeObject {
 }
 
 type ConfigMapFiles struct {
-	ConfigMap *corev1.ConfigMap
-	MountPath string
-	Key       string
+	ConfigMap   *corev1.ConfigMap
+	MountPath   string
+	Key         string
+	withSubPath *bool
 }
 
 func init() {
 	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false)
 }
 
-func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
-		return
+		return nil
 	}
 	mp := DefaultMountDir
 	if spec.Application.ExtraFiles.MountPath != "" {
@@ -38,14 +42,22 @@ func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, m
 	}
 
 	for _, configMap := range spec.Application.ExtraFiles.ConfigMaps {
+		if configMap.MountPath != "" {
+			mp = configMap.MountPath
+		} else if configMap.WithSubPath == ptr.To(false) {
+			return fmt.Errorf("mounting without subPath to non-individual MountPath is forbidden, ConfigMap name: %s", configMap.Name)
+		}
 		cm := model.ExternalConfig.ExtraFileConfigMaps[configMap.Name]
 		cmf := ConfigMapFiles{
-			ConfigMap: &cm,
-			MountPath: mp,
-			Key:       configMap.Key,
+			ConfigMap:   &cm,
+			MountPath:   mp,
+			Key:         configMap.Key,
+			withSubPath: configMap.WithSubPath,
 		}
 		cmf.updatePod(deployment)
 	}
+
+	return nil
 }
 
 // implementation of RuntimeObject interface
@@ -89,6 +101,6 @@ func (p *ConfigMapFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 func (p *ConfigMapFiles) updatePod(deployment *appsv1.Deployment) {
 
 	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,
-		p.ConfigMap.Name, p.MountPath, p.Key, p.ConfigMap.Data)
+		p.ConfigMap.Name, p.MountPath, p.Key, p.withSubPath, p.ConfigMap.Data)
 
 }

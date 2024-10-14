@@ -29,7 +29,7 @@ type PodMutator struct {
 // mountPath - mount path, default one or  as it specified in BackstageCR.spec.Application.AppConfig|ExtraFiles
 // fileName - file name which fits one of the object's key, otherwise error will be returned.
 // data - key:value pairs from the object. should be specified if fileName specified
-func MountFilesFrom(podSpec *corev1.PodSpec, container *corev1.Container, kind ObjectKind, objectName, mountPath, fileName string, data map[string]string) {
+func MountFilesFrom(podSpec *corev1.PodSpec, container *corev1.Container, kind ObjectKind, objectName, mountPath, fileName string, withSubPath *bool, data map[string]string) {
 
 	volName := GenerateVolumeNameFromCmOrSecret(objectName)
 	volSrc := corev1.VolumeSource{}
@@ -48,6 +48,12 @@ func MountFilesFrom(podSpec *corev1.PodSpec, container *corev1.Container, kind O
 	}
 
 	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
+
+	// withSubPath == true by default
+	if withSubPath != nil && !*withSubPath {
+		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{Name: volName, MountPath: mountPath})
+		return
+	}
 
 	if data != nil {
 		for file := range data {

@@ -3,6 +3,8 @@ package model
 import (
 	"fmt"
 
+	"k8s.io/utils/ptr"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,9 +25,10 @@ func (f SecretFilesFactory) newBackstageObject() RuntimeObject {
 }
 
 type SecretFiles struct {
-	Secret    *corev1.Secret
-	MountPath string
-	Key       string
+	Secret      *corev1.Secret
+	MountPath   string
+	Key         string
+	withSubPath *bool
 }
 
 func init() {
@@ -43,6 +46,11 @@ func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) erro
 	}
 
 	for _, sec := range spec.Application.ExtraFiles.Secrets {
+		if sec.MountPath != "" {
+			mp = sec.MountPath
+		} else if sec.WithSubPath == ptr.To(false) {
+			return fmt.Errorf("mounting without subPath to non-individual MountPath is forbidden, Secret name: %s", sec.Name)
+		}
 		if sec.Key == "" {
 			return fmt.Errorf("key is required to mount extra file with secret %s", sec.Name)
 		}
@@ -53,8 +61,9 @@ func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) erro
 				// it is done for 0.1.0 compatibility only
 				StringData: map[string]string{sec.Key: ""},
 			},
-			MountPath: mp,
-			Key:       sec.Key,
+			MountPath:   mp,
+			Key:         sec.Key,
+			withSubPath: sec.WithSubPath,
 		}
 		sf.updatePod(deployment)
 	}
@@ -101,5 +110,5 @@ func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sche
 func (p *SecretFiles) updatePod(depoyment *appsv1.Deployment) {
 
 	utils.MountFilesFrom(&depoyment.Spec.Template.Spec, &depoyment.Spec.Template.Spec.Containers[0], utils.SecretObjectKind,
-		p.Secret.Name, p.MountPath, p.Key, p.Secret.StringData)
+		p.Secret.Name, p.MountPath, p.Key, p.withSubPath, p.Secret.StringData)
 }

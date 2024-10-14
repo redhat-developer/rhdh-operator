@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/utils/ptr"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -107,7 +109,7 @@ func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
 	}
 
 	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.InitContainers[0], utils.ConfigMapObjectKind,
-		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, p.ConfigMap.Data)
+		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, ptr.To(true), p.ConfigMap.Data)
 
 }
 

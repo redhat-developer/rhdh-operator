@@ -3,6 +3,8 @@ package model
 import (
 	"path/filepath"
 
+	"k8s.io/utils/ptr"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -101,7 +103,7 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 func (b *AppConfig) updatePod(deployment *appsv1.Deployment) {
 
 	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,
-		b.ConfigMap.Name, b.MountPath, b.Key, b.ConfigMap.Data)
+		b.ConfigMap.Name, b.MountPath, b.Key, ptr.To(true), b.ConfigMap.Data)
 
 	fileDir := b.MountPath
 	for file := range b.ConfigMap.Data {
