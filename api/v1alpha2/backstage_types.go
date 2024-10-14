@@ -29,10 +29,8 @@ type BackstageSpec struct {
 	// Configuration for database access. Optional.
 	Database *Database `json:"database,omitempty"`
 
-	// Valid fragment of Deployment to be merged with default/raw configuration.
-	// Set the Deployment's metadata and|or spec fields you want to override or add.
+	// Configuration for Backstage Deployment resource.
 	// Optional.
-	// +kubebuilder:pruning:PreserveUnknownFields
 	Deployment *BackstageDeployment `json:"deployment,omitempty"`
 }
 
