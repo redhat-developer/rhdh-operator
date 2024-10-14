@@ -14,5 +14,5 @@ resources:
   domain: rhdh.redhat.com
   kind: Backstage
   path: redhat-developer/red-hat-developer-hub-operator/api/v1alpha3
-  version: v1alpha2
+  version: v1alpha3
 version: "3"
