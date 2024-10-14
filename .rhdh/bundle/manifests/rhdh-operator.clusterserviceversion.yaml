@@ -7,7 +7,7 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "rhdh.redhat.com/v1alpha2",
+          "apiVersion": "rhdh.redhat.com/v1alpha3",
           "kind": "Backstage",
           "metadata": {
             "name": "developer-hub"
