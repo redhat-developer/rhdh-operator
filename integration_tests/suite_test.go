@@ -37,7 +37,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -178,17 +178,17 @@ func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1.Backs
 	return backstageName
 }
 
-func getBackstagePodName(ctx context.Context, ns, backstageName string) (string, error) {
+func getBackstagePod(ctx context.Context, ns, backstageName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	err := k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(podList.Items) != 1 {
-		return "", fmt.Errorf("expected only one Pod, but have %v", podList.Items)
+		return nil, fmt.Errorf("expected only one Pod, but have %v", podList.Items)
 	}
 
-	return podList.Items[0].Name, nil
+	return &podList.Items[0], nil
 }
 
 func createNamespace(ctx context.Context) string {

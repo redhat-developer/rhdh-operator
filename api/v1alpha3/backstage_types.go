@@ -1,4 +1,4 @@
-package v1alpha2
+package v1alpha3
 
 import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -29,8 +29,10 @@ type BackstageSpec struct {
 	// Configuration for database access. Optional.
 	Database *Database `json:"database,omitempty"`
 
-	// Configuration for Backstage Deployment resource.
+	// Valid fragment of Deployment to be merged with default/raw configuration.
+	// Set the Deployment's metadata and|or spec fields you want to override or add.
 	// Optional.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	Deployment *BackstageDeployment `json:"deployment,omitempty"`
 }
 
@@ -146,6 +148,11 @@ type ExtraFiles struct {
 	// For each item in this array, a key must be specified that will be mounted as a file.
 	// +optional
 	Secrets []ObjectKeyRef `json:"secrets,omitempty"`
+
+	// List of references to Persistent Volume Claim objects mounted as extra files
+	// For each item in this array, a key must be specified that will be mounted as a file.
+	// +optional
+	Pvcs []PvcRef `json:"pvcs,omitempty"`
 }
 
 type ExtraEnvs struct {
@@ -175,6 +182,26 @@ type ObjectKeyRef struct {
 	// Key in the object
 	// +optional
 	Key string `json:"key,omitempty"`
+
+	// Path to mount the Object. If not specified default-path/Name will be used
+	// +optional
+	MountPath string `json:"mountPath"`
+
+	// Whether subPath is used to mount
+	// +optional
+	//+kubebuilder:default=true
+	//WithSubPath *bool `json:"withSubPath"`
+}
+
+type PvcRef struct {
+	// Name of the object
+	// We support only ConfigMaps and Secrets.
+	//+kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Path to mount PVC. If not specified default-path/Name will be used
+	// +optional
+	MountPath string `json:"mountPath"`
 }
 
 type Env struct {
@@ -196,6 +223,7 @@ type BackstageStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 
 // Backstage is the Schema for the backstages API
 type Backstage struct {

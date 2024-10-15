@@ -10,7 +10,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"

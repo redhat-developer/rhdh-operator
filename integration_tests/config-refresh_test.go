@@ -15,7 +15,7 @@ import (
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 
 	"k8s.io/apimachinery/pkg/types"
 

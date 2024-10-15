@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 	"path/filepath"
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha2"
+	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 
@@ -18,15 +18,46 @@ import (
 type BackstagePvcsFactory struct{}
 
 func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
-	return &BackstagePvcs{}
+	return &BackstagePvcs{mountPath: DefaultMountDir, fullPath: false}
 }
 
 func init() {
 	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true)
 }
 
+func addPvc(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Pvcs == nil || len(spec.Application.ExtraFiles.Pvcs) == 0 {
+		return
+	}
+
+	mp := DefaultMountDir
+	if spec.Application.ExtraFiles.MountPath != "" {
+		mp = spec.Application.ExtraFiles.MountPath
+	}
+
+	for _, pvcSpec := range spec.Application.ExtraFiles.Pvcs {
+		pvc, ok := model.ExternalConfig.ExtraPvcs[pvcSpec.Name]
+		if ok {
+			pvcObj := BackstagePvcs{}
+			pvcObj.pvcs = &multiobject.MultiObject{}
+			if pvcSpec.MountPath == "" {
+				pvcObj.mountPath = mp
+				pvcObj.fullPath = false
+
+			} else {
+				pvcObj.mountPath = pvcSpec.MountPath
+				pvcObj.fullPath = true
+			}
+			pvcObj.pvcs.Items = append(pvcObj.pvcs.Items, &pvc)
+			pvcObj.updatePod(deployment)
+		}
+	}
+}
+
 type BackstagePvcs struct {
-	pvcs *multiobject.MultiObject
+	pvcs      *multiobject.MultiObject
+	mountPath string
+	fullPath  bool
 }
 
 func PvcsName(backstageName, originalName string) string {
@@ -66,6 +97,7 @@ func (b *BackstagePvcs) validate(model *BackstageModel, backstage bsv1.Backstage
 func (b *BackstagePvcs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	for _, item := range b.pvcs.Items {
 		pvc := item.(*corev1.PersistentVolumeClaim)
+		utils.AddAnnotation(pvc, ConfiguredNameAnnotation, item.GetName())
 		pvc.Name = PvcsName(backstage.Name, pvc.Name)
 		setMetaInfo(pvc, backstage, scheme)
 	}
@@ -86,10 +118,14 @@ func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
 
 		c := &deployment.Spec.Template.Spec.Containers[0]
 
-		c.VolumeMounts = append(c.VolumeMounts, corev1.VolumeMount{
-			Name: volName,
-			// TODO make mountDir flexible?
-			MountPath: filepath.Join(DefaultMountDir, volName),
-		})
+		volMount := corev1.VolumeMount{Name: volName}
+		if b.fullPath {
+			volMount.MountPath = b.mountPath
+		} else {
+			volMount.MountPath = filepath.Join(b.mountPath, volName)
+		}
+
+		c.VolumeMounts = append(c.VolumeMounts, volMount)
+
 	}
 }
