@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2024-09-03T14:33:43Z"
+    createdAt: "2024-10-14T11:21:00Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.36.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -42,6 +42,9 @@ spec:
     - kind: Backstage
       name: backstages.rhdh.redhat.com
       version: v1alpha2
+    - kind: Backstage
+      name: backstages.rhdh.redhat.com
+      version: v1alpha3
   description: |
     Backstage Operator
   displayName: Backstage Operator

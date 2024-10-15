@@ -19,6 +19,7 @@ type ExternalConfig struct {
 	ExtraFileSecrets    map[string]corev1.Secret
 	ExtraEnvConfigMaps  map[string]corev1.ConfigMap
 	ExtraEnvSecrets     map[string]corev1.Secret
+	ExtraPvcs           map[string]corev1.PersistentVolumeClaim
 	DynamicPlugins      corev1.ConfigMap
 
 	syncedContent []byte
@@ -33,6 +34,7 @@ func NewExternalConfig() ExternalConfig {
 		ExtraFileSecrets:    map[string]corev1.Secret{},
 		ExtraEnvConfigMaps:  map[string]corev1.ConfigMap{},
 		ExtraEnvSecrets:     map[string]corev1.Secret{},
+		ExtraPvcs:           map[string]corev1.PersistentVolumeClaim{},
 		DynamicPlugins:      corev1.ConfigMap{},
 
 		syncedContent: []byte{},
