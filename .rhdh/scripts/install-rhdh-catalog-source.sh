@@ -124,7 +124,7 @@ spec:
       - ${ICSP_URL}rhdh-hub-rhel9
   - source: registry.redhat.io/rhdh/rhdh-rhel9-operator
     mirrors: 
-      - ${ICSP_URL}/rhdh-rhel9-operator
+      - ${ICSP_URL}rhdh-rhel9-operator
 " > "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml"
 else
   echo "[INFO] Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io"
