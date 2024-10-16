@@ -58,8 +58,8 @@ var _ = Describe("Backstage Operator E2E", func() {
 					containerListOutput, err := helper.Run(cmd)
 					g.Expect(err).ShouldNot(HaveOccurred())
 					containerListNames := helper.GetNonEmptyLines(string(containerListOutput))
-					g.Expect(containerListNames).Should(HaveLen(2),
-						fmt.Sprintf("expected 2 containers in the controller pod, but got %d", len(containerListNames)))
+					g.Expect(containerListNames).Should(HaveLen(1),
+						fmt.Sprintf("expected 1 container(s) in the controller pod, but got %d", len(containerListNames)))
 				}, 3*time.Minute, time.Second).Should(Succeed())
 			})
 

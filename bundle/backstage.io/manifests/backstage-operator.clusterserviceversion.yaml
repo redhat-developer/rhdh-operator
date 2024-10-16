@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2024-10-14T11:21:00Z"
+    createdAt: "2024-10-15T13:36:33Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.36.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -172,9 +172,6 @@ spec:
                         operator: In
                         values:
                         - amd64
-                        - arm64
-                        - ppc64le
-                        - s390x
                       - key: kubernetes.io/os
                         operator: In
                         values:
@@ -182,31 +179,8 @@ spec:
               automountServiceAccountToken: true
               containers:
               - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=0
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                  protocol: TCP
-                resources:
-                  limits:
-                    cpu: 500m
-                    memory: 128Mi
-                  requests:
-                    cpu: 5m
-                    memory: 64Mi
-                securityContext:
-                  allowPrivilegeEscalation: false
-                  capabilities:
-                    drop:
-                    - ALL
-              - args:
                 - --health-probe-bind-address=:8081
-                - --metrics-bind-address=127.0.0.1:8080
+                - --metrics-bind-address=:8080
                 - --leader-elect
                 command:
                 - /manager
@@ -214,14 +188,19 @@ spec:
                 livenessProbe:
                   httpGet:
                     path: /healthz
-                    port: 8081
+                    port: health
                   initialDelaySeconds: 15
                   periodSeconds: 20
                 name: manager
+                ports:
+                - containerPort: 8081
+                  name: health
+                - containerPort: 8080
+                  name: metrics
                 readinessProbe:
                   httpGet:
                     path: /readyz
-                    port: 8081
+                    port: health
                   initialDelaySeconds: 5
                   periodSeconds: 10
                 resources:
