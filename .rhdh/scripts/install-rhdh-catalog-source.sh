@@ -121,7 +121,7 @@ spec:
   imageDigestMirrors:
   - source: registry.redhat.io/rhdh/rhdh-hub-rhel9
     mirrors:
-      - ${ICSP_URL}/rhdh-hub-rhel9
+      - ${ICSP_URL}rhdh-hub-rhel9
   - source: registry.redhat.io/rhdh/rhdh-rhel9-operator
     mirrors: 
       - ${ICSP_URL}/rhdh-rhel9-operator
