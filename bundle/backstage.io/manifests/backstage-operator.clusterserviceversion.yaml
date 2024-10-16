@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2024-10-15T13:36:33Z"
+    createdAt: "2024-10-16T20:54:13Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.36.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -180,7 +180,8 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --metrics-bind-address=:8080
+                - --metrics-bind-address=:8443
+                - --metrics-secure=true
                 - --leader-elect
                 command:
                 - /manager
@@ -195,7 +196,7 @@ spec:
                 ports:
                 - containerPort: 8081
                   name: health
-                - containerPort: 8080
+                - containerPort: 8443
                   name: metrics
                 readinessProbe:
                   httpGet:

@@ -71,9 +71,10 @@ spec:
       - command:
         - /manager
         args:
-          - "--health-probe-bind-address=:8081"
-          - "--metrics-bind-address=:8080"
-          - "--leader-elect"
+          - --health-probe-bind-address=:8081
+          - --metrics-bind-address=:8443
+          - --metrics-secure=true
+          - --leader-elect
         image: controller:latest
         name: manager
         securityContext:
@@ -85,7 +86,7 @@ spec:
           - name: health
             containerPort: 8081
           - name: metrics
-            containerPort: 8080
+            containerPort: 8443
         livenessProbe:
           httpGet:
             path: /healthz

@@ -224,7 +224,8 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --metrics-bind-address=:8080
+                - --metrics-bind-address=:8443
+                - --metrics-secure=true
                 - --leader-elect
                 command:
                 - /manager
@@ -244,7 +245,7 @@ spec:
                   - name: health
                     containerPort: 8081
                   - name: metrics
-                    containerPort: 8080
+                    containerPort: 8443
                 livenessProbe:
                   httpGet:
                     path: /healthz

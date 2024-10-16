@@ -10,3 +10,7 @@ resources:
 - ../../crd
 - ../../rbac
 - ../../manager
+images:
+- name: controller
+  newName: quay.io/rhdh-community/operator
+  newTag: 0.4.0
