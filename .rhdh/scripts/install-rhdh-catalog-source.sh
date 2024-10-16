@@ -106,12 +106,30 @@ TMPDIR=$(mktemp -d)
 # shellcheck disable=SC2064
 trap "rm -fr $TMPDIR" EXIT
 
-# Add ImageContentSourcePolicy to resolve references to images not on quay as if from quay.io
-echo "[INFO] Adding ISCP to resolve references to images not on quay.io as if from quay.io"
 ICSP_URL="quay.io/rhdh/"
 ICSP_URL_PRE=${ICSP_URL%%/*}
-# echo "[DEBUG] ${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
-echo "apiVersion: operator.openshift.io/v1alpha1
+
+# for 1.4+, use IDMS instead of ICSP
+# TODO https://issues.redhat.com/browse/RHIDP-4188 if we onboard 1.3 to Konflux, use IDMS for latest too
+if [[ "$IIB_IMAGE" == *"next"* ]]; then
+  echo "[INFO] Adding ImageDigestMirrorSet to resolve unreleased images on registry.redhat.io from quay.io"
+  echo "apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: ${ICSP_URL_PRE//./-}
+spec:
+  imageDigestMirrors:
+  - source: registry.redhat.io/rhdh/rhdh-hub-rhel9
+    mirrors:
+      - ${ICSP_URL}rhdh-hub-rhel9
+  - source: registry.redhat.io/rhdh/rhdh-rhel9-operator
+    mirrors: 
+      - ${ICSP_URL}rhdh-rhel9-operator
+" > "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml"
+else
+  echo "[INFO] Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io"
+  # echo "[DEBUG] ${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
+  echo "apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:
   name: ${ICSP_URL_PRE//./-}
@@ -170,6 +188,7 @@ spec:
     - registry.redhat.io
     source: registry-proxy.engineering.redhat.com
 " > "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml"
+fi
 
 CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
 DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
