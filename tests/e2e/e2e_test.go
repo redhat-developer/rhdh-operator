@@ -9,12 +9,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"redhat-developer/red-hat-developer-hub-operator/tests/helper"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 )
 
 var _ = Describe("Backstage Operator E2E", func() {
@@ -35,6 +37,176 @@ var _ = Describe("Backstage Operator E2E", func() {
 
 	AfterEach(func() {
 		helper.DeleteNamespace(ns, false)
+	})
+
+	Context("operator metrics endpoint", func() {
+
+		var metricsEndpoint string
+
+		BeforeEach(func() {
+			if testMode != olmDeployTestMode && testMode != defaultDeployTestMode {
+				Skip(fmt.Sprintf("testing operator metrics endpoint not supported for this mode: %q", testMode))
+			}
+
+			By("not creating a kube-rbac-proxy sidecar", func() {
+				Eventually(func(g Gomega) {
+					cmd := exec.Command(helper.GetPlatformTool(), "get",
+						"pods", "-l", "control-plane=controller-manager",
+						"-o", "jsonpath={.items[*].spec.containers[*].name}",
+						"-n", _namespace,
+					)
+					containerListOutput, err := helper.Run(cmd)
+					g.Expect(err).ShouldNot(HaveOccurred())
+					containerListNames := helper.GetNonEmptyLines(string(containerListOutput))
+					g.Expect(containerListNames).Should(HaveLen(2),
+						fmt.Sprintf("expected 2 containers in the controller pod, but got %d", len(containerListNames)))
+				}, 3*time.Minute, time.Second).Should(Succeed())
+			})
+
+			By("creating a Service to access the metrics")
+			var metricsServiceName string
+			Eventually(func(g Gomega) {
+				cmd := exec.Command(helper.GetPlatformTool(), "get", "services",
+					"-l", "control-plane=controller-manager",
+					"-l", "app.kubernetes.io/component=metrics",
+					"-o", "jsonpath={.items[*].metadata.name}",
+					"-n", _namespace,
+				)
+				svcListOutput, err := helper.Run(cmd)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				svcListNames := helper.GetNonEmptyLines(string(svcListOutput))
+				g.Expect(svcListNames).Should(HaveLen(1),
+					fmt.Sprintf("expected 1 service exposing the controller metrics, but got %d", len(svcListNames)))
+				metricsServiceName = svcListNames[0]
+				g.Expect(metricsServiceName).ToNot(BeEmpty())
+			}, 3*time.Minute, time.Second).Should(Succeed())
+
+			metricsEndpoint = fmt.Sprintf("https://%s.%s.svc.cluster.local:8443/metrics", metricsServiceName, _namespace)
+		})
+
+		buildMetricsTesterPod := func(ns string, withBearerAuth bool) string {
+			var authHdr string
+			if withBearerAuth {
+				authHdr = `-H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"`
+			}
+
+			return fmt.Sprintf(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-controller-metrics-%[1]s
+  labels:
+    app: test-controller-metrics-%[1]s
+spec:
+  restartPolicy: OnFailure
+  securityContext:
+    runAsNonRoot: %[2]s
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: curl
+      image: registry.access.redhat.com/ubi9-minimal:latest
+      command: [ '/bin/sh' ]
+      args: [ '-c', 'curl -v -s -k -i --fail %[3]s %[4]s' ]
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+`, ns, strconv.FormatBool(helper.IsOpenShift()), authHdr, metricsEndpoint)
+		}
+
+		for _, tt := range []struct {
+			description         string
+			withBearerAuth      bool
+			additionalManifests func(ns string) []string
+			expectedLogsMatcher types.GomegaMatcher
+		}{
+			{
+				description: "reject unauthenticated requests to the metrics endpoint",
+				expectedLogsMatcher: SatisfyAll(
+					ContainSubstring("HTTP/1.1 401 Unauthorized"),
+					Not(ContainSubstring(`workqueue_work_duration_seconds_count`)),
+				),
+			},
+			{
+				description:    "reject authenticated requests to the metrics endpoint with a service account token lacking RBAC permission",
+				withBearerAuth: true,
+				expectedLogsMatcher: SatisfyAll(
+					ContainSubstring("HTTP/1.1 403 Forbidden"),
+					Not(ContainSubstring(`workqueue_work_duration_seconds_count`)),
+				),
+			},
+			{
+				description:    "allow authenticated requests to the metrics endpoint with a service account token that has the expected RBAC permission",
+				withBearerAuth: true,
+				additionalManifests: func(ns string) []string {
+					return []string{
+						fmt.Sprintf(`
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metrics-reader-sa-rolebinding-%[1]s
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rhdh-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: %[1]s
+`, ns),
+					}
+				},
+				expectedLogsMatcher: ContainSubstring(`workqueue_work_duration_seconds_count{name="backstage"}`),
+			},
+		} {
+			tt := tt
+			When("creating a Pod that accesses the controller metrics endpoint", func() {
+				var manifests string
+
+				BeforeEach(func() {
+					if tt.expectedLogsMatcher == nil {
+						Fail("test case needs to specify an expectedLogsMatcher to verify the test pod logs")
+					}
+					var manifestList []string
+					if tt.additionalManifests != nil {
+						manifestList = append(manifestList, tt.additionalManifests(ns)...)
+					}
+					manifestList = append(manifestList, buildMetricsTesterPod(ns, tt.withBearerAuth))
+					manifests = strings.Join(manifestList, "\n---\n")
+
+					cmd := exec.Command(helper.GetPlatformTool(), "-n", ns, "apply", "-f", "-")
+					stdin, err := cmd.StdinPipe()
+					ExpectWithOffset(1, err).NotTo(HaveOccurred())
+					go func() {
+						defer stdin.Close()
+						_, _ = io.WriteString(stdin, manifests)
+					}()
+					_, err = helper.Run(cmd)
+					ExpectWithOffset(1, err).NotTo(HaveOccurred())
+				})
+
+				AfterEach(func() {
+					if manifests == "" {
+						return
+					}
+					cmd := exec.Command(helper.GetPlatformTool(), "-n", ns, "delete", "-f", "-")
+					stdin, err := cmd.StdinPipe()
+					ExpectWithOffset(1, err).NotTo(HaveOccurred())
+					go func() {
+						defer stdin.Close()
+						_, _ = io.WriteString(stdin, manifests)
+					}()
+					_, _ = helper.Run(cmd)
+				})
+
+				It("should "+tt.description, func() {
+					Eventually(func(g Gomega) {
+						g.Expect(getPodLogs(ns, fmt.Sprintf("app=test-controller-metrics-%s", ns))).Should(tt.expectedLogsMatcher)
+					}, 3*time.Minute, 5*time.Second).Should(Succeed())
+				})
+			})
+		}
 	})
 
 	Context("Examples CRs", func() {
