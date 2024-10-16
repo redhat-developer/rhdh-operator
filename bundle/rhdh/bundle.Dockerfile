@@ -1,3 +1,5 @@
+# NOTE: not used for Konflux bundle builds - see ../.rhdh/docker/bundle.Dockerfile
+
 FROM scratch
 
 # Core bundle labels.
