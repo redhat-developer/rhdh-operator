@@ -1,0 +1,11 @@
+apiVersion: rhdh.redhat.com/v1alpha2
+kind: Backstage
+metadata:
+  name: bs1
+#  labels:
+#    tt: tt
+
+
+
+
+

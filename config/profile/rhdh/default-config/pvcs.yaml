@@ -1,27 +1,25 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: myclaim1
+  name: audit-log
+  annotations:
+    rhdh.redhat.com/mount-path: /var/log/redhat-developer-hub/audit
 spec:
   accessModes:
     - ReadWriteOnce
   volumeMode: Filesystem
   resources:
     requests:
-      storage: 8Gi
-  storageClassName: slow
+      storage: 1Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: myclaim2
-  annotations:
-    rhdh.redhat.com/mount-path: /mount/path/from/annotation
+  name: dynamic-plugins
 spec:
   accessModes:
     - ReadWriteOnce
   volumeMode: Filesystem
   resources:
     requests:
-      storage: 8Gi
-  storageClassName: slow
+      storage: 1Gi

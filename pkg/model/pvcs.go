@@ -18,7 +18,7 @@ import (
 type BackstagePvcsFactory struct{}
 
 func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
-	return &BackstagePvcs{mountPath: DefaultMountDir, fullPath: false}
+	return &BackstagePvcs{mountPath: DefaultMountDir, fullPath: false, fromDefaultConf: true}
 }
 
 func init() {
@@ -38,7 +38,7 @@ func addPvc(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *Backs
 	for _, pvcSpec := range spec.Application.ExtraFiles.Pvcs {
 		pvc, ok := model.ExternalConfig.ExtraPvcs[pvcSpec.Name]
 		if ok {
-			pvcObj := BackstagePvcs{}
+			pvcObj := BackstagePvcs{fromDefaultConf: false}
 			pvcObj.pvcs = &multiobject.MultiObject{}
 			if pvcSpec.MountPath == "" {
 				pvcObj.mountPath = mp
@@ -57,7 +57,10 @@ func addPvc(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *Backs
 type BackstagePvcs struct {
 	pvcs      *multiobject.MultiObject
 	mountPath string
-	fullPath  bool
+	// if false mountPath will be concatenated with pvc name
+	fullPath bool
+	// whether this object is constructed from default config
+	fromDefaultConf bool
 }
 
 func PvcsName(backstageName, originalName string) string {
@@ -119,6 +122,12 @@ func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
 		c := &deployment.Spec.Template.Spec.Containers[0]
 
 		volMount := corev1.VolumeMount{Name: volName}
+
+		if mp, ok := pvc.GetAnnotations()[DefaultMountPathAnnotation]; ok && b.fromDefaultConf {
+			b.mountPath = mp
+			b.fullPath = true
+		}
+
 		if b.fullPath {
 			volMount.MountPath = b.mountPath
 		} else {
