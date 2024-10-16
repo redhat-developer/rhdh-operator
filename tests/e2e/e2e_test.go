@@ -124,7 +124,10 @@ spec:
 			{
 				description: "reject unauthenticated requests to the metrics endpoint",
 				expectedLogsMatcher: SatisfyAll(
-					ContainSubstring("HTTP/1.1 401 Unauthorized"),
+					SatisfyAny(
+						ContainSubstring("HTTP/1.1 401 Unauthorized"),
+						ContainSubstring("HTTP/2 401"),
+					),
 					Not(ContainSubstring(`workqueue_work_duration_seconds_count`)),
 				),
 			},
@@ -132,7 +135,10 @@ spec:
 				description:    "reject authenticated requests to the metrics endpoint with a service account token lacking RBAC permission",
 				withBearerAuth: true,
 				expectedLogsMatcher: SatisfyAll(
-					ContainSubstring("HTTP/1.1 403 Forbidden"),
+					SatisfyAny(
+						ContainSubstring("HTTP/1.1 403 Forbidden"),
+						ContainSubstring("HTTP/2 403"),
+					),
 					Not(ContainSubstring(`workqueue_work_duration_seconds_count`)),
 				),
 			},
