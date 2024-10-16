@@ -3,8 +3,6 @@ package model
 import (
 	"fmt"
 
-	"k8s.io/utils/ptr"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,11 +46,11 @@ func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) erro
 	for _, sec := range spec.Application.ExtraFiles.Secrets {
 		if sec.MountPath != "" {
 			mp = sec.MountPath
-		} else if sec.WithSubPath == ptr.To(false) {
+		} else if !utils.WithSubPath(sec.WithSubPath) { //if mountPath is NOT specified withSubPath should be true (default)
 			return fmt.Errorf("mounting without subPath to non-individual MountPath is forbidden, Secret name: %s", sec.Name)
 		}
-		if sec.Key == "" {
-			return fmt.Errorf("key is required to mount extra file with secret %s", sec.Name)
+		if sec.Key == "" && utils.WithSubPath(sec.WithSubPath) { //Key required if withSubPath!==false, it is contradictionary otherwise
+			return fmt.Errorf("Key is required if withSubPath is not false to mount extra file from the Secret: %s", sec.Name)
 		}
 		sf := SecretFiles{
 			Secret: &corev1.Secret{

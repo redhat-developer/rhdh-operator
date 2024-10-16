@@ -123,3 +123,10 @@ func SetImagePullSecrets(podSpec *corev1.PodSpec, pullSecrets []string) {
 		podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, corev1.LocalObjectReference{Name: ps})
 	}
 }
+
+func WithSubPath(specified *bool) bool {
+	if specified != nil {
+		return *specified
+	}
+	return true
+}

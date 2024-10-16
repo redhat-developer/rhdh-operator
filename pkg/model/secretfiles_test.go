@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/utils/ptr"
@@ -77,9 +78,31 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret2"), deployment.podSpec().Volumes[1].Name)
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret.dot"), deployment.podSpec().Volumes[2].Name)
 
-	assert.Equal(t, deployment.container().VolumeMounts[0].SubPath, "conf.yaml")
-	assert.Equal(t, deployment.container().VolumeMounts[1].SubPath, "")
-	assert.Equal(t, deployment.container().VolumeMounts[1].MountPath, "/custom/path")
+	assert.Equal(t, "conf.yaml", deployment.container().VolumeMounts[0].SubPath)
+	assert.Equal(t, "", deployment.container().VolumeMounts[1].SubPath)
+
+	assert.Equal(t, "/custom/path", deployment.container().VolumeMounts[1].MountPath)
+
+	assert.Equal(t, filepath.Join("/my/path", "conf.yaml"), deployment.container().VolumeMounts[0].MountPath)
+
+}
+
+func TestFailedValidation(t *testing.T) {
+	bs := *secretFilesTestBackstage.DeepCopy()
+	sf := &bs.Spec.Application.ExtraFiles.Secrets
+	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret1", WithSubPath: ptr.To(false)})
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	assert.EqualError(t, err, "failed object validation, reason: mounting without subPath to non-individual MountPath is forbidden, Secret name: secret1")
+
+	bs = *secretFilesTestBackstage.DeepCopy()
+	sf = &bs.Spec.Application.ExtraFiles.Secrets
+	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret1", MountPath: "/path", WithSubPath: ptr.To(true)})
+
+	testObj = createBackstageTest(bs).withDefaultConfig(true)
+	_, err = InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	assert.EqualError(t, err, "failed object validation, reason: Key is required if withSubPath is not false to mount extra file from the Secret: secret1")
 
 }
 
