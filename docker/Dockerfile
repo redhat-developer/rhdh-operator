@@ -1,3 +1,6 @@
+# THIS IS USED BY Konflux builds >= 1.4
+# TODO verify this works with Cachi2 once we enable that, or switch to use ../.rhdh/docker/Dockerfile as input
+
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
 FROM registry.access.redhat.com/ubi9/go-toolset:1.21.13-2.1727893526@sha256:fd41c001abc243076cc28b63c409ae6d9cbcad401c8124fb67d20fe57a2aa63a AS builder
@@ -44,6 +47,9 @@ RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH=
 # https://registry.access.redhat.com/ubi9/ubi-minimal
 FROM registry.access.redhat.com/ubi9-minimal:9.4-1227.1726694542@sha256:f5d2c6a1e0c86e4234ea601552dbabb4ced0e013a1efcbfb439f1f6a7a9275b0 AS runtime
 RUN microdnf update --setopt=install_weak_deps=0 -y && microdnf install -y openssl; microdnf clean -y all
+
+# RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
+COPY $EXTERNAL_SOURCE/LICENSE /licenses/
 
 # Upstream sources
 # Downstream comment
