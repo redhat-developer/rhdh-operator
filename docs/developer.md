@@ -90,15 +90,6 @@ To undeploy the controller from the cluster:
 make undeploy
 ```
 
-- To generate deployment manifest, use:
-```sh
-make deployment-manifest [IMG=<your-registry>/backstage-operator:tag]
-```
-it will create the file rhdh-operator-${VERSION}.yaml on the project root and you will be able to share it to make it possible to deploy operator with:
-```sh
-kubectl apply -f <path-or-url-to-deployment-script>
-```
-
 **UnDeploy the controller from the cluster:**
 
 ```sh
@@ -173,20 +164,20 @@ Following are the steps to build the installer and distribute this project to us
 1. Build the installer for the image built and published in the registry:
 
 ```sh
-make build-installer IMG=<some-registry>/backstage-operator:tag
+make build-installer IMG=<some-registry>/backstage-operator:tag [PROFILE=rhdh]
 ```
 
 NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
+file in the `dist/${PROFILE}` directory. This file contains all the resources built
 with Kustomize, which are necessary to install this project without
 its dependencies.
 
 2. Using the installer
 
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
+Users can just run `kubectl apply -f <URL for YAML BUNDLE>` to install the project, i.e.:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/backstage-operator/<tag or branch>/dist/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/<org>/rhdh-operator/<tag or branch>/dist/install.yaml
 ```
 
 ## Contributing
