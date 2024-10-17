@@ -5,19 +5,15 @@ metadata:
   labels:
     app.kubernetes.io/name: backstage-operator
     app.kubernetes.io/managed-by: kustomize
-  name: backstage-editor-role
+  name: backstage-viewer-role
 rules:
 - apiGroups:
   - rhdh.redhat.com
   resources:
   - backstages
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - rhdh.redhat.com

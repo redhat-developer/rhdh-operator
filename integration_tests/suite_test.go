@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
+	"path/filepath"
 	"strconv"
+	"testing"
+	"time"
+
+	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -21,13 +25,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"path/filepath"
-	"testing"
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	controller "redhat-developer/red-hat-developer-hub-operator/controllers"
+	"redhat-developer/red-hat-developer-hub-operator/internal/controller"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 

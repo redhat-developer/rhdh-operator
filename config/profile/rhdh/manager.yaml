@@ -127,4 +127,3 @@ spec:
       - name: default-config
         configMap:
           name: default-config
-

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"os"
 
@@ -20,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
-	controller "redhat-developer/red-hat-developer-hub-operator/controllers"
+	"redhat-developer/red-hat-developer-hub-operator/internal/controller"
 
 	openshift "github.com/openshift/api/route/v1"
 	//+kubebuilder:scaffold:imports
@@ -42,18 +43,21 @@ func init() {
 
 func main() {
 	var metricsAddr string
-	var secureMetrics bool
 	var enableLeaderElection bool
 	var probeAddr string
+	var secureMetrics bool
+	var enableHTTP2 bool
 	var ownRuntime bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
 		"The address the metrics endpoint binds to. Use 0 to disable the metrics service.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", false,
-		"If set, the metrics endpoint is served securely over HTTPS and requires authentication and authorization.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", false,
+		"If set, the metrics endpoint is served securely over HTTPS and requires authentication and authorization.")
+	flag.BoolVar(&enableHTTP2, "enable-http2", false,
+		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.BoolVar(&ownRuntime, "own-runtime", true, "Making Backstage Controller own runtime objects. "+
 		"If 'true' - all runtime objects created by Controller will be syncing with desired state configured by Controller")
 
@@ -65,9 +69,26 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// if the enable-http2 flag is false (the default), http/2 should be disabled
+	// due to its vulnerabilities. More specifically, disabling http/2 will
+	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
+	// Rapid Reset CVEs. For more information see:
+	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
+	// - https://github.com/advisories/GHSA-4374-p667-p6c8
+	disableHTTP2 := func(c *tls.Config) {
+		setupLog.Info("disabling http/2")
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	var tlsOpts []func(*tls.Config)
+	if !enableHTTP2 {
+		tlsOpts = append(tlsOpts, disableHTTP2)
+	}
+
 	metricsServerOpts := metricsserver.Options{
 		BindAddress:   metricsAddr,
 		SecureServing: secureMetrics,
+		TLSOpts:       tlsOpts,
 	}
 	if secureMetrics {
 		// FilterProvider is used to protect the metrics endpoint with authn/authz.
@@ -76,12 +97,15 @@ func main() {
 		// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/metrics/filters#WithAuthenticationAndAuthorization
 		metricsServerOpts.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
+
+	webhookServer := webhook.NewServer(webhook.Options{
+		TLSOpts: tlsOpts,
+	})
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:  scheme,
-		Metrics: metricsServerOpts,
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Port: 9443,
-		}),
+		Scheme:                 scheme,
+		Metrics:                metricsServerOpts,
+		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "06bdbdd5.rhdh.redhat.com",
