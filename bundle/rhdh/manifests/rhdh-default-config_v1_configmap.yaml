@@ -15,6 +15,9 @@ data:
                   subject: legacy-default-config
                   # This is a default value, which you should change by providing your own app-config
                   secret: "pl4s3Ch4ng3M3"
+        auditLog:
+          rotateFile:
+            enabled: true
   db-secret.yaml: |-
     apiVersion: v1
     kind: Secret
