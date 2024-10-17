@@ -1,9 +1,5 @@
 # Developer Guide 
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-
 ### How it works
 This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
 
@@ -41,6 +37,10 @@ For testing, you will need a Kubernetes cluster, either remote (with sufficient 
 ```sh
 make image-build image-push IMG=<your-registry>/backstage-operator:tag
 ```
+
+**NOTE:** This image ought to be published in the personal registry you specified.
+And it is required to have access to pull the image from the working environment.
+Make sure you have the proper permission to the registry if the above commands don’t work.
 
 - Install the Custom Resource Definitions into the local cluster (minikube is installed and running):
 ```sh
@@ -82,6 +82,9 @@ To deploy the Operator directly to current cluster use:
 make deploy [PROFILE=<configuration-profile>] [IMG=<your-registry>/backstage-operator[:tag]]
 ```
 
+> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
+privileges or be logged in as admin.
+
 To undeploy the controller from the cluster:
 ```sh
 make undeploy
@@ -94,6 +97,12 @@ make deployment-manifest [IMG=<your-registry>/backstage-operator:tag]
 it will create the file rhdh-operator-${VERSION}.yaml on the project root and you will be able to share it to make it possible to deploy operator with:
 ```sh
 kubectl apply -f <path-or-url-to-deployment-script>
+```
+
+**UnDeploy the controller from the cluster:**
+
+```sh
+make undeploy
 ```
 
 ### Deploy with Operator Lifecycle Manager (valid for v0.3.0+):
@@ -157,7 +166,32 @@ make undeploy-olm
 ```
 
 
+## Project Distribution
+
+Following are the steps to build the installer and distribute this project to users.
+
+1. Build the installer for the image built and published in the registry:
+
+```sh
+make build-installer IMG=<some-registry>/backstage-operator:tag
+```
+
+NOTE: The makefile target mentioned above generates an 'install.yaml'
+file in the dist directory. This file contains all the resources built
+with Kustomize, which are necessary to install this project without
+its dependencies.
+
+2. Using the installer
+
+Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/<org>/backstage-operator/<tag or branch>/dist/install.yaml
+```
+
+## Contributing
+// TODO(user): Add detailed information on how you would like others to contribute to this project
+
 **NOTE:** Run `make help` for more information on all potential `make` targets
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-

@@ -3,15 +3,20 @@
 ## The Goal
 The Goal of [Backstage](https://backstage.io) Operator project is creating Kubernetes Operator for configuring, installing and synchronizing Backstage instance on Kubernetes/OpenShift. 
 The initial target is in support of Red Hat's assemblies of Backstage - specifically supporting [dynamic-plugins](https://github.com/janus-idp/backstage-showcase/blob/main/docs/dynamic-plugins.md) on OpenShift. This includes [Red Hat Developer Hub (RHDH)](https://developers.redhat.com/rhdh) but may be flexible enough to install any compatible Backstage instance on Kubernetes. See additional information under [Configuration](docs/configuration.md).
-The Operator provides clear and flexible configuration options to satisfy a wide range of expectations, from "no  configuration for default quick start" to "highly customized configuration for production".
+The Operator provides clear and flexible configuration options to satisfy a wide range of expectations, from "no configuration for default quick start" to "highly customized configuration for production".
 
 [More documentation...](#more-documentation)
 
 ## Getting Started
+
+### Prerequisites
+- go version v1.21.0+
+
+### To Deploy on the cluster
 You’ll need a Kubernetes or OpenShift cluster. You can use [Minikube](https://minikube.sigs.k8s.io/docs/) or [KIND](https://sigs.k8s.io/kind) for local testing, or deploy to a remote cluster.
 **Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
 
-To test it on minikube from the source code:
+To test it on Minikube from the source code:
 
 Both **kubectl** and **minikube** must be installed. See [tools](https://kubernetes.io/docs/tasks/tools/).
 
