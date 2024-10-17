@@ -229,7 +229,7 @@ GOLANGCI_LINT_VERSION ?= v1.59.1
 GOIMPORTS_VERSION ?= v0.16.1
 # opm and operator-sdk version
 OPM_VERSION ?= v1.45.0
-OPERATOR_SDK_VERSION ?= v1.36.0
+OPERATOR_SDK_VERSION ?= v1.37.0
 GOSEC_VERSION ?= v2.20.0
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
