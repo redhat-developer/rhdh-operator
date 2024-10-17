@@ -18,7 +18,7 @@ import (
 type BackstagePvcsFactory struct{}
 
 func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
-	return &BackstagePvcs{mountPath: DefaultMountDir, fullPath: false, fromDefaultConf: true}
+	return &BackstagePvcs{mountPath: DefaultMountDir, fromDefaultConf: true}
 }
 
 func init() {
@@ -93,6 +93,7 @@ func (b *BackstagePvcs) validate(model *BackstageModel, backstage bsv1.Backstage
 		if !ok {
 			return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
 		}
+
 	}
 	return nil
 }
@@ -120,18 +121,14 @@ func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
 			append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
 
 		c := &deployment.Spec.Template.Spec.Containers[0]
-
 		volMount := corev1.VolumeMount{Name: volName}
 
+		volMount.MountPath = filepath.Join(b.mountPath, volName)
 		if mp, ok := pvc.GetAnnotations()[DefaultMountPathAnnotation]; ok && b.fromDefaultConf {
-			b.mountPath = mp
-			b.fullPath = true
+			volMount.MountPath = mp
 		}
-
-		if b.fullPath {
+		if b.fullPath && !b.fromDefaultConf {
 			volMount.MountPath = b.mountPath
-		} else {
-			volMount.MountPath = filepath.Join(b.mountPath, volName)
 		}
 
 		c.VolumeMounts = append(c.VolumeMounts, volMount)

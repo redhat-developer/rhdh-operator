@@ -2,6 +2,7 @@ package integration_tests
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
@@ -36,7 +37,7 @@ var _ = When("create default rhdh", func() {
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
 
-			By("creating /opt/app-root/src/dynamic-plugins.xml ")
+			//By("creating /opt/app-root/src/dynamic-plugins.xml ")
 			appConfig := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DynamicPluginsDefaultName(backstageName)}, appConfig)
 			g.Expect(err).ShouldNot(HaveOccurred())
@@ -76,8 +77,8 @@ var _ = When("create default rhdh", func() {
 			g.Expect(mainCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 			g.Expect(mainCont.VolumeMounts[1].SubPath).To(Equal("default.app-config.yaml"))
 
-			g.Expect(mainCont.VolumeMounts[2].MountPath).To(Equal("/opt/app-root/src/audit-log"))
-			g.Expect(mainCont.VolumeMounts[3].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins"))
+			g.Expect(mainCont.VolumeMounts[2].MountPath).To(Equal("/var/log/redhat-developer-hub/audit"))
+			g.Expect(mainCont.VolumeMounts[3].MountPath).To(Equal(fmt.Sprintf("/opt/app-root/src/backstage-%s-dynamic-plugins", backstageName)))
 
 		}, 10*time.Second, time.Second).Should(Succeed())
 

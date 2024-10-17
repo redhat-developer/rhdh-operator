@@ -3,7 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: audit-log
   annotations:
-    rhdh.redhat.com/mount-path: /var/log/redhat-developer-hub/audit
+    "rhdh.redhat.com/mount-path": "/var/log/redhat-developer-hub/audit"
 spec:
   accessModes:
     - ReadWriteOnce
