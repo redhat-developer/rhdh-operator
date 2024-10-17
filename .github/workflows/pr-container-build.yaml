@@ -102,13 +102,13 @@ jobs:
           # install skopeo, podman
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
 
-          export CONTAINER_ENGINE=podman 
+          export CONTAINER_TOOL=podman 
           export VERSION=${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }} 
 
           set -ex
 
           # build 4 container images with a 14d expiry
-          CONTAINER_ENGINE=${CONTAINER_ENGINE} VERSION=${VERSION} make lint release-build
+          CONTAINER_TOOL=${CONTAINER_TOOL} VERSION=${VERSION} make lint release-build
 
           # now copy images from local cache to quay, using 0.0.1-pr-123-f00cafe and 0.0.1-pr-123 tags
           for image in operator operator-bundle operator-catalog; do
