@@ -158,11 +158,11 @@ gosec: addgosec ## run the gosec scanner for non-test files in this repo
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
-	$(GOLANGCI_LINT) run
+	$(GOLANGCI_LINT) run --timeout 15m
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	$(GOLANGCI_LINT) run --fix
+	$(GOLANGCI_LINT) run --fix --timeout 15m
 
 .PHONY: vet
 vet: ## Run go vet against code.
