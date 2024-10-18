@@ -3,9 +3,10 @@ package controller
 import (
 	"context"
 	"fmt"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 	"reflect"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"k8s.io/utils/ptr"
 
@@ -29,9 +30,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"

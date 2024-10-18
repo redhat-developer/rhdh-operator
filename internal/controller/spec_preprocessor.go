@@ -14,9 +14,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"

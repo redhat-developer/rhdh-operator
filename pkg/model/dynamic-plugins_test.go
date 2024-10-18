@@ -2,12 +2,13 @@ package model
 
 import (
 	"context"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 	"testing"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -7,8 +7,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 )

@@ -4,6 +4,8 @@
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
 FROM registry.access.redhat.com/ubi9/go-toolset:1.21.13-2.1729155367@sha256:b08eed026ac732d125e61ebfe3a0ef1dea7293b6a1c6d8b71c007a3088c4ed3b AS builder
+ARG TARGETOS
+ARG TARGETARCH
 # hadolint ignore=DL3002
 USER 0
 ENV GOPATH=/go/
@@ -24,11 +26,14 @@ WORKDIR /workspace
 # WORKDIR $CONTAINER_SOURCE/
 #/ Downstream uncomment
 
-COPY $EXTERNAL_SOURCE ./
+# COPY $EXTERNAL_SOURCE ./
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 # Downstream comment
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
 RUN go mod download
 #/ Downstream comment
 
@@ -37,10 +42,19 @@ RUN go mod download
 # RUN source ./cachito.env && rm -f ./cachito.env && mkdir -p /workspace
 #/ Downstream uncomment
 
+# Copy the go source
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/ internal/
+
 # Build
 # hadolint ignore=SC3010
-RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH="amd64"; elif [[ ${ARCH} == "aarch64" ]]; then export ARCH="arm64"; fi && \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${ARCH} go build -a -o manager main.go
+# Build
+# the GOARCH has not a default value to allow the binary be built according to the host where the command
+# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
+# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
+# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Install openssl for FIPS support
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)

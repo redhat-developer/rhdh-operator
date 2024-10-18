@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
+	"path/filepath"
 	"strconv"
+	"testing"
+	"time"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -17,17 +21,13 @@ import (
 	openshift "github.com/openshift/api/route/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 
-	"path/filepath"
-	"testing"
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	controller "redhat-developer/red-hat-developer-hub-operator/controllers"
+	"github.com/redhat-developer/rhdh-operator/internal/controller"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -37,7 +37,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
