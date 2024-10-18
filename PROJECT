@@ -9,7 +9,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: backstage-operator
-repo: redhat-developer/red-hat-developer-hub-operator
+repo: github.com/redhat-developer/rhdh-operator
 resources:
 - api:
     crdVersion: v1
@@ -17,6 +17,6 @@ resources:
   controller: true
   domain: rhdh.redhat.com
   kind: Backstage
-  path: redhat-developer/red-hat-developer-hub-operator/api/v1alpha3
+  path: github.com/redhat-developer/rhdh-operator/api/v1alpha3
   version: v1alpha3
 version: "3"

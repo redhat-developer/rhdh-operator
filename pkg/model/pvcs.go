@@ -3,9 +3,10 @@ package model
 import (
 	"fmt"
 	"path/filepath"
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
 

@@ -7,7 +7,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

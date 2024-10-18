@@ -2,12 +2,11 @@ package model
 
 import (
 	"context"
+	"testing"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
