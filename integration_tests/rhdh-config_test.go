@@ -2,7 +2,6 @@ package integration_tests
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
@@ -62,7 +61,7 @@ var _ = When("create default rhdh", func() {
 			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
 			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
 
-			g.Expect(deploy.Spec.Template.Spec.Volumes).To(HaveLen(8))
+			g.Expect(deploy.Spec.Template.Spec.Volumes).To(HaveLen(7))
 			g.Expect(deploy.Spec.Template.Spec.Containers).To(HaveLen(1))
 			mainCont := deploy.Spec.Template.Spec.Containers[0]
 			g.Expect(mainCont.Args).To(HaveLen(4))
@@ -71,14 +70,14 @@ var _ = When("create default rhdh", func() {
 			g.Expect(mainCont.Args[2]).To(Equal("--config"))
 			g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 
-			g.Expect(mainCont.VolumeMounts).To(HaveLen(4))
+			g.Expect(mainCont.VolumeMounts).To(HaveLen(3))
 			g.Expect(mainCont.VolumeMounts[0].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
 			g.Expect(mainCont.VolumeMounts[0].SubPath).To(BeEmpty())
 			g.Expect(mainCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 			g.Expect(mainCont.VolumeMounts[1].SubPath).To(Equal("default.app-config.yaml"))
 
 			g.Expect(mainCont.VolumeMounts[2].MountPath).To(Equal("/var/log/redhat-developer-hub/audit"))
-			g.Expect(mainCont.VolumeMounts[3].MountPath).To(Equal(fmt.Sprintf("/opt/app-root/src/backstage-%s-dynamic-plugins", backstageName)))
+			//g.Expect(mainCont.VolumeMounts[3].MountPath).To(Equal(fmt.Sprintf("/opt/app-root/src/backstage-%s-dynamic-plugins", backstageName)))
 
 		}, 10*time.Second, time.Second).Should(Succeed())
 

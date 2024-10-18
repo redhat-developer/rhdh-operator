@@ -11,15 +11,16 @@ spec:
   resources:
     requests:
       storage: 1Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: dynamic-plugins
-spec:
-  accessModes:
-    - ReadWriteOnce
-  volumeMode: Filesystem
-  resources:
-    requests:
-      storage: 1Gi
+# commented out this placeholder, will get it back with https://issues.redhat.com/browse/RHIDP-4595
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+#  name: dynamic-plugins
+#spec:
+#  accessModes:
+#    - ReadWriteOnce
+#  volumeMode: Filesystem
+#  resources:
+#    requests:
+#      storage: 1Gi
