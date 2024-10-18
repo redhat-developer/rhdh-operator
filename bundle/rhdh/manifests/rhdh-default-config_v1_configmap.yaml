@@ -299,6 +299,32 @@ data:
         includes:
           - dynamic-plugins.default.yaml
         plugins: []
+  pvcs.yaml: |-
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: audit-log
+      annotations:
+        "rhdh.redhat.com/mount-path": "/var/log/redhat-developer-hub/audit"
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      volumeMode: Filesystem
+      resources:
+        requests:
+          storage: 1Gi
+    ---
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: dynamic-plugins
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      volumeMode: Filesystem
+      resources:
+        requests:
+          storage: 1Gi
   route.yaml: |-
     apiVersion: route.openshift.io/v1
     kind: Route
