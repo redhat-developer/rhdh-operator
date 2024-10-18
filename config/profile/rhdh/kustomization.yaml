@@ -17,15 +17,6 @@ resources:
 - manager.yaml
 #  - ../../manager
 
-patches:
-- path: manager_auth_proxy_patch.yaml
-  target:
-    group: apps
-    kind: Deployment
-    name: controller-manager
-    version: v1
-
-
 images:
 - name: controller
   newName: quay.io/rhdh-community/operator

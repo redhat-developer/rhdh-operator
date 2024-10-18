@@ -10,11 +10,7 @@ resources:
 - ../../crd
 - ../../rbac
 - ../../manager
-
-patches:
-- path: manager_auth_proxy_patch.yaml
-  target:
-    group: apps
-    version: v1
-    kind: Deployment
-    name: controller-manager
+images:
+- name: controller
+  newName: quay.io/rhdh-community/operator
+  newTag: 0.4.0
