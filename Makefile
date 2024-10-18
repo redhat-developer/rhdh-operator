@@ -241,7 +241,7 @@ endif
 
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPERATOR_SDK) generate kustomize manifests -q
+	#$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle/$(PROFILE)
