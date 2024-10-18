@@ -5,9 +5,19 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: backstage-operator
-  name: backstage-metrics-reader
+  name: backstage-backstage-viewer-role
 rules:
-- nonResourceURLs:
-  - /metrics
+- apiGroups:
+  - rhdh.redhat.com
+  resources:
+  - backstages
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - rhdh.redhat.com
+  resources:
+  - backstages/status
   verbs:
   - get
