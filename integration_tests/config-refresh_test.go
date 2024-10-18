@@ -3,9 +3,10 @@ package integration_tests
 import (
 	"context"
 	"fmt"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 	"strings"
 	"time"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -13,9 +14,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	"k8s.io/apimachinery/pkg/types"
 

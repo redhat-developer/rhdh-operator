@@ -20,8 +20,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
-	"redhat-developer/red-hat-developer-hub-operator/internal/controller"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	"github.com/redhat-developer/rhdh-operator/internal/controller"
 
 	openshift "github.com/openshift/api/route/v1"
 	//+kubebuilder:scaffold:imports
