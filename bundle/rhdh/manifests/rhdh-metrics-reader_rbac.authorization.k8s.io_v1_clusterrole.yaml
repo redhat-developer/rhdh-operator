@@ -3,8 +3,12 @@ kind: ClusterRole
 metadata:
   creationTimestamp: null
   labels:
+    app.kubernetes.io/component: metrics-rbac
+    app.kubernetes.io/created-by: backstage-operator
+    app.kubernetes.io/instance: metrics-reader
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: backstage-operator
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-metrics-reader
 rules:
 - nonResourceURLs:
