@@ -2,8 +2,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    app.kubernetes.io/name: backstage-operator
-    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: metrics-auth-rolebinding
+    app.kubernetes.io/instance: metrics-auth-rolebinding
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: backstage-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: metrics-auth-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
