@@ -65,7 +65,16 @@ endif
 # Be aware that the target commands are only tested with Docker which is
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
-CONTAINER_TOOL ?= docker
+# CONTAINER_ENGINE kept for backward compatibility if defined.
+ifneq ($(origin CONTAINER_TOOL), undefined)
+CONTAINER_TOOL := $(CONTAINER_TOOL)
+else
+ifneq ($(origin CONTAINER_ENGINE), undefined)
+CONTAINER_TOOL := $(CONTAINER_ENGINE)
+else
+CONTAINER_TOOL := docker
+endif
+endif
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -464,9 +473,10 @@ OPM = $(shell which opm)
 endif
 endif
 
-show-img:
+##@ Misc.
+
+show-img: ## Show the value of the IMG variable resolved.
 	@echo -n $(IMG)
 
-show-container-engine:
+show-container-tool: ## Show the value of CONTAINER_TOOL variable resolved.
 	@echo -n $(CONTAINER_TOOL)
-
