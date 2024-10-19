@@ -26,14 +26,11 @@ WORKDIR /workspace
 # WORKDIR $CONTAINER_SOURCE/
 #/ Downstream uncomment
 
-# COPY $EXTERNAL_SOURCE ./
-
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 # Downstream comment
-# Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
+COPY $EXTERNAL_SOURCE/go.mod ./go.mod
+COPY $EXTERNAL_SOURCE/go.sum ./go.sum
 RUN go mod download
 #/ Downstream comment
 
@@ -42,11 +39,11 @@ RUN go mod download
 # RUN source ./cachito.env && rm -f ./cachito.env && mkdir -p /workspace
 #/ Downstream uncomment
 
-# Copy the go source
-COPY cmd/main.go cmd/main.go
-COPY api/ api/
-COPY internal/ internal/
-COPY pkg/ pkg/
+COPY $EXTERNAL_SOURCE/api/ ./api/
+COPY $EXTERNAL_SOURCE/cmd/ ./cmd/
+COPY $EXTERNAL_SOURCE/config/ ./config/
+COPY $EXTERNAL_SOURCE/internal/ ./internal/
+COPY $EXTERNAL_SOURCE/pkg/ ./pkg/
 
 # Build
 # hadolint ignore=SC3010
