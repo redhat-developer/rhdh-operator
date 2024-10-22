@@ -23,6 +23,7 @@ import (
 
 const BackstageAppLabel = "rhdh.redhat.com/app"
 const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
+const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
 
 // Backstage configuration scaffolding with empty BackstageObjects.
 // There are all possible objects for configuration

@@ -35,7 +35,23 @@ The Default Configuration defines the structure of all Backstage instances withi
 - **No (for OCP)** - Optional configuration, working in Openshift only.
   
 You can see examples of default configurations as part of the [Operator Profiles](../config/profile) in the **default-config** directory.
+
+#### Object annotation for mounting a volume to a specific path
+
+Using **rhdh.redhat.com/mount-path** annotation it is possible to define the directory where **PersistentVolumeClaim** object will be mounted to Backstage Container.
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+  annotations:
+    rhdh.redhat.com/mount-path: /mount/path/from/annotation
+...
+```
   
+In the example above the PVC called **myclaim** will be mounted to **/mount/path/from/annotation** directory
+
 ### Metadata Generation
   
 For Backstage to function consistently at runtime, certain metadata values need to be predictable. Therefore, the Operator generates values according to the following rules. Any value for these fields specified in either Default or Raw Configuration will be replaced by the generated values.
@@ -333,7 +349,7 @@ MY_VAR = my-value
 
 #### Dynamic Plugins
 
-The Operator can configure [Dynamic Plugins](https://github.com/janus-idp/backstage-showcase/blob/main/showcase-docs/dynamic-plugins.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/default-config/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
+The Operator can configure [Dynamic Plugins](https://github.com/janus-idp/backstage-showcase/blob/main/docs/dynamic-plugins.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/default-config/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
 
 For example, the **dynamic-plugins-config** ConfigMap contains a simple Dynamic Plugins configuration, which includes predefined default plugins in **dynamic-plugins.default.yaml** and the GitHub plugin provided in the package located at `./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic`.
   
