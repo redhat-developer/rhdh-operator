@@ -102,6 +102,7 @@ spec:
           - ""
           resources:
           - configmaps
+          - persistentvolumeclaims
           - secrets
           - services
           verbs:
@@ -115,7 +116,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - persistentvolumeclaims
           - persistentvolumes
           verbs:
           - get

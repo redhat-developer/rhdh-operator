@@ -35,7 +35,23 @@ The Default Configuration defines the structure of all Backstage instances withi
 - **No (for OCP)** - Optional configuration, working in Openshift only.
   
 You can see examples of default configurations as part of the [Operator Profiles](../config/profile) in the **default-config** directory.
+
+#### Object annotation for mounting a volume to a specific path
+
+Using **rhdh.redhat.com/mount-path** annotation it is possible to define the directory where **PersistentVolumeClaim** object will be mounted to Backstage Container.
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+  annotations:
+    rhdh.redhat.com/mount-path: /mount/path/from/annotation
+...
+```
   
+In the example above the PVC called **myclaim** will be mounted to **/mount/path/from/annotation** directory
+
 ### Metadata Generation
   
 For Backstage to function consistently at runtime, certain metadata values need to be predictable. Therefore, the Operator generates values according to the following rules. Any value for these fields specified in either Default or Raw Configuration will be replaced by the generated values.
