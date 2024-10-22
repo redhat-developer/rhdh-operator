@@ -16,7 +16,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 )
 
 // testBackstageObject it is a helper object to simplify testing model component allowing to customize and isolate testing configuration

@@ -7,7 +7,6 @@ metadata:
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/part-of: backstage-operator
-    app.kubernetes.io/managed-by: kustomize
   name: metrics-auth-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
