@@ -35,7 +35,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2024-10-19T22:32:58Z"
+    createdAt: "2024-10-22T17:03:37Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -66,6 +66,7 @@ spec:
           - ""
           resources:
           - configmaps
+          - persistentvolumeclaims
           - secrets
           - services
           verbs:
@@ -79,7 +80,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - persistentvolumeclaims
           - persistentvolumes
           verbs:
           - get
