@@ -8,6 +8,7 @@ rules:
   - ""
   resources:
   - configmaps
+  - persistentvolumeclaims
   - secrets
   - services
   verbs:
@@ -21,7 +22,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - persistentvolumeclaims
   - persistentvolumes
   verbs:
   - get
