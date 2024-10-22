@@ -54,7 +54,7 @@ func GetPlatformTool() string {
 }
 
 func saveImageArchive(name string) (string, error) {
-	cEng, err := Run(exec.Command("make", "--no-print-directory", "show-container-engine"))
+	cEng, err := Run(exec.Command("make", "--no-print-directory", "show-container-tool"))
 	if err != nil {
 		return "", err
 	}
