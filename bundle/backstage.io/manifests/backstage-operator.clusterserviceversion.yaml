@@ -23,12 +23,22 @@ metadata:
             },
             "name": "backstage-sample"
           }
+        },
+        {
+          "apiVersion": "rhdh.redhat.com/v1alpha3",
+          "kind": "Backstage",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "backstage"
+            },
+            "name": "backstage-sample"
+          }
         }
       ]
-    createdAt: "2024-10-16T20:54:13Z"
+    createdAt: "2024-10-22T17:03:33Z"
     description: Backstage Operator
-    operators.operatorframework.io/builder: operator-sdk-v1.36.0
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    operators.operatorframework.io/builder: operator-sdk-v1.37.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   labels:
     operatorframework.io/arch.amd64: supported
   name: backstage-operator.v0.4.0
@@ -56,6 +66,7 @@ spec:
           - ""
           resources:
           - configmaps
+          - persistentvolumeclaims
           - secrets
           - services
           verbs:
@@ -69,7 +80,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - persistentvolumeclaims
           - persistentvolumes
           verbs:
           - get

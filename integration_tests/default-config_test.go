@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	corev1 "k8s.io/api/core/v1"
 

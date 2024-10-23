@@ -1,0 +1,27 @@
+# permissions for end users to edit backstages.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: backstage-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: backstage-operator
+    app.kubernetes.io/part-of: backstage-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: backstage-viewer-role
+rules:
+- apiGroups:
+  - rhdh.redhat.com
+  resources:
+  - backstages
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - rhdh.redhat.com
+  resources:
+  - backstages/status
+  verbs:
+  - get

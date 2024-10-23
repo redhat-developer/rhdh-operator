@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"redhat-developer/red-hat-developer-hub-operator/tests/helper"
+	"github.com/redhat-developer/rhdh-operator/tests/helper"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

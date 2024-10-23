@@ -1,4 +1,4 @@
-module redhat-developer/red-hat-developer-hub-operator
+module github.com/redhat-developer/rhdh-operator
 
 go 1.21
 
