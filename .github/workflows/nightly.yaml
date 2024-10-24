@@ -22,9 +22,9 @@ jobs:
       group: '${{ github.workflow }}-${{ matrix.branch }}-${{ matrix.test_upgrade }}'
       cancel-in-progress: true
     env:
-      CONTAINER_ENGINE: podman
+      CONTAINER_TOOL: podman
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4 # default branch will be checked out by default on scheduled workflows
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4 # default branch will be checked out by default on scheduled workflows
         with:
           fetch-depth: 0
 
@@ -33,7 +33,7 @@ jobs:
         run: git switch ${{ matrix.branch }}
 
       - name: Setup Go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
         with:
           go-version-file: 'go.mod'
 

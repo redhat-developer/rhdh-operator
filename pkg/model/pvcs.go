@@ -3,9 +3,10 @@ package model
 import (
 	"fmt"
 	"path/filepath"
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
 
@@ -18,7 +19,7 @@ import (
 type BackstagePvcsFactory struct{}
 
 func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
-	return &BackstagePvcs{mountPath: DefaultMountDir, fullPath: false}
+	return &BackstagePvcs{mountPath: DefaultMountDir, fromDefaultConf: true}
 }
 
 func init() {
@@ -38,7 +39,7 @@ func addPvc(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *Backs
 	for _, pvcSpec := range spec.Application.ExtraFiles.Pvcs {
 		pvc, ok := model.ExternalConfig.ExtraPvcs[pvcSpec.Name]
 		if ok {
-			pvcObj := BackstagePvcs{}
+			pvcObj := BackstagePvcs{fromDefaultConf: false}
 			pvcObj.pvcs = &multiobject.MultiObject{}
 			if pvcSpec.MountPath == "" {
 				pvcObj.mountPath = mp
@@ -57,7 +58,10 @@ func addPvc(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *Backs
 type BackstagePvcs struct {
 	pvcs      *multiobject.MultiObject
 	mountPath string
-	fullPath  bool
+	// if false mountPath will be concatenated with pvc name
+	fullPath bool
+	// whether this object is constructed from default config
+	fromDefaultConf bool
 }
 
 func PvcsName(backstageName, originalName string) string {
@@ -90,6 +94,7 @@ func (b *BackstagePvcs) validate(model *BackstageModel, backstage bsv1.Backstage
 		if !ok {
 			return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
 		}
+
 	}
 	return nil
 }
@@ -117,12 +122,14 @@ func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
 			append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
 
 		c := &deployment.Spec.Template.Spec.Containers[0]
-
 		volMount := corev1.VolumeMount{Name: volName}
-		if b.fullPath {
+
+		volMount.MountPath = filepath.Join(b.mountPath, volName)
+		if mp, ok := pvc.GetAnnotations()[DefaultMountPathAnnotation]; ok && b.fromDefaultConf {
+			volMount.MountPath = mp
+		}
+		if b.fullPath && !b.fromDefaultConf {
 			volMount.MountPath = b.mountPath
-		} else {
-			volMount.MountPath = filepath.Join(b.mountPath, volName)
 		}
 
 		c.VolumeMounts = append(c.VolumeMounts, volMount)

@@ -3,9 +3,10 @@ package controller
 import (
 	"context"
 	"fmt"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 	"reflect"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"k8s.io/utils/ptr"
 
@@ -29,9 +30,9 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bs "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,8 +69,8 @@ type BackstageReconciler struct {
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=configmaps;secrets;services,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="",resources=persistentvolumes;persistentvolumeclaims,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=configmaps;secrets;services;persistentvolumeclaims,verbs=get;watch;create;update;list;delete;patch
+//+kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
 //+kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
 //+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
 

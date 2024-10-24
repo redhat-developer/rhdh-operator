@@ -17,10 +17,11 @@ package model
 import (
 	"context"
 	"path/filepath"
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
 	"testing"
+
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -49,12 +50,16 @@ func TestDefaultPvcs(t *testing.T) {
 	assert.Equal(t, 2, len(mv.Items))
 	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), mv.Items[0].GetName())
 	assert.Equal(t, "myclaim1", mv.Items[0].GetAnnotations()[ConfiguredNameAnnotation])
+	assert.Equal(t, "/mount/path/from/annotation", mv.Items[1].GetAnnotations()[DefaultMountPathAnnotation])
 
 	// PVC volumes created and mounted to backstage container
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Volumes))
 	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), model.backstageDeployment.podSpec().Volumes[0].Name)
 	assert.Equal(t, 2, len(model.backstageDeployment.container().VolumeMounts))
 	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), model.backstageDeployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, filepath.Join(DefaultMountDir, PvcsName(bs.Name, "myclaim1")), model.backstageDeployment.container().VolumeMounts[0].MountPath)
+	assert.Equal(t, "/mount/path/from/annotation", model.backstageDeployment.container().VolumeMounts[1].MountPath)
+
 }
 
 func TestSpecifiedPvcs(t *testing.T) {
@@ -68,6 +73,9 @@ func TestSpecifiedPvcs(t *testing.T) {
 	pvc2 := corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-pvc2",
+			Annotations: map[string]string{
+				"rhdh.redhat.com/mount-path": "/will/be/ignored",
+			},
 		},
 	}
 

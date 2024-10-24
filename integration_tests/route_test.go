@@ -2,14 +2,15 @@ package integration_tests
 
 import (
 	"context"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model"
 	"time"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	openshift "github.com/openshift/api/route/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	"k8s.io/apimachinery/pkg/types"
 

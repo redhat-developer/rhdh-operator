@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"redhat-developer/red-hat-developer-hub-operator/pkg/model/multiobject"
 	"reflect"
 	"slices"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -16,13 +17,14 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	bsv1 "redhat-developer/red-hat-developer-hub-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	"redhat-developer/red-hat-developer-hub-operator/pkg/utils"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
 const BackstageAppLabel = "rhdh.redhat.com/app"
 const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
+const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
 
 // Backstage configuration scaffolding with empty BackstageObjects.
 // There are all possible objects for configuration

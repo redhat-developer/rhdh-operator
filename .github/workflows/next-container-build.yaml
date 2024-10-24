@@ -25,7 +25,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
 
@@ -59,7 +59,7 @@ jobs:
       - name: Setup Go
         # run this stage only if there are changes that match the includes and not the excludes
         if: ${{ env.CHANGES != '' }}
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
         with:
           go-version-file: 'go.mod'
 
@@ -79,7 +79,7 @@ jobs:
           # install skopeo, podman
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
 
-          export CONTAINER_ENGINE=podman
+          export CONTAINER_TOOL=podman
           latestNext="next"
           # for main branch, use next tags; for 1.y branches, use :latest tags
           if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]; then
@@ -91,7 +91,7 @@ jobs:
           set -ex
 
           # build 4 container images with a 14d expiry
-          CONTAINER_ENGINE=${CONTAINER_ENGINE} VERSION=${VERSION} make release-build
+          CONTAINER_TOOL=${CONTAINER_TOOL} VERSION=${VERSION} make release-build
 
           # now copy images from local cache to quay, using 0.0.1-next-f00cafe, 0.0.1-next, and next tags
           for image in operator operator-bundle operator-catalog; do
