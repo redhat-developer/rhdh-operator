@@ -1,321 +1,378 @@
 #!/bin/bash
-# Fail on error
+#
+# Script to streamline installing an IIB image in an OpenShift cluster for testing.
+#
+# Requires: oc, jq
+
 set -e
 
-# Example usage:
-# ./prepare-restricted-environment.sh \
-#   --prod_operator_index "registry.redhat.io/redhat/redhat-operator-index:v4.14" \
-#   --prod_operator_package_name "rhdh" \
-#   --prod_operator_bundle_name "rhdh-operator" \
-#   --prod_operator_version "v1.3.0" \
-#   --helper_mirror_registry_storage "30Gi" \
-#   --use_existing_mirror_registry "$MY_MIRROR_REGISTRY"
+RED='\033[0;31m'
+NC='\033[0m'
 
-# Parse input arguments
-while [ $# -gt 0 ]; do
-  if [[ $1 == *"--"* ]]; then
-    param="${1/--/}"
-    declare "$param"="$2"
-  fi
-  shift
-done
+NAMESPACE_CATALOGSOURCE="openshift-marketplace"
+NAMESPACE_SUBSCRIPTION="rhdh-operator"
+OLM_CHANNEL="fast"
 
-# Operators
-declare prod_operator_index="${prod_operator_index:?Must set --prod_operator_index: for OCP 4.12+, use registry.redhat.io/redhat/redhat-operator-index:v4.14 or quay.io/rhdh/iib:latest-v4.14-x86_64}"
-declare prod_operator_package_name="rhdh"
-declare prod_operator_bundle_name="rhdh-operator"
-declare prod_operator_version="${prod_operator_version:?Must set --prod_operator_version: use v1.3.x, v1.3.1, etc.}"
+errorf() {
+  echo -e "${RED}$1${NC}"
+}
 
-# Destination registry
-declare my_operator_index_image_name_and_tag=${prod_operator_package_name}-index:${prod_operator_version}
-declare helper_mirror_registry_storage=${helper_mirror_registry_storage:-"30Gi"}
-declare my_catalog=${prod_operator_package_name}-disconnected-install
-declare k8s_resource_name=${my_catalog}
+usage() {
+echo "
+This script streamlines testing IIB images by configuring an OpenShift cluster to enable it to use the specified IIB image
+as a catalog source. The CatalogSource is created in the openshift-marketplace namespace,
+and is named 'operatorName-channelName', eg., rhdh-fast
 
-# Check if logged into OpenShift cluster
-if ! oc whoami > /dev/null 2>&1; then
-  echo "[ERROR] Not logged into an OpenShift cluster."
+If IIB installation fails, see https://docs.engineering.redhat.com/display/CFC/Test and
+follow steps in section 'Adding Brew Pull Secret'
+
+Usage:
+  $0 [OPTIONS]
+
+Options:
+  --latest                     : Install from iib quay.io/rhdh/iib:latest-\$OCP_VER-\$OCP_ARCH (eg., latest-v4.14-x86_64) [default]
+  --next                       : Install from iib quay.io/rhdh/iib:next-\$OCP_VER-\$OCP_ARCH (eg., next-v4.14-x86_64)
+  --install-operator <NAME>    : Install operator named \$NAME after creating CatalogSource
+
+Examples:
+  $0 \\
+    --install-operator rhdh          # RC release in progess (from latest tag and stable branch )
+
+  $0 \\
+    --next --install-operator rhdh   # CI future release (from next tag and upstream main branch)
+"
+}
+
+if [[ "$#" -lt 1 ]]; then usage; exit 0; fi
+
+# minimum requirements
+if [[ ! $(command -v oc) ]]; then
+  errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
+  exit 1
+fi
+if [[ ! $(command -v jq) ]]; then
+  errorf "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
   exit 1
 fi
 
-# Check OpenShift version and architecture
-OCP_VER="$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+\.[0-9]+)-.+#\1#")"
-OCP_VER_MAJOR="$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+)\..+#\1#")"
+# Check we're logged into a cluster
+if ! oc whoami > /dev/null 2>&1; then
+  errorf "Not logged into an OpenShift cluster"
+  exit 1
+fi
+
+# log into your OCP cluster before running this or you'll get null values for OCP vars!
+OCP_VER="v$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
 OCP_ARCH="$(oc version -o json | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
 if [[ $OCP_ARCH == "amd64" ]]; then OCP_ARCH="x86_64"; fi
+# if logged in, this should return something like latest-v4.12-x86_64
+UPSTREAM_IIB="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}";
 
-# Check for ROSA cluster
-CLUSTER_TYPE=$(oc get infrastructure cluster -o jsonpath='{.status.platform}')
-if [[ $CLUSTER_TYPE == "AWS" ]]; then
-  echo "[INFO] Detected ROSA/AWS cluster. Ensuring compatibility with airgapped setup..."
-  # Add ROSA-specific logic if needed
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    '--install-operator')
+      # Create project if necessary
+      if ! oc get project "$NAMESPACE_SUBSCRIPTION" > /dev/null 2>&1; then
+        echo "Project $NAMESPACE_SUBSCRIPTION does not exist; creating it"
+        oc create namespace "$NAMESPACE_SUBSCRIPTION"
+      fi
+      TO_INSTALL="$2"; shift 1;;
+    '--next'|'--latest')
+      # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
+      UPSTREAM_IIB="quay.io/rhdh/iib:${1/--/}-${OCP_VER}-$OCP_ARCH";;
+    '-h'|'--help') usage; exit 0;;
+    *) echo "[ERROR] Unknown parameter is used: $1."; usage; exit 1;;
+  esac
+  shift 1
+done
+
+# check if the IIB we're going to install as a catalog source exists before trying to install it
+if [[ ! $(command -v skopeo) ]]; then
+  errorf "Please install skopeo 1.11+"
+  exit 1
 fi
 
-function deploy_mirror_registry() {
-    echo "[INFO] Deploying mirror registry..." >&2
-    local namespace="airgap-helper-ns"
-    local image="registry:2"
-    local username="registryuser"
-    local password=$(echo "$RANDOM" | base64 | head -c 20)
+# shellcheck disable=SC2086
+UPSTREAM_IIB_MANIFEST="$(skopeo inspect docker://${UPSTREAM_IIB} --raw || exit 2)"
+# echo "Got: $UPSTREAM_IIB_MANIFEST"
+if [[ $UPSTREAM_IIB_MANIFEST == *"Error parsing image name "* ]] || [[ $UPSTREAM_IIB_MANIFEST == *"manifest unknown"* ]]; then
+  echo "$UPSTREAM_IIB_MANIFEST"; exit 3
+else
+  echo "[INFO] Using iib from image $UPSTREAM_IIB"
+  IIB_IMAGE="${UPSTREAM_IIB}"
+fi
 
-    if ! oc get namespace "${namespace}" &> /dev/null; then
-      echo "  namespace ${namespace} does not exist - creating it..." >&2
-      oc create namespace "${namespace}" >&2
-    fi
+TMPDIR=$(mktemp -d)
+# shellcheck disable=SC2064
+trap "rm -fr $TMPDIR" EXIT
 
-    registry_htpasswd=$(htpasswd -Bbn "${username}" "${password}")
-    echo "  generating auth secret for mirror registry. Those creds will be stored in 'airgap-registry-auth-creds' in ${namespace} ..." >&2
-    cat <<EOF | oc apply -f - >&2
-apiVersion: v1
-kind: Secret
-type: Opaque
-metadata:
-  name: airgap-registry-auth
-  namespace: "${namespace}"
-  labels:
-    app: airgap-registry
-stringData:
-  htpasswd: "${registry_htpasswd}"
-EOF
+CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
+DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
 
-    cat <<EOF | oc apply -f - >&2
-apiVersion: v1
-kind: Secret
-type: Opaque
-metadata:
-  name: airgap-registry-auth-creds
-  namespace: "${namespace}"
-  labels:
-    app: airgap-registry
-stringData:
-  username: "${username}"
-  password: "${password}"
-EOF
+# Add CatalogSource for the IIB
+if [ -z "$TO_INSTALL" ]; then
+  IIB_NAME="${UPSTREAM_IIB##*:}"
+  IIB_NAME="${IIB_NAME//_/-}"
+  IIB_NAME="${IIB_NAME//./-}"
+  IIB_NAME="$(echo "$IIB_NAME" | tr '[:upper:]' '[:lower:]')"
+  CATALOGSOURCE_NAME="rhdh-iib-${IIB_NAME}-${OLM_CHANNEL}"
+  DISPLAY_NAME_SUFFIX="${IIB_NAME}"
+fi
 
-    # Use default storage class if not provided
-    if [ -z "$storage_class" ]; then
-      storage_class=$(oc get storageclasses -o=jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
-    fi
+function install_regular_cluster() {
+  # A regular cluster should support ImageContentSourcePolicy/ImageDigestMirrorSet resources
+  ICSP_URL="quay.io/rhdh/"
+  ICSP_URL_PRE=${ICSP_URL%%/*}
 
-    echo "  creating PVC for mirror registry with storage class ${storage_class}: persistentvolumeclaim/airgap-registry-storage ..." >&2
-    cat <<EOF | oc apply -f - >&2
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: airgap-registry-storage
-  namespace: "${namespace}"
-spec:
-  resources:
-    requests:
-      storage: "${helper_mirror_registry_storage}"
-  storageClassName: "${storage_class}"
-  accessModes:
-    - ReadWriteOnce
-EOF
+  # for 1.4+, use IDMS instead of ICSP
+  # TODO https://issues.redhat.com/browse/RHIDP-4188 if we onboard 1.3 to Konflux, use IDMS for latest too
+  if [[ "$IIB_IMAGE" == *"next"* ]]; then
+    echo "[INFO] Adding ImageDigestMirrorSet to resolve unreleased images on registry.redhat.io from quay.io" >&2
+    echo "apiVersion: config.openshift.io/v1
+  kind: ImageDigestMirrorSet
+  metadata:
+    name: ${ICSP_URL_PRE//./-}
+  spec:
+    imageDigestMirrors:
+    - source: registry.redhat.io/rhdh/rhdh-hub-rhel9
+      mirrors:
+        - ${ICSP_URL}rhdh-hub-rhel9
+    - source: registry.redhat.io/rhdh/rhdh-rhel9-operator
+      mirrors:
+        - ${ICSP_URL}rhdh-rhel9-operator
+  " > "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" >&2
+  else
+    echo "[INFO] Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io" >&2
+    # echo "[DEBUG] ${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
+    echo "apiVersion: operator.openshift.io/v1alpha1
+  kind: ImageContentSourcePolicy
+  metadata:
+    name: ${ICSP_URL_PRE//./-}
+  spec:
+    repositoryDigestMirrors:
+    ## 1. add mappings for Developer Hub bundle, operator, hub
+    - mirrors:
+      - ${ICSP_URL}rhdh-operator-bundle
+      source: registry.redhat.io/rhdh/rhdh-operator-bundle
+    - mirrors:
+      - ${ICSP_URL}rhdh-operator-bundle
+      source: registry.stage.redhat.io/rhdh/rhdh-operator-bundle
+    - mirrors:
+      - ${ICSP_URL}rhdh-operator-bundle
+      source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-operator-bundle
 
-    echo "  creating mirror registry Deployment: deployment/airgap-registry ..." >&2
-    cat <<EOF | oc replace --force -f - >&2
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: airgap-registry
-  namespace: "${namespace}"
-  labels:
-    app: airgap-registry
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: airgap-registry
-  template:
-    metadata:
-      labels:
-        app: airgap-registry
-    spec:
-      containers:
-        - image: "${image}"
-          name: airgap-registry
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: REGISTRY_AUTH
-              value: "htpasswd"
-            - name: REGISTRY_AUTH_HTPASSWD_REALM
-              value: "RHDH Private Registry"
-            - name: REGISTRY_AUTH_HTPASSWD_PATH
-              value: "/auth/htpasswd"
-            - name: REGISTRY_STORAGE_DELETE_ENABLED
-              value: "true"
-          ports:
-            - containerPort: 5000
-          volumeMounts:
-            - name: registry-vol
-              mountPath: /var/lib/registry
-            - name: auth-vol
-              mountPath: "/auth"
-              readOnly: true
-      volumes:
-        - name: registry-vol
-          persistentVolumeClaim:
-            claimName: airgap-registry-storage
-        - name: auth-vol
-          secret:
-            secretName: airgap-registry-auth
-EOF
+    - mirrors:
+      - ${ICSP_URL}rhdh-rhel9-operator
+      source: registry.redhat.io/rhdh/rhdh-rhel9-operator
+    - mirrors:
+      - ${ICSP_URL}rhdh-rhel9-operator
+      source: registry.stage.redhat.io/rhdh/rhdh-rhel9-operator
+    - mirrors:
+      - ${ICSP_URL}rhdh-rhel9-operator
+      source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-rhel9-operator
 
-    echo "  creating mirror registry Service: service/airgap-registry ..." >&2
-    cat <<EOF | oc apply -f - >&2
-apiVersion: v1
-kind: Service
-metadata:
-  name: airgap-registry
-  namespace: "${namespace}"
-  labels:
-    app: airgap-registry
-spec:
-  type: ClusterIP
-  ports:
-    - port: 5000
-      protocol: TCP
-      targetPort: 5000
-  selector:
-    app: airgap-registry
-EOF
+    - mirrors:
+      - ${ICSP_URL}rhdh-hub-rhel9
+      source: registry.redhat.io/rhdh/rhdh-hub-rhel9
+    - mirrors:
+      - ${ICSP_URL}rhdh-hub-rhel9
+      source: registry.stage.redhat.io/rhdh/rhdh-hub-rhel9
+    - mirrors:
+      - ${ICSP_URL}rhdh-hub-rhel9
+      source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9
 
-    echo "  creating Route to access mirror registry: route/airgap-registry ..." >&2
-    oc -n "${namespace}" create route edge --service=airgap-registry --insecure-policy=Redirect --dry-run=client -o yaml \
-      | oc -n "${namespace}" apply -f - >&2
+    ## 2. general repo mappings
+    - mirrors:
+      - ${ICSP_URL_PRE}
+      source: registry.redhat.io
+    - mirrors:
+      - ${ICSP_URL_PRE}
+      source: registry.stage.redhat.io
+    - mirrors:
+      - ${ICSP_URL_PRE}
+      source: registry-proxy.engineering.redhat.com
 
-    local registry_url=$(oc get route airgap-registry -n "${namespace}" --template='{{ .spec.host }}')
-    echo "... done. Mirror registry should now be reachable at: ${registry_url} ..." >&2
+    ### now add mappings to resolve internal references
+    - mirrors:
+      - registry.redhat.io
+      source: registry.stage.redhat.io
+    - mirrors:
+      - registry.stage.redhat.io
+      source: registry-proxy.engineering.redhat.com
+    - mirrors:
+      - registry.redhat.io
+      source: registry-proxy.engineering.redhat.com
+  " > "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" >&2
+  fi
 
-    # Wait until url is ready
-    echo "[INFO] Waiting for mirror registry to be ready and reachable ..." >&2
-    curl --insecure -IL "${registry_url}" --retry 100 --retry-all-errors --retry-max-time 900 --fail &> /tmp/"${registry_url}.log" >&2
-
-    echo "[INFO] Log into mirror registry to be able to push images to it..." >&2
-    podman login -u="${username}" -p="${password}" "${registry_url}" --tls-verify=false >&2
-
-    echo "[INFO] Marking mirror registry as insecure in the cluster ..." >&2
-    oc patch image.config.openshift.io/cluster --patch '{"spec":{"registrySources":{"insecureRegistries":["'${registry_url}'"]}}}' --type=merge >&2
-
-    echo "[INFO] Adding mirror registry creds to cluster global pull secret ..." >&2
-    echo "  downloading global pull secret from the cluster ..." >&2
-    oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/my-global-pull-secret-for-mirror-reg.yaml
-    echo "   log into mirror registry and store creds into the pull secret downloaded..." >&2
-    oc registry login \
-      --insecure=true \
-      --registry="${registry_url}" \
-      --auth-basic="${username}:${password}" \
-      --to=/tmp/my-global-pull-secret-for-mirror-reg.yaml \
-       >&2
-    echo "  writing updated pull secret into the cluster ..." >&2
-    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/my-global-pull-secret-for-mirror-reg.yaml >&2
-
-    # Mirror OCP release images
-    echo "[INFO] Mirroring OCP release images for airgapped environments..." >&2
-    local ocp_product_repo='openshift-release-dev'
-    local ocp_release_name="ocp-release"
-    local ocp_local_repo="ocp/openshift"
-    oc adm release mirror -a /tmp/my-global-pull-secret-for-mirror-reg.yaml \
-      --from="quay.io/${ocp_product_repo}/${ocp_release_name}:${OCP_VER}-${OCP_ARCH}" \
-      --to="${registry_url}/${ocp_local_repo}" \
-      --to-release-image="${registry_url}/${ocp_local_repo}:${OCP_VER}-${OCP_ARCH}" \
-      --insecure=true > /tmp/oc-adm-release-mirror__mirror-registry.out
-
-    # Create ImageContentSourcePolicy for OCP release images
-    echo "[INFO] Creating ImageContentSourcePolicy for OCP release images..." >&2
-    cat <<EOF | oc apply -f - >&2
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
-metadata:
-  name: ocp-release
-  labels:
-    app: airgap-registry
-spec:
-  repositoryDigestMirrors:
-  - mirrors:
-    - "${registry_url}/${ocp_local_repo}"
-    source: quay.io/openshift-release-dev/ocp-release
-  - mirrors:
-    - "${registry_url}/${ocp_local_repo}"
-    source: "quay.io/openshift-release-dev/ocp-v${OCP_VER_MAJOR}.0-art-dev"
-EOF
-
-    echo "[INFO] Cleaning up temporary files..." >&2
-    rm -f /tmp/my-global-pull-secret-for-mirror-reg.yaml /tmp/oc-adm-release-mirror__mirror-registry.out >&2
-
-    echo "[INFO] Mirror registry ready: ${registry_url}" >&2
-    echo "${registry_url}"
+  printf "%s" "${IIB_IMAGE}"
 }
 
-# Deploy or use existing mirror registry
-declare my_registry="${use_existing_mirror_registry}"
-if [ -z "${my_registry}" ]; then
-  my_registry=$(deploy_mirror_registry)
-fi
-
-declare my_operator_index="${my_registry}/${prod_operator_package_name}/${my_operator_index_image_name_and_tag}"
-
-# Create local directory for catalog
-mkdir -p "${my_catalog}/${prod_operator_package_name}"
-
-# Fetch metadata for the operator catalog
-echo "[INFO] Fetching metadata for the ${prod_operator_package_name} operator catalog."
-opm render "${my_operator_index}" \
-  | jq "select \
-    (\
-      (.schema == \"olm.bundle\" and .name == \"${prod_operator_bundle_name}.${prod_operator_version}\") or \
-      (.schema == \"olm.package\" and .name == \"${prod_operator_package_name}\") or \
-      (.schema == \"olm.channel\" and .package == \"${prod_operator_package_name}\") \
-    )" \
-  | jq "select \
-     (.schema == \"olm.channel\" and .package == \"${prod_operator_package_name}\").entries \
-      |= [{name: \"${prod_operator_bundle_name}.${prod_operator_version}\"}]" \
-  > "${my_catalog}/${prod_operator_package_name}/render.json"
-
-echo "[INFO] Creating the catalog Dockerfile."
-if [ -f "${my_catalog}.Dockerfile" ]; then
-  rm -f "${my_catalog}.Dockerfile"
-fi
-opm generate dockerfile "./${my_catalog}"
-
-# Build the catalog image locally
-echo "[INFO] Building the catalog image locally."
-podman build -t "${my_operator_index}" -f "./${my_catalog}.Dockerfile" --no-cache .
-
-# Disable default Red Hat OperatorHub sources
-echo "[INFO] Disabling the default Red Hat Ecosystem Catalog."
-oc patch OperatorHub cluster --type json \
-    --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
-
-# Push the catalog image to the registry
-echo "[INFO] Deploying catalog image to ${my_operator_index} registry."
-skopeo copy --src-tls-verify=false --dest-tls-verify=false --all "containers-storage:$my_operator_index" "docker://$my_operator_index"
-
-# Remove index image from mapping.txt for mirroring
-oc adm catalog mirror "$my_operator_index" "$my_registry" --insecure --manifests-only | tee catalog_mirror.log
-MANIFESTS_FOLDER=$(sed -n -e 's/^wrote mirroring manifests to \(.*\)$/\1/p' catalog_mirror.log |xargs)
-sed -i -e "/${my_operator_index_image_name_and_tag}/d" "${MANIFESTS_FOLDER}/mapping.txt"
-
-# Mirror related images to the registry
-echo "[INFO] Mirroring related images to the ${my_registry} registry."
-while IFS= read -r line; do
-  public_image=$(echo "${line}" | cut -d '=' -f1)
-  if [[ "$prod_operator_index" != registry.redhat.io/redhat/redhat-operator-index* ]] && [[ "$public_image" == registry.redhat.io/rhdh/* ]]; then
-    if ! skopeo inspect "docker://$public_image" &> /dev/null; then
-      echo "  Replacing non-public CI image $public_image ..."
-      public_image=${public_image/registry.redhat.io\/rhdh/quay.io\/rhdh}
-      echo "    => $public_image"
-    fi
+function install_hosted_control_plane_cluster() {
+  # Clusters with an hosted control plane do not propagate ImageContentSourcePolicy/ImageDigestMirrorSet resources
+  # to the underlying nodes, causing an issue mirroring internal images effectively.
+  oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
+  my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+  podman login -u $(oc whoami) -p $(oc whoami -t) --tls-verify=false $my_registry >&2
+  if oc -n openshift-marketplace get secret internal-reg-auth-for-rhdh > /dev/null; then
+    oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh >&2
   fi
-  private_image=$(echo "${line}" | cut -d '=' -f2)
-  echo "[INFO] Mirroring ${public_image}"
-  skopeo copy --dest-tls-verify=false --preserve-digests --all "docker://$public_image" "docker://$private_image"
-done < "${MANIFESTS_FOLDER}/mapping.txt"
+  oc -n openshift-marketplace create secret docker-registry internal-reg-auth-for-rhdh \
+    --docker-server=${my_registry} \
+    --docker-username=$(oc whoami) \
+    --docker-password=$(oc whoami -t) \
+    --docker-email="admin@internal-registry.example.com" >&2
+  oc registry login --registry="$my_registry" --auth-basic="$(oc whoami):$(oc whoami -t)" >&2
+  for ns in rhdh-operator rhdh; do
+    # To be able to push images under this scope in the internal image registry
+    if ! oc get namespace "$ns" > /dev/null; then
+      oc create namespace "$ns" >&2
+    fi
+    oc adm policy add-cluster-role-to-user system:image-signer system:serviceaccount:${ns}:default >&2 || true
+  done
+  oc policy add-role-to-user system:image-puller system:serviceaccount:openshift-marketplace:default -n openshift-marketplace >&2 || true
+  oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:default -n rhdh-operator >&2 || true
 
-# Create CatalogSource and ImageContentSourcePolicy
-echo "[INFO] Creating CatalogSource and ImageContentSourcePolicy"
-cat "${MANIFESTS_FOLDER}/catalogSource.yaml" | sed 's|name: .*|name: '${k8s_resource_name}'|' | oc apply -f -
-cat "${MANIFESTS_FOLDER}/imageContentSourcePolicy.yaml" | sed 's|name: .*|name: '${k8s_resource_name}'|' | oc apply -f -
+  echo ">>> WORKING DIR: $TMPDIR <<<" >&2
+  mkdir -p "${TMPDIR}/rhdh/rhdh" >&2
+  opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
+  pushd "${TMPDIR}" >&2
+  for bundleImg in $(cat "${TMPDIR}/rhdh/rhdh/render.yaml" | grep -E '^image: .*operator-bundle' | awk '{print $2}' | uniq); do
+    originalBundleImg="$bundleImg"
+    digest="${originalBundleImg##*@sha256:}"
+    bundleImg="${bundleImg/registry.stage.redhat.io/quay.io}"
+    bundleImg="${bundleImg/registry.redhat.io/quay.io}"
+    bundleImg="${bundleImg/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
+    echo "[DEBUG] $originalBundleImg => $bundleImg" >&2
+    if podman pull "$bundleImg" >&2; then
+      mkdir -p "bundles/$digest" >&2
+      containerId=$(podman create "$bundleImg")
+      podman cp $containerId:/metadata "./bundles/${digest}/metadata" >&2
+      podman cp $containerId:/manifests "./bundles/${digest}/manifests" >&2
+      podman rm -f $containerId >&2
 
-echo "[INFO] Catalog $my_operator_index deployed to the $my_registry registry."
+      # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
+      for file in "./bundles/${digest}/manifests"/*; do
+        if [ -f "$file" ]; then
+          sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file" >&2
+          sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file" >&2
+          sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file" >&2
+        fi
+      done
+
+      cat <<EOF > "./bundles/${digest}/bundle.Dockerfile"
+FROM scratch
+COPY ./manifests /manifests/
+COPY ./metadata /metadata/
+EOF
+      pushd "./bundles/${digest}" >&2
+      newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
+      podman image build -f bundle.Dockerfile -t "${newBundleImage}" . >&2
+      podman image push "${newBundleImage}" >&2
+      popd >&2
+
+      sed -i "s#${originalBundleImg}#${newBundleImage}#g" "${TMPDIR}/rhdh/rhdh/render.yaml" >&2
+    fi
+  done
+
+  local newIndex="${UPSTREAM_IIB/quay.io/"${my_registry}"}"
+
+  opm generate dockerfile rhdh/rhdh >&2
+  podman image build -t "${newIndex}" -f "./rhdh/rhdh.Dockerfile" --no-cache rhdh >&2
+  podman image push "${newIndex}" >&2
+
+  printf "%s" "${newIndex}"
+}
+
+# Defaulting to the hosted control plane behavior which has more chances to work
+CONTROL_PLANE_TECH=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
+  (echo '[WARN] Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
+IS_HOSTED_CONTROL_PLANE="false"
+if [[ "${CONTROL_PLANE_TECH}" == "External" ]]; then
+  # 'External' indicates that the control plane is hosted externally to the cluster
+  # and that its components are not visible within the cluster.
+  IS_HOSTED_CONTROL_PLANE="true"
+fi
+
+newIIBImage=${IIB_IMAGE}
+if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
+  echo "[INFO] Detected a cluster with a hosted control plane"
+  newIIBImage=$(install_hosted_control_plane_cluster)
+else
+  newIIBImage=$(install_regular_cluster)
+fi
+
+echo "[DEBUG] newIIBImage=${newIIBImage}"
+
+echo "apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${CATALOGSOURCE_NAME}
+  namespace: ${NAMESPACE_CATALOGSOURCE}
+spec:
+  sourceType: grpc
+  image: ${newIIBImage}
+  secrets:
+  - "internal-reg-auth-for-rhdh"
+  publisher: IIB testing ${DISPLAY_NAME_SUFFIX}
+  displayName: IIB testing catalog ${DISPLAY_NAME_SUFFIX}
+" > "$TMPDIR"/CatalogSource.yml && oc apply -f "$TMPDIR"/CatalogSource.yml
+
+if [ -z "$TO_INSTALL" ]; then
+  echo "Done. Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
+  exit 0
+fi
+
+# Create OperatorGroup to allow installing all-namespaces operators in $NAMESPACE_SUBSCRIPTION
+echo "Creating OperatorGroup to allow all-namespaces operators to be installed"
+echo "apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: rhdh-operator-group
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+" > "$TMPDIR"/OperatorGroup.yml && oc apply -f "$TMPDIR"/OperatorGroup.yml
+
+# Create subscription for operator
+echo "apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: $TO_INSTALL
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+spec:
+  channel: $OLM_CHANNEL
+  installPlanApproval: Automatic
+  name: $TO_INSTALL
+  source: ${CATALOGSOURCE_NAME}
+  sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
+" > "$TMPDIR"/Subscription.yml && oc apply -f "$TMPDIR"/Subscription.yml
+
+OCP_CONSOLE_ROUTE_HOST=$(oc get route console -n openshift-console -o=jsonpath='{.spec.host}')
+CLUSTER_ROUTER_BASE=$(oc get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
+echo "
+
+To install, go to:
+https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogType=OperatorBackedService
+
+Or run this:
+
+echo \"apiVersion: rhdh.redhat.com/v1alpha2
+kind: Backstage
+metadata:
+  name: developer-hub
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+    extraFiles:
+      mountPath: /opt/app-root/src
+    replicas: 1
+    route:
+      enabled: true
+  database:
+    enableLocalDb: true
+\" | oc apply -f-
+
+Once deployed, Developer Hub will be available at
+https://backstage-developer-hub-${NAMESPACE_SUBSCRIPTION}.${CLUSTER_ROUTER_BASE}
+"
