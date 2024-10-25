@@ -216,18 +216,27 @@ spec:
 function install_hosted_control_plane_cluster() {
   # Clusters with an hosted control plane do not propagate ImageContentSourcePolicy/ImageDigestMirrorSet resources
   # to the underlying nodes, causing an issue mirroring internal images effectively.
+  internal_registry_url="image-registry.openshift-image-registry.svc:5000"
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
-  podman login -u $(oc whoami) -p $(oc whoami -t) --tls-verify=false $my_registry >&2
-  if oc -n openshift-marketplace get secret internal-reg-auth-for-rhdh > /dev/null; then
+  podman login -u kubeadmin -p $(oc whoami -t) --tls-verify=false $my_registry >&2
+  if oc -n openshift-marketplace get secret internal-reg-auth-for-rhdh &> /dev/null; then
     oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh >&2
   fi
-  oc -n openshift-marketplace create secret docker-registry internal-reg-auth-for-rhdh \
+  if oc -n openshift-marketplace get secret internal-reg-ext-auth-for-rhdh &> /dev/null; then
+    oc -n openshift-marketplace delete secret internal-reg-ext-auth-for-rhdh >&2
+  fi
+  oc -n openshift-marketplace create secret docker-registry internal-reg-ext-auth-for-rhdh \
     --docker-server=${my_registry} \
-    --docker-username=$(oc whoami) \
+    --docker-username=kubeadmin \
+    --docker-password=$(oc whoami -t) \
+    --docker-email="admin@internal-registry-ext.example.com" >&2
+  oc -n openshift-marketplace create secret docker-registry internal-reg-auth-for-rhdh \
+    --docker-server=${internal_registry_url} \
+    --docker-username=kubeadmin \
     --docker-password=$(oc whoami -t) \
     --docker-email="admin@internal-registry.example.com" >&2
-  oc registry login --registry="$my_registry" --auth-basic="$(oc whoami):$(oc whoami -t)" >&2
+  oc registry login --registry="$my_registry" --auth-basic="kubeadmin:$(oc whoami -t)" >&2
   for ns in rhdh-operator rhdh; do
     # To be able to push images under this scope in the internal image registry
     if ! oc get namespace "$ns" > /dev/null; then
@@ -273,21 +282,23 @@ COPY ./metadata /metadata/
 EOF
       pushd "./bundles/${digest}" >&2
       newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
+      newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"
       podman image build -f bundle.Dockerfile -t "${newBundleImage}" . >&2
       podman image push "${newBundleImage}" --tls-verify=false >&2
       popd >&2
 
-      sed -i "s#${originalBundleImg}#${newBundleImage}#g" "${TMPDIR}/rhdh/rhdh/render.yaml" >&2
+      sed -i "s#${originalBundleImg}#${newBundleImageAsInt}#g" "${TMPDIR}/rhdh/rhdh/render.yaml" >&2
     fi
   done
 
   local newIndex="${UPSTREAM_IIB/quay.io/"${my_registry}"}"
+  local newIndexAsInt="${UPSTREAM_IIB/quay.io/"${internal_registry_url}"}"
 
   opm generate dockerfile rhdh/rhdh >&2
   podman image build -t "${newIndex}" -f "./rhdh/rhdh.Dockerfile" --no-cache rhdh >&2
   podman image push "${newIndex}" --tls-verify=false >&2
 
-  printf "%s" "${newIndex}"
+  printf "%s" "${newIndexAsInt}"
 }
 
 # Defaulting to the hosted control plane behavior which has more chances to work
@@ -319,7 +330,8 @@ spec:
   sourceType: grpc
   image: ${newIIBImage}
   secrets:
-  - "internal-reg-auth-for-rhdh"
+  - internal-reg-auth-for-rhdh
+  - internal-reg-ext-auth-for-rhdh
   publisher: IIB testing ${DISPLAY_NAME_SUFFIX}
   displayName: IIB testing catalog ${DISPLAY_NAME_SUFFIX}
 " > "$TMPDIR"/CatalogSource.yml && oc apply -f "$TMPDIR"/CatalogSource.yml
