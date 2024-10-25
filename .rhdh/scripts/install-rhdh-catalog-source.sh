@@ -273,7 +273,7 @@ EOF
       pushd "./bundles/${digest}" >&2
       newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
       podman image build -f bundle.Dockerfile -t "${newBundleImage}" . >&2
-      podman image push "${newBundleImage}" >&2
+      podman image push "${newBundleImage}" --tls-verify=false >&2
       popd >&2
 
       sed -i "s#${originalBundleImg}#${newBundleImage}#g" "${TMPDIR}/rhdh/rhdh/render.yaml" >&2
@@ -284,7 +284,7 @@ EOF
 
   opm generate dockerfile rhdh/rhdh >&2
   podman image build -t "${newIndex}" -f "./rhdh/rhdh.Dockerfile" --no-cache rhdh >&2
-  podman image push "${newIndex}" >&2
+  podman image push "${newIndex}" --tls-verify=false >&2
 
   printf "%s" "${newIndex}"
 }
