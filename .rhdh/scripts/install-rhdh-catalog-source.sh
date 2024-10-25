@@ -128,80 +128,85 @@ function install_regular_cluster() {
   # TODO https://issues.redhat.com/browse/RHIDP-4188 if we onboard 1.3 to Konflux, use IDMS for latest too
   if [[ "$IIB_IMAGE" == *"next"* ]]; then
     echo "[INFO] Adding ImageDigestMirrorSet to resolve unreleased images on registry.redhat.io from quay.io" >&2
-    echo "apiVersion: config.openshift.io/v1
-  kind: ImageDigestMirrorSet
-  metadata:
-    name: ${ICSP_URL_PRE//./-}
-  spec:
-    imageDigestMirrors:
-    - source: registry.redhat.io/rhdh/rhdh-hub-rhel9
-      mirrors:
-        - ${ICSP_URL}rhdh-hub-rhel9
-    - source: registry.redhat.io/rhdh/rhdh-rhel9-operator
-      mirrors:
-        - ${ICSP_URL}rhdh-rhel9-operator
+    echo "---
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: ${ICSP_URL_PRE//./-}
+spec:
+  imageDigestMirrors:
+  - source: registry.redhat.io/rhdh/rhdh-hub-rhel9
+    mirrors:
+      - ${ICSP_URL}rhdh-hub-rhel9
+  - source: registry.redhat.io/rhdh/rhdh-rhel9-operator
+    mirrors:
+      - ${ICSP_URL}rhdh-rhel9-operator
+  - source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-operator-bundle
+    mirrors:
+      - ${ICSP_URL}rhdh-operator-bundle
   " > "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" >&2
   else
     echo "[INFO] Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io" >&2
     # echo "[DEBUG] ${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
-    echo "apiVersion: operator.openshift.io/v1alpha1
-  kind: ImageContentSourcePolicy
-  metadata:
-    name: ${ICSP_URL_PRE//./-}
-  spec:
-    repositoryDigestMirrors:
-    ## 1. add mappings for Developer Hub bundle, operator, hub
-    - mirrors:
-      - ${ICSP_URL}rhdh-operator-bundle
-      source: registry.redhat.io/rhdh/rhdh-operator-bundle
-    - mirrors:
-      - ${ICSP_URL}rhdh-operator-bundle
-      source: registry.stage.redhat.io/rhdh/rhdh-operator-bundle
-    - mirrors:
-      - ${ICSP_URL}rhdh-operator-bundle
-      source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-operator-bundle
+    echo "---
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: ${ICSP_URL_PRE//./-}
+spec:
+  repositoryDigestMirrors:
+  ## 1. add mappings for Developer Hub bundle, operator, hub
+  - mirrors:
+    - ${ICSP_URL}rhdh-operator-bundle
+    source: registry.redhat.io/rhdh/rhdh-operator-bundle
+  - mirrors:
+    - ${ICSP_URL}rhdh-operator-bundle
+    source: registry.stage.redhat.io/rhdh/rhdh-operator-bundle
+  - mirrors:
+    - ${ICSP_URL}rhdh-operator-bundle
+    source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-operator-bundle
 
-    - mirrors:
-      - ${ICSP_URL}rhdh-rhel9-operator
-      source: registry.redhat.io/rhdh/rhdh-rhel9-operator
-    - mirrors:
-      - ${ICSP_URL}rhdh-rhel9-operator
-      source: registry.stage.redhat.io/rhdh/rhdh-rhel9-operator
-    - mirrors:
-      - ${ICSP_URL}rhdh-rhel9-operator
-      source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-rhel9-operator
+  - mirrors:
+    - ${ICSP_URL}rhdh-rhel9-operator
+    source: registry.redhat.io/rhdh/rhdh-rhel9-operator
+  - mirrors:
+    - ${ICSP_URL}rhdh-rhel9-operator
+    source: registry.stage.redhat.io/rhdh/rhdh-rhel9-operator
+  - mirrors:
+    - ${ICSP_URL}rhdh-rhel9-operator
+    source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-rhel9-operator
 
-    - mirrors:
-      - ${ICSP_URL}rhdh-hub-rhel9
-      source: registry.redhat.io/rhdh/rhdh-hub-rhel9
-    - mirrors:
-      - ${ICSP_URL}rhdh-hub-rhel9
-      source: registry.stage.redhat.io/rhdh/rhdh-hub-rhel9
-    - mirrors:
-      - ${ICSP_URL}rhdh-hub-rhel9
-      source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9
+  - mirrors:
+    - ${ICSP_URL}rhdh-hub-rhel9
+    source: registry.redhat.io/rhdh/rhdh-hub-rhel9
+  - mirrors:
+    - ${ICSP_URL}rhdh-hub-rhel9
+    source: registry.stage.redhat.io/rhdh/rhdh-hub-rhel9
+  - mirrors:
+    - ${ICSP_URL}rhdh-hub-rhel9
+    source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9
 
-    ## 2. general repo mappings
-    - mirrors:
-      - ${ICSP_URL_PRE}
-      source: registry.redhat.io
-    - mirrors:
-      - ${ICSP_URL_PRE}
-      source: registry.stage.redhat.io
-    - mirrors:
-      - ${ICSP_URL_PRE}
-      source: registry-proxy.engineering.redhat.com
+  ## 2. general repo mappings
+  - mirrors:
+    - ${ICSP_URL_PRE}
+    source: registry.redhat.io
+  - mirrors:
+    - ${ICSP_URL_PRE}
+    source: registry.stage.redhat.io
+  - mirrors:
+    - ${ICSP_URL_PRE}
+    source: registry-proxy.engineering.redhat.com
 
-    ### now add mappings to resolve internal references
-    - mirrors:
-      - registry.redhat.io
-      source: registry.stage.redhat.io
-    - mirrors:
-      - registry.stage.redhat.io
-      source: registry-proxy.engineering.redhat.com
-    - mirrors:
-      - registry.redhat.io
-      source: registry-proxy.engineering.redhat.com
+  ### now add mappings to resolve internal references
+  - mirrors:
+    - registry.redhat.io
+    source: registry.stage.redhat.io
+  - mirrors:
+    - registry.stage.redhat.io
+    source: registry-proxy.engineering.redhat.com
+  - mirrors:
+    - registry.redhat.io
+    source: registry-proxy.engineering.redhat.com
   " > "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" >&2
   fi
 
