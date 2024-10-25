@@ -251,7 +251,8 @@ function install_hosted_control_plane_cluster() {
     echo "[DEBUG] $originalBundleImg => $bundleImg" >&2
     if podman pull "$bundleImg" >&2; then
       mkdir -p "bundles/$digest" >&2
-      containerId=$(podman create "$bundleImg")
+      # --entrypoint is needed on some older versions of Podman, but work with
+      containerId=$(podman create --entrypoint='/bin/sh' "$bundleImg" || exit 1)
       podman cp $containerId:/metadata "./bundles/${digest}/metadata" >&2
       podman cp $containerId:/manifests "./bundles/${digest}/manifests" >&2
       podman rm -f $containerId >&2
