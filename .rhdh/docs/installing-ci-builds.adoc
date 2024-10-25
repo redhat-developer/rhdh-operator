@@ -2,8 +2,12 @@
 
 *Prerequisites*
 
-* You are logged in as an administrator on the OpenShift web console.
-* You have configured the appropriate roles and permissions within your project to create an application. See the link:https://docs.openshift.com/container-platform/4.17/applications/index.html[Red Hat OpenShift documentation on Building applications] for more details.
+* `oc`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[Installing the OpenShift CLI].
+* You are logged in as an administrator using `oc login`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in_cli-developer-commands[Logging in to the OpenShift CLI] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in-web_cli-developer-commands[Logging in to the OpenShift CLI using a web browser].
+* `skopeo`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
+* `opm`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/opm-cli[opm CLI].
+* `podman`. See link:https://podman.io/docs/installation[Podman Installation Instructions].
+* `sed`. See link:https://www.gnu.org/software/sed/[GNU sed].
 
 *Procedure*
 
