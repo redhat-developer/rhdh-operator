@@ -1,15 +1,17 @@
 == Installing CI builds of Red Hat Developer Hub
 
-WARNING: The procedure below will not work properly on OpenShift clusters with hosted control planes, like link:https://hypershift-docs.netlify.app/[HyperShift] or link:https://www.redhat.com/en/blog/red-hat-openshift-service-aws-hosted-control-planes-now-available[ROSA with hosted control planes]. This is due to a limitation preventing link:https://docs.openshift.com/container-platform/4.14/rest_api/operator_apis/imagecontentsourcepolicy-operator-openshift-io-v1alpha1.html[`ImageContentSourcePolicy`] resources from being propagated to the cluster nodes. There is currently no workaround for these clusters.
-
 *Prerequisites*
 
-* You are logged in as an administrator on the OpenShift web console.
-* You have configured the appropriate roles and permissions within your project to create an application. See the link:https://docs.openshift.com/container-platform/4.14/applications/index.html[Red Hat OpenShift documentation on Building applications] for more details.
+* `oc`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[Installing the OpenShift CLI].
+* You are logged in as an administrator using `oc login`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in_cli-developer-commands[Logging in to the OpenShift CLI] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in-web_cli-developer-commands[Logging in to the OpenShift CLI using a web browser].
+* `skopeo`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
+* `opm`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/opm-cli[opm CLI].
+* `podman`. See link:https://podman.io/docs/installation[Podman Installation Instructions].
+* `sed`. See link:https://www.gnu.org/software/sed/[GNU sed].
 
 *Procedure*
 
-. Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate or GA version (from the `1.yy.x` branch), but the `--next` option allows to install the current development build (from the `main` branch). For example:
+. Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate or GA version (from the `release-1.yy` branch), but the `--next` option allows to install the current development build (from the `main` branch). For example:
 +
 [source,console]
 ----
@@ -17,10 +19,10 @@ cd /tmp
 curl -sSLO https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/.rhdh/scripts/install-rhdh-catalog-source.sh
 chmod +x install-rhdh-catalog-source.sh
 
-# install catalog source and operator subscription, for the latest stable RC or GA from 1.yy.x branch
+# install catalog source and operator subscription, for the latest downstream stable, RC or GA build from the release-1.yy branch
 ./install-rhdh-catalog-source.sh --latest --install-operator rhdh  
 
-# OR, install catalog source and operator subscription, for the next CI build from main branch
+# OR, install catalog source and operator subscription, for the next donwstream CI build from the main branch
 ./install-rhdh-catalog-source.sh --next --install-operator rhdh  
 ----
 
