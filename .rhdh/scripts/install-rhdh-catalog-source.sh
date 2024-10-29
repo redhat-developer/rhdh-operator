@@ -106,14 +106,30 @@ TMPDIR=$(mktemp -d)
 # shellcheck disable=SC2064
 trap "rm -fr $TMPDIR" EXIT
 
-ICSP_URL="quay.io/rhdh/"
-ICSP_URL_PRE=${ICSP_URL%%/*}
+CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
+DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
 
-# for 1.4+, use IDMS instead of ICSP
-# TODO https://issues.redhat.com/browse/RHIDP-4188 if we onboard 1.3 to Konflux, use IDMS for latest too
-if [[ "$IIB_IMAGE" == *"next"* ]]; then
-  echo "[INFO] Adding ImageDigestMirrorSet to resolve unreleased images on registry.redhat.io from quay.io"
-  echo "apiVersion: config.openshift.io/v1
+# Add CatalogSource for the IIB
+if [ -z "$TO_INSTALL" ]; then
+  IIB_NAME="${UPSTREAM_IIB##*:}"
+  IIB_NAME="${IIB_NAME//_/-}"
+  IIB_NAME="${IIB_NAME//./-}"
+  IIB_NAME="$(echo "$IIB_NAME" | tr '[:upper:]' '[:lower:]')"
+  CATALOGSOURCE_NAME="rhdh-iib-${IIB_NAME}-${OLM_CHANNEL}"
+  DISPLAY_NAME_SUFFIX="${IIB_NAME}"
+fi
+
+function install_regular_cluster() {
+  # A regular cluster should support ImageContentSourcePolicy/ImageDigestMirrorSet resources
+  ICSP_URL="quay.io/rhdh/"
+  ICSP_URL_PRE=${ICSP_URL%%/*}
+
+  # for 1.4+, use IDMS instead of ICSP
+  # TODO https://issues.redhat.com/browse/RHIDP-4188 if we onboard 1.3 to Konflux, use IDMS for latest too
+  if [[ "$IIB_IMAGE" == *"next"* ]]; then
+    echo "[INFO] Adding ImageDigestMirrorSet to resolve unreleased images on registry.redhat.io from quay.io" >&2
+    echo "---
+apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
 metadata:
   name: ${ICSP_URL_PRE//./-}
@@ -123,13 +139,17 @@ spec:
     mirrors:
       - ${ICSP_URL}rhdh-hub-rhel9
   - source: registry.redhat.io/rhdh/rhdh-rhel9-operator
-    mirrors: 
+    mirrors:
       - ${ICSP_URL}rhdh-rhel9-operator
-" > "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml"
-else
-  echo "[INFO] Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io"
-  # echo "[DEBUG] ${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
-  echo "apiVersion: operator.openshift.io/v1alpha1
+  - source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-operator-bundle
+    mirrors:
+      - ${ICSP_URL}rhdh-operator-bundle
+  " > "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" >&2
+  else
+    echo "[INFO] Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io" >&2
+    # echo "[DEBUG] ${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
+    echo "---
+apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:
   name: ${ICSP_URL_PRE//./-}
@@ -187,21 +207,120 @@ spec:
   - mirrors:
     - registry.redhat.io
     source: registry-proxy.engineering.redhat.com
-" > "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml"
+  " > "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" >&2
+  fi
+
+  printf "%s" "${IIB_IMAGE}"
+}
+
+function install_hosted_control_plane_cluster() {
+  # Clusters with an hosted control plane do not propagate ImageContentSourcePolicy/ImageDigestMirrorSet resources
+  # to the underlying nodes, causing an issue mirroring internal images effectively.
+  internal_registry_url="image-registry.openshift-image-registry.svc:5000"
+  oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
+  my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+  podman login -u kubeadmin -p $(oc whoami -t) --tls-verify=false $my_registry >&2
+  if oc -n openshift-marketplace get secret internal-reg-auth-for-rhdh &> /dev/null; then
+    oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh >&2
+  fi
+  if oc -n openshift-marketplace get secret internal-reg-ext-auth-for-rhdh &> /dev/null; then
+    oc -n openshift-marketplace delete secret internal-reg-ext-auth-for-rhdh >&2
+  fi
+  oc -n openshift-marketplace create secret docker-registry internal-reg-ext-auth-for-rhdh \
+    --docker-server=${my_registry} \
+    --docker-username=kubeadmin \
+    --docker-password=$(oc whoami -t) \
+    --docker-email="admin@internal-registry-ext.example.com" >&2
+  oc -n openshift-marketplace create secret docker-registry internal-reg-auth-for-rhdh \
+    --docker-server=${internal_registry_url} \
+    --docker-username=kubeadmin \
+    --docker-password=$(oc whoami -t) \
+    --docker-email="admin@internal-registry.example.com" >&2
+  oc registry login --registry="$my_registry" --auth-basic="kubeadmin:$(oc whoami -t)" >&2
+  for ns in rhdh-operator rhdh; do
+    # To be able to push images under this scope in the internal image registry
+    if ! oc get namespace "$ns" > /dev/null; then
+      oc create namespace "$ns" >&2
+    fi
+    oc adm policy add-cluster-role-to-user system:image-signer system:serviceaccount:${ns}:default >&2 || true
+  done
+  oc policy add-role-to-user system:image-puller system:serviceaccount:openshift-marketplace:default -n openshift-marketplace >&2 || true
+  oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:default -n rhdh-operator >&2 || true
+
+  echo ">>> WORKING DIR: $TMPDIR <<<" >&2
+  mkdir -p "${TMPDIR}/rhdh/rhdh" >&2
+  opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
+  pushd "${TMPDIR}" >&2
+  for bundleImg in $(cat "${TMPDIR}/rhdh/rhdh/render.yaml" | grep -E '^image: .*operator-bundle' | awk '{print $2}' | uniq); do
+    originalBundleImg="$bundleImg"
+    digest="${originalBundleImg##*@sha256:}"
+    bundleImg="${bundleImg/registry.stage.redhat.io/quay.io}"
+    bundleImg="${bundleImg/registry.redhat.io/quay.io}"
+    bundleImg="${bundleImg/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
+    echo "[DEBUG] $originalBundleImg => $bundleImg" >&2
+    if podman pull "$bundleImg" >&2; then
+      mkdir -p "bundles/$digest" >&2
+      # --entrypoint is needed on some older versions of Podman, but work with
+      containerId=$(podman create --entrypoint='/bin/sh' "$bundleImg" || exit 1)
+      podman cp $containerId:/metadata "./bundles/${digest}/metadata" >&2
+      podman cp $containerId:/manifests "./bundles/${digest}/manifests" >&2
+      podman rm -f $containerId >&2
+
+      # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
+      for file in "./bundles/${digest}/manifests"/*; do
+        if [ -f "$file" ]; then
+          sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file" >&2
+          sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file" >&2
+          sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file" >&2
+        fi
+      done
+
+      cat <<EOF > "./bundles/${digest}/bundle.Dockerfile"
+FROM scratch
+COPY ./manifests /manifests/
+COPY ./metadata /metadata/
+EOF
+      pushd "./bundles/${digest}" >&2
+      newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
+      newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"
+      podman image build -f bundle.Dockerfile -t "${newBundleImage}" . >&2
+      podman image push "${newBundleImage}" --tls-verify=false >&2
+      popd >&2
+
+      sed -i "s#${originalBundleImg}#${newBundleImageAsInt}#g" "${TMPDIR}/rhdh/rhdh/render.yaml" >&2
+    fi
+  done
+
+  local newIndex="${UPSTREAM_IIB/quay.io/"${my_registry}"}"
+  local newIndexAsInt="${UPSTREAM_IIB/quay.io/"${internal_registry_url}"}"
+
+  opm generate dockerfile rhdh/rhdh >&2
+  podman image build -t "${newIndex}" -f "./rhdh/rhdh.Dockerfile" --no-cache rhdh >&2
+  podman image push "${newIndex}" --tls-verify=false >&2
+
+  printf "%s" "${newIndexAsInt}"
+}
+
+# Defaulting to the hosted control plane behavior which has more chances to work
+CONTROL_PLANE_TECH=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
+  (echo '[WARN] Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
+IS_HOSTED_CONTROL_PLANE="false"
+if [[ "${CONTROL_PLANE_TECH}" == "External" ]]; then
+  # 'External' indicates that the control plane is hosted externally to the cluster
+  # and that its components are not visible within the cluster.
+  IS_HOSTED_CONTROL_PLANE="true"
 fi
 
-CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
-DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
-
-# Add CatalogSource for the IIB
-if [ -z "$TO_INSTALL" ]; then
-  IIB_NAME="${UPSTREAM_IIB##*:}"
-  IIB_NAME="${IIB_NAME//_/-}"
-  IIB_NAME="${IIB_NAME//./-}"
-  IIB_NAME="$(echo "$IIB_NAME" | tr '[:upper:]' '[:lower:]')"
-  CATALOGSOURCE_NAME="rhdh-iib-${IIB_NAME}-${OLM_CHANNEL}"
-  DISPLAY_NAME_SUFFIX="${IIB_NAME}"
+newIIBImage=${IIB_IMAGE}
+if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
+  echo "[INFO] Detected a cluster with a hosted control plane"
+  newIIBImage=$(install_hosted_control_plane_cluster)
+else
+  newIIBImage=$(install_regular_cluster)
 fi
+
+echo "[DEBUG] newIIBImage=${newIIBImage}"
+
 echo "apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -209,7 +328,10 @@ metadata:
   namespace: ${NAMESPACE_CATALOGSOURCE}
 spec:
   sourceType: grpc
-  image: ${IIB_IMAGE}
+  image: ${newIIBImage}
+  secrets:
+  - internal-reg-auth-for-rhdh
+  - internal-reg-ext-auth-for-rhdh
   publisher: IIB testing ${DISPLAY_NAME_SUFFIX}
   displayName: IIB testing catalog ${DISPLAY_NAME_SUFFIX}
 " > "$TMPDIR"/CatalogSource.yml && oc apply -f "$TMPDIR"/CatalogSource.yml
@@ -242,11 +364,12 @@ spec:
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 " > "$TMPDIR"/Subscription.yml && oc apply -f "$TMPDIR"/Subscription.yml
 
-CLUSTER_ROUTER_BASE=$(oc get route console -n openshift-console -o=jsonpath='{.spec.host}' | sed 's/^[^.]*\.//')
+OCP_CONSOLE_ROUTE_HOST=$(oc get route console -n openshift-console -o=jsonpath='{.spec.host}')
+CLUSTER_ROUTER_BASE=$(oc get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
 echo "
 
 To install, go to:
-https://console-openshift-console.${CLUSTER_ROUTER_BASE}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogType=OperatorBackedService
+https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogType=OperatorBackedService
 
 Or run this:
 

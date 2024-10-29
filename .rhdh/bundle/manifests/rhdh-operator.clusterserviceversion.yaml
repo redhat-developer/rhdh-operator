@@ -1,11 +1,29 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  labels:
-    operatorframework.io/arch.amd64: supported
   annotations:
     alm-examples: |-
       [
+        {
+          "apiVersion": "rhdh.redhat.com/v1alpha1",
+          "kind": "Backstage",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "backstage"
+            },
+            "name": "backstage-sample"
+          }
+        },
+        {
+          "apiVersion": "rhdh.redhat.com/v1alpha2",
+          "kind": "Backstage",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "backstage"
+            },
+            "name": "backstage-sample"
+          }
+        },
         {
           "apiVersion": "rhdh.redhat.com/v1alpha3",
           "kind": "Backstage",
@@ -20,15 +38,11 @@ metadata:
     categories: Developer Tools
     certified: 'true'
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.4
-    createdAt: "2023-03-20T16:11:34Z"
+    createdAt: "2024-10-25T17:30:36Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
-      It comes with pre-built plug-ins and configuration settings, supports use of an external database, and can
-      help streamline the process of setting up a self-managed internal
-      developer portal for adopters who are just starting out.
-    operatorframework.io/suggested-namespace: rhdh-operator
-    operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.36.0
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+      It comes with pre-built plug-ins and configuration settings, supports use of
+      an external database, and can help streamline the process of setting up a self-managed
+      internal developer portal for adopters who are just starting out.
     # Infrastructure Feature Test annotations - must be strings, not booleans - see https://issues.redhat.com/browse/RHIDP-294
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "false"
@@ -40,9 +54,15 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
+    operatorframework.io/suggested-namespace: rhdh-operator
+    operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
+    operators.operatorframework.io/builder: operator-sdk-v1.37.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    support: Red Hat
     skipRange: '>=1.0.0 <1.4.0'
+    support: Red Hat
+  labels:
+    operatorframework.io/arch.amd64: supported
   name: rhdh-operator.v1.4.0
   namespace: placeholder
 spec:
@@ -241,11 +261,6 @@ spec:
                 - name: RELATED_IMAGE_backstage
                   value: registry.redhat.io/rhdh/rhdh-hub-rhel9:1.4
                 image: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.4
-                ports:
-                  - name: health
-                    containerPort: 8081
-                  - name: metrics
-                    containerPort: 8443
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -253,6 +268,11 @@ spec:
                   initialDelaySeconds: 15
                   periodSeconds: 20
                 name: manager
+                ports:
+                - containerPort: 8081
+                  name: health
+                - containerPort: 8443
+                  name: metrics
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -278,10 +298,10 @@ spec:
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: rhdh-operator
-              terminationGracePeriodSeconds: 20
+              terminationGracePeriodSeconds: 10
               volumes:
               - configMap:
-                  name: backstage-default-config
+                  name: rhdh-default-config
                 name: default-config
       permissions:
       - rules:
@@ -347,5 +367,5 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
+  replaces: rhdh-operator.v1.3.0
   version: 1.4.0
-  replaces: rhdh-operator.v1.1.1
