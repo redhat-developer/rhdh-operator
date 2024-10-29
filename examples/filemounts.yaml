@@ -1,0 +1,67 @@
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: my-rhdh
+spec:
+  application:
+    extraFiles:
+      mountPath: /my/path
+      configMaps:
+        - name: cm1
+        - name: cm2
+          key: file21.txt
+        - name: cm3
+          mountPath: /my/cm3/path
+      secrets:
+        - name: secret1
+          key: file3.txt
+        - name: secret2
+          mountPath: /my/secret2/path
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+data:
+  file11.txt: |
+    My file11 content
+  file12.txt: |
+    My file12 content
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm2
+data:
+  file21.txt: |
+    My file21 content
+  file22.txt: |
+    My file22 content
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm3
+data:
+  file31.txt: |
+    My file31 content
+  file32.txt: |
+    My file32 content
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret1
+stringData:
+  file3.txt: |
+    content
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret2
+stringData:
+  file1: |
+    base64-encoded-content
+  file2: |
+    base64-encoded-content
