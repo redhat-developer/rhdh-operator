@@ -40,7 +40,7 @@ var _ = When("create backstage with external configuration", func() {
 		deleteNamespace(ctx, ns)
 	})
 
-	It("refreshes config", func() {
+	It("refreshes pod for mounts with subPath", func() {
 
 		if !*testEnv.UseExistingCluster {
 			Skip("Skipped for not real cluster")
@@ -67,7 +67,7 @@ organization:
 			Application: &bsv1.Application{
 				AppConfig: &bsv1.AppConfig{
 					MountPath: "/my/mount/path",
-					ConfigMaps: []bsv1.ObjectKeyRef{
+					ConfigMaps: []bsv1.FileObjectKeyRef{
 						{Name: appConfig1},
 					},
 				},
@@ -150,6 +150,92 @@ organization:
 			g.Expect(fmt.Sprintf("%s%s", newEnv, "\r\n")).To(Equal(out2))
 
 		}, 10*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
+
+	})
+
+	It("refreshes mounts without subPath", func() {
+
+		if !*testEnv.UseExistingCluster {
+			Skip("Skipped for not real cluster")
+		}
+
+		//if !useExistingController {
+		//	Skip("Skipped for not real controller")
+		//}
+
+		appConfig1 := "app-config1"
+		secretFile1 := "secret1"
+
+		backstageName := generateRandName("")
+
+		conf := `
+organization:
+  name: "my org"
+`
+
+		generateConfigMap(ctx, k8sClient, appConfig1, ns, map[string]string{"appconfig11": conf}, nil, nil)
+		generateSecret(ctx, k8sClient, secretFile1, ns, map[string]string{"sec11": "val11"}, nil, nil)
+
+		bs := bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				AppConfig: &bsv1.AppConfig{
+					ConfigMaps: []bsv1.FileObjectKeyRef{
+						{Name: appConfig1, MountPath: "/my/appconfig"},
+					},
+				},
+				ExtraFiles: &bsv1.ExtraFiles{
+					MountPath: "/my",
+					Secrets: []bsv1.FileObjectKeyRef{
+						{Name: secretFile1, MountPath: "secret"},
+					},
+				},
+			},
+		}
+
+		createAndReconcileBackstage(ctx, ns, bs, backstageName)
+
+		var podName string
+		Eventually(func(g Gomega) {
+			deploy := &appsv1.Deployment{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			podList := &corev1.PodList{}
+			err = k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			g.Expect(len(podList.Items)).To(Equal(1))
+			podName = podList.Items[0].Name
+
+			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/appconfig/appconfig11")
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(conf))
+
+			out, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/secret/sec11")
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+		}, 3*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
+
+		cm := &corev1.ConfigMap{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig1}, cm)
+		Expect(err).ShouldNot(HaveOccurred())
+		// update appconfig11
+		newData := `
+organization:
+  name: "another org"
+`
+		cm.Data = map[string]string{"appconfig11": newData}
+		err = k8sClient.Update(ctx, cm)
+		Expect(err).ShouldNot(HaveOccurred())
+
+		Eventually(func(g Gomega) {
+			// no need to re-ask pod name, it is not recreated, just use what we've got
+			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/appconfig/appconfig11")
+			g.Expect(err).ShouldNot(HaveOccurred())
+			// let's check, just in case (it is k8s job to refresh it :)
+			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))
+
+		}, 3*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
 
 	})
 

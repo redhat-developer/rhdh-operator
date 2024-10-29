@@ -129,7 +129,7 @@ type AppConfig struct {
 	// environment variables (which you can set with the ExtraEnvs field) and/or include extra files (see the ExtraFiles field).
 	// More details on https://backstage.io/docs/conf/writing/.
 	// +optional
-	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
+	ConfigMaps []FileObjectKeyRef `json:"configMaps,omitempty"`
 }
 
 type ExtraFiles struct {
@@ -142,12 +142,12 @@ type ExtraFiles struct {
 	// For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be mounted as files.
 	// Otherwise, only the specified key will be mounted as a file.
 	// +optional
-	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
+	ConfigMaps []FileObjectKeyRef `json:"configMaps,omitempty"`
 
 	// List of references to Secrets objects mounted as extra files under the MountPath specified.
 	// For each item in this array, a key must be specified that will be mounted as a file.
 	// +optional
-	Secrets []ObjectKeyRef `json:"secrets,omitempty"`
+	Secrets []FileObjectKeyRef `json:"secrets,omitempty"`
 
 	// List of references to Persistent Volume Claim objects mounted as extra files
 	// For each item in this array, a key must be specified that will be mounted as a file.
@@ -182,15 +182,21 @@ type ObjectKeyRef struct {
 	// Key in the object
 	// +optional
 	Key string `json:"key,omitempty"`
+}
+
+type FileObjectKeyRef struct {
+	// Name of the object
+	// We support only ConfigMaps and Secrets.
+	//+kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Key in the object
+	// +optional
+	Key string `json:"key,omitempty"`
 
 	// Path to mount the Object. If not specified default-path/Name will be used
 	// +optional
 	MountPath string `json:"mountPath"`
-
-	// Whether subPath is used to mount
-	// +optional
-	//+kubebuilder:default=true
-	WithSubPath *bool `json:"withSubPath"`
 }
 
 type PvcRef struct {

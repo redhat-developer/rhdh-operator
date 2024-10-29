@@ -1,11 +1,8 @@
 package model
 
 import (
-	"fmt"
-
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
@@ -17,14 +14,14 @@ import (
 type ConfigMapFilesFactory struct{}
 
 func (f ConfigMapFilesFactory) newBackstageObject() RuntimeObject {
-	return &ConfigMapFiles{MountPath: DefaultMountDir}
+	return &ConfigMapFiles{MountPath: DefaultMountDir, withSubPath: true}
 }
 
 type ConfigMapFiles struct {
 	ConfigMap   *corev1.ConfigMap
 	MountPath   string
 	Key         string
-	withSubPath *bool
+	withSubPath bool
 }
 
 func init() {
@@ -36,23 +33,17 @@ func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, m
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
 		return nil
 	}
-	mp := DefaultMountDir
-	if spec.Application.ExtraFiles.MountPath != "" {
-		mp = spec.Application.ExtraFiles.MountPath
-	}
 
 	for _, configMap := range spec.Application.ExtraFiles.ConfigMaps {
-		if configMap.MountPath != "" {
-			mp = configMap.MountPath
-		} else if configMap.WithSubPath == ptr.To(false) {
-			return fmt.Errorf("mounting without subPath to non-individual MountPath is forbidden, ConfigMap name: %s", configMap.Name)
-		}
+
+		mp, wSubpath := GetMountPath(configMap, spec.Application.ExtraFiles.MountPath)
+
 		cm := model.ExternalConfig.ExtraFileConfigMaps[configMap.Name]
 		cmf := ConfigMapFiles{
 			ConfigMap:   &cm,
 			MountPath:   mp,
 			Key:         configMap.Key,
-			withSubPath: configMap.WithSubPath,
+			withSubPath: wSubpath,
 		}
 		cmf.updatePod(deployment)
 	}

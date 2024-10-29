@@ -64,7 +64,8 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	if bsSpec.Application.AppConfig != nil {
 		for _, ac := range bsSpec.Application.AppConfig.ConfigMaps {
 			cm := &corev1.ConfigMap{}
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ac.Name, ns); err != nil {
+			_, wSubpath := model.GetMountPath(ac, bsSpec.Application.AppConfig.MountPath)
+			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ac.Name, ns, wSubpath); err != nil {
 				return result, err
 			}
 			result.AppConfigs[ac.Name] = *cm
@@ -75,7 +76,8 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.ConfigMaps != nil {
 		for _, ef := range bsSpec.Application.ExtraFiles.ConfigMaps {
 			cm := &corev1.ConfigMap{}
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ef.Name, ns); err != nil {
+			_, wSubpath := model.GetMountPath(ef, bsSpec.Application.ExtraFiles.MountPath)
+			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ef.Name, ns, wSubpath); err != nil {
 				return result, err
 			}
 			result.ExtraFileConfigMaps[cm.Name] = *cm
@@ -86,7 +88,8 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.Secrets != nil {
 		for _, ef := range bsSpec.Application.ExtraFiles.Secrets {
 			secret := &corev1.Secret{}
-			if err := r.addExtConfig(&result, ctx, secret, backstage.Name, ef.Name, ns); err != nil {
+			_, wSubpath := model.GetMountPath(ef, bsSpec.Application.ExtraFiles.MountPath)
+			if err := r.addExtConfig(&result, ctx, secret, backstage.Name, ef.Name, ns, wSubpath); err != nil {
 				return result, err
 			}
 			result.ExtraFileSecrets[secret.Name] = *secret
@@ -97,7 +100,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	if bsSpec.Application.ExtraEnvs != nil && bsSpec.Application.ExtraEnvs.ConfigMaps != nil {
 		for _, ee := range bsSpec.Application.ExtraEnvs.ConfigMaps {
 			cm := &corev1.ConfigMap{}
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ee.Name, ns); err != nil {
+			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ee.Name, ns, true); err != nil {
 				return result, err
 			}
 			result.ExtraEnvConfigMaps[cm.Name] = *cm
@@ -108,7 +111,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	if bsSpec.Application.ExtraEnvs != nil && bsSpec.Application.ExtraEnvs.Secrets != nil {
 		for _, ee := range bsSpec.Application.ExtraEnvs.Secrets {
 			secret := &corev1.Secret{}
-			if err := r.addExtConfig(&result, ctx, secret, backstage.Name, ee.Name, ns); err != nil {
+			if err := r.addExtConfig(&result, ctx, secret, backstage.Name, ee.Name, ns, true); err != nil {
 				return result, err
 			}
 			result.ExtraEnvSecrets[secret.Name] = *secret
@@ -129,7 +132,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	// Process DynamicPlugins
 	if bsSpec.Application.DynamicPluginsConfigMapName != "" {
 		cm := &corev1.ConfigMap{}
-		if err := r.addExtConfig(&result, ctx, cm, backstage.Name, bsSpec.Application.DynamicPluginsConfigMapName, ns); err != nil {
+		if err := r.addExtConfig(&result, ctx, cm, backstage.Name, bsSpec.Application.DynamicPluginsConfigMapName, ns, true); err != nil {
 			return result, err
 		}
 		result.DynamicPlugins = *cm
@@ -138,9 +141,16 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	return result, nil
 }
 
-func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx context.Context, obj client.Object, backstageName, objectName, ns string) error {
+// addExtConfig makes object watchable by Operator adding ExtConfigSyncLabel label and BackstageNameAnnotation
+// and adding its content (marshalled object) to make it watchable by Operator and able to refresh the Pod if needed
+// (Pod refresh will be called if external configuration hash changed)
+func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx context.Context, obj client.Object, backstageName, objectName, ns string, addToWatch bool) error {
 
 	lg := log.FromContext(ctx)
+
+	if !addToWatch {
+		return r.checkExternalObject(ctx, obj, objectName, ns)
+	}
 
 	// use RetryOnConflict to avoid possible Conflict error which may be caused mostly by other call of this function
 	// https://pkg.go.dev/k8s.io/client-go/util/retry#RetryOnConflict.

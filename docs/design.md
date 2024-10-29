@@ -58,5 +58,31 @@ Backstage Operator supports this flexibility allowing to define these configurat
 
 ![Backstage App with Advanced Configuration](images/backstage_application_advanced_config.jpg)
 
+#### Updating mounted files
+
+As you can see, the Operator mounts ConfigMaps and Secrets to the Backstage container
+* As a part of Default/Raw configuration, configuring certan configuration files
+* As a part of Backstage CR configuration, using spec.application field
+
+In either case ConfigMaps/Secrets data's key/value is transformed to file's name/content on Backstage CR creating time and the general expectation is to be able to update the file contents by updating the corresponding ConfigMap/Secret.
+Kubernetes [allows this updating](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically) but only if volume mount does not contain subPath. In turn, using subPath allows to mount certain file individually on certain container's directory not worrying about directories overlapping, which is beneficial for some cases. 
+
+Historically, the Operator actively uses subPath option which allows to make "convenient" Backstage App file structure (e g all the app-config files in the same directory). In this case file(s) are mounted to default directory or to the **spec.application.(appConfig|extraFiles).mountPath** field if specified. 
+Also, in a case if user need only certain key (file) to be mounted, the only choice is to use subPath.
+In order to be able to update file(s) for mounted with subPath volumes case Operator watches ConfigMaps/Secrets and refreshes (recreates) Backstage Pod in a case of changes.
+Technically this approach is working in any case (with or without subPath) but it has certan disadvantages:
+* recreating of Pod is quite slow
+* it disables in fact using Backstage's file watching mechanism. Indeed, configuration changing causes file-system rebooting, so file-system watchers have no effect.  
+
+Another option, implemented in version 0.4.0, is to specify the **mountPath** and not specify the key (filename). In this case, Operator relies on the automatic update provided by Kubernetes, it simply mounts a directory with all key/value files at the specified path.
+
+#### Updating injected environment variables
+
+As you can see, the Operator injects environment variables to the Backstage container with ConfigMaps and Secrets 
+* As a part of Default/Raw configuration, configuring certan configuration files
+* As a part of Backstage CR configuration, using spec.application field
+Kubernetes doesn’t allow you to change environment variables after a Pod has been created, so in order to update enviromnent variables when ConfigMap or Secret changed Operator refreshes the Pod the same way as mentioned [here](#updating-mounted-files) 
+
+
 ### Networking
 TODO
