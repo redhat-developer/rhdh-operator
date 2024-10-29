@@ -211,7 +211,7 @@ organization:
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(conf))
 
-			out, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/secret/sec11")
+			_, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/secret/sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 3*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
