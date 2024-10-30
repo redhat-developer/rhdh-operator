@@ -32,11 +32,11 @@ func (matcher *BeMountedToContainerMatcher) Match(actual interface{}) (bool, err
 }
 func (matcher *BeMountedToContainerMatcher) FailureMessage(actual interface{}) string {
 	mountPath, _ := actual.(string)
-	return fmt.Sprintf("Expected container to contain VolumeMount %s", mountPath)
+	return fmt.Sprintf("Expected container to contain VolumeMount with mountPath %s", mountPath)
 }
 func (matcher *BeMountedToContainerMatcher) NegatedFailureMessage(actual interface{}) string {
 	mountPath, _ := actual.(string)
-	return fmt.Sprintf("Expected container not to contain VolumeMount %s", mountPath)
+	return fmt.Sprintf("Expected container not to contain VolumeMount with mountPath %s", mountPath)
 }
 
 // Matcher for PodSpec Volumes

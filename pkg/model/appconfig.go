@@ -19,15 +19,16 @@ type AppConfigFactory struct{}
 
 // factory method to create App Config object
 func (f AppConfigFactory) newBackstageObject() RuntimeObject {
-	return &AppConfig{MountPath: DefaultMountDir}
+	return &AppConfig{MountPath: DefaultMountDir, withSubPath: true}
 }
 
 // structure containing ConfigMap where keys are Backstage ConfigApp file names and vaues are contents of the files
 // Mount path is a patch to the follder to place the files to
 type AppConfig struct {
-	ConfigMap *corev1.ConfigMap
-	MountPath string
-	Key       string
+	ConfigMap   *corev1.ConfigMap
+	MountPath   string
+	Key         string
+	withSubPath bool
 }
 
 func init() {
@@ -46,14 +47,12 @@ func addAppConfigs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model
 
 	for _, configMap := range spec.Application.AppConfig.ConfigMaps {
 		cm := model.ExternalConfig.AppConfigs[configMap.Name]
-		mp := DefaultMountDir
-		if spec.Application.AppConfig.MountPath != "" {
-			mp = spec.Application.AppConfig.MountPath
-		}
+		mp, wSubpath := GetMountPath(configMap, spec.Application.AppConfig.MountPath)
 		ac := AppConfig{
-			ConfigMap: &cm,
-			MountPath: mp,
-			Key:       configMap.Key,
+			ConfigMap:   &cm,
+			MountPath:   mp,
+			Key:         configMap.Key,
+			withSubPath: wSubpath,
 		}
 		ac.updatePod(deployment)
 	}
@@ -101,7 +100,7 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 func (b *AppConfig) updatePod(deployment *appsv1.Deployment) {
 
 	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,
-		b.ConfigMap.Name, b.MountPath, b.Key, b.ConfigMap.Data)
+		b.ConfigMap.Name, b.MountPath, b.Key, b.withSubPath, b.ConfigMap.Data)
 
 	fileDir := b.MountPath
 	for file := range b.ConfigMap.Data {

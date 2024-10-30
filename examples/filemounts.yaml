@@ -1,0 +1,95 @@
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: my-rhdh
+spec:
+  application:
+    extraFiles:
+      mountPath: /my/path
+      configMaps:
+        - name: cm1 # /my/path/file11.txt and /my/path/file12.txt expected, watched
+        - name: cm2 # /my/path/file21.txt expected, watched
+          key: file21.txt
+        - name: cm3  # /my/cm3/path/file31.txt and /my/cm3/path/file312.txt expected, not watched
+          mountPath: /my/cm3/path
+        - name: cm4  # /my/cm4/path/file41.txt expected, watched
+          mountPath: /my/cm4/path
+          key: file41.txt
+      secrets:
+        - name: secret1 # /my/path/secret11.txt expected, watched
+          key: secret11.txt
+        - name: secret2 # /my/secret2/path/secret21.txt and /my/secret2/path/secret22.txt expected, not watched
+          mountPath: /my/secret2/path
+        - name: secret3 # /my/secret3/path/secret31.txt expected, watched
+          mountPath: /my/secret3/path
+          key: secret31.txt
+#        - name: secret4  <-- this is forbidden
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+data:
+  file11.txt: |
+    My file11 content
+  file12.txt: |
+    My file12 content
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm2
+data:
+  file21.txt: |
+    My file21 content
+  file22.txt: |
+    My file22 content
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm3
+data:
+  file31.txt: |
+    My file31 content
+  file32.txt: |
+    My file32 content
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm4
+data:
+  file41.txt: |
+    My file41 content
+  file42.txt: |
+    My file42 content
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret1
+stringData:
+  secret11.txt: |
+    content
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret2
+stringData:
+  secret21.txt: |
+    base64-encoded-content
+  secret22.txt: |
+    base64-encoded-content
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret3
+stringData:
+  secret31.txt: |
+    base64-encoded-content
+  secret32.txt: |
+    base64-encoded-content

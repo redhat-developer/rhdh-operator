@@ -185,7 +185,7 @@ On the other hand, Backstage application merges the chain of **app-config** file
 
 #### Extra Files
 
-Extra files can be mounted from pre-created ConfigMaps or Secrets. For example, consider the following objects in the namespace:
+Extra files can be mounted to the Backstage container from pre-created ConfigMaps or Secrets. For example, consider the following objects in the namespace:
 
 ```yaml
 apiVersion: v1
@@ -211,12 +211,32 @@ data:
 
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm3
+data:
+  file31.txt: |
+    My file31 content
+  file32.txt: |
+    My file32 content
+---
+apiVersion: v1
 kind: Secret
 metadata:
   name: secret1
-data:
-  file3.txt: |
-    base64-encoded-content
+stringData:
+  secret11.txt: |
+    secret-content
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret2
+stringData:
+  secret21.txt: |
+    secret-content
+  secret22.txt: |
+    secret-content
 ```
 
 These objects can be mounted to the Backstage container as follows:
@@ -230,23 +250,42 @@ spec:
         - name: cm1
         - name: cm2
           key: file21.txt
+        - name: cm3
+          mountPath: /my/cm3/path
       secrets:
         - name: secret1
           key: file3.txt
+        - name: secret2
+          mountPath: /my/secret2/path
 ```
 
 The Operator will either get all entries from the specified object (if no key is specified) or will pick the specified one, creating volumes per object and mounting the files to the Backstage container.
+Since **v1alpha3 (v0.4)** Backstage CRD introduced **mountPath** field which allows to mount ConfigMap or Secret to specified path. A combination of key/mountPath fields impacts on whether the Volume will be mounted with or without [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath) as following:
+* If nothing specified: each key/values will be mounted as filename/content with **subPath**
+* If **key** specified, with or without **mountPath**: the specified key/value will be mounted with **subPath**
+* If only **mountPath** specified: a directory containing all the key/value will be mounted without **subPath**
+
+**Note**: A volume mounted with **subPath** is not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). So, by default, the Operator watches such ConfigMaps/Secrets and refreshes the Backstage Pod when they change. 
+  
+**Note:** To limit read access to Secrets by the Operator Service Account (for security reasons), we do not support mounting files from Secrets without mountPath and key specified.
 
 In our example, the following files will be mounted:
 
 ```
-/my/path/file11.txt
-/my/path/file12.txt
-/my/path/file21.txt
-/my/path/file3.txt
+// Each file is mounted individually (related resources are watched by Operator):
+/my/path/
+  file11.txt
+  file12.txt
+  file21.txt
+  file3.txt
+// Directory mounted (related resources are auto-updated):
+/my/cm3/path/
+  file31.txt
+  file32.txt
+/my/secret2/path/
+  file1
+  file2  
 ```
-
-**Note:** To limit read access to Secrets by the Operator Service Account (for security reasons), we only support mounting files from Secrets if a key is specified.
 
 ##### PersistentVolumeClaims
 

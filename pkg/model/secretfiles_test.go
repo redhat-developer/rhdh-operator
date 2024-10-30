@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
@@ -14,22 +16,6 @@ import (
 )
 
 var (
-	//secretFilesTestSecret = corev1.Secret{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name:      "secret1",
-	//		Namespace: "ns123",
-	//	},
-	//	StringData: map[string]string{"conf.yaml": ""},
-	//}
-	//
-	//secretFilesTestSecret2 = corev1.Secret{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name:      "secret2",
-	//		Namespace: "ns123",
-	//	},
-	//	StringData: map[string]string{"conf2.yaml": ""},
-	//}
-
 	secretFilesTestBackstage = bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
@@ -39,7 +25,7 @@ var (
 			Application: &bsv1.Application{
 				ExtraFiles: &bsv1.ExtraFiles{
 					MountPath: "/my/path",
-					Secrets:   []bsv1.ObjectKeyRef{},
+					Secrets:   []bsv1.FileObjectKeyRef{},
 				},
 			},
 		},
@@ -68,12 +54,18 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
-	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret2", Key: "conf.yaml"})
+	// 0 - expected subPath="conf.yaml", expected mountPath=/
+	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret2", MountPath: "/custom/path"})
 	// https://issues.redhat.com/browse/RHIDP-2246 - mounting secret/CM with dot in the name
-	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret.dot", Key: "conf3.yaml"})
+	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret.dot", Key: "conf3.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	testObj.externalConfig.ExtraFileSecrets = map[string]corev1.Secret{}
+	testObj.externalConfig.ExtraFileSecrets["secret1"] = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret1"} /*, StringData: map[string]string{"conf.yaml": "data"}*/} // no data possible if no permissions to read the Secret
+	testObj.externalConfig.ExtraFileSecrets["secret2"] = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret2"}, StringData: map[string]string{"conf.yaml": "data"}}
+	testObj.externalConfig.ExtraFileSecrets["secret.dot"] = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret.dot"}, StringData: map[string]string{"conf3.yaml": "data"}}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 
@@ -91,14 +83,37 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret2"), deployment.podSpec().Volumes[1].Name)
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret.dot"), deployment.podSpec().Volumes[2].Name)
 
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret1"), deployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret2"), deployment.container().VolumeMounts[1].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret.dot"), deployment.container().VolumeMounts[2].Name)
+
+	assert.Equal(t, "/my/path/conf.yaml", deployment.container().VolumeMounts[0].MountPath)
+	assert.Equal(t, "/custom/path", deployment.container().VolumeMounts[1].MountPath)
+
+	assert.Equal(t, "conf.yaml", deployment.container().VolumeMounts[0].SubPath)
+	assert.Equal(t, "", deployment.container().VolumeMounts[1].SubPath)
+
+}
+
+func TestFailedValidation(t *testing.T) {
+	bs := *secretFilesTestBackstage.DeepCopy()
+	sf := &bs.Spec.Application.ExtraFiles.Secrets
+	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret1"})
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	assert.EqualError(t, err, "failed object validation, reason: key is required if mountPath is not specified for secret secret1")
+
 }
 
 func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.ObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
+
+	testObj.externalConfig.ExtraFileSecrets = map[string]corev1.Secret{"secret1": corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret1"}, StringData: map[string]string{"conf.yaml": ""}}}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
 
