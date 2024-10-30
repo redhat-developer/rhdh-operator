@@ -267,7 +267,7 @@ Since **v1alpha3 (v0.4)** Backstage CRD introduced **mountPath** field which all
 
 **Note**: A volume mounted with **subPath** is not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). So, by default, the Operator watches such ConfigMaps/Secrets and refresh Pod in case if it was changed. 
   
-**Note:** To limit read access to Secrets by the Operator Service Account (for security reasons), we only support mounting files from Secrets if a key is specified.
+**Note:** To limit read access to Secrets by the Operator Service Account (for security reasons), we do not support mounting files from Secrets without mountPath and key specified.
 
 In our example, the following files will be mounted:
 
