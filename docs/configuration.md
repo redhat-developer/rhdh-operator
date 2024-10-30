@@ -263,9 +263,9 @@ The Operator will either get all entries from the specified object (if no key is
 Since **v1alpha3 (v0.4)** Backstage CRD introduced **mountPath** field which allows to mount ConfigMap or Secret to specified path. A combination of key/mountPath fields impacts on whether the Volume will be mounted with or without [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath) as following:
 * If nothing specified: each key/values will be mounted as filename/content with **subPath**
 * If **key** specified, with or without **mountPath**: the specified key/value will be mounted with **subPath**
-* If only **mountPath** specified: a directory containing all the key/values will be mounted w/o **subPath**
+* If only **mountPath** specified: a directory containing all the key/values will be mounted without **subPath**
 
-**Note**: A volume mounted with **subPath** is not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). So, by default, the Operator watches such ConfigMaps/Secrets and refresh Pod in case if it was changed. 
+**Note**: A volume mounted with **subPath** is not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). So, by default, the Operator watches such ConfigMaps/Secrets and refreshes the Backstage Pod when they change. 
   
 **Note:** To limit read access to Secrets by the Operator Service Account (for security reasons), we do not support mounting files from Secrets without mountPath and key specified.
 
