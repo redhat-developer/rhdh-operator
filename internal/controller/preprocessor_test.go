@@ -26,7 +26,7 @@ func updateConfigMap(t *testing.T) BackstageReconciler {
 		Spec: bsv1.BackstageSpec{
 			Application: &bsv1.Application{
 				AppConfig: &bsv1.AppConfig{
-					ConfigMaps: []bsv1.ObjectKeyRef{{Name: "cm1"}},
+					ConfigMaps: []bsv1.FileObjectKeyRef{{Name: "cm1"}},
 				},
 			},
 		},

@@ -101,11 +101,13 @@ func (b *BackstageDeployment) validate(model *BackstageModel, backstage bsv1.Bac
 
 	addAppConfigs(backstage.Spec, b.deployment, model)
 
-	addConfigMapFiles(backstage.Spec, b.deployment, model)
+	if err := addConfigMapFiles(backstage.Spec, b.deployment, model); err != nil {
+		return err
+	}
 
 	addConfigMapEnvs(backstage.Spec, b.deployment, model)
 
-	if err := addSecretFiles(backstage.Spec, b.deployment); err != nil {
+	if err := addSecretFiles(backstage.Spec, b.deployment, model); err != nil {
 		return err
 	}
 

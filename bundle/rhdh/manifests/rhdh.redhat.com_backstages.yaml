@@ -858,10 +858,6 @@ spec:
                             key:
                               description: Key in the object
                               type: string
-                            mountPath:
-                              description: Path to mount the Object. If not specified
-                                default-path/Name will be used
-                              type: string
                             name:
                               description: |-
                                 Name of the object
@@ -896,10 +892,6 @@ spec:
                           properties:
                             key:
                               description: Key in the object
-                              type: string
-                            mountPath:
-                              description: Path to mount the Object. If not specified
-                                default-path/Name will be used
                               type: string
                             name:
                               description: |-

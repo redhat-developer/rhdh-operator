@@ -107,7 +107,7 @@ func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
 	}
 
 	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.InitContainers[0], utils.ConfigMapObjectKind,
-		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, p.ConfigMap.Data)
+		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, p.ConfigMap.Data)
 
 }
 

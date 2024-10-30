@@ -14,38 +14,41 @@ import (
 type ConfigMapFilesFactory struct{}
 
 func (f ConfigMapFilesFactory) newBackstageObject() RuntimeObject {
-	return &ConfigMapFiles{MountPath: DefaultMountDir}
+	return &ConfigMapFiles{MountPath: DefaultMountDir, withSubPath: true}
 }
 
 type ConfigMapFiles struct {
-	ConfigMap *corev1.ConfigMap
-	MountPath string
-	Key       string
+	ConfigMap   *corev1.ConfigMap
+	MountPath   string
+	Key         string
+	withSubPath bool
 }
 
 func init() {
 	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false)
 }
 
-func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
-		return
-	}
-	mp := DefaultMountDir
-	if spec.Application.ExtraFiles.MountPath != "" {
-		mp = spec.Application.ExtraFiles.MountPath
+		return nil
 	}
 
 	for _, configMap := range spec.Application.ExtraFiles.ConfigMaps {
+
+		mp, wSubpath := GetMountPath(configMap, spec.Application.ExtraFiles.MountPath)
+
 		cm := model.ExternalConfig.ExtraFileConfigMaps[configMap.Name]
 		cmf := ConfigMapFiles{
-			ConfigMap: &cm,
-			MountPath: mp,
-			Key:       configMap.Key,
+			ConfigMap:   &cm,
+			MountPath:   mp,
+			Key:         configMap.Key,
+			withSubPath: wSubpath,
 		}
 		cmf.updatePod(deployment)
 	}
+
+	return nil
 }
 
 // implementation of RuntimeObject interface
@@ -89,6 +92,6 @@ func (p *ConfigMapFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 func (p *ConfigMapFiles) updatePod(deployment *appsv1.Deployment) {
 
 	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,
-		p.ConfigMap.Name, p.MountPath, p.Key, p.ConfigMap.Data)
+		p.ConfigMap.Name, p.MountPath, p.Key, p.withSubPath, p.ConfigMap.Data)
 
 }
