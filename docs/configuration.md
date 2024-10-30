@@ -225,18 +225,18 @@ kind: Secret
 metadata:
   name: secret1
 stringData:
-  file3.txt: |
-    base64-encoded-content
+  secret11.txt: |
+    secret-content
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: secret2
 stringData:
-  file1: |
-    base64-encoded-content
-  file2: |
-    base64-encoded-content
+  secret21.txt: |
+    secret-content
+  secret22.txt: |
+    secret-content
 ```
 
 These objects can be mounted to the Backstage container as follows:
@@ -263,7 +263,7 @@ The Operator will either get all entries from the specified object (if no key is
 Since **v1alpha3 (v0.4)** Backstage CRD introduced **mountPath** field which allows to mount ConfigMap or Secret to specified path. A combination of key/mountPath fields impacts on whether the Volume will be mounted with or without [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath) as following:
 * If nothing specified: each key/values will be mounted as filename/content with **subPath**
 * If **key** specified, with or without **mountPath**: the specified key/value will be mounted with **subPath**
-* If only **mountPath** specified: a directory containing all the key/values will be mounted without **subPath**
+* If only **mountPath** specified: a directory containing all the key/value will be mounted without **subPath**
 
 **Note**: A volume mounted with **subPath** is not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). So, by default, the Operator watches such ConfigMaps/Secrets and refreshes the Backstage Pod when they change. 
   
@@ -272,13 +272,13 @@ Since **v1alpha3 (v0.4)** Backstage CRD introduced **mountPath** field which all
 In our example, the following files will be mounted:
 
 ```
-// Each file is mounted individually:
+// Each file is mounted individually (related resources are watched by Operator):
 /my/path/
   file11.txt
   file12.txt
   file21.txt
   file3.txt
-// Directory mounted:
+// Directory mounted (related resources are auto-updated):
 /my/cm3/path/
   file31.txt
   file32.txt
