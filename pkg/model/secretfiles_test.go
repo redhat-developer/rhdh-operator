@@ -38,7 +38,7 @@ func TestDefaultSecretFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 
@@ -67,7 +67,7 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	testObj.externalConfig.ExtraFileSecrets["secret2"] = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret2"}, StringData: map[string]string{"conf.yaml": "data"}}
 	testObj.externalConfig.ExtraFileSecrets["secret.dot"] = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret.dot"}, StringData: map[string]string{"conf3.yaml": "data"}}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -101,7 +101,7 @@ func TestFailedValidation(t *testing.T) {
 	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
-	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 	assert.EqualError(t, err, "failed object validation, reason: key is required if mountPath is not specified for secret secret1")
 
 }
@@ -115,7 +115,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 
 	testObj.externalConfig.ExtraFileSecrets = map[string]corev1.Secret{"secret1": corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret1"}, StringData: map[string]string{"conf.yaml": ""}}}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)

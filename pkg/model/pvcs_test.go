@@ -38,7 +38,7 @@ func TestDefaultPvcs(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, true, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
@@ -104,7 +104,7 @@ func TestSpecifiedPvcs(t *testing.T) {
 
 	testObj.externalConfig.ExtraPvcs = map[string]corev1.PersistentVolumeClaim{"my-pvc1": pvc1, "my-pvc2": pvc2}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, true, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 	d := model.backstageDeployment

@@ -42,7 +42,7 @@ func TestInitDefaultDeploy(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	bsDeployment := model.backstageDeployment
 
@@ -81,7 +81,7 @@ func TestIfEmptyObjectIsValid(t *testing.T) {
 
 	assert.False(t, bs.Spec.IsLocalDbEnabled())
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(model.RuntimeObjects))
@@ -103,7 +103,7 @@ func TestAddToModel(t *testing.T) {
 	}
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 	assert.NotNil(t, model.RuntimeObjects)
@@ -156,14 +156,14 @@ spec:
 	}
 
 	// No raw config
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageService)
 	assert.Equal(t, "true", model.backstageService.service.GetLabels()["default"])
 	assert.Empty(t, model.backstageService.service.GetLabels()["raw"])
 
 	// Put raw config
-	model, err = InitObjects(context.TODO(), bs, extConfig, true, false, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, extConfig, false, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageService)
 	assert.Equal(t, "true", model.backstageService.service.GetLabels()["raw"])
@@ -173,7 +173,7 @@ spec:
 func TestMultiobject(t *testing.T) {
 	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 	found := false
@@ -190,7 +190,7 @@ func TestMultiobject(t *testing.T) {
 func TestSingleMultiobject(t *testing.T) {
 	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "single-pvc.yaml")
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 	found := false
@@ -207,13 +207,13 @@ func TestSingleMultiobject(t *testing.T) {
 func TestSingleFailedWithMultiDefinition(t *testing.T) {
 	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "multi-service-err.yaml")
-	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 	assert.EqualError(t, err, "failed to initialize object: multiple objects not expected for: service.yaml")
 }
 
 func TestInvalidObjectKind(t *testing.T) {
 	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "invalid-service-type.yaml")
-	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 	assert.EqualError(t, err, "failed to read default value for the key service.yaml, reason: GroupVersionKind not match, found: /v1, Kind=Deployment, expected: [/v1, Kind=Service]")
 }
