@@ -59,9 +59,6 @@ var watchedConfigSelector = metav1.LabelSelector{
 type BackstageReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	// If true, Backstage Controller always sync the state of runtime objects created
-	// otherwise, runtime objects can be re-configured independently
-	OwnsRuntime bool
 	// indicates if current cluster is Openshift
 	IsOpenShift bool
 }
@@ -113,7 +110,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// This creates array of model objects to be reconsiled
-	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.OwnsRuntime, r.IsOpenShift, r.Scheme)
+	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.IsOpenShift, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
 	}

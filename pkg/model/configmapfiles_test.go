@@ -36,7 +36,7 @@ func TestDefaultConfigMapFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 
@@ -63,7 +63,7 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 	testObj.externalConfig.ExtraFileConfigMaps["cm2"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm2"}, Data: map[string]string{"conf2.yaml": "data"}}
 	testObj.externalConfig.ExtraFileConfigMaps["cm3"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm3"}, Data: map[string]string{"conf3.yaml": "data"}}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -96,7 +96,7 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
