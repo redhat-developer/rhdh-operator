@@ -143,7 +143,6 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		if added, err := backstageObject.addToModel(model, backstage); err != nil {
 			return nil, fmt.Errorf("failed to initialize backstage, reason: %s", err)
 		} else if added {
-			//setMetaInfo(backstageObject, backstage, ownsRuntime, scheme)
 			backstageObject.setMetaInfo(backstage, scheme)
 		}
 	}
