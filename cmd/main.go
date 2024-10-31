@@ -47,7 +47,6 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
-	var ownRuntime bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
 		"The address the metrics endpoint binds to. Use 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -58,8 +57,6 @@ func main() {
 		"If set, the metrics endpoint is served securely over HTTPS and requires authentication and authorization.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.BoolVar(&ownRuntime, "own-runtime", true, "Making Backstage Controller own runtime objects. "+
-		"If 'true' - all runtime objects created by Controller will be syncing with desired state configured by Controller")
 
 	opts := zap.Options{
 		Development: true,
@@ -135,7 +132,6 @@ func main() {
 	if err = (&controller.BackstageReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
-		OwnsRuntime: ownRuntime,
 		IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backstage")
@@ -153,7 +149,6 @@ func main() {
 	}
 
 	setupLog.Info("starting manager with parameters: ",
-		"own-runtime", ownRuntime,
 		"env.LOCALBIN", os.Getenv("LOCALBIN"),
 		"isOpenShift", isOpenShift,
 	)

@@ -36,7 +36,7 @@ func TestDynamicPluginsValidationFailed(t *testing.T) {
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml")
 
-	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	//"failed object validation, reason: failed to find initContainer named install-dynamic-plugins")
 	assert.Error(t, err)
@@ -57,7 +57,7 @@ func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 		Data:       map[string]string{"WrongKeyName.yml": "tt"},
 	}
 
-	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "expects exactly one key named 'dynamic-plugins.yaml'")
@@ -73,7 +73,7 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageDeployment)
@@ -107,7 +107,7 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 		Data:       map[string]string{DynamicPluginsFile: "tt"},
 	}
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -130,7 +130,7 @@ func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml")
 
-	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.Error(t, err)
 }
@@ -142,7 +142,7 @@ func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true)
 
-	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, true, false, testObj.scheme)
+	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	for _, obj := range m.RuntimeObjects {

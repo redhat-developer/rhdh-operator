@@ -88,7 +88,7 @@ func registerConfig(key string, factory ObjectFactory, multiple bool) {
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
-func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, ownsRuntime bool, isOpenshift bool, scheme *runtime.Scheme) (*BackstageModel, error) {
+func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, isOpenshift bool, scheme *runtime.Scheme) (*BackstageModel, error) {
 
 	// 3 phases of Backstage configuration:
 	// 1- load from Operator defaults, modify metadata (labels, selectors..) and namespace as needed
@@ -143,7 +143,6 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		if added, err := backstageObject.addToModel(model, backstage); err != nil {
 			return nil, fmt.Errorf("failed to initialize backstage, reason: %s", err)
 		} else if added {
-			//setMetaInfo(backstageObject, backstage, ownsRuntime, scheme)
 			backstageObject.setMetaInfo(backstage, scheme)
 		}
 	}

@@ -62,7 +62,7 @@ func TestDefaultAppConfig(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -93,7 +93,7 @@ func TestSpecifiedAppConfig(t *testing.T) {
 	testObj.externalConfig.AppConfigs = map[string]corev1.ConfigMap{appConfigTestCm.Name: appConfigTestCm, appConfigTestCm2.Name: appConfigTestCm2,
 		appConfigTestCm3.Name: appConfigTestCm3}
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig,
-		true, false, testObj.scheme)
+		false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -127,7 +127,7 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 	//testObj.detailedSpec.AddConfigObject(&AppConfig{ConfigMap: &cm, MountPath: "/my/path"})
 	testObj.externalConfig.AppConfigs[appConfigTestCm.Name] = appConfigTestCm
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)

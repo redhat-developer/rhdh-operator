@@ -224,9 +224,8 @@ func NewTestBackstageReconciler(namespace string) *TestBackstageReconciler {
 	}
 
 	return &TestBackstageReconciler{rec: controller.BackstageReconciler{
-		Client:      k8sClient,
-		Scheme:      sch,
-		OwnsRuntime: true,
+		Client: k8sClient,
+		Scheme: sch,
 		// let's set it explicitly to avoid misunderstanding
 		IsOpenShift: isOpenshift,
 	}, namespace: namespace}
