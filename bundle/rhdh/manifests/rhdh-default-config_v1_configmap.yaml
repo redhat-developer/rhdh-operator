@@ -153,7 +153,7 @@ data:
             resources:
               requests:
                 storage: 1Gi
-  deployment.yaml: |
+  deployment.yaml: |-
     apiVersion: apps/v1
     kind: Deployment
     metadata:
@@ -289,6 +289,7 @@ data:
                   cpu: 1000m
                   memory: 2.5Gi
                   ephemeral-storage: 5Gi
+              workingDir: /opt/app-root/src
   dynamic-plugins.yaml: |-
     apiVersion: v1
     kind: ConfigMap

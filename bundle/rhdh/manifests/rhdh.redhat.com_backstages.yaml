@@ -827,7 +827,7 @@ spec:
                             name:
                               description: |-
                                 Name of the object
-                                We support only ConfigMaps and Secrets.
+                                Supported ConfigMaps, Secrets and PVCs
                               type: string
                           required:
                           - name
@@ -926,7 +926,7 @@ spec:
                             name:
                               description: |-
                                 Name of the object
-                                We support only ConfigMaps and Secrets.
+                                Supported ConfigMaps, Secrets and PVCs
                               type: string
                           required:
                           - name
@@ -943,14 +943,17 @@ spec:
                           For each item in this array, a key must be specified that will be mounted as a file.
                         items:
                           properties:
+                            key:
+                              description: Key in the object
+                              type: string
                             mountPath:
-                              description: Path to mount PVC. If not specified default-path/Name
-                                will be used
+                              description: Path to mount the Object. If not specified
+                                default-path/Name will be used
                               type: string
                             name:
                               description: |-
                                 Name of the object
-                                We support only ConfigMaps and Secrets.
+                                Supported ConfigMaps, Secrets and PVCs
                               type: string
                           required:
                           - name
@@ -972,7 +975,7 @@ spec:
                             name:
                               description: |-
                                 Name of the object
-                                We support only ConfigMaps and Secrets.
+                                Supported ConfigMaps, Secrets and PVCs
                               type: string
                           required:
                           - name
