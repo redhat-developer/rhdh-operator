@@ -36,6 +36,10 @@ The Default Configuration defines the structure of all Backstage instances withi
   
 You can see examples of default configurations as part of the [Operator Profiles](../config/profile) in the **default-config** directory.
 
+#### Default mount path
+
+Some objects, such as: app-config, configmap-files, secret-files, dynamic-plugins, pvcs, are mounted to the Backstage Container as files or directories. Default mount path is Container's WorkingDir, if not defined it falls to "/opt/app-root/src". 
+
 #### Object annotation for mounting a volume to a specific path
 
 Using **rhdh.redhat.com/mount-path** annotation it is possible to define the directory where **PersistentVolumeClaim** object will be mounted to Backstage Container.

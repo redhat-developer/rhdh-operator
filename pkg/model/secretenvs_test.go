@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/utils/ptr"
-
 	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDefaultConfigMapEnvFrom(t *testing.T) {
+func TestDefaultSecretEnvFrom(t *testing.T) {
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -29,7 +29,7 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-envs.yaml", "raw-cm-envs.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-envs.yaml", "raw-sec-envs.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -44,7 +44,7 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 
 }
 
-func TestSpecifiedConfigMapEnvs(t *testing.T) {
+func TestSpecifiedSecretEnvs(t *testing.T) {
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -54,17 +54,17 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 		Spec: bsv1.BackstageSpec{
 			Application: &bsv1.Application{
 				ExtraEnvs: &bsv1.ExtraEnvs{
-					ConfigMaps: []bsv1.EnvObjectRef{},
+					Secrets: []bsv1.EnvObjectRef{},
 				},
 			},
 		},
 	}
 
-	bs.Spec.Application.ExtraEnvs.ConfigMaps = append(bs.Spec.Application.ExtraEnvs.ConfigMaps,
-		bsv1.EnvObjectRef{Name: "mapName", Key: "ENV1"})
+	bs.Spec.Application.ExtraEnvs.Secrets = append(bs.Spec.Application.ExtraEnvs.Secrets,
+		bsv1.EnvObjectRef{Name: "secName", Key: "ENV1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
-	testObj.externalConfig.ExtraEnvConfigMaps["mapName"] = corev1.ConfigMap{Data: map[string]string{"mapName": "ENV1"}}
+	testObj.externalConfig.ExtraEnvConfigMaps["secName"] = corev1.ConfigMap{Data: map[string]string{"secName": "ENV1"}}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -76,6 +76,6 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 	assert.Equal(t, 1, len(bscontainer.Env))
 
 	assert.NotNil(t, bscontainer.Env[0])
-	assert.Equal(t, "ENV1", bscontainer.Env[0].ValueFrom.ConfigMapKeyRef.Key)
+	assert.Equal(t, "ENV1", bscontainer.Env[0].ValueFrom.SecretKeyRef.Key)
 
 }

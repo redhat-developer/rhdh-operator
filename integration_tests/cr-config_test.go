@@ -66,7 +66,7 @@ var _ = When("create backstage with CR configured", func() {
 			Application: &bsv1.Application{
 				AppConfig: &bsv1.AppConfig{
 					MountPath: "/my/mount/path",
-					ConfigMaps: []bsv1.FileObjectKeyRef{
+					ConfigMaps: []bsv1.FileObjectRef{
 						{Name: appConfig1},
 						{Name: appConfig2, Key: "key21"},
 						{Name: appConfig3},
@@ -74,13 +74,13 @@ var _ = When("create backstage with CR configured", func() {
 				},
 				ExtraFiles: &bsv1.ExtraFiles{
 					MountPath: "/my/file/path",
-					ConfigMaps: []bsv1.FileObjectKeyRef{
+					ConfigMaps: []bsv1.FileObjectRef{
 						{Name: cmFile1},
 						{Name: cmFile2, Key: "cm21"},
 						{Name: cmFile3},
 						{Name: cmFileWithPath, MountPath: "/cm/file/withpath"},
 					},
-					Secrets: []bsv1.FileObjectKeyRef{
+					Secrets: []bsv1.FileObjectRef{
 						{Name: secretFile1, Key: "sec11"},
 						{Name: secretFile2, Key: "sec21"},
 						{Name: secretFile3, Key: "sec.31"},
@@ -88,11 +88,11 @@ var _ = When("create backstage with CR configured", func() {
 					},
 				},
 				ExtraEnvs: &bsv1.ExtraEnvs{
-					ConfigMaps: []bsv1.ObjectKeyRef{
+					ConfigMaps: []bsv1.EnvObjectRef{
 						{Name: cmEnv1},
 						{Name: cmEnv2, Key: "cm21"},
 					},
-					Secrets: []bsv1.ObjectKeyRef{
+					Secrets: []bsv1.EnvObjectRef{
 						{Name: secretEnv1, Key: "sec11"},
 					},
 					Envs: []bsv1.Env{
@@ -175,7 +175,7 @@ var _ = When("create backstage with CR configured", func() {
 		bs := bsv1.BackstageSpec{
 			Application: &bsv1.Application{
 				AppConfig: &bsv1.AppConfig{
-					ConfigMaps: []bsv1.FileObjectKeyRef{
+					ConfigMaps: []bsv1.FileObjectRef{
 						{Name: appConfig},
 					},
 				},

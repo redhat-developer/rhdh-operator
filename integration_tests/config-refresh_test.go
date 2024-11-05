@@ -67,12 +67,12 @@ organization:
 			Application: &bsv1.Application{
 				AppConfig: &bsv1.AppConfig{
 					MountPath: "/my/mount/path",
-					ConfigMaps: []bsv1.FileObjectKeyRef{
+					ConfigMaps: []bsv1.FileObjectRef{
 						{Name: appConfig1},
 					},
 				},
 				ExtraEnvs: &bsv1.ExtraEnvs{
-					Secrets: []bsv1.ObjectKeyRef{
+					Secrets: []bsv1.EnvObjectRef{
 						{Name: secretEnv1, Key: "sec11"},
 					},
 				},
@@ -179,13 +179,13 @@ organization:
 		bs := bsv1.BackstageSpec{
 			Application: &bsv1.Application{
 				AppConfig: &bsv1.AppConfig{
-					ConfigMaps: []bsv1.FileObjectKeyRef{
+					ConfigMaps: []bsv1.FileObjectRef{
 						{Name: appConfig1, MountPath: "/my/appconfig"},
 					},
 				},
 				ExtraFiles: &bsv1.ExtraFiles{
 					MountPath: "/my",
-					Secrets: []bsv1.FileObjectKeyRef{
+					Secrets: []bsv1.FileObjectRef{
 						{Name: secretFile1, MountPath: "secret"},
 					},
 				},

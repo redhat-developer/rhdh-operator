@@ -33,7 +33,7 @@ func (p *SecretEnvs) Object() runtime.Object {
 	return p.Secret
 }
 
-func addSecretEnvs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) error {
+func addSecretEnvs(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.Secrets == nil {
 		return nil
@@ -44,7 +44,7 @@ func addSecretEnvs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment) error
 			Secret: &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: sec.Name}},
 			Key:    sec.Key,
 		}
-		se.updatePod(deployment)
+		se.updatePod(model.backstageDeployment.deployment)
 	}
 	return nil
 }
@@ -71,7 +71,8 @@ func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, 
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) validate(_ *BackstageModel, _ bsv1.Backstage) error {
+func (p *SecretEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+	p.updatePod(m.backstageDeployment.deployment)
 	return nil
 }
 
@@ -80,7 +81,6 @@ func (p *SecretEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Schem
 	setMetaInfo(p.Secret, backstage, scheme)
 }
 
-// implementation of BackstagePodContributor interface
 func (p *SecretEnvs) updatePod(deployment *appsv1.Deployment) {
 
 	utils.AddEnvVarsFrom(&deployment.Spec.Template.Spec.Containers[0], utils.SecretObjectKind,

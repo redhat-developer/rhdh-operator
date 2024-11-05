@@ -14,7 +14,7 @@ import (
 type ConfigMapFilesFactory struct{}
 
 func (f ConfigMapFilesFactory) newBackstageObject() RuntimeObject {
-	return &ConfigMapFiles{MountPath: DefaultMountDir, withSubPath: true}
+	return &ConfigMapFiles{withSubPath: true}
 }
 
 type ConfigMapFiles struct {
@@ -28,7 +28,7 @@ func init() {
 	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false)
 }
 
-func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) error {
+func addConfigMapFiles(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
 		return nil
@@ -36,8 +36,7 @@ func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, m
 
 	for _, configMap := range spec.Application.ExtraFiles.ConfigMaps {
 
-		mp, wSubpath := GetMountPath(configMap, spec.Application.ExtraFiles.MountPath)
-
+		mp, wSubpath := model.backstageDeployment.mountPath(configMap, spec.Application.ExtraFiles.MountPath)
 		cm := model.ExternalConfig.ExtraFileConfigMaps[configMap.Name]
 		cmf := ConfigMapFiles{
 			ConfigMap:   &cm,
@@ -45,7 +44,7 @@ func addConfigMapFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, m
 			Key:         configMap.Key,
 			withSubPath: wSubpath,
 		}
-		cmf.updatePod(deployment)
+		cmf.updatePod(model.backstageDeployment.deployment)
 	}
 
 	return nil
@@ -79,7 +78,10 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapFiles) validate(_ *BackstageModel, _ bsv1.Backstage) error {
+func (p *ConfigMapFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+	p.MountPath = m.backstageDeployment.defaultMountPath()
+	p.updatePod(m.backstageDeployment.deployment)
+
 	return nil
 }
 
@@ -88,7 +90,6 @@ func (p *ConfigMapFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
-// implementation of BackstagePodContributor interface
 func (p *ConfigMapFiles) updatePod(deployment *appsv1.Deployment) {
 
 	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,

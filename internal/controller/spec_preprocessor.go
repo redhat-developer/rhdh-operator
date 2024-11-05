@@ -14,7 +14,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
@@ -26,7 +26,7 @@ const AutoSyncEnvVar = "EXT_CONF_SYNC_backstage"
 
 // Add additional details to the Backstage Spec helping in making Backstage RuntimeObjects Model
 // Validates Backstage Spec and fails fast if something not correct
-func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.Backstage) (model.ExternalConfig, error) {
+func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1.Backstage) (model.ExternalConfig, error) {
 	//lg := log.FromContext(ctx)
 
 	bsSpec := backstage.Spec
@@ -57,15 +57,14 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	}
 
 	if bsSpec.Application == nil {
-		bsSpec.Application = &bs.Application{}
+		bsSpec.Application = &bsv1.Application{}
 	}
 
 	// Process AppConfigs
 	if bsSpec.Application.AppConfig != nil {
 		for _, ac := range bsSpec.Application.AppConfig.ConfigMaps {
 			cm := &corev1.ConfigMap{}
-			_, wSubpath := model.GetMountPath(ac, bsSpec.Application.AppConfig.MountPath)
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ac.Name, ns, wSubpath); err != nil {
+			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ac.Name, ns, addToWatch(ac)); err != nil {
 				return result, err
 			}
 			result.AppConfigs[ac.Name] = *cm
@@ -76,8 +75,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.ConfigMaps != nil {
 		for _, ef := range bsSpec.Application.ExtraFiles.ConfigMaps {
 			cm := &corev1.ConfigMap{}
-			_, wSubpath := model.GetMountPath(ef, bsSpec.Application.ExtraFiles.MountPath)
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ef.Name, ns, wSubpath); err != nil {
+			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ef.Name, ns, addToWatch(ef)); err != nil {
 				return result, err
 			}
 			result.ExtraFileConfigMaps[cm.Name] = *cm
@@ -88,8 +86,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bs.B
 	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.Secrets != nil {
 		for _, ef := range bsSpec.Application.ExtraFiles.Secrets {
 			secret := &corev1.Secret{}
-			_, wSubpath := model.GetMountPath(ef, bsSpec.Application.ExtraFiles.MountPath)
-			if err := r.addExtConfig(&result, ctx, secret, backstage.Name, ef.Name, ns, wSubpath); err != nil {
+			if err := r.addExtConfig(&result, ctx, secret, backstage.Name, ef.Name, ns, addToWatch(ef)); err != nil {
 				return result, err
 			}
 			result.ExtraFileSecrets[secret.Name] = *secret
@@ -202,4 +199,12 @@ func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj clien
 		return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
 	}
 	return nil
+}
+
+func addToWatch(fileObjectRef bsv1.FileObjectRef) bool {
+	// it will contain subPath either as specified key or as a list of all keys if only mountPath specified
+	if fileObjectRef.MountPath == "" || fileObjectRef.Key != "" {
+		return true
+	}
+	return false
 }

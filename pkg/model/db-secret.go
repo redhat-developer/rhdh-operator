@@ -67,7 +67,7 @@ func (b *DbSecret) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) validate(model *BackstageModel, backstage bsv1.Backstage) error {
+func (b *DbSecret) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
 
 	pswd, _ := utils.GeneratePassword(24)
 

@@ -3,6 +3,9 @@ package model
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -91,34 +94,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) validate(model *BackstageModel, backstage bsv1.Backstage) error {
-
-	for _, bso := range model.RuntimeObjects {
-		if bs, ok := bso.(BackstagePodContributor); ok {
-			bs.updatePod(b.deployment)
-		}
-	}
-
-	addAppConfigs(backstage.Spec, b.deployment, model)
-
-	if err := addConfigMapFiles(backstage.Spec, b.deployment, model); err != nil {
-		return err
-	}
-
-	addConfigMapEnvs(backstage.Spec, b.deployment, model)
-
-	if err := addSecretFiles(backstage.Spec, b.deployment, model); err != nil {
-		return err
-	}
-
-	if err := addSecretEnvs(backstage.Spec, b.deployment); err != nil {
-		return err
-	}
-	if err := addDynamicPlugins(backstage.Spec, b.deployment, model); err != nil {
-		return err
-	}
-
-	addPvc(backstage.Spec, b.deployment, model)
+func (b *BackstageDeployment) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
 
 	//DbSecret
 	if backstage.Spec.IsAuthSecretSpecified() {
@@ -133,6 +109,9 @@ func (b *BackstageDeployment) validate(model *BackstageModel, backstage bsv1.Bac
 func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	b.deployment.SetName(DeploymentName(backstage.Name))
 	utils.GenerateLabel(&b.deployment.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+	if b.deployment.Spec.Selector == nil {
+		b.deployment.Spec.Selector = &metav1.LabelSelector{}
+	}
 	utils.GenerateLabel(&b.deployment.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
 	setMetaInfo(b.deployment, backstage, scheme)
 }
@@ -143,6 +122,37 @@ func (b *BackstageDeployment) container() *corev1.Container {
 
 func (b *BackstageDeployment) podSpec() *corev1.PodSpec {
 	return &b.deployment.Spec.Template.Spec
+}
+
+func (b *BackstageDeployment) defaultMountPath() string {
+	dmp := b.container().WorkingDir
+	if dmp == "" {
+		return DefaultMountDir
+	}
+	return dmp
+}
+
+func (b *BackstageDeployment) mountPath(objectRef bsv1.FileObjectRef, sharedMountPath string) (string, bool) {
+
+	mp := b.defaultMountPath()
+	if sharedMountPath != "" {
+		mp = sharedMountPath
+	}
+
+	wSubpath := true
+	if objectRef.MountPath != "" {
+		if filepath.IsAbs(objectRef.MountPath) {
+			mp = objectRef.MountPath
+		} else {
+			mp = filepath.Join(mp, objectRef.MountPath)
+		}
+
+		if objectRef.Key == "" {
+			wSubpath = false
+		}
+	}
+
+	return mp, wSubpath
 }
 
 func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {

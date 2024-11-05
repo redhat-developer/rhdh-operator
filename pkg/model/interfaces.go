@@ -6,13 +6,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
-
-	appsv1 "k8s.io/api/apps/v1"
 )
-
-type ObjectConfigOptions struct {
-	Multiple bool
-}
 
 // Registered Object configuring Backstage runtime model
 type ObjectConfig struct {
@@ -41,16 +35,9 @@ type RuntimeObject interface {
 	// adds runtime object to the model
 	// returns false if the object was not added to the model (not configured)
 	addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error)
-	// at this stage all the information is updated
-	// set the final references validates the object at the end of initialization
-	validate(model *BackstageModel, backstage bsv1.Backstage) error
+	// at this stage all the information is added to the model
+	// this step is for updating the final references and validate the object
+	updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error
 	// sets object name, labels and other necessary meta information
 	setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme)
-}
-
-// BackstagePodContributor contributing to the pod as an Environment variables or mounting file/directory.
-// Usually app-config related
-type BackstagePodContributor interface {
-	RuntimeObject
-	updatePod(deployment *appsv1.Deployment)
 }

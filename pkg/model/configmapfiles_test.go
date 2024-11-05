@@ -23,7 +23,7 @@ var (
 			Application: &bsv1.Application{
 				ExtraFiles: &bsv1.ExtraFiles{
 					MountPath:  "/my/path",
-					ConfigMaps: []bsv1.FileObjectKeyRef{},
+					ConfigMaps: []bsv1.FileObjectRef{},
 				},
 			},
 		},
@@ -52,9 +52,9 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1.FileObjectKeyRef{Name: "cm1"})
-	*cmf = append(*cmf, bsv1.FileObjectKeyRef{Name: "cm2", MountPath: "/custom/path"})
-	*cmf = append(*cmf, bsv1.FileObjectKeyRef{Name: "cm3", MountPath: "rel"})
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm1"})
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm2", MountPath: "/custom/path"})
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm3", MountPath: "rel"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -92,7 +92,7 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1.FileObjectKeyRef{Name: appConfigTestCm.Name})
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: appConfigTestCm.Name})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 

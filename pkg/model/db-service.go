@@ -71,7 +71,7 @@ func (b *DbService) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbService) validate(_ *BackstageModel, _ bsv1.Backstage) error {
+func (b *DbService) updateAndValidate(_ *BackstageModel, _ bsv1.Backstage) error {
 	return nil
 }
 

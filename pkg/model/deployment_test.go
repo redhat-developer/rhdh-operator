@@ -47,6 +47,26 @@ func TestSpecs(t *testing.T) {
 
 }
 
+func TestWorkingDirMount(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "working-dir-mount.yaml")
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "/my/home", model.backstageDeployment.defaultMountPath())
+	fileor := bsv1.FileObjectRef{
+		Name:      "test",
+		MountPath: "subpath",
+	}
+	mp, sp := model.backstageDeployment.mountPath(fileor, "")
+	assert.Equal(t, "/my/home/subpath", mp)
+	assert.False(t, sp)
+
+}
+
 // It tests the overriding image feature
 func TestOverrideBackstageImage(t *testing.T) {
 
