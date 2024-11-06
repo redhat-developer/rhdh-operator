@@ -43,7 +43,7 @@ func TestDefaultConfigMapFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
+	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
 }
@@ -71,8 +71,8 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 3, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Equal(t, 0, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
+	assert.Equal(t, 3, len(deployment.container().VolumeMounts))
+	assert.Equal(t, 0, len(deployment.container().Args))
 	assert.Equal(t, 3, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("cm1"), deployment.container().VolumeMounts[0].Name)
@@ -104,8 +104,8 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Equal(t, 0, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
+	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
+	assert.Equal(t, 0, len(deployment.container().Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
 }

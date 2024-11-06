@@ -8,8 +8,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	appsv1 "k8s.io/api/apps/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
@@ -45,7 +43,7 @@ func addPvc(spec bsv1.BackstageSpec, model *BackstageModel) {
 				pvcObj.specifiedInCR = true
 			}
 			pvcObj.pvcs.Items = append(pvcObj.pvcs.Items, &pvc)
-			pvcObj.updatePod(model.backstageDeployment.deployment)
+			pvcObj.updatePod(model.backstageDeployment)
 		}
 	}
 }
@@ -75,7 +73,7 @@ func (b *BackstagePvcs) EmptyObject() client.Object {
 	return &corev1.PersistentVolumeClaim{}
 }
 
-func (b *BackstagePvcs) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (b *BackstagePvcs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if b.pvcs != nil {
 		model.setRuntimeObject(b)
 		return true, nil
@@ -83,10 +81,10 @@ func (b *BackstagePvcs) addToModel(model *BackstageModel, backstage bsv1.Backsta
 	return false, nil
 }
 
-func (b *BackstagePvcs) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
+func (b *BackstagePvcs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
 	b.mountPath = m.backstageDeployment.defaultMountPath()
 
-	b.updatePod(m.backstageDeployment.deployment)
+	b.updatePod(m.backstageDeployment)
 
 	for _, o := range b.pvcs.Items {
 		_, ok := o.(*corev1.PersistentVolumeClaim)
@@ -107,8 +105,9 @@ func (b *BackstagePvcs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sc
 	}
 }
 
-func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
+func (b *BackstagePvcs) updatePod(bsd *BackstageDeployment) {
 
+	deployment := bsd.deployment
 	for _, pvc := range b.pvcs.Items {
 		volName := utils.ToRFC1123Label(pvc.GetName())
 		volSrc := corev1.VolumeSource{
@@ -119,7 +118,7 @@ func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
 		deployment.Spec.Template.Spec.Volumes =
 			append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
 
-		c := &deployment.Spec.Template.Spec.Containers[0]
+		c := bsd.container()
 		volMount := corev1.VolumeMount{Name: volName}
 
 		// concatenate with volName by default

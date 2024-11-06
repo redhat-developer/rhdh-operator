@@ -92,12 +92,12 @@ organization:
 
 			g.Expect(len(podList.Items)).To(Equal(1))
 			podName := podList.Items[0].Name
-			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "cat /my/mount/path/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			out = strings.Replace(out, "\r", "", -1)
 			g.Expect(out).To(Equal(conf))
 
-			out, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "echo $sec11")
+			out, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "echo $sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect("val11\r\n").To(Equal(out))
 
@@ -129,13 +129,17 @@ organization:
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(cm.Data["appconfig11"]).To(Equal(newData))
 
+			deploy := &appsv1.Deployment{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
 			// Pod replaced so have to re-ask
 			podList := &corev1.PodList{}
 			err = k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			podName := podList.Items[0].Name
-			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/mount/path/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "cat /my/mount/path/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// TODO nicer method to compare file content with added '\r'
 			// NOTE: it does not work well on envtest, real controller needed
@@ -144,7 +148,7 @@ organization:
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			out2, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "echo $sec11")
+			out2, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "echo $sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// NOTE: it does not work well on envtest, real controller needed
 			g.Expect(fmt.Sprintf("%s%s", newEnv, "\r\n")).To(Equal(out2))
@@ -207,11 +211,11 @@ organization:
 			g.Expect(len(podList.Items)).To(Equal(1))
 			podName = podList.Items[0].Name
 
-			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/appconfig/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "cat /my/appconfig/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(conf))
 
-			_, _, err = executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/secret/sec11")
+			_, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "cat /my/secret/sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 3*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
@@ -229,8 +233,13 @@ organization:
 		Expect(err).ShouldNot(HaveOccurred())
 
 		Eventually(func(g Gomega) {
+
+			deploy := &appsv1.Deployment{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
 			// no need to re-ask pod name, it is not recreated, just use what we've got
-			out, _, err := executeRemoteCommand(ctx, ns, podName, "backstage-backend", "cat /my/appconfig/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "cat /my/appconfig/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// let's check, just in case (it is k8s job to refresh it :)
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))

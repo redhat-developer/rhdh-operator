@@ -70,10 +70,10 @@ func TestDefaultAppConfig(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Contains(t, deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath, deployment.defaultMountPath())
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
+	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
+	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath, deployment.defaultMountPath())
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, 2, len(deployment.container().Args))
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
 }
@@ -135,12 +135,11 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Equal(t, 4, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
+	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
+	assert.Equal(t, 4, len(deployment.container().Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
-	//assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret()deployment.deployment.Spec.Template.Spec.Volumes[0].Name
 	assert.Equal(t, deployment.deployment.Spec.Template.Spec.Volumes[0].Name,
-		deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
+		deployment.container().VolumeMounts[0].Name)
 
 }

@@ -36,7 +36,7 @@ func TestDefaultSecretEnvFrom(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.deployment.Spec.Template.Spec.Containers[0]
+	bscontainer := model.backstageDeployment.container()
 	assert.NotNil(t, bscontainer)
 
 	assert.Equal(t, 1, len(bscontainer.EnvFrom))

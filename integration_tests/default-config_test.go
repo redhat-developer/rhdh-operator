@@ -132,7 +132,7 @@ var _ = When("create default backstage", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
 			g.Expect(deploy.Spec.Template.Spec.Containers).To(HaveLen(1))
-			g.Expect(deploy.Spec.Template.Spec.Containers[0].Image).To(Equal("busybox"))
+			g.Expect(deploy.Spec.Template.Spec.Containers[model.BackstageContainerIndex(deploy)].Image).To(Equal("busybox"))
 
 			By("creating StatefulSet")
 			ss := &appsv1.StatefulSet{}

@@ -7,8 +7,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	appsv1 "k8s.io/api/apps/v1"
-
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
@@ -54,7 +52,7 @@ func addAppConfigs(spec bsv1.BackstageSpec, model *BackstageModel) {
 			Key:         configMap.Key,
 			withSubPath: wSubpath,
 		}
-		ac.updatePod(model.backstageDeployment.deployment)
+		ac.updatePod(model.backstageDeployment)
 	}
 }
 
@@ -88,7 +86,7 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 // implementation of RuntimeObject interface
 func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
 	b.MountPath = m.backstageDeployment.defaultMountPath()
-	b.updatePod(m.backstageDeployment.deployment)
+	b.updatePod(m.backstageDeployment)
 	return nil
 }
 
@@ -98,16 +96,16 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 }
 
 // it contrubutes to Volumes, container.VolumeMounts and contaiter.Args
-func (b *AppConfig) updatePod(deployment *appsv1.Deployment) {
+func (b *AppConfig) updatePod(bsd *BackstageDeployment) {
 
-	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,
+	deployment := bsd.deployment
+	utils.MountFilesFrom(&deployment.Spec.Template.Spec, bsd.container(), utils.ConfigMapObjectKind,
 		b.ConfigMap.Name, b.MountPath, b.Key, b.withSubPath, b.ConfigMap.Data)
 
 	fileDir := b.MountPath
 	for file := range b.ConfigMap.Data {
 		if b.Key == "" || b.Key == file {
-			deployment.Spec.Template.Spec.Containers[0].Args =
-				append(deployment.Spec.Template.Spec.Containers[0].Args, []string{"--config", filepath.Join(fileDir, file)}...)
+			bsd.container().Args = append(bsd.container().Args, []string{"--config", filepath.Join(fileDir, file)}...)
 		}
 	}
 }

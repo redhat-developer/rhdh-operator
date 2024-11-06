@@ -49,6 +49,16 @@ func DeploymentName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage")
 }
 
+// BackstageContainerIndex returns the index of backstage container in from deployment.spec.template.spec.containers array
+func BackstageContainerIndex(bsd *appsv1.Deployment) int {
+	for i, c := range bsd.Spec.Template.Spec.Containers {
+		if c.Name == "backstage-backend" {
+			return i
+		}
+	}
+	return -1
+}
+
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) Object() runtime.Object {
 	return b.deployment
@@ -71,6 +81,10 @@ func (b *BackstageDeployment) EmptyObject() client.Object {
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 	if b.deployment == nil {
 		return false, fmt.Errorf("Backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
+	}
+
+	if BackstageContainerIndex(b.deployment) < 0 {
+		return false, fmt.Errorf("Backstage Deployment is not initialized, Backstage Container is not identified")
 	}
 
 	if b.deployment.Spec.Template.ObjectMeta.Annotations == nil {
@@ -117,7 +131,7 @@ func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runt
 }
 
 func (b *BackstageDeployment) container() *corev1.Container {
-	return &b.deployment.Spec.Template.Spec.Containers[0]
+	return &b.deployment.Spec.Template.Spec.Containers[BackstageContainerIndex(b.deployment)]
 }
 
 func (b *BackstageDeployment) podSpec() *corev1.PodSpec {
@@ -216,7 +230,7 @@ func (b *BackstageDeployment) setImage(image *string) {
 // adds environment variables to the Backstage Container
 func (b *BackstageDeployment) addContainerEnvVar(env bsv1.Env) {
 	b.container().Env =
-		append(b.deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+		append(b.container().Env, corev1.EnvVar{
 			Name:  env.Name,
 			Value: env.Value,
 		})

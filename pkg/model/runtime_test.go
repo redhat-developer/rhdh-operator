@@ -52,7 +52,7 @@ func TestInitDefaultDeploy(t *testing.T) {
 	assert.Equal(t, "ns123", bsDeployment.deployment.GetNamespace())
 	assert.Equal(t, 2, len(bsDeployment.deployment.GetLabels()))
 
-	assert.NotNil(t, bsDeployment.deployment.Spec.Template.Spec.Containers[0])
+	assert.NotNil(t, bsDeployment.container())
 
 	bsService := model.backstageService
 	assert.Equal(t, ServiceName(bs.Name), bsService.service.Name)

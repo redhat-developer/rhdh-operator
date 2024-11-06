@@ -8,7 +8,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -39,7 +38,7 @@ func addConfigMapEnvs(spec bsv1.BackstageSpec, model *BackstageModel) {
 			ConfigMap: &cm,
 			Key:       configMap.Key,
 		}
-		cmf.updatePod(model.backstageDeployment.deployment)
+		cmf.updatePod(model.backstageDeployment)
 	}
 }
 
@@ -71,7 +70,7 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
-	p.updatePod(m.backstageDeployment.deployment)
+	p.updatePod(m.backstageDeployment)
 	return nil
 }
 
@@ -80,8 +79,8 @@ func (p *ConfigMapEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sc
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
-func (p *ConfigMapEnvs) updatePod(deployment *appsv1.Deployment) {
+func (p *ConfigMapEnvs) updatePod(bsd *BackstageDeployment) {
 
-	utils.AddEnvVarsFrom(&deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,
+	utils.AddEnvVarsFrom(bsd.container(), utils.ConfigMapObjectKind,
 		p.ConfigMap.Name, p.Key)
 }

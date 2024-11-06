@@ -1,7 +1,6 @@
 package model
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,7 +43,7 @@ func addConfigMapFiles(spec bsv1.BackstageSpec, model *BackstageModel) error {
 			Key:         configMap.Key,
 			withSubPath: wSubpath,
 		}
-		cmf.updatePod(model.backstageDeployment.deployment)
+		cmf.updatePod(model.backstageDeployment)
 	}
 
 	return nil
@@ -80,7 +79,7 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 // implementation of RuntimeObject interface
 func (p *ConfigMapFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
 	p.MountPath = m.backstageDeployment.defaultMountPath()
-	p.updatePod(m.backstageDeployment.deployment)
+	p.updatePod(m.backstageDeployment)
 
 	return nil
 }
@@ -90,9 +89,9 @@ func (p *ConfigMapFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
-func (p *ConfigMapFiles) updatePod(deployment *appsv1.Deployment) {
+func (p *ConfigMapFiles) updatePod(bsd *BackstageDeployment) {
 
-	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,
+	utils.MountFilesFrom(&bsd.deployment.Spec.Template.Spec, bsd.container(), utils.ConfigMapObjectKind,
 		p.ConfigMap.Name, p.MountPath, p.Key, p.withSubPath, p.ConfigMap.Data)
 
 }

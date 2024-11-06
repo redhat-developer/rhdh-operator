@@ -109,7 +109,7 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			podSpec := deploy.Spec.Template.Spec
-			c := podSpec.Containers[0]
+			c := podSpec.Containers[model.BackstageContainerIndex(deploy)]
 
 			By("checking if app-config volumes are added to PodSpec")
 			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig1)).To(BeAddedAsVolumeToPodSpec(podSpec))
@@ -199,7 +199,7 @@ var _ = When("create backstage with CR configured", func() {
 
 	})
 
-	It("creates default Backstage and then update CR ", func() {
+	It("creates default Backstage and then update CR", func() {
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
 
@@ -238,7 +238,7 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(err).To(Not(HaveOccurred()))
 			g.Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(2)))
 			g.Expect(deploy.Spec.Template.Spec.ImagePullSecrets).To(HaveLen(2))
-			g.Expect(deploy.Spec.Template.Spec.Containers[0].Image).To(HaveValue(BeEquivalentTo(imageName)))
+			g.Expect(deploy.Spec.Template.Spec.Containers[model.BackstageContainerIndex(deploy)].Image).To(HaveValue(BeEquivalentTo(imageName)))
 
 		}, time.Minute, time.Second).Should(Succeed())
 

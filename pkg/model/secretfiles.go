@@ -7,8 +7,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	appsv1 "k8s.io/api/apps/v1"
-
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
@@ -52,7 +50,7 @@ func addSecretFiles(spec bsv1.BackstageSpec, model *BackstageModel) error {
 			Key:         sec.Key,
 			withSubPath: wSubpath,
 		}
-		sf.updatePod(model.backstageDeployment.deployment)
+		sf.updatePod(model.backstageDeployment)
 	}
 	return nil
 }
@@ -86,7 +84,7 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool,
 // implementation of RuntimeObject interface
 func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
 	p.MountPath = m.backstageDeployment.defaultMountPath()
-	p.updatePod(m.backstageDeployment.deployment)
+	p.updatePod(m.backstageDeployment)
 	return nil
 }
 
@@ -95,8 +93,8 @@ func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sche
 	setMetaInfo(p.Secret, backstage, scheme)
 }
 
-func (p *SecretFiles) updatePod(depoyment *appsv1.Deployment) {
+func (p *SecretFiles) updatePod(bsd *BackstageDeployment) {
 
-	utils.MountFilesFrom(&depoyment.Spec.Template.Spec, &depoyment.Spec.Template.Spec.Containers[0], utils.SecretObjectKind,
+	utils.MountFilesFrom(&bsd.deployment.Spec.Template.Spec, bsd.container(), utils.SecretObjectKind,
 		p.Secret.Name, p.MountPath, p.Key, p.withSubPath, p.Secret.StringData)
 }
