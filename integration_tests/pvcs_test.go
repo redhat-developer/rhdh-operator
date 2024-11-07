@@ -259,7 +259,7 @@ var _ = When("create backstage PVCs configured", func() {
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
 			Application: &bsv1.Application{
 				ExtraFiles: &bsv1.ExtraFiles{
-					Pvcs: []bsv1.FileObjectRef{
+					Pvcs: []bsv1.PvcRef{
 						{
 							Name: "my-pvc1",
 						},

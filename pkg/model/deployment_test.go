@@ -61,7 +61,7 @@ func TestWorkingDirMount(t *testing.T) {
 		Name:      "test",
 		MountPath: "subpath",
 	}
-	mp, sp := model.backstageDeployment.mountPath(fileor, "")
+	mp, sp := model.backstageDeployment.mountPath(fileor.MountPath, "", "")
 	assert.Equal(t, "/my/home/subpath", mp)
 	assert.False(t, sp)
 

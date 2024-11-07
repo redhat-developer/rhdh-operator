@@ -132,7 +132,7 @@ func (b *BackstageDeployment) defaultMountPath() string {
 	return dmp
 }
 
-func (b *BackstageDeployment) mountPath(objectRef bsv1.FileObjectRef, sharedMountPath string) (string, bool) {
+func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountPath string) (string, bool) {
 
 	mp := b.defaultMountPath()
 	if sharedMountPath != "" {
@@ -140,14 +140,14 @@ func (b *BackstageDeployment) mountPath(objectRef bsv1.FileObjectRef, sharedMoun
 	}
 
 	wSubpath := true
-	if objectRef.MountPath != "" {
-		if filepath.IsAbs(objectRef.MountPath) {
-			mp = objectRef.MountPath
+	if objectMountPath != "" {
+		if filepath.IsAbs(objectMountPath) {
+			mp = objectMountPath
 		} else {
-			mp = filepath.Join(mp, objectRef.MountPath)
+			mp = filepath.Join(mp, objectMountPath)
 		}
 
-		if objectRef.Key == "" {
+		if objectKey == "" {
 			wSubpath = false
 		}
 	}

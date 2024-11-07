@@ -86,7 +86,7 @@ func TestSpecifiedPvcs(t *testing.T) {
 		Spec: bsv1.BackstageSpec{
 			Application: &bsv1.Application{
 				ExtraFiles: &bsv1.ExtraFiles{
-					Pvcs: []bsv1.FileObjectRef{
+					Pvcs: []bsv1.PvcRef{
 						{
 							Name: "my-pvc1",
 						},

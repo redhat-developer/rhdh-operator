@@ -36,7 +36,7 @@ func addConfigMapFiles(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
 	for _, configMap := range spec.Application.ExtraFiles.ConfigMaps {
 
-		mp, wSubpath := model.backstageDeployment.mountPath(configMap, spec.Application.ExtraFiles.MountPath)
+		mp, wSubpath := model.backstageDeployment.mountPath(configMap.MountPath, configMap.Key, spec.Application.ExtraFiles.MountPath)
 		cm := model.ExternalConfig.ExtraFileConfigMaps[configMap.Name]
 		cmf := ConfigMapFiles{
 			ConfigMap:   &cm,
