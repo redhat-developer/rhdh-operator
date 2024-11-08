@@ -35,7 +35,7 @@ func addPvc(spec bsv1.BackstageSpec, model *BackstageModel) {
 			pvcObj := BackstagePvcs{fromDefaultConf: false}
 			pvcObj.pvcs = &multiobject.MultiObject{}
 			if pvcSpec.MountPath == "" {
-				pvcObj.mountPath, _ = model.backstageDeployment.mountPath(pvcSpec, spec.Application.ExtraFiles.MountPath)
+				pvcObj.mountPath, _ = model.backstageDeployment.mountPath(pvcSpec.MountPath, "", spec.Application.ExtraFiles.MountPath)
 				pvcObj.specifiedInCR = false
 
 			} else {

@@ -151,7 +151,7 @@ type ExtraFiles struct {
 	// List of references to Persistent Volume Claim objects mounted as extra files
 	// For each item in this array, a key must be specified that will be mounted as a file.
 	// +optional
-	Pvcs []FileObjectRef `json:"pvcs,omitempty"`
+	Pvcs []PvcRef `json:"pvcs,omitempty"`
 }
 
 type ExtraEnvs struct {
@@ -185,7 +185,7 @@ type EnvObjectRef struct {
 
 type FileObjectRef struct {
 	// Name of the object
-	// Supported ConfigMaps, Secrets and PVCs
+	// Supported ConfigMaps and Secrets
 	//+kubebuilder:validation:Required
 	Name string `json:"name"`
 
@@ -194,6 +194,16 @@ type FileObjectRef struct {
 	Key string `json:"key,omitempty"`
 
 	// Path to mount the Object. If not specified default-path/Name will be used
+	// +optional
+	MountPath string `json:"mountPath"`
+}
+
+type PvcRef struct {
+	// Name of the object
+	//+kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Path to mount PVC. If not specified default-path/Name will be used
 	// +optional
 	MountPath string `json:"mountPath"`
 }

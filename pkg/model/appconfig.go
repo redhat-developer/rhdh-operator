@@ -45,7 +45,7 @@ func addAppConfigs(spec bsv1.BackstageSpec, model *BackstageModel) {
 
 	for _, configMap := range spec.Application.AppConfig.ConfigMaps {
 		cm := model.ExternalConfig.AppConfigs[configMap.Name]
-		mp, wSubpath := model.backstageDeployment.mountPath(configMap, spec.Application.AppConfig.MountPath)
+		mp, wSubpath := model.backstageDeployment.mountPath(configMap.MountPath, configMap.Key, spec.Application.AppConfig.MountPath)
 		ac := AppConfig{
 			ConfigMap:   &cm,
 			MountPath:   mp,
