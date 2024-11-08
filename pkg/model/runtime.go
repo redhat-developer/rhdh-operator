@@ -147,18 +147,43 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		}
 	}
 
-	// set generic metainfo and validate all
+	// set generic metainfo and updateAndValidate all
 	for _, v := range model.RuntimeObjects {
-		err := v.validate(model, backstage)
+		err := v.updateAndValidate(model, backstage)
 		if err != nil {
 			return nil, fmt.Errorf("failed object validation, reason: %s", err)
 		}
+	}
+
+	// Add objects specified in Backstage CR
+	if err := addFromSpec(backstage.Spec, model); err != nil {
+		return nil, err
 	}
 
 	// sort for reconciliation number optimization
 	model.sortRuntimeObjects()
 
 	return model, nil
+}
+
+func addFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
+
+	addAppConfigs(spec, model)
+	if err := addConfigMapFiles(spec, model); err != nil {
+		return err
+	}
+	addConfigMapEnvs(spec, model)
+	if err := addDynamicPlugins(spec, model); err != nil {
+		return err
+	}
+	if err := addSecretFiles(spec, model); err != nil {
+		return err
+	}
+	if err := addSecretEnvs(spec, model); err != nil {
+		return err
+	}
+	addPvc(spec, model)
+	return nil
 }
 
 // Every RuntimeObject.setMetaInfo should as minimum call this

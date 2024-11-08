@@ -27,7 +27,7 @@ func init() {
 	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, false)
 }
 
-func addConfigMapEnvs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addConfigMapEnvs(spec bsv1.BackstageSpec, model *BackstageModel) {
 
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.ConfigMaps == nil {
 		return
@@ -39,7 +39,7 @@ func addConfigMapEnvs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, mo
 			ConfigMap: &cm,
 			Key:       configMap.Key,
 		}
-		cmf.updatePod(deployment)
+		cmf.updatePod(model.backstageDeployment.deployment)
 	}
 }
 
@@ -70,7 +70,8 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) validate(_ *BackstageModel, _ bsv1.Backstage) error {
+func (p *ConfigMapEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+	p.updatePod(m.backstageDeployment.deployment)
 	return nil
 }
 
@@ -79,7 +80,6 @@ func (p *ConfigMapEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sc
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
-// implementation of BackstagePodContributor interface
 func (p *ConfigMapEnvs) updatePod(deployment *appsv1.Deployment) {
 
 	utils.AddEnvVarsFrom(&deployment.Spec.Template.Spec.Containers[0], utils.ConfigMapObjectKind,

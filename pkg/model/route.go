@@ -126,7 +126,7 @@ func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backst
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) validate(model *BackstageModel, _ bsv1.Backstage) error {
+func (b *BackstageRoute) updateAndValidate(model *BackstageModel, _ bsv1.Backstage) error {
 	b.route.Spec.To.Name = model.backstageService.service.Name
 	return nil
 }

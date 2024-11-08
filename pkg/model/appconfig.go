@@ -19,7 +19,7 @@ type AppConfigFactory struct{}
 
 // factory method to create App Config object
 func (f AppConfigFactory) newBackstageObject() RuntimeObject {
-	return &AppConfig{MountPath: DefaultMountDir, withSubPath: true}
+	return &AppConfig{withSubPath: true}
 }
 
 // structure containing ConfigMap where keys are Backstage ConfigApp file names and vaues are contents of the files
@@ -39,7 +39,7 @@ func AppConfigDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-appconfig")
 }
 
-func addAppConfigs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addAppConfigs(spec bsv1.BackstageSpec, model *BackstageModel) {
 
 	if spec.Application == nil || spec.Application.AppConfig == nil || spec.Application.AppConfig.ConfigMaps == nil {
 		return
@@ -47,14 +47,14 @@ func addAppConfigs(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model
 
 	for _, configMap := range spec.Application.AppConfig.ConfigMaps {
 		cm := model.ExternalConfig.AppConfigs[configMap.Name]
-		mp, wSubpath := GetMountPath(configMap, spec.Application.AppConfig.MountPath)
+		mp, wSubpath := model.backstageDeployment.mountPath(configMap.MountPath, configMap.Key, spec.Application.AppConfig.MountPath)
 		ac := AppConfig{
 			ConfigMap:   &cm,
 			MountPath:   mp,
 			Key:         configMap.Key,
 			withSubPath: wSubpath,
 		}
-		ac.updatePod(deployment)
+		ac.updatePod(model.backstageDeployment.deployment)
 	}
 }
 
@@ -86,7 +86,9 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) validate(_ *BackstageModel, _ bsv1.Backstage) error {
+func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
+	b.MountPath = m.backstageDeployment.defaultMountPath()
+	b.updatePod(m.backstageDeployment.deployment)
 	return nil
 }
 
@@ -95,7 +97,6 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 	setMetaInfo(b.ConfigMap, backstage, scheme)
 }
 
-// implementation of BackstagePodContributor interface
 // it contrubutes to Volumes, container.VolumeMounts and contaiter.Args
 func (b *AppConfig) updatePod(deployment *appsv1.Deployment) {
 

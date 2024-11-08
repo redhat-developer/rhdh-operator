@@ -32,7 +32,6 @@ type BackstageSpec struct {
 	// Valid fragment of Deployment to be merged with default/raw configuration.
 	// Set the Deployment's metadata and|or spec fields you want to override or add.
 	// Optional.
-	// +kubebuilder:pruning:PreserveUnknownFields
 	Deployment *BackstageDeployment `json:"deployment,omitempty"`
 }
 
@@ -129,7 +128,7 @@ type AppConfig struct {
 	// environment variables (which you can set with the ExtraEnvs field) and/or include extra files (see the ExtraFiles field).
 	// More details on https://backstage.io/docs/conf/writing/.
 	// +optional
-	ConfigMaps []FileObjectKeyRef `json:"configMaps,omitempty"`
+	ConfigMaps []FileObjectRef `json:"configMaps,omitempty"`
 }
 
 type ExtraFiles struct {
@@ -142,12 +141,12 @@ type ExtraFiles struct {
 	// For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be mounted as files.
 	// Otherwise, only the specified key will be mounted as a file.
 	// +optional
-	ConfigMaps []FileObjectKeyRef `json:"configMaps,omitempty"`
+	ConfigMaps []FileObjectRef `json:"configMaps,omitempty"`
 
 	// List of references to Secrets objects mounted as extra files under the MountPath specified.
 	// For each item in this array, a key must be specified that will be mounted as a file.
 	// +optional
-	Secrets []FileObjectKeyRef `json:"secrets,omitempty"`
+	Secrets []FileObjectRef `json:"secrets,omitempty"`
 
 	// List of references to Persistent Volume Claim objects mounted as extra files
 	// For each item in this array, a key must be specified that will be mounted as a file.
@@ -160,20 +159,20 @@ type ExtraEnvs struct {
 	// For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be injected as additional environment variables.
 	// Otherwise, only the specified key will be injected as an additional environment variable.
 	// +optional
-	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
+	ConfigMaps []EnvObjectRef `json:"configMaps,omitempty"`
 
 	// List of references to Secrets objects to inject as additional environment variables.
 	// For each item in this array, if a key is not specified, it means that all keys in the Secret will be injected as additional environment variables.
 	// Otherwise, only the specified key will be injected as environment variable.
 	// +optional
-	Secrets []ObjectKeyRef `json:"secrets,omitempty"`
+	Secrets []EnvObjectRef `json:"secrets,omitempty"`
 
 	// List of name and value pairs to add as environment variables.
 	// +optional
 	Envs []Env `json:"envs,omitempty"`
 }
 
-type ObjectKeyRef struct {
+type EnvObjectRef struct {
 	// Name of the object
 	// We support only ConfigMaps and Secrets.
 	//+kubebuilder:validation:Required
@@ -184,9 +183,9 @@ type ObjectKeyRef struct {
 	Key string `json:"key,omitempty"`
 }
 
-type FileObjectKeyRef struct {
+type FileObjectRef struct {
 	// Name of the object
-	// We support only ConfigMaps and Secrets.
+	// Supported ConfigMaps and Secrets
 	//+kubebuilder:validation:Required
 	Name string `json:"name"`
 
@@ -201,7 +200,6 @@ type FileObjectKeyRef struct {
 
 type PvcRef struct {
 	// Name of the object
-	// We support only ConfigMaps and Secrets.
 	//+kubebuilder:validation:Required
 	Name string `json:"name"`
 
