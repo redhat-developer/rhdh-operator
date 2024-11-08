@@ -19,21 +19,16 @@ import (
 type BackstagePvcsFactory struct{}
 
 func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
-	return &BackstagePvcs{mountPath: DefaultMountDir, fromDefaultConf: true}
+	return &BackstagePvcs{fromDefaultConf: true}
 }
 
 func init() {
 	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true)
 }
 
-func addPvc(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) {
+func addPvc(spec bsv1.BackstageSpec, model *BackstageModel) {
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Pvcs == nil || len(spec.Application.ExtraFiles.Pvcs) == 0 {
 		return
-	}
-
-	mp := DefaultMountDir
-	if spec.Application.ExtraFiles.MountPath != "" {
-		mp = spec.Application.ExtraFiles.MountPath
 	}
 
 	for _, pvcSpec := range spec.Application.ExtraFiles.Pvcs {
@@ -42,15 +37,15 @@ func addPvc(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *Backs
 			pvcObj := BackstagePvcs{fromDefaultConf: false}
 			pvcObj.pvcs = &multiobject.MultiObject{}
 			if pvcSpec.MountPath == "" {
-				pvcObj.mountPath = mp
-				pvcObj.fullPath = false
+				pvcObj.mountPath, _ = model.backstageDeployment.mountPath(pvcSpec.MountPath, "", spec.Application.ExtraFiles.MountPath)
+				pvcObj.specifiedInCR = false
 
 			} else {
 				pvcObj.mountPath = pvcSpec.MountPath
-				pvcObj.fullPath = true
+				pvcObj.specifiedInCR = true
 			}
 			pvcObj.pvcs.Items = append(pvcObj.pvcs.Items, &pvc)
-			pvcObj.updatePod(deployment)
+			pvcObj.updatePod(model.backstageDeployment.deployment)
 		}
 	}
 }
@@ -59,7 +54,7 @@ type BackstagePvcs struct {
 	pvcs      *multiobject.MultiObject
 	mountPath string
 	// if false mountPath will be concatenated with pvc name
-	fullPath bool
+	specifiedInCR bool
 	// whether this object is constructed from default config
 	fromDefaultConf bool
 }
@@ -88,7 +83,11 @@ func (b *BackstagePvcs) addToModel(model *BackstageModel, backstage bsv1.Backsta
 	return false, nil
 }
 
-func (b *BackstagePvcs) validate(model *BackstageModel, backstage bsv1.Backstage) error {
+func (b *BackstagePvcs) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
+	b.mountPath = m.backstageDeployment.defaultMountPath()
+
+	b.updatePod(m.backstageDeployment.deployment)
+
 	for _, o := range b.pvcs.Items {
 		_, ok := o.(*corev1.PersistentVolumeClaim)
 		if !ok {
@@ -108,7 +107,6 @@ func (b *BackstagePvcs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sc
 	}
 }
 
-// implementation of BackstagePodContributor interface
 func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
 
 	for _, pvc := range b.pvcs.Items {
@@ -124,11 +122,14 @@ func (b *BackstagePvcs) updatePod(deployment *appsv1.Deployment) {
 		c := &deployment.Spec.Template.Spec.Containers[0]
 		volMount := corev1.VolumeMount{Name: volName}
 
+		// concatenate with volName by default
 		volMount.MountPath = filepath.Join(b.mountPath, volName)
-		if mp, ok := pvc.GetAnnotations()[DefaultMountPathAnnotation]; ok && b.fromDefaultConf {
-			volMount.MountPath = mp
+		// get path from annotation if any for default config
+		if pathFromAnnotation, ok := pvc.GetAnnotations()[DefaultMountPathAnnotation]; ok && b.fromDefaultConf {
+			volMount.MountPath = pathFromAnnotation
 		}
-		if b.fullPath && !b.fromDefaultConf {
+		// get path from CR spec if specified
+		if b.specifiedInCR && !b.fromDefaultConf {
 			volMount.MountPath = b.mountPath
 		}
 

@@ -37,13 +37,13 @@ func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
 }
 
-func addDynamicPlugins(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) error {
+func addDynamicPlugins(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.DynamicPluginsConfigMapName == "" {
 		return nil
 	}
 
-	if _, ic := DynamicPluginsInitContainer(deployment.Spec.Template.Spec.InitContainers); ic == nil {
+	if _, ic := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers); ic == nil {
 		return fmt.Errorf("validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
 	}
 
@@ -53,7 +53,7 @@ func addDynamicPlugins(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, m
 		return fmt.Errorf("dynamic plugin configMap expects exactly one key named '%s' ", DynamicPluginsFile)
 	}
 
-	dp.updatePod(deployment)
+	dp.updatePod(model.backstageDeployment.deployment)
 	return nil
 
 }
@@ -86,7 +86,6 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 	return true, nil
 }
 
-// implementation of BackstagePodContributor interface
 func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
 
 	//it relies on implementation where dynamic-plugin initContainer
@@ -102,7 +101,7 @@ func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
 
 	_, initContainer := DynamicPluginsInitContainer(deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
-		// it will fail on validate
+		// it will fail on updateAndValidate
 		return
 	}
 
@@ -113,7 +112,7 @@ func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-func (p *DynamicPlugins) validate(model *BackstageModel, _ bsv1.Backstage) error {
+func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backstage) error {
 
 	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
@@ -127,6 +126,8 @@ func (p *DynamicPlugins) validate(model *BackstageModel, _ bsv1.Backstage) error
 		// the same way as Backstage's one
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
+
+	p.updatePod(model.backstageDeployment.deployment)
 	return nil
 }
 

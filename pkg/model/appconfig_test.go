@@ -48,7 +48,7 @@ var (
 			Application: &bsv1.Application{
 				AppConfig: &bsv1.AppConfig{
 					MountPath:  "/my/path",
-					ConfigMaps: []bsv1.FileObjectKeyRef{},
+					ConfigMaps: []bsv1.FileObjectRef{},
 				},
 			},
 		},
@@ -71,7 +71,7 @@ func TestDefaultAppConfig(t *testing.T) {
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Contains(t, deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath, DefaultMountDir)
+	assert.Contains(t, deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath, deployment.defaultMountPath())
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))
@@ -83,11 +83,11 @@ func TestSpecifiedAppConfig(t *testing.T) {
 	bs := *appConfigTestBackstage.DeepCopy()
 	bs.Spec.Application.AppConfig.MountPath = "/app/src"
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1.FileObjectKeyRef{Name: appConfigTestCm.Name})
+		bsv1.FileObjectRef{Name: appConfigTestCm.Name})
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1.FileObjectKeyRef{Name: appConfigTestCm2.Name, MountPath: "/my/appconfig"})
+		bsv1.FileObjectRef{Name: appConfigTestCm2.Name, MountPath: "/my/appconfig"})
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1.FileObjectKeyRef{Name: appConfigTestCm3.Name, Key: "conf31.yaml"})
+		bsv1.FileObjectRef{Name: appConfigTestCm3.Name, Key: "conf31.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	testObj.externalConfig.AppConfigs = map[string]corev1.ConfigMap{appConfigTestCm.Name: appConfigTestCm, appConfigTestCm2.Name: appConfigTestCm2,
@@ -120,7 +120,7 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 
 	bs := *appConfigTestBackstage.DeepCopy()
 	cms := &bs.Spec.Application.AppConfig.ConfigMaps
-	*cms = append(*cms, bsv1.FileObjectKeyRef{Name: appConfigTestCm.Name})
+	*cms = append(*cms, bsv1.FileObjectRef{Name: appConfigTestCm.Name})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
 

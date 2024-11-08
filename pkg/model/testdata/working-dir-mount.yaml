@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ""
+spec:
+#  selector:
+#    matchLabels:
+#      backstage.io/app:  #
+  template:
+#    metadata:
+#      labels:
+#        backstage.io/app:  #
+    spec:
+      containers:
+        - name: backstage-backend
+          image: ghcr.io/backstage/backstage
+          workingDir: "/my/home"
+
+
+
+
+

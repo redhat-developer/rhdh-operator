@@ -25,7 +25,7 @@ var (
 			Application: &bsv1.Application{
 				ExtraFiles: &bsv1.ExtraFiles{
 					MountPath: "/my/path",
-					Secrets:   []bsv1.FileObjectKeyRef{},
+					Secrets:   []bsv1.FileObjectRef{},
 				},
 			},
 		},
@@ -54,11 +54,11 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	// 0 - expected subPath="conf.yaml", expected mountPath=/
-	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
-	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret2", MountPath: "/custom/path"})
+	// 0 - expected subPath="conf.yaml", expected defaultMountPath=/
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret2", MountPath: "/custom/path"})
 	// https://issues.redhat.com/browse/RHIDP-2246 - mounting secret/CM with dot in the name
-	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret.dot", Key: "conf3.yaml"})
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret.dot", Key: "conf3.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -98,11 +98,11 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 func TestFailedValidation(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret1"})
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
-	assert.EqualError(t, err, "failed object validation, reason: key is required if mountPath is not specified for secret secret1")
+	assert.EqualError(t, err, "key is required if defaultMountPath is not specified for secret secret1")
 
 }
 
@@ -110,7 +110,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectKeyRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
 	testObj.externalConfig.ExtraFileSecrets = map[string]corev1.Secret{"secret1": corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret1"}, StringData: map[string]string{"conf.yaml": ""}}}

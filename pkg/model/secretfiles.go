@@ -18,7 +18,7 @@ import (
 type SecretFilesFactory struct{}
 
 func (f SecretFilesFactory) newBackstageObject() RuntimeObject {
-	return &SecretFiles{MountPath: DefaultMountDir, withSubPath: true}
+	return &SecretFiles{withSubPath: true}
 }
 
 type SecretFiles struct {
@@ -32,7 +32,7 @@ func init() {
 	registerConfig("secret-files.yaml", SecretFilesFactory{}, false)
 }
 
-func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, model *BackstageModel) error {
+func addSecretFiles(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
 		return nil
@@ -41,11 +41,10 @@ func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, mode
 	for _, sec := range spec.Application.ExtraFiles.Secrets {
 
 		if sec.MountPath == "" && sec.Key == "" {
-			return fmt.Errorf("key is required if mountPath is not specified for secret %s", sec.Name)
+			return fmt.Errorf("key is required if defaultMountPath is not specified for secret %s", sec.Name)
 		}
 
-		mp, wSubpath := GetMountPath(sec, spec.Application.ExtraFiles.MountPath)
-
+		mp, wSubpath := model.backstageDeployment.mountPath(sec.MountPath, sec.Key, spec.Application.ExtraFiles.MountPath)
 		efs := model.ExternalConfig.ExtraFileSecrets[sec.Name]
 		sf := SecretFiles{
 			Secret:      &efs,
@@ -53,7 +52,7 @@ func addSecretFiles(spec bsv1.BackstageSpec, deployment *appsv1.Deployment, mode
 			Key:         sec.Key,
 			withSubPath: wSubpath,
 		}
-		sf.updatePod(deployment)
+		sf.updatePod(model.backstageDeployment.deployment)
 	}
 	return nil
 }
@@ -85,7 +84,9 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool,
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) validate(_ *BackstageModel, _ bsv1.Backstage) error {
+func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+	p.MountPath = m.backstageDeployment.defaultMountPath()
+	p.updatePod(m.backstageDeployment.deployment)
 	return nil
 }
 
@@ -94,7 +95,6 @@ func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sche
 	setMetaInfo(p.Secret, backstage, scheme)
 }
 
-// implementation of BackstagePodContributor interface
 func (p *SecretFiles) updatePod(depoyment *appsv1.Deployment) {
 
 	utils.MountFilesFrom(&depoyment.Spec.Template.Spec, &depoyment.Spec.Template.Spec.Containers[0], utils.SecretObjectKind,

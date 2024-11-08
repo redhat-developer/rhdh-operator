@@ -827,7 +827,7 @@ spec:
                             name:
                               description: |-
                                 Name of the object
-                                We support only ConfigMaps and Secrets.
+                                Supported ConfigMaps and Secrets
                               type: string
                           required:
                           - name
@@ -926,7 +926,7 @@ spec:
                             name:
                               description: |-
                                 Name of the object
-                                We support only ConfigMaps and Secrets.
+                                Supported ConfigMaps and Secrets
                               type: string
                           required:
                           - name
@@ -948,9 +948,7 @@ spec:
                                 will be used
                               type: string
                             name:
-                              description: |-
-                                Name of the object
-                                We support only ConfigMaps and Secrets.
+                              description: Name of the object
                               type: string
                           required:
                           - name
@@ -972,7 +970,7 @@ spec:
                             name:
                               description: |-
                                 Name of the object
-                                We support only ConfigMaps and Secrets.
+                                Supported ConfigMaps and Secrets
                               type: string
                           required:
                           - name
@@ -1087,7 +1085,6 @@ spec:
                       Optional.
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
-                x-kubernetes-preserve-unknown-fields: true
               rawRuntimeConfig:
                 description: Raw Runtime RuntimeObjects configuration. For Advanced
                   scenarios.
