@@ -30,7 +30,7 @@ type PodMutator struct {
 // fileName - file name which fits one of the object's key, otherwise error will be returned.
 // withSubPath - if true will be mounted file-by-file with subpath, otherwise will be mounted as directory to specified path
 // data - key:value pairs from the object. should be specified if fileName specified
-func MountFilesFrom(podSpec *corev1.PodSpec, container *corev1.Container, kind ObjectKind, objectName, mountPath, fileName string, withSubPath bool, data map[string]string) {
+func MountFilesFrom(podSpec *corev1.PodSpec, container *corev1.Container, kind ObjectKind, objectName, mountPath, fileName string, withSubPath bool, dataKeys []string) {
 
 	volName := GenerateVolumeNameFromCmOrSecret(objectName)
 	volSrc := corev1.VolumeSource{}
@@ -55,8 +55,8 @@ func MountFilesFrom(podSpec *corev1.PodSpec, container *corev1.Container, kind O
 		return
 	}
 
-	if data != nil {
-		for file := range data {
+	if dataKeys != nil && len(dataKeys) > 0 {
+		for _, file := range dataKeys {
 			if fileName == "" || fileName == file {
 				vm := corev1.VolumeMount{Name: volName, MountPath: filepath.Join(mountPath, file), SubPath: file, ReadOnly: true}
 				container.VolumeMounts = append(container.VolumeMounts, vm)

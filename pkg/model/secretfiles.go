@@ -3,6 +3,8 @@ package model
 import (
 	"fmt"
 
+	"golang.org/x/exp/maps"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,41 +18,34 @@ import (
 type SecretFilesFactory struct{}
 
 func (f SecretFilesFactory) newBackstageObject() RuntimeObject {
-	return &SecretFiles{withSubPath: true}
+	return &SecretFiles{}
 }
 
 type SecretFiles struct {
-	Secret      *corev1.Secret
-	MountPath   string
-	Key         string
-	withSubPath bool
+	Secret *corev1.Secret
 }
 
 func init() {
 	registerConfig("secret-files.yaml", SecretFilesFactory{}, false)
 }
 
-func addSecretFiles(spec bsv1.BackstageSpec, model *BackstageModel) error {
+func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
 		return nil
 	}
 
-	for _, sec := range spec.Application.ExtraFiles.Secrets {
+	for _, specSec := range spec.Application.ExtraFiles.Secrets {
 
-		if sec.MountPath == "" && sec.Key == "" {
-			return fmt.Errorf("key is required if defaultMountPath is not specified for secret %s", sec.Name)
+		if specSec.MountPath == "" && specSec.Key == "" {
+			return fmt.Errorf("key is required if defaultMountPath is not specified for secret %s", specSec.Name)
 		}
+		mp, wSubpath := model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
 
-		mp, wSubpath := model.backstageDeployment.mountPath(sec.MountPath, sec.Key, spec.Application.ExtraFiles.MountPath)
-		efs := model.ExternalConfig.ExtraFileSecrets[sec.Name]
-		sf := SecretFiles{
-			Secret:      &efs,
-			MountPath:   mp,
-			Key:         sec.Key,
-			withSubPath: wSubpath,
-		}
-		sf.updatePod(model.backstageDeployment)
+		keys := append(maps.Keys(model.ExternalConfig.ExtraFileSecrets[specSec.Name].Data),
+			maps.Keys(model.ExternalConfig.ExtraFileSecrets[specSec.Name].StringData)...)
+		utils.MountFilesFrom(&model.backstageDeployment.deployment.Spec.Template.Spec, model.backstageDeployment.container(), utils.SecretObjectKind,
+			specSec.Name, mp, specSec.Key, wSubpath, keys)
 	}
 	return nil
 }
@@ -83,18 +78,15 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool,
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
-	p.MountPath = m.backstageDeployment.defaultMountPath()
-	p.updatePod(m.backstageDeployment)
+
+	keys := append(maps.Keys(p.Secret.Data), maps.Keys(p.Secret.StringData)...)
+	utils.MountFilesFrom(&m.backstageDeployment.deployment.Spec.Template.Spec, m.backstageDeployment.container(), utils.SecretObjectKind,
+		p.Secret.Name, m.backstageDeployment.defaultMountPath(), "", true, keys)
 	return nil
 }
 
+// implementation of RuntimeObject interface
 func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	p.Secret.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files"))
 	setMetaInfo(p.Secret, backstage, scheme)
-}
-
-func (p *SecretFiles) updatePod(bsd *BackstageDeployment) {
-
-	utils.MountFilesFrom(&bsd.deployment.Spec.Template.Spec, bsd.container(), utils.SecretObjectKind,
-		p.Secret.Name, p.MountPath, p.Key, p.withSubPath, p.Secret.StringData)
 }

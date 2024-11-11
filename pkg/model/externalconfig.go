@@ -43,7 +43,8 @@ func NewExternalConfig() ExternalConfig {
 
 func (e *ExternalConfig) GetHash() string {
 	h := sha256.New()
-	h.Write([]byte(e.syncedContent))
+	h.Write(e.syncedContent)
+	h.Reset()
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
@@ -56,4 +57,62 @@ func (e *ExternalConfig) AddToSyncedConfig(content client.Object) error {
 
 	e.syncedContent = append(e.syncedContent, d...)
 	return nil
+}
+
+//func (e *ExternalConfig) AddToSyncedConfig(obj client.Object) error {
+//
+//	stringData := map[string]string{}
+//	binaryData := map[string][]byte{}
+//
+//	switch v := obj.(type) {
+//	case *corev1.ConfigMap:
+//		stringData = v.Data
+//		binaryData = v.BinaryData
+//	case *corev1.Secret:
+//		stringData = v.StringData
+//		binaryData = v.Data
+//	default:
+//		return fmt.Errorf("unsupported value type: %v", v)
+//	}
+//
+//	for k, v := range stringData {
+//		e.syncedContent = append(e.syncedContent, []byte(k+v)...)
+//	}
+//
+//	for k, v := range binaryData {
+//		e.syncedContent = append(e.syncedContent, []byte(k)...)
+//		e.syncedContent = append(e.syncedContent, v...)
+//	}
+//	return nil
+//}
+
+func concatData(original []byte, obj client.Object) []byte {
+
+	data := original
+	stringData := map[string]string{}
+	binaryData := map[string][]byte{}
+
+	switch v := obj.(type) {
+	case *corev1.ConfigMap:
+		stringData = v.Data
+		binaryData = v.BinaryData
+	case *corev1.Secret:
+		stringData = v.StringData
+		binaryData = v.Data
+		//default:
+		//	return fmt.Errorf("unsupported value type: %v", v)
+	}
+
+	for k, v := range stringData {
+		//h.Sum([]byte(k + v))
+		data = append(data, []byte(k+v)...)
+	}
+
+	for k, v := range binaryData {
+		//h.Sum([]byte(k))
+		//h.Sum(v)
+		data = append(data, []byte(k)...)
+		data = append(data, v...)
+	}
+	return data
 }

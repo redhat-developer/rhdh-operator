@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
@@ -96,6 +97,9 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 
+	testObj.externalConfig.ExtraFileConfigMaps = map[string]corev1.ConfigMap{}
+	testObj.externalConfig.ExtraFileConfigMaps[appConfigTestCm.Name] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: appConfigTestCm.Name}, BinaryData: map[string][]byte{"conf1.yaml": []byte("data")}}
+
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
@@ -107,5 +111,30 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 0, len(deployment.container().Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
+
+}
+
+func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
+
+	bs := *configMapFilesTestBackstage.DeepCopy()
+	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm1"})
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	testObj.externalConfig.ExtraFileConfigMaps = map[string]corev1.ConfigMap{}
+	testObj.externalConfig.ExtraFileConfigMaps["cm1"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm1"}, BinaryData: map[string][]byte{"conf1.yaml": []byte("data")}}
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.True(t, len(model.RuntimeObjects) > 0)
+
+	deployment := model.backstageDeployment
+	assert.NotNil(t, deployment)
+
+	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
+	// file name (cm.Data.key) is expected to be a part of mountPath
+	assert.Equal(t, filepath.Join("/my/path", "conf1.yaml"), deployment.container().VolumeMounts[0].MountPath)
 
 }
