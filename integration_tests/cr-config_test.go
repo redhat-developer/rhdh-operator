@@ -199,7 +199,7 @@ var _ = When("create backstage with CR configured", func() {
 
 	})
 
-	It("creates default Backstage and then update CR", func() {
+	It("creates default Backstage and then update this CR", func() {
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
 

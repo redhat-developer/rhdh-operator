@@ -90,7 +90,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 	if b.deployment.Spec.Template.ObjectMeta.Annotations == nil {
 		b.deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{}
 	}
-	b.deployment.Spec.Template.ObjectMeta.Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.GetHash()
+	b.deployment.Spec.Template.ObjectMeta.Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
 
 	model.backstageDeployment = b
 	model.setRuntimeObject(b)

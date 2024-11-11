@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
@@ -62,10 +60,10 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	testObj.externalConfig.ExtraFileSecrets = map[string]corev1.Secret{}
-	testObj.externalConfig.ExtraFileSecrets["secret1"] = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret1"} /*, StringData: map[string]string{"conf.yaml": "data"}*/} // no data possible if no permissions to read the Secret
-	testObj.externalConfig.ExtraFileSecrets["secret2"] = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret2"}, StringData: map[string]string{"conf.yaml": "data"}}
-	testObj.externalConfig.ExtraFileSecrets["secret.dot"] = corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret.dot"}, Data: map[string][]byte{"conf3.yaml": []byte("data")}}
+	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileSecretKeys["secret1"] = NewDataObjectKeys(nil, nil)
+	testObj.externalConfig.ExtraFileSecretKeys["secret2"] = NewDataObjectKeys(map[string]string{"conf.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileSecretKeys["secret.dot"] = NewDataObjectKeys(nil, map[string][]byte{"conf3.yaml": []byte("data")})
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -113,7 +111,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
-	testObj.externalConfig.ExtraFileSecrets = map[string]corev1.Secret{"secret1": corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret1"}, StringData: map[string]string{"conf.yaml": ""}}}
+	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(map[string]string{"conf.yaml": ""}, nil)}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -137,7 +135,7 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
-	testObj.externalConfig.ExtraFileSecrets = map[string]corev1.Secret{"secret1": corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret1"}, Data: map[string][]byte{"conf.yaml": []byte("")}}}
+	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(nil, map[string][]byte{"conf.yaml": []byte("")})}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 

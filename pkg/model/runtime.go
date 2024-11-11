@@ -186,7 +186,7 @@ func addFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
 	if err := addSecretEnvsFromSpec(spec, model); err != nil {
 		return err
 	}
-	addPvc(spec, model)
+	addPvcsFromSpec(spec, model)
 	return nil
 }
 

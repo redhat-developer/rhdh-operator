@@ -2,9 +2,12 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"strconv"
+
+	"golang.org/x/exp/maps"
 
 	"k8s.io/client-go/util/retry"
 
@@ -34,11 +37,14 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 
 	result := model.NewExternalConfig()
 
+	hashingData := []byte{}
+	var err error
+
 	// Process RawConfig
 	if bsSpec.RawRuntimeConfig != nil {
 		if bsSpec.RawRuntimeConfig.BackstageConfigName != "" {
 			cm := &corev1.ConfigMap{}
-			if err := r.checkExternalObject(ctx, cm, bsSpec.RawRuntimeConfig.BackstageConfigName, ns); err != nil {
+			if err = r.checkExternalObject(ctx, cm, bsSpec.RawRuntimeConfig.BackstageConfigName, ns); err != nil {
 				return result, err
 			}
 			for key, value := range cm.Data {
@@ -47,7 +53,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 		}
 		if bsSpec.RawRuntimeConfig.LocalDbConfigName != "" {
 			cm := &corev1.ConfigMap{}
-			if err := r.checkExternalObject(ctx, cm, bsSpec.RawRuntimeConfig.LocalDbConfigName, ns); err != nil {
+			if err = r.checkExternalObject(ctx, cm, bsSpec.RawRuntimeConfig.LocalDbConfigName, ns); err != nil {
 				return result, err
 			}
 			for key, value := range cm.Data {
@@ -63,55 +69,56 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	// Process AppConfigs
 	if bsSpec.Application.AppConfig != nil {
 		for _, ac := range bsSpec.Application.AppConfig.ConfigMaps {
-			cm := &corev1.ConfigMap{}
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ac.Name, ns, addToWatch(ac)); err != nil {
+			cm := &corev1.ConfigMap{Data: map[string]string{}}
+			if hashingData, err = r.addExtConfig(&result, ctx, cm, backstage.Name, ac.Name, ns, addToWatch(ac), hashingData); err != nil {
 				return result, err
 			}
-			result.AppConfigs[ac.Name] = *cm
+			result.AppConfigKeys[ac.Name] = maps.Keys(cm.Data)
 		}
 	}
 
 	// Process ConfigMapFiles
 	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.ConfigMaps != nil {
 		for _, ef := range bsSpec.Application.ExtraFiles.ConfigMaps {
-			cm := &corev1.ConfigMap{}
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ef.Name, ns, addToWatch(ef)); err != nil {
+			cm := &corev1.ConfigMap{Data: map[string]string{}, BinaryData: map[string][]byte{}}
+			if hashingData, err = r.addExtConfig(&result, ctx, cm, backstage.Name, ef.Name, ns, addToWatch(ef), hashingData); err != nil {
 				return result, err
 			}
-			result.ExtraFileConfigMaps[cm.Name] = *cm
+			result.ExtraFileConfigMapKeys[ef.Name] = model.NewDataObjectKeys(cm.Data, cm.BinaryData)
 		}
 	}
 
 	// Process SecretFiles
 	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.Secrets != nil {
 		for _, ef := range bsSpec.Application.ExtraFiles.Secrets {
-			secret := &corev1.Secret{}
-			if err := r.addExtConfig(&result, ctx, secret, backstage.Name, ef.Name, ns, addToWatch(ef)); err != nil {
+			secret := &corev1.Secret{Data: map[string][]byte{}, StringData: map[string]string{}}
+			if hashingData, err = r.addExtConfig(&result, ctx, secret, backstage.Name, ef.Name, ns, addToWatch(ef), hashingData); err != nil {
 				return result, err
 			}
-			result.ExtraFileSecrets[secret.Name] = *secret
+			result.ExtraFileSecretKeys[ef.Name] = model.NewDataObjectKeys(secret.StringData, secret.Data)
 		}
 	}
 
 	// Process ConfigMapEnvs
 	if bsSpec.Application.ExtraEnvs != nil && bsSpec.Application.ExtraEnvs.ConfigMaps != nil {
 		for _, ee := range bsSpec.Application.ExtraEnvs.ConfigMaps {
-			cm := &corev1.ConfigMap{}
-			if err := r.addExtConfig(&result, ctx, cm, backstage.Name, ee.Name, ns, true); err != nil {
+			cm := &corev1.ConfigMap{Data: map[string]string{}, BinaryData: map[string][]byte{}}
+			if hashingData, err = r.addExtConfig(&result, ctx, cm, backstage.Name, ee.Name, ns, true, hashingData); err != nil {
 				return result, err
 			}
-			result.ExtraEnvConfigMaps[cm.Name] = *cm
+			result.ExtraEnvConfigMapKeys[ee.Name] = model.NewDataObjectKeys(cm.Data, cm.BinaryData)
 		}
 	}
 
 	// Process SecretEnvs
 	if bsSpec.Application.ExtraEnvs != nil && bsSpec.Application.ExtraEnvs.Secrets != nil {
 		for _, ee := range bsSpec.Application.ExtraEnvs.Secrets {
-			secret := &corev1.Secret{}
-			if err := r.addExtConfig(&result, ctx, secret, backstage.Name, ee.Name, ns, true); err != nil {
+			secret := &corev1.Secret{Data: map[string][]byte{}, StringData: map[string]string{}}
+			if hashingData, err = r.addExtConfig(&result, ctx, secret, backstage.Name, ee.Name, ns, true, hashingData); err != nil {
 				return result, err
 			}
-			result.ExtraEnvSecrets[secret.Name] = *secret
+			//result.ExtraEnvSecrets[secret.Name] = *secret
+			result.ExtraEnvSecretKeys[ee.Name] = model.NewDataObjectKeys(secret.StringData, secret.Data)
 		}
 	}
 
@@ -122,18 +129,23 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 			if err := r.checkExternalObject(ctx, pvc, ep.Name, ns); err != nil {
 				return result, err
 			}
-			result.ExtraPvcs[pvc.Name] = *pvc
+			//result.ExtraPvcs[pvc.Name] = *pvc
+			result.ExtraPvcKeys = append(result.ExtraPvcKeys, pvc.Name)
 		}
 	}
 
 	// Process DynamicPlugins
 	if bsSpec.Application.DynamicPluginsConfigMapName != "" {
 		cm := &corev1.ConfigMap{}
-		if err := r.addExtConfig(&result, ctx, cm, backstage.Name, bsSpec.Application.DynamicPluginsConfigMapName, ns, true); err != nil {
+		if hashingData, err = r.addExtConfig(&result, ctx, cm, backstage.Name, bsSpec.Application.DynamicPluginsConfigMapName, ns, true, hashingData); err != nil {
 			return result, err
 		}
 		result.DynamicPlugins = *cm
 	}
+
+	hash := sha256.New()
+	hash.Write(hashingData)
+	result.WatchingHash = fmt.Sprintf("%x", hash.Sum(nil))
 
 	return result, nil
 }
@@ -141,12 +153,12 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 // addExtConfig makes object watchable by Operator adding ExtConfigSyncLabel label and BackstageNameAnnotation
 // and adding its content (marshalled object) to make it watchable by Operator and able to refresh the Pod if needed
 // (Pod refresh will be called if external configuration hash changed)
-func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx context.Context, obj client.Object, backstageName, objectName, ns string, addToWatch bool) error {
+func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx context.Context, obj client.Object, backstageName, objectName, ns string, addToWatch bool, hashingData []byte) ([]byte, error) {
 
 	lg := log.FromContext(ctx)
 
 	if !addToWatch {
-		return r.checkExternalObject(ctx, obj, objectName, ns)
+		return hashingData, r.checkExternalObject(ctx, obj, objectName, ns)
 	}
 
 	// use RetryOnConflict to avoid possible Conflict error which may be caused mostly by other call of this function
@@ -181,14 +193,11 @@ func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx con
 			lg.V(1).Info(fmt.Sprintf("update external config %s with label %s=%s and annotation %s=%s", obj.GetName(), model.ExtConfigSyncLabel, strconv.FormatBool(autoSync), model.BackstageNameAnnotation, backstageName))
 		}
 
-		if err := config.AddToSyncedConfig(obj); err != nil {
-			return fmt.Errorf("failed to add to synced %s: %s", obj.GetName(), err)
-		}
-
 		return nil
 
 	})
-	return err
+
+	return concatData(hashingData, obj), err
 }
 
 func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj client.Object, objectName, ns string) error {
@@ -207,4 +216,30 @@ func addToWatch(fileObjectRef bsv1.FileObjectRef) bool {
 		return true
 	}
 	return false
+}
+
+func concatData(original []byte, obj client.Object) []byte {
+	data := original
+	stringData := map[string]string{}
+	binaryData := map[string][]byte{}
+
+	switch v := obj.(type) {
+	case *corev1.ConfigMap:
+		stringData = v.Data
+		binaryData = v.BinaryData
+	case *corev1.Secret:
+		stringData = v.StringData
+		binaryData = v.Data
+	}
+
+	for k, v := range stringData {
+		data = append(data, []byte(k+v)...)
+	}
+
+	for k, v := range binaryData {
+		data = append(data, []byte(k)...)
+		data = append(data, v...)
+	}
+
+	return data
 }

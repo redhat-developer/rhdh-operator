@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"golang.org/x/exp/maps"
@@ -46,12 +45,9 @@ func addAppConfigsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error
 	}
 
 	for _, specCm := range spec.Application.AppConfig.ConfigMaps {
-		if model.ExternalConfig.AppConfigs[specCm.Name].BinaryData != nil && len(model.ExternalConfig.AppConfigs[specCm.Name].BinaryData) > 0 {
-			return fmt.Errorf("BinaryData is not expected in appConfig.ConfigMap: %s", specCm.Name)
-		}
 		mp, wSubpath := model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
 		updatePodWithAppConfig(model.backstageDeployment.deployment, model.backstageDeployment.container(), specCm.Name,
-			mp, specCm.Key, wSubpath, model.ExternalConfig.AppConfigs[specCm.Name].Data)
+			mp, specCm.Key, wSubpath /*model.ExternalConfig.AppConfigs[specCm.Name].Data*/, model.ExternalConfig.AppConfigKeys[specCm.Name])
 	}
 	return nil
 }
@@ -85,7 +81,7 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 
 // implementation of RuntimeObject interface
 func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
-	updatePodWithAppConfig(m.backstageDeployment.deployment, m.backstageDeployment.container(), b.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, b.ConfigMap.Data)
+	updatePodWithAppConfig(m.backstageDeployment.deployment, m.backstageDeployment.container(), b.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
 	return nil
 }
 
@@ -95,11 +91,11 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 }
 
 // updatePodWithAppConfig contrubutes to Volumes, container.VolumeMounts and contaiter.Args
-func updatePodWithAppConfig(deployment *appsv1.Deployment, container *corev1.Container, cmName, mountPath, key string, withSubPath bool, cmData map[string]string) {
+func updatePodWithAppConfig(deployment *appsv1.Deployment, container *corev1.Container, cmName, mountPath, key string, withSubPath bool, cmData []string) {
 	utils.MountFilesFrom(&deployment.Spec.Template.Spec, container, utils.ConfigMapObjectKind,
-		cmName, mountPath, key, withSubPath, maps.Keys(cmData))
+		cmName, mountPath, key, withSubPath, cmData)
 
-	for file := range cmData {
+	for _, file := range cmData {
 		if key == "" || key == file {
 			container.Args = append(container.Args, []string{"--config", filepath.Join(mountPath, file)}...)
 		}

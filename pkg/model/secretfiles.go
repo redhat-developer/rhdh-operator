@@ -41,9 +41,7 @@ func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) erro
 			return fmt.Errorf("key is required if defaultMountPath is not specified for secret %s", specSec.Name)
 		}
 		mp, wSubpath := model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
-
-		keys := append(maps.Keys(model.ExternalConfig.ExtraFileSecrets[specSec.Name].Data),
-			maps.Keys(model.ExternalConfig.ExtraFileSecrets[specSec.Name].StringData)...)
+		keys := model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
 		utils.MountFilesFrom(&model.backstageDeployment.deployment.Spec.Template.Spec, model.backstageDeployment.container(), utils.SecretObjectKind,
 			specSec.Name, mp, specSec.Key, wSubpath, keys)
 	}

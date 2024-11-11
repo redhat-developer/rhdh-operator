@@ -272,7 +272,7 @@ func (r *BackstageReconciler) requestByLabel(ctx context.Context, object client.
 		return []reconcile.Request{}
 	}
 
-	newHash := ec.GetHash()
+	newHash := ec.WatchingHash
 	oldHash := deploy.Spec.Template.ObjectMeta.GetAnnotations()[model.ExtConfigHashAnnotation]
 	if newHash == oldHash {
 		lg.V(1).Info("request by label, hash are equal", "hash", newHash)

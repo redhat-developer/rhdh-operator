@@ -7,8 +7,6 @@ import (
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-	corev1 "k8s.io/api/core/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -59,10 +57,10 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	testObj.externalConfig.ExtraFileConfigMaps = map[string]corev1.ConfigMap{}
-	testObj.externalConfig.ExtraFileConfigMaps["cm1"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm1"}, Data: map[string]string{"conf1.yaml": "data"}}
-	testObj.externalConfig.ExtraFileConfigMaps["cm2"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm2"}, Data: map[string]string{"conf2.yaml": "data"}}
-	testObj.externalConfig.ExtraFileConfigMaps["cm3"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm3"}, Data: map[string]string{"conf3.yaml": "data"}}
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm1"] = NewDataObjectKeys(map[string]string{"conf1.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm2"] = NewDataObjectKeys(map[string]string{"conf2.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm3"] = NewDataObjectKeys(map[string]string{"conf3.yaml": "data"}, nil)
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -97,8 +95,8 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 
-	testObj.externalConfig.ExtraFileConfigMaps = map[string]corev1.ConfigMap{}
-	testObj.externalConfig.ExtraFileConfigMaps[appConfigTestCm.Name] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: appConfigTestCm.Name}, BinaryData: map[string][]byte{"conf1.yaml": []byte("data")}}
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys[appConfigTestCm.Name] = NewDataObjectKeys(nil, map[string][]byte{"conf1.yaml": []byte("data")})
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -122,8 +120,8 @@ func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	testObj.externalConfig.ExtraFileConfigMaps = map[string]corev1.ConfigMap{}
-	testObj.externalConfig.ExtraFileConfigMaps["cm1"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm1"}, BinaryData: map[string][]byte{"conf1.yaml": []byte("data")}}
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm1"] = NewDataObjectKeys(nil, map[string][]byte{"conf1.yaml": []byte("data")})
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
