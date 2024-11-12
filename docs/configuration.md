@@ -330,7 +330,7 @@ spec:
   application:
     extraFiles:
       mountPath: /my/path
-      pods:
+      pvcs:
         - name: myclaim1
         - name: myclaim2
           mountPath: /vol/my/claim
