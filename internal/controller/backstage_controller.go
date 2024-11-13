@@ -43,6 +43,14 @@ import (
 
 const (
 	BackstageFieldManager = "backstage-controller"
+
+	// AutoSyncEnvVar: EXT_CONF_SYNC_backstage env variable which defines the value for rhdh.redhat.com/ext-config-sync annotation of external config object (ConfigMap|Secret)
+	// True by default
+	AutoSyncEnvVar = "EXT_CONF_SYNC_backstage"
+
+	// WatchExtConfig: WATCH_EXT_CONF_backstage if false disables watching external config objects (ConfigMaps|Secrets)
+	// True by default
+	WatchExtConfig = "WATCH_EXT_CONF_backstage"
 )
 
 var watchedConfigSelector = metav1.LabelSelector{
@@ -307,8 +315,11 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	})
 
 	b := ctrl.NewControllerManagedBy(mgr).
-		For(&bs.Backstage{}).
-		WatchesMetadata(
+		For(&bs.Backstage{})
+
+	// Watch in all the cases but WatchExtConfig == false
+	if utils.BoolEnvVar(WatchExtConfig, true) {
+		b.WatchesMetadata(
 			secretMeta,
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 				return r.requestByLabel(ctx, o)
@@ -319,17 +330,17 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				//CreateFunc: func(e event.CreateEvent) bool { return true },
 			}),
 		).
-		WatchesMetadata(
-			configMapMeta,
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-				return r.requestByLabel(ctx, o)
-			}),
-			builder.WithPredicates(pred, predicate.Funcs{
-				DeleteFunc: func(e event.DeleteEvent) bool { return true },
-				UpdateFunc: func(e event.UpdateEvent) bool { return true },
-				//CreateFunc: func(e event.CreateEvent) bool { return true },
-			}))
-
+			WatchesMetadata(
+				configMapMeta,
+				handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+					return r.requestByLabel(ctx, o)
+				}),
+				builder.WithPredicates(pred, predicate.Funcs{
+					DeleteFunc: func(e event.DeleteEvent) bool { return true },
+					UpdateFunc: func(e event.UpdateEvent) bool { return true },
+					//CreateFunc: func(e event.CreateEvent) bool { return true },
+				}))
+	}
 	return b.Complete(r)
 }
 

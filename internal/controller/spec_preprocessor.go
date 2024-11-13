@@ -25,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const AutoSyncEnvVar = "EXT_CONF_SYNC_backstage"
-
 // Add additional details to the Backstage Spec helping in making Backstage RuntimeObjects Model
 // Validates Backstage Spec and fails fast if something not correct
 func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1.Backstage) (model.ExternalConfig, error) {
