@@ -373,7 +373,7 @@ https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogTy
 
 Or run this:
 
-echo \"apiVersion: rhdh.redhat.com/v1alpha2
+echo \"apiVersion: rhdh.redhat.com/v1alpha3
 kind: Backstage
 metadata:
   name: developer-hub
