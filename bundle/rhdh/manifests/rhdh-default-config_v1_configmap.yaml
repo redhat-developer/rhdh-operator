@@ -5,8 +5,8 @@ data:
     \   backend:\n      auth:\n        externalAccess:\n          - type: legacy\n
     \           options:\n              subject: legacy-default-config\n              #
     This is a default value, which you should change by providing your own app-config\n
-    \             secret: \"pl4s3Ch4ng3M3\"\n    auth:\n      providers:\n        github:
-    {}\n    auditLog:\n      rotateFile:\n        enabled: true\n        \n"
+    \             secret: \"pl4s3Ch4ng3M3\"\n    auth:\n      providers: {}\n    auditLog:\n
+    \     rotateFile:\n        enabled: true\n        \n"
   db-secret.yaml: |-
     apiVersion: v1
     kind: Secret
