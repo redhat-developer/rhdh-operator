@@ -45,8 +45,6 @@ func updateConfigMap(t *testing.T) BackstageReconciler {
 	extConf, err := rc.preprocessSpec(ctx, bs)
 	assert.NoError(t, err)
 
-	//assert.NotNil(t, extConf.AppConfigs["cm1"].Labels)
-	//assert.Equal(t, 1, len(extConf.AppConfigs["cm1"].Labels))
 	oldHash := extConf.WatchingHash
 
 	// Update ConfigMap with new data

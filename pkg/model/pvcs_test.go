@@ -63,22 +63,6 @@ func TestDefaultPvcs(t *testing.T) {
 }
 
 func TestSpecifiedPvcs(t *testing.T) {
-
-	//pvc1 := corev1.PersistentVolumeClaim{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name: "my-pvc1",
-	//	},
-	//}
-	//
-	//pvc2 := corev1.PersistentVolumeClaim{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name: "my-pvc2",
-	//		Annotations: map[string]string{
-	//			"rhdh.redhat.com/mount-path": "/will/be/ignored",
-	//		},
-	//	},
-	//}
-
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pvc",
