@@ -243,7 +243,7 @@ spec:
                 - name: RELATED_IMAGE_backstage
                   value: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9:1.2
                 - name: RELATED_IMAGE_postgresql
-                  value: registry.redhat.io/rhel9/postgresql-15:latest
+                  value: registry.redhat.io/rhel9/postgresql-15:1-78.1729775645
                 command:
                 - /manager
                 image: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-rhel9-operator:1.2
