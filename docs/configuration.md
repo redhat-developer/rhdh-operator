@@ -295,7 +295,8 @@ In our example, the following files will be mounted:
 
 Since **v1alpha3** (Operator version **0.4.0**), it is also possible to mount directory from pre-created [PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) using **spec.application.extraFiles.pvcs** field. PersistentVolumeClaims are mounted as a directory to the container's path defined as following:
 * **spec.application.extraFiles.pvcs[].mountPath** if defined
-* Otherwise **spec.application.extraFiles.mountPath**/<pvc-name> 
+* Then **spec.application.extraFiles.mountPath**/<pvc-name> if defined
+* Then Backstage container's **WorkingDir** if defined
 * And if nothing defined it falls to default path (**/opt/app-root/src**)
 
 For example, consider the following objects in the namespace:

@@ -10,7 +10,7 @@ The Operator provides clear and flexible configuration options to satisfy a wide
 ## Getting Started
 
 ### Prerequisites
-- go version v1.21.0+
+- go version v1.22.0+
 
 ### To Deploy on the cluster
 You’ll need a Kubernetes or OpenShift cluster. You can use [Minikube](https://minikube.sigs.k8s.io/docs/) or [KIND](https://sigs.k8s.io/kind) for local testing, or deploy to a remote cluster.

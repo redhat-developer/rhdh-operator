@@ -17,7 +17,7 @@
     "/^1\\.2\\.x/"
   ],
   "constraints": {
-    "go": "1.21"
+    "go": "1.22"
   },
   "kustomize": {
     "enabled": false
@@ -49,31 +49,7 @@
       "pinDigests": false
     },
     {
-      "description": "k8s go: minor and patch updates in main (suspended till UBI w/ go 1.22)",
-      "enabled": false,
-      "groupName": "k8s-go main",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "digest"
-      ],
-      "baseBranches": [
-        "main"
-      ],
-      "automerge": false,
-      "matchPackageNames": [
-        "k8s.io/api{/,}**",
-        "k8s.io/apimachinery{/,}**",
-        "k8s.io/client-go{/,}**",
-        "sigs.k8s.io{/,}**",
-        "github.com/openshift{/,}**"
-      ]
-    },
-    {
-      "description": "k8s go: patch updates only in 1.y (suspended till UBI w/ go 1.22)",
+      "description": "k8s go: patch updates only in 1.y (these branches use go < 1.22)",
       "enabled": false,
       "groupName": "k8s-go 1.y",
       "matchDatasources": [
@@ -84,7 +60,7 @@
         "digest"
       ],
       "baseBranches": [
-        "/^release-1\\..*/",
+        "/^release-1\\.3/",
         "/^1\\.2\\.x/"
       ],
       "automerge": false,
@@ -97,26 +73,7 @@
       ]
     },
     {
-      "description": "ginkgo: minor and patch updates in main (disabled until we support Go 1.22+, which is required since ginkgo 2.20.2)",
-      "enabled": false,
-      "groupName": "ginkgo main",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "baseBranches": [
-        "main"
-      ],
-      "automerge": false,
-      "matchPackageNames": [
-        "github.com/onsi/ginkgo/v2{/,}**"
-      ]
-    },
-    {
-      "description": "ginkgo: patch updates only in 1.y (disabled until we support Go 1.22+, which is required since ginkgo 2.20.2)",
+      "description": "ginkgo: patch updates only in 1.y (disabled because Go 1.22+ is required since ginkgo 2.20.2)",
       "enabled": false,
       "groupName": "ginkgo 1.y",
       "matchDatasources": [
@@ -126,7 +83,7 @@
         "patch"
       ],
       "baseBranches": [
-        "/^release-1\\..*/",
+        "/^release-1\\.3/",
         "/^1\\.2\\.x/"
       ],
       "automerge": false,
@@ -135,26 +92,7 @@
       ]
     },
     {
-      "description": "gomega: minor and patch updates in main (disabled until we support Go 1.22+, which is required since gomega 1.34.2)",
-      "enabled": false,
-      "groupName": "gomega main",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "baseBranches": [
-        "main"
-      ],
-      "automerge": false,
-      "matchPackageNames": [
-        "github.com/onsi/gomega{/,}**"
-      ]
-    },
-    {
-      "description": "gomega: patch updates only in 1.y (disabled until we support Go 1.22+, which is required since gomega 1.34.2)",
+      "description": "gomega: patch updates only in 1.y (disabled since Go 1.22+ is required since gomega 1.34.2)",
       "enabled": false,
       "groupName": "gomega 1.y",
       "matchDatasources": [

@@ -30,6 +30,7 @@ Usage:
   $0 [OPTIONS]
 
 Options:
+  -v 1.y                       : Install from iib quay.io/rhdh/iib:1.y-\$OCP_VER-\$OCP_ARCH (eg., 1.4-v4.14-x86_64)
   --latest                     : Install from iib quay.io/rhdh/iib:latest-\$OCP_VER-\$OCP_ARCH (eg., latest-v4.14-x86_64) [default]
   --next                       : Install from iib quay.io/rhdh/iib:next-\$OCP_VER-\$OCP_ARCH (eg., next-v4.14-x86_64)
   --install-operator <NAME>    : Install operator named \$NAME after creating CatalogSource
@@ -80,6 +81,10 @@ while [[ "$#" -gt 0 ]]; do
     '--next'|'--latest')
       # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
       UPSTREAM_IIB="quay.io/rhdh/iib:${1/--/}-${OCP_VER}-$OCP_ARCH";;
+    '-v')
+      UPSTREAM_IIB="quay.io/rhdh/iib:${2}-${OCP_VER}-$OCP_ARCH"; 
+      OLM_CHANNEL="fast-${2}"
+      shift 1;;
     '-h'|'--help') usage; exit 0;;
     *) echo "[ERROR] Unknown parameter is used: $1."; usage; exit 1;;
   esac
@@ -373,7 +378,7 @@ https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogTy
 
 Or run this:
 
-echo \"apiVersion: rhdh.redhat.com/v1alpha2
+echo \"apiVersion: rhdh.redhat.com/v1alpha3
 kind: Backstage
 metadata:
   name: developer-hub
