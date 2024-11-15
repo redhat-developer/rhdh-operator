@@ -155,10 +155,11 @@ var _ = When("create backstage PVCs configured", func() {
 				AccessModes: []corev1.PersistentVolumeAccessMode{
 					corev1.ReadWriteOnce,
 				},
-				StorageClassName: scName,
+				PersistentVolumeReclaimPolicy: corev1.PersistentVolumeReclaimDelete,
+				StorageClassName:              scName,
 				PersistentVolumeSource: corev1.PersistentVolumeSource{
 					HostPath: &corev1.HostPathVolumeSource{
-						Path: "/tmp/my/path",
+						Path: "/tmp",
 					},
 				},
 			},
