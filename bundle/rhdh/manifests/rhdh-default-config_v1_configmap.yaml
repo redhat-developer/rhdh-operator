@@ -1,23 +1,12 @@
 apiVersion: v1
 data:
-  app-config.yaml: |
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: my-backstage-config-cm1 # placeholder for <bs>-default-appconfig
-    data:
-      default.app-config.yaml: |
-        backend:
-          auth:
-            externalAccess:
-              - type: legacy
-                options:
-                  subject: legacy-default-config
-                  # This is a default value, which you should change by providing your own app-config
-                  secret: "pl4s3Ch4ng3M3"
-        auditLog:
-          rotateFile:
-            enabled: true
+  app-config.yaml: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: my-backstage-config-cm1
+    # placeholder for <bs>-default-appconfig\ndata:\n  default.app-config.yaml: |\n
+    \   backend:\n      auth:\n        externalAccess:\n          - type: legacy\n
+    \           options:\n              subject: legacy-default-config\n              #
+    This is a default value, which you should change by providing your own app-config\n
+    \             secret: \"pl4s3Ch4ng3M3\"\n    auth:\n      providers: {}\n    auditLog:\n
+    \     rotateFile:\n        enabled: true\n        \n"
   db-secret.yaml: |-
     apiVersion: v1
     kind: Secret
