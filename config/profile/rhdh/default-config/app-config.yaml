@@ -13,8 +13,7 @@ data:
               # This is a default value, which you should change by providing your own app-config
               secret: "pl4s3Ch4ng3M3"
     auth:
-      providers:
-        github: {}
+      providers: {}
     auditLog:
       rotateFile:
         enabled: true
