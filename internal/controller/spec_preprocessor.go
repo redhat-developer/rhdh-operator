@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+
 	"golang.org/x/exp/maps"
 
 	"k8s.io/client-go/util/retry"
@@ -210,7 +212,7 @@ func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj clien
 
 func addToWatch(fileObjectRef bsv1.FileObjectRef) bool {
 	// it will contain subPath either as specified key or as a list of all keys if only mountPath specified
-	if fileObjectRef.MountPath == "" || fileObjectRef.Key != "" {
+	if (fileObjectRef.MountPath == "" || fileObjectRef.Key != "") && utils.BoolEnvVar(WatchExtConfig, true) {
 		return true
 	}
 	return false
