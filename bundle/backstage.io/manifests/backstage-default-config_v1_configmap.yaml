@@ -199,6 +199,10 @@ data:
         - name: http-backend
           port: 80
           targetPort: backend
+        - name: http-metrics
+          protocol: TCP
+          port: 9464
+          targetPort: 9464
 kind: ConfigMap
 metadata:
   name: backstage-default-config
