@@ -55,7 +55,7 @@ func MountFilesFrom(podSpec *corev1.PodSpec, container *corev1.Container, kind O
 		return
 	}
 
-	if dataKeys != nil && len(dataKeys) > 0 {
+	if len(dataKeys) > 0 {
 		for _, file := range dataKeys {
 			if fileName == "" || fileName == file {
 				vm := corev1.VolumeMount{Name: volName, MountPath: filepath.Join(mountPath, file), SubPath: file, ReadOnly: true}
