@@ -14,7 +14,3 @@ data:
               secret: "pl4s3Ch4ng3M3"
     auth:
       providers: {}
-    auditLog:
-      rotateFile:
-        enabled: true
-        
