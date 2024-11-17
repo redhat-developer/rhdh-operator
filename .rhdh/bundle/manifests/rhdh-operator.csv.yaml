@@ -355,4 +355,4 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   version: 1.2.5
-  replaces: rhdh-operator.v1.1.1
+  replaces: rhdh-operator.v1.2.4
