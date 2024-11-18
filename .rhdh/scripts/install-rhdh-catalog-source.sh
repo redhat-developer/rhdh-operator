@@ -4,7 +4,7 @@
 #
 # Requires: oc, jq
 
-set -e
+set -euo pipefail
 
 RED='\033[0;31m'
 NC='\033[0m'
