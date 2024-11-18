@@ -67,7 +67,7 @@ OCP_VER="v$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]
 OCP_ARCH="$(oc version -o json | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
 if [[ $OCP_ARCH == "amd64" ]]; then OCP_ARCH="x86_64"; fi
 # if logged in, this should return something like latest-v4.12-x86_64
-UPSTREAM_IIB="quay.io/rhdh/iib:latest-${OCP_VER}-${OCP_ARCH}";
+IIB_TAG="latest-${OCP_VER}-${OCP_ARCH}"
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
@@ -80,9 +80,9 @@ while [[ "$#" -gt 0 ]]; do
       TO_INSTALL="$2"; shift 1;;
     '--next'|'--latest')
       # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
-      UPSTREAM_IIB="quay.io/rhdh/iib:${1/--/}-${OCP_VER}-$OCP_ARCH";;
+      IIB_TAG="${1/--/}-${OCP_VER}-$OCP_ARCH";;
     '-v')
-      UPSTREAM_IIB="quay.io/rhdh/iib:${2}-${OCP_VER}-$OCP_ARCH"; 
+      IIB_TAG="${2}-${OCP_VER}-$OCP_ARCH";
       OLM_CHANNEL="fast-${2}"
       shift 1;;
     '-h'|'--help') usage; exit 0;;
@@ -96,6 +96,8 @@ if [[ ! $(command -v skopeo) ]]; then
   errorf "Please install skopeo 1.11+"
   exit 1
 fi
+
+UPSTREAM_IIB="quay.io/rhdh/iib:${IIB_TAG}";
 
 # shellcheck disable=SC2086
 UPSTREAM_IIB_MANIFEST="$(skopeo inspect docker://${UPSTREAM_IIB} --raw || exit 2)"
@@ -221,10 +223,27 @@ spec:
 function install_hosted_control_plane_cluster() {
   # Clusters with an hosted control plane do not propagate ImageContentSourcePolicy/ImageDigestMirrorSet resources
   # to the underlying nodes, causing an issue mirroring internal images effectively.
+  # This function works around this by locally modifying the bundles (replacing all refs to the internal registries
+  # with their mirrors on quay.io), rebuilding and pushing the images to the internal cluster registry.
+  if [[ ! $(command -v umoci) ]]; then
+    errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci"
+    exit 1
+  fi
+
+  mkdir -p "${TMPDIR}/rhdh/rhdh" >&2
+  echo "[DEBUG] Rendering IIB $UPSTREAM_IIB as a local file..." >&2
+  opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
+  if [ ! -s "${TMPDIR}/rhdh/rhdh/render.yaml" ]; then
+    errorf "[ERROR] 'opm render $UPSTREAM_IIB' returned an empty output, which likely means that this IIB Image does not contain any operators in it. Please reach out to the RHDH Productization team." >&2
+    exit 1
+  fi
+
+  # 1. Expose the internal cluster registry if not done already
+  echo "[DEBUG] Exposing cluster registry..." >&2
   internal_registry_url="image-registry.openshift-image-registry.svc:5000"
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
-  podman login -u kubeadmin -p $(oc whoami -t) --tls-verify=false $my_registry >&2
+  skopeo login -u kubeadmin -p $(oc whoami -t) --tls-verify=false $my_registry >&2
   if oc -n openshift-marketplace get secret internal-reg-auth-for-rhdh &> /dev/null; then
     oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh >&2
   fi
@@ -252,10 +271,8 @@ function install_hosted_control_plane_cluster() {
   oc policy add-role-to-user system:image-puller system:serviceaccount:openshift-marketplace:default -n openshift-marketplace >&2 || true
   oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:default -n rhdh-operator >&2 || true
 
-  echo ">>> WORKING DIR: $TMPDIR <<<" >&2
-  mkdir -p "${TMPDIR}/rhdh/rhdh" >&2
-  opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
-  pushd "${TMPDIR}" >&2
+  # 2. Render the IIB locally, modify any references to the internal registries with their mirrors on Quay
+  # and push the updates to the internal cluster registry
   for bundleImg in $(cat "${TMPDIR}/rhdh/rhdh/render.yaml" | grep -E '^image: .*operator-bundle' | awk '{print $2}' | uniq); do
     originalBundleImg="$bundleImg"
     digest="${originalBundleImg##*@sha256:}"
@@ -263,48 +280,60 @@ function install_hosted_control_plane_cluster() {
     bundleImg="${bundleImg/registry.redhat.io/quay.io}"
     bundleImg="${bundleImg/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
     echo "[DEBUG] $originalBundleImg => $bundleImg" >&2
-    if podman pull "$bundleImg" >&2; then
-      mkdir -p "bundles/$digest" >&2
-      # --entrypoint is needed on some older versions of Podman, but work with
-      containerId=$(podman create --entrypoint='/bin/sh' "$bundleImg" || exit 1)
-      podman cp $containerId:/metadata "./bundles/${digest}/metadata" >&2
-      podman cp $containerId:/manifests "./bundles/${digest}/manifests" >&2
-      podman rm -f $containerId >&2
-
-      # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
-      for file in "./bundles/${digest}/manifests"/*; do
-        if [ -f "$file" ]; then
-          sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file" >&2
-          sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file" >&2
-          sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file" >&2
-        fi
-      done
-
-      cat <<EOF > "./bundles/${digest}/bundle.Dockerfile"
-FROM scratch
-COPY ./manifests /manifests/
-COPY ./metadata /metadata/
-EOF
-      pushd "./bundles/${digest}" >&2
+    if skopeo inspect "docker://$bundleImg" &> /dev/null; then
       newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
       newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"
-      podman image build -f bundle.Dockerfile -t "${newBundleImage}" . >&2
-      podman image push "${newBundleImage}" --tls-verify=false >&2
-      popd >&2
+      mkdir -p "bundles/$digest" >&2
+
+      echo "[DEBUG] Copying and unpacking image $bundleImg locally..." >&2
+      skopeo copy "docker://$bundleImg" "oci:./bundles/${digest}/src:latest" >&2
+      umoci unpack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked" --rootless >&2
+
+      # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
+      echo "[DEBUG] Replacing refs to internal registry in bundle image $bundleImg..." >&2
+      for folder in manifests metadata; do
+        for file in "./bundles/${digest}/unpacked/rootfs/${folder}"/*; do
+          if [ -f "$file" ]; then
+            echo "[DEBUG] replacing refs to internal registries in file '${file}'" >&2
+            sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file" >&2
+            sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file" >&2
+            sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file" >&2
+          fi
+        done
+      done
+
+      # repack the image with the changes
+      echo "[DEBUG] Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..." >&2
+      umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked" >&2
+
+      # Push the bundle to the internal cluster registry
+      echo "[DEBUG] Pushing updated image: ./bundles/${digest}/src => ${newBundleImage}..." >&2
+      skopeo copy --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}" >&2
 
       sed -i "s#${originalBundleImg}#${newBundleImageAsInt}#g" "${TMPDIR}/rhdh/rhdh/render.yaml" >&2
     fi
   done
 
-  local newIndex="${UPSTREAM_IIB/quay.io/"${my_registry}"}"
-  local newIndexAsInt="${UPSTREAM_IIB/quay.io/"${internal_registry_url}"}"
-
+  # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
+  echo "[DEBUG] Regenerating IIB Dockerfile with updated refs..." >&2
   opm generate dockerfile rhdh/rhdh >&2
-  podman image build -t "${newIndex}" -f "./rhdh/rhdh.Dockerfile" --no-cache rhdh >&2
-  podman image push "${newIndex}" --tls-verify=false >&2
 
-  printf "%s" "${newIndexAsInt}"
+  echo "[DEBUG] Submitting in-cluster build request for the updated IIB..." >&2
+  if ! oc -n rhdh get buildconfig.build.openshift.io/iib >& /dev/null; then
+    oc -n rhdh new-build --strategy docker --binary --name iib >&2
+    oc -n rhdh patch buildconfig.build.openshift.io/iib -p '{"spec": {"strategy": {"dockerStrategy": {"dockerfilePath": "rhdh.Dockerfile"}}}}' >&2
+  fi
+  oc -n rhdh start-build iib --wait --follow --from-dir=rhdh >&2
+  local imageStreamWithTag="rhdh/iib:${IIB_TAG}"
+  oc tag rhdh/iib:latest "${imageStreamWithTag}" >&2
+
+  local result="${internal_registry_url}/${imageStreamWithTag}"
+  echo "[DEBUG] IIB built and pushed to internal cluster registry: $result..." >&2
+  printf "%s" "${result}"
 }
+
+pushd "${TMPDIR}"
+echo ">>> WORKING DIR: $TMPDIR <<<"
 
 # Defaulting to the hosted control plane behavior which has more chances to work
 CONTROL_PLANE_TECH=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
