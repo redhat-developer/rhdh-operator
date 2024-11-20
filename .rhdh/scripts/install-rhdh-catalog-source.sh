@@ -260,7 +260,7 @@ function install_hosted_control_plane_cluster() {
     --docker-username=kubeadmin \
     --docker-password=$(oc whoami -t) \
     --docker-email="admin@internal-registry.example.com" >&2
-  oc registry login --registry="$my_registry" --auth-basic="kubeadmin:$(oc whoami -t)" >&2
+#  oc registry login --registry="$my_registry" --auth-basic="kubeadmin:$(oc whoami -t)" --to="${REGISTRY_AUTH_FILE}" >&2
   for ns in rhdh-operator rhdh; do
     # To be able to push images under this scope in the internal image registry
     if ! oc get namespace "$ns" > /dev/null; then
@@ -321,8 +321,8 @@ function install_hosted_control_plane_cluster() {
   echo "[DEBUG] Submitting in-cluster build request for the updated IIB..." >&2
   if ! oc -n rhdh get buildconfig.build.openshift.io/iib >& /dev/null; then
     oc -n rhdh new-build --strategy docker --binary --name iib >&2
-    oc -n rhdh patch buildconfig.build.openshift.io/iib -p '{"spec": {"strategy": {"dockerStrategy": {"dockerfilePath": "rhdh.Dockerfile"}}}}' >&2
   fi
+  oc -n rhdh patch buildconfig.build.openshift.io/iib -p '{"spec": {"strategy": {"dockerStrategy": {"dockerfilePath": "rhdh.Dockerfile"}}}}' >&2
   oc -n rhdh start-build iib --wait --follow --from-dir=rhdh >&2
   local imageStreamWithTag="rhdh/iib:${IIB_TAG}"
   oc tag rhdh/iib:latest "${imageStreamWithTag}" >&2
@@ -334,6 +334,10 @@ function install_hosted_control_plane_cluster() {
 
 pushd "${TMPDIR}"
 echo ">>> WORKING DIR: $TMPDIR <<<"
+
+# Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
+# might be restricted in CI environments.
+export REGISTRY_AUTH_FILE="${TMPDIR}/.auth.json"
 
 # Defaulting to the hosted control plane behavior which has more chances to work
 CONTROL_PLANE_TECH=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
