@@ -1,13 +1,13 @@
-== Installing CI builds of Red Hat Developer Hub
+== Installing CI builds of Red Hat Developer Hub on OpenShift
 
 *Prerequisites*
 
 * `oc`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[Installing the OpenShift CLI].
 * You are logged in as an administrator using `oc login`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in_cli-developer-commands[Logging in to the OpenShift CLI] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in-web_cli-developer-commands[Logging in to the OpenShift CLI using a web browser].
-* `skopeo`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
 * `opm`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/opm-cli[opm CLI].
-* `podman`. See link:https://podman.io/docs/installation[Podman Installation Instructions].
 * `sed`. See link:https://www.gnu.org/software/sed/[GNU sed].
+* `skopeo`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
+* `umoci` (used if the script detects that the cluster has a hosted control plane). See link:https://github.com/opencontainers/umoci#install[Install].
 
 *Procedure*
 
