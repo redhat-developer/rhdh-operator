@@ -168,21 +168,25 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 
 func addFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
-	addAppConfigs(spec, model)
-	if err := addConfigMapFiles(spec, model); err != nil {
+	if err := addAppConfigsFromSpec(spec, model); err != nil {
 		return err
 	}
-	addConfigMapEnvs(spec, model)
-	if err := addDynamicPlugins(spec, model); err != nil {
+
+	if err := addConfigMapFilesFromSpec(spec, model); err != nil {
 		return err
 	}
-	if err := addSecretFiles(spec, model); err != nil {
+
+	addConfigMapEnvsFromSpec(spec, model)
+	if err := addDynamicPluginsFromSpec(spec, model); err != nil {
 		return err
 	}
-	if err := addSecretEnvs(spec, model); err != nil {
+	if err := addSecretFilesFromSpec(spec, model); err != nil {
 		return err
 	}
-	addPvc(spec, model)
+	if err := addSecretEnvsFromSpec(spec, model); err != nil {
+		return err
+	}
+	addPvcsFromSpec(spec, model)
 	return nil
 }
 

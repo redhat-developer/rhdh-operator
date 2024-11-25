@@ -15,7 +15,7 @@ spec:
         app: bs1
     spec:
       containers:
-        - name: bs1
+        - name: backstage-backend
           image: busybox
       initContainers:
         - name: install-dynamic-plugins

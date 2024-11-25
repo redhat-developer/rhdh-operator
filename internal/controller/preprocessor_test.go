@@ -45,9 +45,7 @@ func updateConfigMap(t *testing.T) BackstageReconciler {
 	extConf, err := rc.preprocessSpec(ctx, bs)
 	assert.NoError(t, err)
 
-	assert.NotNil(t, extConf.AppConfigs["cm1"].Labels)
-	assert.Equal(t, 1, len(extConf.AppConfigs["cm1"].Labels))
-	oldHash := extConf.GetHash()
+	oldHash := extConf.WatchingHash
 
 	// Update ConfigMap with new data
 	err = rc.Get(ctx, types.NamespacedName{Namespace: "ns1", Name: "cm1"}, &cm)
@@ -60,7 +58,7 @@ func updateConfigMap(t *testing.T) BackstageReconciler {
 	extConf, err = rc.preprocessSpec(ctx, bs)
 	assert.NoError(t, err)
 
-	assert.NotEqual(t, oldHash, extConf.GetHash())
+	assert.NotEqual(t, oldHash, extConf.WatchingHash)
 
 	return rc
 }

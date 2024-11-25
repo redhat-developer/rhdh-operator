@@ -43,7 +43,7 @@ var _ = When("create default rhdh", func() {
 
 			g.Expect(deploy.Spec.Template.Spec.InitContainers).To(HaveLen(1))
 			_, initCont := model.DynamicPluginsInitContainer(deploy.Spec.Template.Spec.InitContainers)
-			//deploy.Spec.Template.Spec.InitContainers[0]
+
 			g.Expect(initCont.VolumeMounts).To(HaveLen(5))
 			g.Expect(initCont.VolumeMounts[0].MountPath).To(Equal("/dynamic-plugins-root"))
 			g.Expect(initCont.VolumeMounts[0].SubPath).To(BeEmpty())
@@ -63,7 +63,7 @@ var _ = When("create default rhdh", func() {
 
 			g.Expect(deploy.Spec.Template.Spec.Volumes).To(HaveLen(6))
 			g.Expect(deploy.Spec.Template.Spec.Containers).To(HaveLen(1))
-			mainCont := deploy.Spec.Template.Spec.Containers[0]
+			mainCont := deploy.Spec.Template.Spec.Containers[model.BackstageContainerIndex(deploy)]
 			g.Expect(mainCont.Args).To(HaveLen(4))
 			g.Expect(mainCont.Args[0]).To(Equal("--config"))
 			g.Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))

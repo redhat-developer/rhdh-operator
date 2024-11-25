@@ -6,8 +6,6 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	corev1 "k8s.io/api/core/v1"
-
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +34,7 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.deployment.Spec.Template.Spec.Containers[0]
+	bscontainer := model.backstageDeployment.container()
 	assert.NotNil(t, bscontainer)
 
 	assert.Equal(t, 1, len(bscontainer.EnvFrom))
@@ -64,7 +62,9 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 		bsv1.EnvObjectRef{Name: "mapName", Key: "ENV1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
-	testObj.externalConfig.ExtraEnvConfigMaps["mapName"] = corev1.ConfigMap{Data: map[string]string{"mapName": "ENV1"}}
+
+	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraEnvConfigMapKeys["mapName"] = NewDataObjectKeys(map[string]string{"mapName": "ENV1"}, nil)
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 

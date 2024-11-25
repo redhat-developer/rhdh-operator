@@ -2,12 +2,11 @@ package model
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-	corev1 "k8s.io/api/core/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -43,7 +42,7 @@ func TestDefaultConfigMapFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
+	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
 }
@@ -58,10 +57,10 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	testObj.externalConfig.ExtraFileConfigMaps = map[string]corev1.ConfigMap{}
-	testObj.externalConfig.ExtraFileConfigMaps["cm1"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm1"}, Data: map[string]string{"conf1.yaml": "data"}}
-	testObj.externalConfig.ExtraFileConfigMaps["cm2"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm2"}, Data: map[string]string{"conf2.yaml": "data"}}
-	testObj.externalConfig.ExtraFileConfigMaps["cm3"] = corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm3"}, Data: map[string]string{"conf3.yaml": "data"}}
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm1"] = NewDataObjectKeys(map[string]string{"conf1.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm2"] = NewDataObjectKeys(map[string]string{"conf2.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm3"] = NewDataObjectKeys(map[string]string{"conf3.yaml": "data"}, nil)
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -71,8 +70,8 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 3, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Equal(t, 0, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
+	assert.Equal(t, 3, len(deployment.container().VolumeMounts))
+	assert.Equal(t, 0, len(deployment.container().Args))
 	assert.Equal(t, 3, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("cm1"), deployment.container().VolumeMounts[0].Name)
@@ -96,6 +95,9 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys[appConfigTestCm.Name] = NewDataObjectKeys(nil, map[string][]byte{"conf1.yaml": []byte("data")})
+
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
@@ -104,8 +106,33 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Equal(t, 0, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
+	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
+	assert.Equal(t, 0, len(deployment.container().Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
+
+}
+
+func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
+
+	bs := *configMapFilesTestBackstage.DeepCopy()
+	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm1"})
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm1"] = NewDataObjectKeys(nil, map[string][]byte{"conf1.yaml": []byte("data")})
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.True(t, len(model.RuntimeObjects) > 0)
+
+	deployment := model.backstageDeployment
+	assert.NotNil(t, deployment)
+
+	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
+	// file name (cm.Data.key) is expected to be a part of mountPath
+	assert.Equal(t, filepath.Join("/my/path", "conf1.yaml"), deployment.container().VolumeMounts[0].MountPath)
 
 }

@@ -60,7 +60,7 @@ func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "expects exactly one key named 'dynamic-plugins.yaml'")
+	assert.Contains(t, err.Error(), "expects exactly one Data key named 'dynamic-plugins.yaml'")
 
 }
 
