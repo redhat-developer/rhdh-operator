@@ -21,7 +21,7 @@ metadata:
         }
       ]
     capabilities: Seamless Upgrades
-    createdAt: "2024-10-10T15:58:03Z"
+    createdAt: "2024-11-25T09:48:20Z"
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.36.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -213,8 +213,8 @@ spec:
                 - name: RELATED_IMAGE_postgresql
                   value: quay.io/fedora/postgresql-15:latest
                 - name: RELATED_IMAGE_backstage
-                  value: quay.io/rhdh/rhdh-hub-rhel9:next
-                image: quay.io/rhdh-community/operator:0.3.1
+                  value: quay.io/rhdh/rhdh-hub-rhel9:1.3
+                image: quay.io/rhdh-community/operator:0.3.2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -313,7 +313,7 @@ spec:
   relatedImages:
   - image: quay.io/fedora/postgresql-15:latest
     name: postgresql
-  - image: quay.io/rhdh/rhdh-hub-rhel9:next
+  - image: quay.io/rhdh/rhdh-hub-rhel9:1.3
     name: backstage
   replaces: backstage-operator.v0.2.0
   version: 0.3.2

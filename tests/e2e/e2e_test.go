@@ -119,7 +119,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 						BodyMatcher: SatisfyAll(
 							ContainSubstring("@janus-idp/backstage-scaffolder-backend-module-quay-dynamic"),
 							ContainSubstring("@janus-idp/backstage-scaffolder-backend-module-regex-dynamic"),
-							ContainSubstring("roadiehq-scaffolder-backend-module-utils-dynamic"),
+							// ContainSubstring("roadiehq-scaffolder-backend-module-utils-dynamic"),
 							ContainSubstring("backstage-plugin-catalog-backend-module-github-dynamic"),
 							ContainSubstring("backstage-plugin-techdocs-backend-dynamic"),
 							ContainSubstring("backstage-plugin-catalog-backend-module-gitlab-dynamic")),
