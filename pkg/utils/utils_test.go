@@ -128,3 +128,15 @@ func TestGetObjectKind(t *testing.T) {
 	assert.Nil(t, objk)
 
 }
+
+func TestBoolEnvVar(t *testing.T) {
+
+	// not defined - true
+	assert.True(t, BoolEnvVar("MyVar", true))
+	// false
+	t.Setenv("MyVar", "false")
+	assert.False(t, BoolEnvVar("MyVar", true))
+	// anything else than eligible to false - true
+	t.Setenv("MyVar", "anything")
+	assert.True(t, BoolEnvVar("anything", true))
+}

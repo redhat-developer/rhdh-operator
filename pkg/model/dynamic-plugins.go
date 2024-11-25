@@ -4,17 +4,28 @@ import (
 	"fmt"
 	"os"
 
+	"golang.org/x/exp/maps"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
-
-	appsv1 "k8s.io/api/apps/v1"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 )
+
+//it relies on implementation where dynamic-plugin initContainer
+//uses specified ConfigMap for producing app-config with dynamic-plugins
+//For this implementation:
+//- backstage contaier and dynamic-plugin initContainer must share a volume
+//  where initContainer writes and backstage container reads produced app-config
+//- app-config path should be set as a --config parameter of backstage container
+//in the deployment manifest
+
+//it creates a volume with dynamic-plugins ConfigMap (there should be a key named "dynamic-plugins.yaml")
+//and mount it to the dynamic-plugin initContainer's WorkingDir (what if not specified?)
 
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
@@ -37,23 +48,25 @@ func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
 }
 
-func addDynamicPlugins(spec bsv1.BackstageSpec, model *BackstageModel) error {
+func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
 	if spec.Application == nil || spec.Application.DynamicPluginsConfigMapName == "" {
 		return nil
 	}
 
-	if _, ic := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers); ic == nil {
+	c, ic := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	if ic == nil {
 		return fmt.Errorf("validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
 	}
 
-	dp := DynamicPlugins{ConfigMap: &model.ExternalConfig.DynamicPlugins}
-
-	if dp.ConfigMap.Data == nil || len(dp.ConfigMap.Data) != 1 || dp.ConfigMap.Data[DynamicPluginsFile] == "" {
-		return fmt.Errorf("dynamic plugin configMap expects exactly one key named '%s' ", DynamicPluginsFile)
+	dp := model.ExternalConfig.DynamicPlugins
+	if dp.Data == nil || len(dp.Data) != 1 || dp.Data[DynamicPluginsFile] == "" {
+		return fmt.Errorf("dynamic plugin configMap expects exactly one Data key named '%s' ", DynamicPluginsFile)
 	}
 
-	dp.updatePod(model.backstageDeployment.deployment)
+	utils.MountFilesFrom(&model.backstageDeployment.deployment.Spec.Template.Spec, &model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers[c], utils.ConfigMapObjectKind,
+		dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
+
 	return nil
 
 }
@@ -86,35 +99,11 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 	return true, nil
 }
 
-func (p *DynamicPlugins) updatePod(deployment *appsv1.Deployment) {
-
-	//it relies on implementation where dynamic-plugin initContainer
-	//uses specified ConfigMap for producing app-config with dynamic-plugins
-	//For this implementation:
-	//- backstage contaier and dynamic-plugin initContainer must share a volume
-	//  where initContainer writes and backstage container reads produced app-config
-	//- app-config path should be set as a --config parameter of backstage container
-	//in the deployment manifest
-
-	//it creates a volume with dynamic-plugins ConfigMap (there should be a key named "dynamic-plugins.yaml")
-	//and mount it to the dynamic-plugin initContainer's WorkingDir (what if not specified?)
-
-	_, initContainer := DynamicPluginsInitContainer(deployment.Spec.Template.Spec.InitContainers)
-	if initContainer == nil {
-		// it will fail on updateAndValidate
-		return
-	}
-
-	utils.MountFilesFrom(&deployment.Spec.Template.Spec, &deployment.Spec.Template.Spec.InitContainers[0], utils.ConfigMapObjectKind,
-		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, p.ConfigMap.Data)
-
-}
-
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
 func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backstage) error {
 
-	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	c, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
 		return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
 	}
@@ -127,10 +116,13 @@ func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backsta
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
 
-	p.updatePod(model.backstageDeployment.deployment)
+	utils.MountFilesFrom(&model.backstageDeployment.deployment.Spec.Template.Spec, &model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers[c], utils.ConfigMapObjectKind,
+		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
+
 	return nil
 }
 
+// implementation of RuntimeObject interface
 func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	p.ConfigMap.SetName(DynamicPluginsDefaultName(backstage.Name))
 	setMetaInfo(p.ConfigMap, backstage, scheme)

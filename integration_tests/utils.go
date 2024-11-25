@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
+	appsv1 "k8s.io/api/apps/v1"
+
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"k8s.io/client-go/kubernetes"
@@ -120,4 +123,10 @@ func ReadYamlFile(path string, object interface{}) error {
 		return fmt.Errorf("failed to read YAML file: %w", err)
 	}
 	return ReadYaml(b, object)
+}
+
+func backstageContainerName(deploy *appsv1.Deployment) string {
+	// backstage-backend
+	cIndex := model.BackstageContainerIndex(deploy)
+	return deploy.Spec.Template.Spec.Containers[cIndex].Name
 }

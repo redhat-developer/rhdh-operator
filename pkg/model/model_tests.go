@@ -10,8 +10,6 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	corev1 "k8s.io/api/core/v1"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,10 +31,10 @@ type testBackstageObject struct {
 // initialises testBackstageObject object
 func createBackstageTest(bs bsv1.Backstage) *testBackstageObject {
 	ec := ExternalConfig{
-		RawConfig:           map[string]string{},
-		AppConfigs:          map[string]corev1.ConfigMap{},
-		ExtraFileConfigMaps: map[string]corev1.ConfigMap{},
-		ExtraEnvConfigMaps:  map[string]corev1.ConfigMap{},
+		RawConfig: map[string]string{},
+		//AppConfigs:          map[string]corev1.ConfigMap{},
+		//ExtraFileConfigMaps: map[string]corev1.ConfigMap{},
+		//ExtraEnvConfigMaps: map[string]corev1.ConfigMap{},
 	}
 	b := &testBackstageObject{backstage: bs, externalConfig: ec, scheme: runtime.NewScheme()}
 	utilruntime.Must(bsv1.AddToScheme(b.scheme))

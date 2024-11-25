@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -201,4 +202,13 @@ func ToRFC1123Label(str string) string {
 	}
 
 	return name
+}
+
+func BoolEnvVar(envvar string, def bool) bool {
+	if envValue, ok := os.LookupEnv(envvar); ok {
+		if ret, err := strconv.ParseBool(envValue); err == nil {
+			return ret
+		}
+	}
+	return def
 }

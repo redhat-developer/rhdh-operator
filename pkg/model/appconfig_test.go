@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
@@ -70,10 +72,10 @@ func TestDefaultAppConfig(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Contains(t, deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath, deployment.defaultMountPath())
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
+	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
+	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath, deployment.defaultMountPath())
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, 2, len(deployment.container().Args))
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
 }
@@ -90,8 +92,10 @@ func TestSpecifiedAppConfig(t *testing.T) {
 		bsv1.FileObjectRef{Name: appConfigTestCm3.Name, Key: "conf31.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
-	testObj.externalConfig.AppConfigs = map[string]corev1.ConfigMap{appConfigTestCm.Name: appConfigTestCm, appConfigTestCm2.Name: appConfigTestCm2,
-		appConfigTestCm3.Name: appConfigTestCm3}
+
+	testObj.externalConfig.AppConfigKeys = map[string][]string{appConfigTestCm.Name: maps.Keys(appConfigTestCm.Data),
+		appConfigTestCm2.Name: maps.Keys(appConfigTestCm2.Data), appConfigTestCm3.Name: maps.Keys(appConfigTestCm3.Data)}
+
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig,
 		false, testObj.scheme)
 
@@ -124,8 +128,7 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
 
-	//testObj.detailedSpec.AddConfigObject(&AppConfig{ConfigMap: &cm, MountPath: "/my/path"})
-	testObj.externalConfig.AppConfigs[appConfigTestCm.Name] = appConfigTestCm
+	testObj.externalConfig.AppConfigKeys = map[string][]string{appConfigTestCm.Name: maps.Keys(appConfigTestCm.Data)}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -135,12 +138,11 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts))
-	assert.Equal(t, 4, len(deployment.deployment.Spec.Template.Spec.Containers[0].Args))
+	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
+	assert.Equal(t, 4, len(deployment.container().Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
-	//assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret()deployment.deployment.Spec.Template.Spec.Volumes[0].Name
 	assert.Equal(t, deployment.deployment.Spec.Template.Spec.Volumes[0].Name,
-		deployment.deployment.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name)
+		deployment.container().VolumeMounts[0].Name)
 
 }

@@ -8,9 +8,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type SecretEnvsFactory struct{}
@@ -21,7 +19,6 @@ func (f SecretEnvsFactory) newBackstageObject() RuntimeObject {
 
 type SecretEnvs struct {
 	Secret *corev1.Secret
-	Key    string
 }
 
 func init() {
@@ -33,18 +30,13 @@ func (p *SecretEnvs) Object() runtime.Object {
 	return p.Secret
 }
 
-func addSecretEnvs(spec bsv1.BackstageSpec, model *BackstageModel) error {
-
+func addSecretEnvsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.Secrets == nil {
 		return nil
 	}
 
-	for _, sec := range spec.Application.ExtraEnvs.Secrets {
-		se := SecretEnvs{
-			Secret: &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: sec.Name}},
-			Key:    sec.Key,
-		}
-		se.updatePod(model.backstageDeployment.deployment)
+	for _, specSec := range spec.Application.ExtraEnvs.Secrets {
+		utils.AddEnvVarsFrom(model.backstageDeployment.container(), utils.SecretObjectKind, specSec.Name, specSec.Key)
 	}
 	return nil
 }
@@ -72,17 +64,13 @@ func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, 
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
-	p.updatePod(m.backstageDeployment.deployment)
+	utils.AddEnvVarsFrom(m.backstageDeployment.container(), utils.SecretObjectKind,
+		p.Secret.Name, "")
 	return nil
 }
 
+// implementation of RuntimeObject interface
 func (p *SecretEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	p.Secret.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs"))
 	setMetaInfo(p.Secret, backstage, scheme)
-}
-
-func (p *SecretEnvs) updatePod(deployment *appsv1.Deployment) {
-
-	utils.AddEnvVarsFrom(&deployment.Spec.Template.Spec.Containers[0], utils.SecretObjectKind,
-		p.Secret.Name, p.Key)
 }
