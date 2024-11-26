@@ -1,11 +1,8 @@
 package e2e
 
 import (
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -246,39 +243,8 @@ subjects:
 				crName:     "bs-app-config",
 				additionalApiEndpointTests: []helper.ApiEndpointTest{
 					{
-						Endpoint: "/api/dynamic-plugins-info/loaded-plugins",
-						BearerTokenRetrievalFn: func(baseUrl string) (string, error) { // Authenticated endpoint that does not accept service tokens
-							url := fmt.Sprintf("%s/api/auth/guest/refresh", baseUrl)
-							tr := &http.Transport{
-								TLSClientConfig: &tls.Config{
-									InsecureSkipVerify: true, // #nosec G402 -- test code only, not used in production
-								},
-							}
-							httpClient := &http.Client{Transport: tr}
-							req, err := http.NewRequest("GET", url, nil)
-							if err != nil {
-								return "", fmt.Errorf("error while building request to GET %q: %w", url, err)
-							}
-							req.Header.Add("Accept", "application/json")
-							resp, err := httpClient.Do(req)
-							if err != nil {
-								return "", fmt.Errorf("error while trying to GET %q: %w", url, err)
-							}
-							defer resp.Body.Close()
-							body, err := io.ReadAll(resp.Body)
-							if err != nil {
-								return "", fmt.Errorf("error while trying to read response body from 'GET %q': %w", url, err)
-							}
-							if resp.StatusCode != 200 {
-								return "", fmt.Errorf("expected status code 200, but got %d in response to 'GET %q', body: %s", resp.StatusCode, url, string(body))
-							}
-							var authResponse helper.BackstageAuthRefreshResponse
-							err = json.Unmarshal(body, &authResponse)
-							if err != nil {
-								return "", fmt.Errorf("error while trying to decode response body from 'GET %q': %w", url, err)
-							}
-							return authResponse.BackstageIdentity.Token, nil
-						},
+						Endpoint:               "/api/dynamic-plugins-info/loaded-plugins",
+						BearerTokenRetrievalFn: helper.GuestAuth,
 						ExpectedHttpStatusCode: 200,
 						BodyMatcher: SatisfyAll(
 							ContainSubstring("janus-idp-backstage-scaffolder-backend-module-quay-dynamic"),
