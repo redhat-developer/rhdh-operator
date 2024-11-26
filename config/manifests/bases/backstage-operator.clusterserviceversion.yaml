@@ -5,8 +5,8 @@ metadata:
     alm-examples: '[]'
     capabilities: Seamless Upgrades
     operatorframework.io/suggested-namespace: backstage-system
-    skipRange: '>=0.0.1 <0.3.1'
-  name: backstage-operator.v0.3.1
+    skipRange: '>=0.0.1 <0.3.2'
+  name: backstage-operator.v0.3.2
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
