@@ -2,6 +2,7 @@ package helper
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -46,6 +47,42 @@ type BackstageAuthRefreshResponse struct {
 
 type BackstageIdentity struct {
 	Token string `json:"token,omitempty"`
+}
+
+// GuestAuth logs in with the guest user in Backstage and returns the auth token.
+// It requires guest login to be enabled in the loaded app-config.
+// See https://backstage.io/docs/auth/guest/provider/ for more details.
+func GuestAuth(baseUrl string) (string, error) {
+	url := fmt.Sprintf("%s/api/auth/guest/refresh", baseUrl)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // #nosec G402 -- test code only, not used in production
+		},
+	}
+	httpClient := &http.Client{Transport: tr}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("error while building request to GET %q: %w", url, err)
+	}
+	req.Header.Add("Accept", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error while trying to GET %q: %w", url, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error while trying to read response body from 'GET %q': %w", url, err)
+	}
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("expected status code 200, but got %d in response to 'GET %q', body: %s", resp.StatusCode, url, string(body))
+	}
+	var authResponse BackstageAuthRefreshResponse
+	err = json.Unmarshal(body, &authResponse)
+	if err != nil {
+		return "", fmt.Errorf("error while trying to decode response body from 'GET %q': %w", url, err)
+	}
+	return authResponse.BackstageIdentity.Token, nil
 }
 
 func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus string) {

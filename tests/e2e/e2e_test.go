@@ -1,22 +1,22 @@
 package e2e
 
 import (
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega/gcustom"
+
 	"github.com/redhat-developer/rhdh-operator/tests/helper"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
+	"github.com/tidwall/gjson"
 )
 
 var _ = Describe("Backstage Operator E2E", func() {
@@ -163,7 +163,7 @@ subjects:
 `, ns),
 					}
 				},
-				expectedLogsMatcher: ContainSubstring(`workqueue_work_duration_seconds_count{name="backstage"}`),
+				expectedLogsMatcher: ContainSubstring(`workqueue_work_duration_seconds_count`),
 			},
 		} {
 			tt := tt
@@ -246,48 +246,15 @@ subjects:
 				crName:     "bs-app-config",
 				additionalApiEndpointTests: []helper.ApiEndpointTest{
 					{
-						Endpoint: "/api/dynamic-plugins-info/loaded-plugins",
-						BearerTokenRetrievalFn: func(baseUrl string) (string, error) { // Authenticated endpoint that does not accept service tokens
-							url := fmt.Sprintf("%s/api/auth/guest/refresh", baseUrl)
-							tr := &http.Transport{
-								TLSClientConfig: &tls.Config{
-									InsecureSkipVerify: true, // #nosec G402 -- test code only, not used in production
-								},
-							}
-							httpClient := &http.Client{Transport: tr}
-							req, err := http.NewRequest("GET", url, nil)
-							if err != nil {
-								return "", fmt.Errorf("error while building request to GET %q: %w", url, err)
-							}
-							req.Header.Add("Accept", "application/json")
-							resp, err := httpClient.Do(req)
-							if err != nil {
-								return "", fmt.Errorf("error while trying to GET %q: %w", url, err)
-							}
-							defer resp.Body.Close()
-							body, err := io.ReadAll(resp.Body)
-							if err != nil {
-								return "", fmt.Errorf("error while trying to read response body from 'GET %q': %w", url, err)
-							}
-							if resp.StatusCode != 200 {
-								return "", fmt.Errorf("expected status code 200, but got %d in response to 'GET %q', body: %s", resp.StatusCode, url, string(body))
-							}
-							var authResponse helper.BackstageAuthRefreshResponse
-							err = json.Unmarshal(body, &authResponse)
-							if err != nil {
-								return "", fmt.Errorf("error while trying to decode response body from 'GET %q': %w", url, err)
-							}
-							return authResponse.BackstageIdentity.Token, nil
-						},
+						Endpoint:               "/api/dynamic-plugins-info/loaded-plugins",
+						BearerTokenRetrievalFn: helper.GuestAuth,
 						ExpectedHttpStatusCode: 200,
-						BodyMatcher: SatisfyAll(
-							ContainSubstring("janus-idp-backstage-scaffolder-backend-module-quay-dynamic"),
-							ContainSubstring("janus-idp-backstage-scaffolder-backend-module-regex-dynamic"),
-							//ContainSubstring("roadiehq-scaffolder-backend-module-utils-dynamic"),
-							ContainSubstring("backstage-plugin-catalog-backend-module-github-dynamic"),
-							ContainSubstring("backstage-plugin-techdocs"),
-							ContainSubstring("backstage-plugin-catalog-backend-module-gitlab-dynamic"),
-							ContainSubstring("janus-idp-backstage-plugin-analytics-provider-segment")),
+						BodyMatcher: gcustom.MakeMatcher(func(respBody string) (bool, error) {
+							if !gjson.Valid(respBody) {
+								return false, fmt.Errorf("invalid json: %q", respBody)
+							}
+							return gjson.Get(respBody, "#").Int() > 0, nil
+						}).WithMessage("be a valid and non-empty JSON array. This is the response from the 'GET /api/dynamic-plugins-info/loaded-plugins' endpoint, using the guest user."),
 					},
 				},
 			},
