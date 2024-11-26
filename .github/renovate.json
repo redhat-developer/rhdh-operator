@@ -39,6 +39,8 @@
       "matchUpdateTypes": [
         "patch"
       ],
+      "additionalBranchPrefix": "dockerfile ",
+      "groupName": "All dockerfile images",      
       "automerge": true,
       "pinDigests": false
     },
