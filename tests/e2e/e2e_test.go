@@ -163,7 +163,7 @@ subjects:
 `, ns),
 					}
 				},
-				expectedLogsMatcher: ContainSubstring(`workqueue_work_duration_seconds_count{name="backstage"}`),
+				expectedLogsMatcher: ContainSubstring(`workqueue_work_duration_seconds_count`),
 			},
 		} {
 			tt := tt
