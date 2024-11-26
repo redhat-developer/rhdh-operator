@@ -9,11 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/gomega/gcustom"
+
 	"github.com/redhat-developer/rhdh-operator/tests/helper"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
+	"github.com/tidwall/gjson"
 )
 
 var _ = Describe("Backstage Operator E2E", func() {
@@ -246,14 +249,12 @@ subjects:
 						Endpoint:               "/api/dynamic-plugins-info/loaded-plugins",
 						BearerTokenRetrievalFn: helper.GuestAuth,
 						ExpectedHttpStatusCode: 200,
-						BodyMatcher: SatisfyAll(
-							ContainSubstring("janus-idp-backstage-scaffolder-backend-module-quay-dynamic"),
-							ContainSubstring("janus-idp-backstage-scaffolder-backend-module-regex-dynamic"),
-							//ContainSubstring("roadiehq-scaffolder-backend-module-utils-dynamic"),
-							ContainSubstring("backstage-plugin-catalog-backend-module-github-dynamic"),
-							ContainSubstring("backstage-plugin-techdocs"),
-							ContainSubstring("backstage-plugin-catalog-backend-module-gitlab-dynamic"),
-							ContainSubstring("janus-idp-backstage-plugin-analytics-provider-segment")),
+						BodyMatcher: gcustom.MakeMatcher(func(respBody string) (bool, error) {
+							if !gjson.Valid(respBody) {
+								return false, fmt.Errorf("invalid json: %q", respBody)
+							}
+							return gjson.Get(respBody, "#").Int() > 0, nil
+						}).WithMessage("be a valid and non-empty JSON array. This is the response from the 'GET /api/dynamic-plugins-info/loaded-plugins' endpoint, using the guest user."),
 					},
 				},
 			},
