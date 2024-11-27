@@ -1,36 +1,48 @@
-name: Nightly checks
+name: Nightly checks (Upgrade)
 
 on:
   # workflow_dispatch so that it can be triggered manually if needed
   workflow_dispatch:
   schedule:
-    - cron: "34 23 * * *"
+    - cron: "55 23 * * *"
 
 jobs:
-  e2e-tests:
+  e2e-upgrade-tests:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        branch:
+        from_version:
+          - 1.2
+          - 1.3
+          - 1.4
+        to_branch:
           - main
           - release-1.4
           - release-1.3
-          - 1.2.x
-    name: 'E2E Tests on ${{ matrix.branch }}'
+        exclude:
+          - from_version: 1.3
+            to_branch: release-1.3
+
+          - from_version: 1.4
+            to_branch: release-1.3
+          - from_version: 1.4
+            to_branch: release-1.4
+
+    name: 'E2E Upgrade: ${{ matrix.from_version }} => ${{ matrix.to_branch }}'
     concurrency:
-      group: '${{ github.workflow }}-${{ matrix.branch }}'
+      group: '${{ github.workflow }}-${{ matrix.to_branch }}-${{ matrix.from_version }}'
       cancel-in-progress: true
     env:
-      CONTAINER_TOOL: podman
+      CONTAINER_ENGINE: podman
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4 # default branch will be checked out by default on scheduled workflows
         with:
           fetch-depth: 0
 
-      - if: ${{ matrix.branch != 'main' }}
-        name: Checkout ${{ matrix.branch }} branch
-        run: git switch ${{ matrix.branch }}
+      - if: ${{ matrix.to_branch != 'main' }}
+        name: Checkout ${{ matrix.to_branch }} branch
+        run: git switch ${{ matrix.to_branch }}
 
       - name: Setup Go
         uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
@@ -49,15 +61,17 @@ jobs:
       - name: Display warning if image was not found
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'false' }}
         run: |
-          echo "::warning ::Image ${{ env.OPERATOR_IMAGE }} not found for testing the ${{ matrix.branch }} branch. It might have expired. E2E tests will be skipped for ${{ matrix.branch }}."
+          echo "::warning ::Target image ${{ env.OPERATOR_IMAGE }} not found for testing the ${{ matrix.to_branch }} branch. It might have expired. E2E tests will be skipped for ${{ matrix.to_branch }}."
 
       - name: Start Minikube
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
 
-      - name: Run E2E tests
+      - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_version }} => ${{ matrix.to_branch }})'
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
+          PROFILE: 'rhdh'
+          START_VERSION_MANIFEST: '${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${{ matrix.from_version }}.yaml'
           IMG: ${{ env.OPERATOR_IMAGE }}
-        run: make test-e2e
+        run: make test-e2e-upgrade
