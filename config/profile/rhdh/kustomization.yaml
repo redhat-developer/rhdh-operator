@@ -138,6 +138,18 @@ images:
   newName: quay.io/rhdh-community/operator
   newTag: 0.4.0
 
+patches:
+- patch: |-
+    - op: replace
+      path: "/spec/template/spec/containers/0/env/3"
+      value:
+        name: RELATED_IMAGE_backstage
+        value: "quay.io/rhdh/rhdh-hub-rhel9:1.4"
+  target:
+    kind: Deployment
+    name: controller-manager
+    namespace: operator
+
 generatorOptions:
   disableNameSuffixHash: true
 
