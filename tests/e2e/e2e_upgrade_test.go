@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -38,7 +39,8 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 		const managerPodLabel = "control-plane=controller-manager"
 		const crName = "my-backstage-app"
 
-		var fromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "rhdh-operator-1.2.yaml")
+		var defaultFromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "rhdh-operator-1.2.yaml")
+		var fromDeploymentManifest string
 
 		BeforeEach(func() {
 			if testMode != defaultDeployTestMode {
@@ -48,6 +50,12 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 			// Uninstall the current version of the operator (which was installed in the SynchronizedBeforeSuite),
 			// because this test needs to start from a previous version, then perform the upgrade.
 			uninstallOperator()
+
+			var manifestSet bool
+			fromDeploymentManifest, manifestSet = os.LookupEnv("START_VERSION_MANIFEST")
+			if !manifestSet {
+				fromDeploymentManifest = defaultFromDeploymentManifest
+			}
 
 			cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", fromDeploymentManifest)
 			_, err := helper.Run(cmd)
