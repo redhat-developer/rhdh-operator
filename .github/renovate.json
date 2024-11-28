@@ -18,6 +18,7 @@
   "constraints": {
     "go": "1.20"
   },
+  "recreateWhen": "never",
   "packageRules": [
     {
       "description": "Do NOT generate PRs to pin or apply digests to dockerfiles",
