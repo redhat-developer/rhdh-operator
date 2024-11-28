@@ -42,7 +42,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
     support: Red Hat
-    skipRange: '>=1.0.0 <1.3.2'
+    skipRange: '>=1.2.0 <1.3.2'
   name: rhdh-operator.v1.3.2
   namespace: placeholder
 spec:
@@ -357,4 +357,4 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   version: 1.3.2
-  replaces: rhdh-operator.v1.2.4
+  replaces: rhdh-operator.v1.2.5
