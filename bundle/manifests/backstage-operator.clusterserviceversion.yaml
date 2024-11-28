@@ -25,8 +25,8 @@ metadata:
     operatorframework.io/suggested-namespace: backstage-system
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-    skipRange: '>=0.0.1 <0.2.2'
-  name: backstage-operator.v0.2.3
+    skipRange: '>=0.0.1 <0.2.6'
+  name: backstage-operator.v0.2.6
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -317,4 +317,4 @@ spec:
     name: postgresql
   - image: quay.io/janus-idp/backstage-showcase:latest
     name: backstage
-  version: 0.2.3
+  version: 0.2.6
