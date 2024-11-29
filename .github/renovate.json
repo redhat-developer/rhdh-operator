@@ -37,6 +37,21 @@
       "automerge": false
     },
     {
+      "description": "Do NOT generate PRs for minor dockerfile updates in 1.y ",
+      "enabled": false,
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "matchBaseBranches": [
+        "/^release-1\\.3/",
+        "/^1\\.2\\.x/"
+      ],      
+      "automerge": false
+    },  
+    {
       "description": "Do automerge patch updates to dockerfiles",
       "enabled": true,
       "matchDatasources": [
@@ -51,17 +66,16 @@
       "pinDigests": false
     },
     {
-      "description": "k8s go: patch updates only in 1.y (these branches use go < 1.22)",
+      "description": "k8s go: disable minor updates in 1.y (these branches use go < 1.22)",
       "enabled": false,
       "groupName": "k8s-go 1.y",
       "matchDatasources": [
         "go"
       ],
       "matchUpdateTypes": [
-        "patch",
-        "digest"
+         "minor"
       ],
-      "baseBranches": [
+      "matchBaseBranches": [
         "/^release-1\\.3/",
         "/^1\\.2\\.x/"
       ],
@@ -75,16 +89,16 @@
       ]
     },
     {
-      "description": "ginkgo: patch updates only in 1.y (disabled because Go 1.22+ is required since ginkgo 2.20.2)",
+      "description": "ginkgo: disable minor updates only in 1.y (disabled because Go 1.22+ is required since ginkgo 2.20.2)",
       "enabled": false,
       "groupName": "ginkgo 1.y",
       "matchDatasources": [
         "go"
       ],
       "matchUpdateTypes": [
-        "patch"
+        "minor"
       ],
-      "baseBranches": [
+      "matchBaseBranches": [
         "/^release-1\\.3/",
         "/^1\\.2\\.x/"
       ],
@@ -101,9 +115,9 @@
         "go"
       ],
       "matchUpdateTypes": [
-        "patch"
+        "minor"
       ],
-      "baseBranches": [
+      "matchBaseBranches": [
         "/^release-1\\..*/",
         "/^1\\.2\\.x/"
       ],
