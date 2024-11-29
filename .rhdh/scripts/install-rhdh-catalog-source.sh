@@ -103,12 +103,23 @@ See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-you
 fi
 
 # log into your OCP cluster before running this or you'll get null values for OCP vars!
-OCP_VER="v$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
-if [[ $OCP_VER == "vnull" ]]; then # try releaseClientVersion = 4.16.14
+OCP_VER="v4.16"
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  OCP_VER="v$(invoke_cluster_cli version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
+  if [[ $OCP_VER == "vnull" ]]; then # try releaseClientVersion = 4.16.14
+    OCP_VER="v$(invoke_cluster_cli version -o json | jq -r '.releaseClientVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
+  fi
+fi
+
+OCP_ARCH="x86_64"
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  if [[ $OCP_VER == "vnull" ]]; then # try releaseClientVersion = 4.16.14
   OCP_VER="v$(oc version -o json | jq -r '.releaseClientVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
 fi
-OCP_ARCH="$(oc version -o json | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
+OCP_ARCH="$(invoke_cluster_cli version -o json | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
+fi
 if [[ $OCP_ARCH == "amd64" ]]; then OCP_ARCH="x86_64"; fi
+
 # if logged in, this should return something like latest-v4.12-x86_64
 IIB_TAG="latest-${OCP_VER}-${OCP_ARCH}"
 
@@ -116,9 +127,9 @@ while [[ "$#" -gt 0 ]]; do
   case $1 in
     '--install-operator')
       # Create project if necessary
-      if ! oc get project "$NAMESPACE_SUBSCRIPTION" > /dev/null 2>&1; then
-        echo "Project $NAMESPACE_SUBSCRIPTION does not exist; creating it"
-        oc create namespace "$NAMESPACE_SUBSCRIPTION"
+      if ! invoke_cluster_cli get namespace "$NAMESPACE_SUBSCRIPTION" > /dev/null 2>&1; then
+        echo "Namespace $NAMESPACE_SUBSCRIPTION does not exist; creating it"
+        invoke_cluster_cli create namespace "$NAMESPACE_SUBSCRIPTION"
       fi
       TO_INSTALL="$2"; shift 1;;
     '--next'|'--latest')
@@ -169,7 +180,7 @@ if [ -z "$TO_INSTALL" ]; then
   DISPLAY_NAME_SUFFIX="${IIB_NAME}"
 fi
 
-function install_regular_cluster() {
+function ocp_install_regular_cluster() {
   # A regular cluster should support ImageContentSourcePolicy/ImageDigestMirrorSet resources
   ICSP_URL="quay.io/rhdh/"
   ICSP_URL_PRE=${ICSP_URL%%/*}
@@ -622,26 +633,33 @@ echo ">>> WORKING DIR: $TMPDIR <<<"
 # might be restricted in CI environments.
 export REGISTRY_AUTH_FILE="${TMPDIR}/.auth.json"
 
-# Defaulting to the hosted control plane behavior which has more chances to work
-CONTROL_PLANE_TECH=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
-  (echo '[WARN] Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
-IS_HOSTED_CONTROL_PLANE="false"
-if [[ "${CONTROL_PLANE_TECH}" == "External" ]]; then
-  # 'External' indicates that the control plane is hosted externally to the cluster
-  # and that its components are not visible within the cluster.
-  IS_HOSTED_CONTROL_PLANE="true"
-fi
-
 newIIBImage=${IIB_IMAGE}
-if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
-  echo "[INFO] Detected a cluster with a hosted control plane"
-  if [[ ! $(command -v umoci) ]]; then
-    errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
-    exit 1
+
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  # Defaulting to the hosted control plane behavior which has more chances to work
+  CONTROL_PLANE_TECH=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
+    (echo '[WARN] Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
+  IS_HOSTED_CONTROL_PLANE="false"
+  if [[ "${CONTROL_PLANE_TECH}" == "External" ]]; then
+    # 'External' indicates that the control plane is hosted externally to the cluster
+    # and that its components are not visible within the cluster.
+    IS_HOSTED_CONTROL_PLANE="true"
   fi
-  newIIBImage=$(install_hosted_control_plane_cluster)
+
+  if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
+    echo "[INFO] Detected an OpenShift cluster with a hosted control plane"
+    if [[ ! $(command -v umoci) ]]; then
+      errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
+      exit 1
+    fi
+    newIIBImage=$(ocp_install_hosted_control_plane_cluster)
+  else
+    newIIBImage=$(ocp_install_regular_cluster)
+  fi
 else
-  newIIBImage=$(install_regular_cluster)
+  # K8s cluster with OLM installed
+  echo "[INFO] Detected a Kubernetes cluster"
+  newIIBImage=$(k8s_install)
 fi
 
 echo "[DEBUG] newIIBImage=${newIIBImage}"
