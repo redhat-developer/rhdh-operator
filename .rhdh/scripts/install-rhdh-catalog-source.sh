@@ -69,19 +69,37 @@ function invoke_cluster_cli() {
 }
 
 # minimum requirements
-if [[ ! $(command -v oc) ]]; then
-  errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
-  exit 1
-fi
 if [[ ! $(command -v jq) ]]; then
   errorf "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
   exit 1
 fi
 
-# Check we're logged into a cluster
-if ! oc whoami > /dev/null 2>&1; then
-  errorf "Not logged into an OpenShift cluster"
-  exit 1
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  echo "[DEBUG] Detected an OpenShift cluster"
+  if [[ ! $(command -v oc) ]]; then
+    errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
+    exit 1
+  fi
+  # Check we're logged into a cluster
+  if ! oc whoami > /dev/null 2>&1; then
+    errorf "Not logged into an OpenShift cluster"
+    exit 1
+  fi
+else
+  if [[ ! $(command -v oc) && ! $(command -v kubectl) ]]; then
+    errorf "Please install kubectl or invoke_cluster_cli 4.10+ (from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/)"
+    exit 1
+  fi
+  echo "[DEBUG] Falling back to a standard K8s cluster"
+  # Check that OLM is installed
+  if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &> /dev/null; then
+    errorf "
+OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
+Check that you are correctly logged into the cluster and that OLM is installed.
+See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM.
+"
+    exit 1
+  fi
 fi
 
 # log into your OCP cluster before running this or you'll get null values for OCP vars!
