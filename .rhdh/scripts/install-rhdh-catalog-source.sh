@@ -9,7 +9,6 @@ set -euo pipefail
 RED='\033[0;31m'
 NC='\033[0m'
 
-NAMESPACE_CATALOGSOURCE="openshift-marketplace"
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 
@@ -165,7 +164,7 @@ fi
 
 TMPDIR=$(mktemp -d)
 # shellcheck disable=SC2064
-trap "rm -fr $TMPDIR" EXIT
+trap "rm -fr $TMPDIR || true" EXIT
 
 CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
 DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
@@ -664,6 +663,11 @@ fi
 
 echo "[DEBUG] newIIBImage=${newIIBImage}"
 
+NAMESPACE_CATALOGSOURCE="olm"
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  NAMESPACE_CATALOGSOURCE="openshift-marketplace"
+fi
+
 echo "apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -677,7 +681,7 @@ spec:
   - internal-reg-ext-auth-for-rhdh
   publisher: IIB testing ${DISPLAY_NAME_SUFFIX}
   displayName: IIB testing catalog ${DISPLAY_NAME_SUFFIX}
-" > "$TMPDIR"/CatalogSource.yml && oc apply -f "$TMPDIR"/CatalogSource.yml
+" > "$TMPDIR"/CatalogSource.yml && invoke_cluster_cli apply -f "$TMPDIR"/CatalogSource.yml
 
 if [ -z "$TO_INSTALL" ]; then
   echo "Done. Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
@@ -691,7 +695,7 @@ kind: OperatorGroup
 metadata:
   name: rhdh-operator-group
   namespace: ${NAMESPACE_SUBSCRIPTION}
-" > "$TMPDIR"/OperatorGroup.yml && oc apply -f "$TMPDIR"/OperatorGroup.yml
+" > "$TMPDIR"/OperatorGroup.yml && invoke_cluster_cli apply -f "$TMPDIR"/OperatorGroup.yml
 
 # Create subscription for operator
 echo "apiVersion: operators.coreos.com/v1alpha1
@@ -705,16 +709,29 @@ spec:
   name: $TO_INSTALL
   source: ${CATALOGSOURCE_NAME}
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
-" > "$TMPDIR"/Subscription.yml && oc apply -f "$TMPDIR"/Subscription.yml
+" > "$TMPDIR"/Subscription.yml && invoke_cluster_cli apply -f "$TMPDIR"/Subscription.yml
 
-OCP_CONSOLE_ROUTE_HOST=$(oc get route console -n openshift-console -o=jsonpath='{.spec.host}')
-CLUSTER_ROUTER_BASE=$(oc get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
-echo "
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
+  CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
+  echo -n "
 
 To install, go to:
 https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogType=OperatorBackedService
 
-Or run this:
+Or "
+else
+  echo -n "
+
+To install on Kubernetes, "
+fi
+
+CLI_TOOL="kubectl"
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  CLI_TOOL="oc"
+fi
+
+echo "run this:
 
 echo \"apiVersion: rhdh.redhat.com/v1alpha3
 kind: Backstage
@@ -732,8 +749,13 @@ spec:
       enabled: true
   database:
     enableLocalDb: true
-\" | oc apply -f-
+\" | ${CLI_TOOL} apply -f-
 
+"
+
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  echo "
 Once deployed, Developer Hub will be available at
 https://backstage-developer-hub-${NAMESPACE_SUBSCRIPTION}.${CLUSTER_ROUTER_BASE}
 "
+fi
