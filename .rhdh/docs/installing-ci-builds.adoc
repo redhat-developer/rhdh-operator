@@ -1,15 +1,32 @@
-== Installing CI builds of Red Hat Developer Hub on OpenShift
+== Installing CI builds of Red Hat Developer Hub
 
-*Prerequisites*
+=== Installing the Operator
 
-* `oc`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[Installing the OpenShift CLI].
-* You are logged in as an administrator using `oc login`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in_cli-developer-commands[Logging in to the OpenShift CLI] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in-web_cli-developer-commands[Logging in to the OpenShift CLI using a web browser].
+==== Prerequisites
+
+Regardless of the cluster provider, you will need the following tools:
+
 * `opm`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/opm-cli[opm CLI].
 * `sed`. See link:https://www.gnu.org/software/sed/[GNU sed].
 * `skopeo`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
-* `umoci` (used if the script detects that the cluster has a hosted control plane). See link:https://github.com/opencontainers/umoci#install[Install].
+* `umoci` (used on vanilla Kubernetes or if the script detects that the cluster is OpenShift with a hosted control plane). See link:https://github.com/opencontainers/umoci#install[Install].
 
-*Procedure*
+===== OpenShift
+
+Besides the prerequisites listed above, you will also need:
+
+* `oc`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[Installing the OpenShift CLI].
+* You are logged in as an administrator using `oc login`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in_cli-developer-commands[Logging in to the OpenShift CLI] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in-web_cli-developer-commands[Logging in to the OpenShift CLI using a web browser].
+
+===== Kubernetes
+
+Besides the prerequisites listed above, you will also need:
+
+* `kubectl` or `oc`
+* Operator Lifecycle Manager (OLM)
+* `tar`
+
+==== Procedure
 
 . Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate or GA version (from the `release-1.yy` branch), but the `--next` option allows to install the current development build (from the `main` branch). For example:
 +
@@ -26,4 +43,41 @@ chmod +x install-rhdh-catalog-source.sh
 ./install-rhdh-catalog-source.sh --next --install-operator rhdh  
 ----
 
-. If you did not create a subscription in the previous step, you can do so now. In the *Administrator* perspective of the OpenShift web console, go to *Operators* → *OperatorHub*, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator. For more info, see link:https://docs.openshift.com/container-platform/4.14/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster[Installing from OperatorHub using the web console].
+. If you did not create a subscription in the previous step, you can do so now. On OpenShift, open the *Administrator* perspective of the web console, then go to *Operators* → *OperatorHub*, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator. For more info, see link:https://docs.openshift.com/container-platform/4.14/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster[Installing from OperatorHub using the web console].
+
+=== Deploying RHDH
+
+Now that the Operator is installed and running, we can deploy an instance of RHDH by creating a Custom Resource (CR).
+
+==== OpenShift
+
+Nothing special to do here. Create a CR in any namespace and it should work out of the box.
+
+==== Kubernetes
+
+To enable pulling the PostgreSQL image from the Red Hat Ecosystem Catalog, you will need to register an account on `registry.redhat.io` and add an image pull secret to the default service account within the namespace where RHDH is being deployed.
+
+*Procedure*
+
+. Create an image pull secret:
++
+[source,console]
+----
+# Replace $YOUR_NS with your own namespace
+kubectl -n "$YOUR_NS" create secret docker-registry rhdh-pull-secret \
+    --docker-server=registry.redhat.io \
+    --docker-username=<user_name> \
+    --docker-password=<password> \
+    --docker-email=<email>
+----
+
+. Add the pull secret to the namespace default service account
++
+[source,console]
+----
+# Replace $YOUR_NS with your own namespace
+$ kubectl -n "$RHDH_NS" patch serviceaccount default \
+    -p '{"imagePullSecrets": [{"name": "rhdh-pull-secret"}]}'
+----
+
+. Create a CR. See the link:../../examples[examples].
