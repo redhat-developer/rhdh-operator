@@ -6,25 +6,28 @@
 
 Regardless of the cluster provider, you will need the following tools:
 
+* `jq`. See link:https://jqlang.github.io/jq/download/[Download jq].
 * `opm`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/opm-cli[opm CLI].
 * `sed`. See link:https://www.gnu.org/software/sed/[GNU sed].
 * `skopeo`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
-* `umoci` (used on vanilla Kubernetes or if the script detects that the cluster is OpenShift with a hosted control plane). See link:https://github.com/opencontainers/umoci#install[Install].
 
 ===== OpenShift
 
 Besides the prerequisites listed above, you will also need:
 
 * `oc`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[Installing the OpenShift CLI].
-* You are logged in as an administrator using `oc login`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in_cli-developer-commands[Logging in to the OpenShift CLI] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in-web_cli-developer-commands[Logging in to the OpenShift CLI using a web browser].
+* A login as an administrator using `oc login`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in_cli-developer-commands[Logging in to the OpenShift CLI] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in-web_cli-developer-commands[Logging in to the OpenShift CLI using a web browser].
+* `umoci` (used if the script detects that the cluster is has a hosted control plane). See link:https://github.com/opencontainers/umoci#install[Install].
 
 ===== Kubernetes
 
 Besides the prerequisites listed above, you will also need:
 
-* `kubectl` or `oc`
+* `base64`
+* link:https://kubernetes.io/docs/tasks/tools/#kubectl[`kubectl`] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[`oc`]
 * Operator Lifecycle Manager (OLM)
 * `tar`
+* `umoci`. See link:https://github.com/opencontainers/umoci#install[Install].
 
 ==== Procedure
 
@@ -51,11 +54,13 @@ Now that the Operator is installed and running, we can deploy an instance of RHD
 
 ==== OpenShift
 
-Nothing special to do here. Create a CR in any namespace and it should work out of the box.
+Just create a CR in any namespace and it should work out of the box. See the link:../../examples[examples].
 
 ==== Kubernetes
 
-To enable pulling the PostgreSQL image from the Red Hat Ecosystem Catalog, you will need to register an account on `registry.redhat.io` and add an image pull secret to the default service account within the namespace where RHDH is being deployed.
+To enable pulling the PostgreSQL image from the link:https://catalog.redhat.com/[Red Hat Ecosystem Catalog], you will need to register an account on `registry.redhat.io` and add an image pull secret to the default service account within the namespace where RHDH is being deployed.
+
+More details on link:https://access.redhat.com/RegistryAuthentication[Red Hat Container Registry Authentication].
 
 *Procedure*
 
@@ -64,7 +69,7 @@ To enable pulling the PostgreSQL image from the Red Hat Ecosystem Catalog, you w
 [source,console]
 ----
 # Replace $YOUR_NS with your own namespace
-kubectl -n "$YOUR_NS" create secret docker-registry rhdh-pull-secret \
+kubectl -n "$YOUR_NS" create secret docker-registry rh-pull-secret \
     --docker-server=registry.redhat.io \
     --docker-username=<user_name> \
     --docker-password=<password> \
@@ -76,8 +81,8 @@ kubectl -n "$YOUR_NS" create secret docker-registry rhdh-pull-secret \
 [source,console]
 ----
 # Replace $YOUR_NS with your own namespace
-$ kubectl -n "$RHDH_NS" patch serviceaccount default \
-    -p '{"imagePullSecrets": [{"name": "rhdh-pull-secret"}]}'
+$ kubectl -n "$YOUR_NS" patch serviceaccount default \
+    -p '{"imagePullSecrets": [{"name": "rh-pull-secret"}]}'
 ----
 
 . Create a CR. See the link:../../examples[examples].
