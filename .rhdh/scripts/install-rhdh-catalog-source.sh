@@ -1,25 +1,51 @@
 #!/bin/bash
 #
-# Script to streamline installing an IIB image in an OpenShift cluster for testing.
+# Script to streamline installing an IIB image in an OpenShift or Kubernetes cluster for testing.
 #
-# Requires: oc, jq
+# Requires: oc (OCP) or kubectl (K8s), jq, umoci, base64, opm, skopeo
 
 set -euo pipefail
 
-RED='\033[0;31m'
 NC='\033[0m'
+
+IS_OPENSHIFT=""
 
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 
-errorf() {
-  echo -e "${RED}$1${NC}"
+function logf() {
+  local prefix=$1
+  local color=$2
+  local msg=$3
+  local fullMsg="[${prefix}] ${msg}"
+
+  if [[ "$TERM" == *"color"* ]]; then
+    echo -e "${color}${fullMsg}${NC}"
+  else
+    echo -e "${fullMsg}"
+  fi
 }
 
-usage() {
-echo "
-This script streamlines testing IIB images by configuring an OpenShift cluster to enable it to use the specified IIB image
-as a catalog source. The CatalogSource is created in the openshift-marketplace namespace,
+function infof() {
+  logf "INFO" "${NC}" "$1"
+}
+
+function warnf() {
+  logf "WARN" "\033[0;33m" "$1"
+}
+
+function debugf() {
+  logf "DEBUG" "\033[0;90m" "$1"
+}
+
+function errorf() {
+  logf "ERROR" "\033[0;31m" "$1"
+}
+
+function usage() {
+  echo "
+This script streamlines testing IIB images by configuring an OpenShift or Kubernetes cluster to enable it to use the specified IIB image
+as a catalog source. The CatalogSource is created in the 'openshift-marketplace' namespace on OpenShift or 'olm' namespace on Kubernetes,
 and is named 'operatorName-channelName', eg., rhdh-fast
 
 If IIB installation fails, see https://docs.engineering.redhat.com/display/CFC/Test and
@@ -36,26 +62,29 @@ Options:
 
 Examples:
   $0 \\
-    --install-operator rhdh          # RC release in progess (from latest tag and stable branch )
+    --install-operator rhdh          # RC release in progress (from latest tag and stable branch )
 
   $0 \\
     --next --install-operator rhdh   # CI future release (from next tag and upstream main branch)
 "
 }
 
-if [[ "$#" -lt 1 ]]; then usage; exit 0; fi
-
 function is_openshift() {
   oc get routes.route.openshift.io &> /dev/null || kubectl get routes.route.openshift.io &> /dev/null
 }
 
-IS_OPENSHIFT=$(is_openshift && echo 'true' || echo 'false')
+function detect_ocp_and_set_env_var() {
+  if [[ "${IS_OPENSHIFT}" = "" ]]; then
+    IS_OPENSHIFT=$(is_openshift && echo 'true' || echo 'false')
+  fi
+}
 
 # Wrapper function to call kubectl or oc
 function invoke_cluster_cli() {
   local command=$1
   shift
 
+  detect_ocp_and_set_env_var
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     if command -v oc &> /dev/null; then
       oc $command "$@"
@@ -67,117 +96,6 @@ function invoke_cluster_cli() {
   fi
 }
 
-# minimum requirements
-if [[ ! $(command -v jq) ]]; then
-  errorf "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
-  exit 1
-fi
-
-if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-  echo "[DEBUG] Detected an OpenShift cluster"
-  if [[ ! $(command -v oc) ]]; then
-    errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
-    exit 1
-  fi
-  # Check we're logged into a cluster
-  if ! oc whoami > /dev/null 2>&1; then
-    errorf "Not logged into an OpenShift cluster"
-    exit 1
-  fi
-else
-  if [[ ! $(command -v oc) && ! $(command -v kubectl) ]]; then
-    errorf "Please install kubectl or invoke_cluster_cli 4.10+ (from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/)"
-    exit 1
-  fi
-  echo "[DEBUG] Falling back to a standard K8s cluster"
-  # Check that OLM is installed
-  if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &> /dev/null; then
-    errorf "
-OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
-Check that you are correctly logged into the cluster and that OLM is installed.
-See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
-    exit 1
-  fi
-fi
-
-# log into your OCP cluster before running this or you'll get null values for OCP vars!
-OCP_VER="v4.16"
-if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-  OCP_VER="v$(invoke_cluster_cli version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
-  if [[ $OCP_VER == "vnull" ]]; then # try releaseClientVersion = 4.16.14
-    OCP_VER="v$(invoke_cluster_cli version -o json | jq -r '.releaseClientVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
-  fi
-fi
-
-OCP_ARCH="x86_64"
-if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-  if [[ $OCP_VER == "vnull" ]]; then # try releaseClientVersion = 4.16.14
-  OCP_VER="v$(oc version -o json | jq -r '.releaseClientVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
-fi
-OCP_ARCH="$(invoke_cluster_cli version -o json | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
-fi
-if [[ $OCP_ARCH == "amd64" ]]; then OCP_ARCH="x86_64"; fi
-
-# if logged in, this should return something like latest-v4.12-x86_64
-IIB_TAG="latest-${OCP_VER}-${OCP_ARCH}"
-
-while [[ "$#" -gt 0 ]]; do
-  case $1 in
-    '--install-operator')
-      # Create project if necessary
-      if ! invoke_cluster_cli get namespace "$NAMESPACE_SUBSCRIPTION" > /dev/null 2>&1; then
-        echo "Namespace $NAMESPACE_SUBSCRIPTION does not exist; creating it"
-        invoke_cluster_cli create namespace "$NAMESPACE_SUBSCRIPTION"
-      fi
-      TO_INSTALL="$2"; shift 1;;
-    '--next'|'--latest')
-      # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
-      IIB_TAG="${1/--/}-${OCP_VER}-$OCP_ARCH";;
-    '-v')
-      IIB_TAG="${2}-${OCP_VER}-$OCP_ARCH";
-      OLM_CHANNEL="fast-${2}"
-      shift 1;;
-    '-h'|'--help') usage; exit 0;;
-    *) echo "[ERROR] Unknown parameter is used: $1."; usage; exit 1;;
-  esac
-  shift 1
-done
-
-# check if the IIB we're going to install as a catalog source exists before trying to install it
-if [[ ! $(command -v skopeo) ]]; then
-  errorf "Please install skopeo 1.11+"
-  exit 1
-fi
-
-UPSTREAM_IIB="quay.io/rhdh/iib:${IIB_TAG}";
-
-# shellcheck disable=SC2086
-UPSTREAM_IIB_MANIFEST="$(skopeo inspect docker://${UPSTREAM_IIB} --raw || exit 2)"
-# echo "Got: $UPSTREAM_IIB_MANIFEST"
-if [[ $UPSTREAM_IIB_MANIFEST == *"Error parsing image name "* ]] || [[ $UPSTREAM_IIB_MANIFEST == *"manifest unknown"* ]]; then
-  echo "$UPSTREAM_IIB_MANIFEST"; exit 3
-else
-  echo "[INFO] Using iib from image $UPSTREAM_IIB"
-  IIB_IMAGE="${UPSTREAM_IIB}"
-fi
-
-TMPDIR=$(mktemp -d)
-# shellcheck disable=SC2064
-trap "rm -fr $TMPDIR || true" EXIT
-
-CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
-DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
-
-# Add CatalogSource for the IIB
-if [ -z "$TO_INSTALL" ]; then
-  IIB_NAME="${UPSTREAM_IIB##*:}"
-  IIB_NAME="${IIB_NAME//_/-}"
-  IIB_NAME="${IIB_NAME//./-}"
-  IIB_NAME="$(echo "$IIB_NAME" | tr '[:upper:]' '[:lower:]')"
-  CATALOGSOURCE_NAME="rhdh-iib-${IIB_NAME}-${OLM_CHANNEL}"
-  DISPLAY_NAME_SUFFIX="${IIB_NAME}"
-fi
-
 function ocp_install_regular_cluster() {
   # A regular cluster should support ImageContentSourcePolicy/ImageDigestMirrorSet resources
   ICSP_URL="quay.io/rhdh/"
@@ -186,7 +104,7 @@ function ocp_install_regular_cluster() {
   # for 1.4+, use IDMS instead of ICSP
   # TODO https://issues.redhat.com/browse/RHIDP-4188 if we onboard 1.3 to Konflux, use IDMS for latest too
   if [[ "$IIB_IMAGE" == *"next"* ]]; then
-    echo "[INFO] Adding ImageDigestMirrorSet to resolve unreleased images on registry.redhat.io from quay.io" >&2
+    debugf "Adding ImageDigestMirrorSet to resolve unreleased images on registry.redhat.io from quay.io" >&2
     echo "---
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -205,8 +123,8 @@ spec:
       - ${ICSP_URL}rhdh-operator-bundle
   " > "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" >&2
   else
-    echo "[INFO] Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io" >&2
-    # echo "[DEBUG] ${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
+    debugf "Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io" >&2
+    # debugf "${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
     echo "---
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
@@ -274,7 +192,7 @@ spec:
 
 function render_iib() {
   mkdir -p "${TMPDIR}/rhdh/rhdh"
-  echo "[DEBUG] Rendering IIB $UPSTREAM_IIB as a local file..."
+  debugf "Rendering IIB $UPSTREAM_IIB as a local file..."
   opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
   if [ ! -s "${TMPDIR}/rhdh/rhdh/render.yaml" ]; then
     errorf "
@@ -296,22 +214,22 @@ function update_refs_in_iib_bundles() {
       bundleImg="${bundleImg/registry.stage.redhat.io/quay.io}"
       bundleImg="${bundleImg/registry.redhat.io/quay.io}"
       bundleImg="${bundleImg/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
-      echo "[DEBUG] $originalBundleImg => $bundleImg"
+      debugf "$originalBundleImg => $bundleImg"
       if skopeo inspect "docker://$bundleImg" &> /dev/null; then
         newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
         newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"
         mkdir -p "bundles/$digest"
 
-        echo "[DEBUG] Copying and unpacking image $bundleImg locally..."
+        debugf "Copying and unpacking image $bundleImg locally..."
         skopeo copy "docker://$bundleImg" "oci:./bundles/${digest}/src:latest"
         umoci unpack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked" --rootless
 
         # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
-        echo "[DEBUG] Replacing refs to internal registry in bundle image $bundleImg..."
+        debugf "Replacing refs to internal registry in bundle image $bundleImg..."
         for folder in manifests metadata; do
           for file in "./bundles/${digest}/unpacked/rootfs/${folder}"/*; do
             if [ -f "$file" ]; then
-              echo "[DEBUG] replacing refs to internal registries in file '${file}'"
+              debugf "replacing refs to internal registries in file '${file}'"
               sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file"
               sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file"
               sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file"
@@ -320,11 +238,11 @@ function update_refs_in_iib_bundles() {
         done
 
         # repack the image with the changes
-        echo "[DEBUG] Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
+        debugf "Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
         umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked"
 
         # Push the bundle to the internal cluster registry
-        echo "[DEBUG] Pushing updated image: ./bundles/${digest}/src => ${newBundleImage}..."
+        debugf "Pushing updated image: ./bundles/${digest}/src => ${newBundleImage}..."
         skopeo copy --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
 
         sed -i "s#${originalBundleImg}#${newBundleImageAsInt}#g" "${TMPDIR}/rhdh/rhdh/render.yaml"
@@ -332,7 +250,7 @@ function update_refs_in_iib_bundles() {
     done
 
     # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
-    echo "[DEBUG] Regenerating IIB Dockerfile with updated refs..."
+    debugf "Regenerating IIB Dockerfile with updated refs..."
     opm generate dockerfile rhdh/rhdh
 }
 
@@ -345,7 +263,7 @@ function ocp_install_hosted_control_plane_cluster() {
   render_iib >&2
 
   # 1. Expose the internal cluster registry if not done already
-  echo "[DEBUG] Exposing cluster registry..." >&2
+  debugf "Exposing cluster registry..." >&2
   internal_registry_url="image-registry.openshift-image-registry.svc:5000"
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
@@ -380,7 +298,7 @@ function ocp_install_hosted_control_plane_cluster() {
   # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
   update_refs_in_iib_bundles "$internal_registry_url" "$my_registry" >&2
 
-  echo "[DEBUG] Submitting in-cluster build request for the updated IIB..." >&2
+  debugf "Submitting in-cluster build request for the updated IIB..." >&2
   if ! oc -n rhdh get buildconfig.build.openshift.io/iib >& /dev/null; then
     oc -n rhdh new-build --strategy docker --binary --name iib >&2
   fi
@@ -390,7 +308,7 @@ function ocp_install_hosted_control_plane_cluster() {
   oc tag rhdh/iib:latest "${imageStreamWithTag}" >&2
 
   local result="${internal_registry_url}/${imageStreamWithTag}"
-  echo "[DEBUG] IIB built and pushed to internal cluster registry: $result..." >&2
+  debugf "IIB built and pushed to internal cluster registry: $result..." >&2
   printf "%s" "${result}"
 }
 
@@ -399,7 +317,8 @@ function k8s_install() {
   local image="registry:2"
   local registry_name="local-registry"
   local username="registryuser"
-  local password=$(echo "$RANDOM" | base64 | head -c 20)
+  local password
+  password=$(echo "$RANDOM" | base64 | head -c 20)
 
   render_iib >&2
 
@@ -412,7 +331,7 @@ function k8s_install() {
     username=$(invoke_cluster_cli -n "${namespace}" get secret "${registry_name}-auth-creds" -o json | jq -r '.data.username' | base64 -d)
     password=$(invoke_cluster_cli -n "${namespace}" get secret "${registry_name}-auth-creds" -o json | jq -r '.data.password' | base64 -d)
   else
-    echo "  generating auth secret for mirror registry. FYI, those creds will be stored in a secret named 'airgap-registry-auth-creds' in ${namespace} ..." >&2
+    debugf "Generating auth secret for mirror registry. FYI, those creds will be stored in a secret named 'airgap-registry-auth-creds' in ${namespace} ..." >&2
     cat <<EOF | invoke_cluster_cli apply -f - >&2
 apiVersion: v1
 kind: Secret
@@ -438,7 +357,7 @@ stringData:
   htpasswd: "${registry_htpasswd}"
 EOF
 
-  echo "[info]  creating the registry Deployment: deployment/${registry_name} ..." >&2
+  debugf "Creating the registry Deployment: deployment/${registry_name} ..." >&2
   cat <<EOF | invoke_cluster_cli apply -f - >&2
 apiVersion: apps/v1
 kind: Deployment
@@ -483,7 +402,7 @@ spec:
             secretName: "${registry_name}-auth"
 EOF
 
-  echo "[info]  creating the registry Service: service/${registry_name} ..." >&2
+  debugf "Creating the registry Service: service/${registry_name} ..." >&2
   # NOTE: We need a NodePort here, for the kubelet to be able to pull insecurely from localhost.
   # We cannot use the internal Service DNS name (ending with .svc.cluster.local) because the Kubelet is responsible for
   # pulling the images and does not seem able to resolve such internal DNS names.
@@ -504,28 +423,29 @@ spec:
   selector:
     app: "${registry_name}"
 EOF
-  echo "Waiting for service $registry_name in namespace $namespace to become ready..." >&2
+  debugf "Waiting for service $registry_name in namespace $namespace to become ready..." >&2
   sleep 7
-  local registrySvcNodePort=$(invoke_cluster_cli -n "${namespace}" get service "$registry_name" -o jsonpath='{.spec.ports[0].nodePort}')
+  local registrySvcNodePort
+  registrySvcNodePort=$(invoke_cluster_cli -n "${namespace}" get service "$registry_name" -o jsonpath='{.spec.ports[0].nodePort}')
   if [[ -z "$registrySvcNodePort" ]]; then
     errorf "NodePort not allocated for service/$registry_name or Service not found"
     exit 1
   fi
 
-  echo "Waiting for deployment $registry_name in namespace $namespace to become ready..." >&2
+  debugf "Waiting for deployment $registry_name in namespace $namespace to become ready..." >&2
   if ! invoke_cluster_cli rollout status deployment/$registry_name -n $namespace --timeout=5m &>/dev/null; then
-    echo "Timed out waiting for deployment $registry_name to be ready." >&2
+    errorf "Timed out waiting for deployment $registry_name to be ready." >&2
     exit 1
   fi
 
   local registry_port_fwd_out="${TMPDIR}/k8s.registry_port_fwd.out.txt"
   invoke_cluster_cli port-forward "service/$registry_name" -n "$namespace" :5000 &> "${registry_port_fwd_out}" &
   local port_fwd_pid=$!
-  echo "Port-forwarding process: $port_fwd_pid" &>2
+  debugf "Port-forwarding process: $port_fwd_pid" &>2
   sleep 7
   # Check if the port-forward is running
   if ! kill -0 $port_fwd_pid &> /dev/null; then
-      echo "Port-forwarding to the cluster registry failed to start. Logs:" >&2
+      errorf "Port-forwarding to the cluster registry failed to start. Logs:" >&2
       cat "${registry_port_fwd_out}"
       exit 1
   fi
@@ -533,11 +453,11 @@ EOF
 
   local portFwdLocalPort=$(grep -oP '127\.0\.0\.1:\K[0-9]+' "${registry_port_fwd_out}")
   if [[ -z "$portFwdLocalPort" ]]; then
-      echo "Failed to determine the local port. Logs:" >&2
+      errorf "Failed to determine the local port. Logs:" >&2
       cat "${registry_port_fwd_out}"
       exit 1
   fi
-  echo "[DEBUG] Port-forwarding from localhost:${portFwdLocalPort} to the cluster registry..." >&2
+  debugf "Port-forwarding from localhost:${portFwdLocalPort} to the cluster registry..." >&2
 
   local kaniko_internal_registry_url="${registry_name}.${namespace}.svc.cluster.local:5000"
   local internal_registry_url="localhost:${registrySvcNodePort}"
@@ -567,7 +487,7 @@ EOF
   local kanikoResult="${kaniko_internal_registry_url}/${imageStreamWithTag}"
 
   # 4. Rebuild the IIB image in the cluster using Kaniko
-  echo "[DEBUG] Rebuilding the IIB Image using Kaniko in the cluster..." >&2
+  debugf "Rebuilding the IIB Image using Kaniko in the cluster..." >&2
   local timestamp=$(date +%s)
   local kanikoJobName="kaniko-build-${timestamp}"
   cat <<EOF | invoke_cluster_cli apply -f - >&2
@@ -608,7 +528,7 @@ spec:
 EOF
 
   local kanikoPod=$(invoke_cluster_cli -n "${namespace}" get pods --selector=job-name="${kanikoJobName}" -o jsonpath='{.items[0].metadata.name}' || exit 1)
-  echo "[DEBUG] Waiting for Kaniko pod to be ready..." >&2
+  debugf "Waiting for Kaniko pod to be ready..." >&2
   invoke_cluster_cli -n "${namespace}" wait --for=condition=Ready "pod/$kanikoPod" --timeout=60s >&2
   invoke_cluster_cli -n "${namespace}" logs -f "${kanikoPod}" >&2 &
   kanikoLogsPid=$!
@@ -620,12 +540,120 @@ EOF
 
   invoke_cluster_cli -n "${namespace}" wait --for=condition=complete "job/${kanikoJobName}" --timeout=300s >&2 || exit 1
 
-  echo "[DEBUG] IIB built and pushed to internal cluster registry: $result..." >&2
+  debugf "IIB built and pushed to internal cluster registry: $result..." >&2
   printf "%s" "${result}"
 }
 
-pushd "${TMPDIR}"
-echo ">>> WORKING DIR: $TMPDIR <<<"
+##########################################################################################
+# Script start
+##########################################################################################
+if [[ "$#" -lt 1 ]]; then
+  usage
+  exit 0
+fi
+
+# minimum requirements
+if [[ ! $(command -v jq) ]]; then
+  errorf "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
+  exit 1
+fi
+if [[ ! $(command -v skopeo) ]]; then
+  errorf "Please install skopeo 1.11+"
+  exit 1
+fi
+
+TMPDIR=$(mktemp -d)
+pushd "${TMPDIR}" > /dev/null
+debugf ">>> WORKING DIR: $TMPDIR <<<"
+# shellcheck disable=SC2064
+trap "rm -fr $TMPDIR || true" EXIT
+
+detect_ocp_and_set_env_var
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  debugf "Detected an OpenShift cluster"
+  if [[ ! $(command -v oc) ]]; then
+    errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
+    exit 1
+  fi
+  # Check we're logged into a cluster
+  if ! oc whoami > /dev/null 2>&1; then
+    errorf "Not logged into an OpenShift cluster"
+    exit 1
+  fi
+else
+  if [[ ! $(command -v oc) && ! $(command -v kubectl) ]]; then
+    errorf "Please install kubectl or invoke_cluster_cli 4.10+ (from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/)"
+    exit 1
+  fi
+  debugf "Falling back to a standard K8s cluster"
+  # Check that OLM is installed
+  if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &> /dev/null; then
+    errorf "
+OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
+Check that you are correctly logged into the cluster and that OLM is installed.
+See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
+    exit 1
+  fi
+fi
+
+OCP_VER="v4.16"
+OCP_ARCH="x86_64"
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  # log into your OCP cluster before running this or you'll get null values for OCP vars!
+  ocpVerJson=$(invoke_cluster_cli version -o json)
+  OCP_VER="v$(echo "$ocpVerJson" | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
+  if [[ $OCP_VER == "vnull" ]]; then # try releaseClientVersion = 4.16.14
+    OCP_VER="v$(echo "$ocpVerJson" | jq -r '.releaseClientVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
+  fi
+  OCP_ARCH="$(echo "$ocpVerJson" | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
+  if [[ $OCP_ARCH == "amd64" ]]; then
+    OCP_ARCH="x86_64"
+  fi
+fi
+
+# if logged in, this should return something like latest-v4.12-x86_64
+IIB_TAG="latest-${OCP_VER}-${OCP_ARCH}"
+
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    '--install-operator')
+      TO_INSTALL="$2"; shift 1;;
+    '--next'|'--latest')
+      # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
+      IIB_TAG="${1/--/}-${OCP_VER}-$OCP_ARCH";;
+    '-v')
+      IIB_TAG="${2}-${OCP_VER}-$OCP_ARCH";
+      OLM_CHANNEL="fast-${2}"
+      shift 1;;
+    '-h'|'--help') usage; exit 0;;
+    *) errorf "Unknown parameter is used: $1."; usage; exit 1;;
+  esac
+  shift 1
+done
+
+UPSTREAM_IIB="quay.io/rhdh/iib:${IIB_TAG}";
+# shellcheck disable=SC2086
+UPSTREAM_IIB_MANIFEST="$(skopeo inspect docker://${UPSTREAM_IIB} --raw || exit 2)"
+if [[ $UPSTREAM_IIB_MANIFEST == *"Error parsing image name "* ]] || [[ $UPSTREAM_IIB_MANIFEST == *"manifest unknown"* ]]; then
+  errorf "Problem with image $UPSTREAM_IIB: $UPSTREAM_IIB_MANIFEST"
+  exit 3
+else
+  infof "Using IIB from image $UPSTREAM_IIB"
+  IIB_IMAGE="${UPSTREAM_IIB}"
+fi
+
+CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
+DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
+
+# Add CatalogSource for the IIB
+if [ -z "$TO_INSTALL" ]; then
+  IIB_NAME="${UPSTREAM_IIB##*:}"
+  IIB_NAME="${IIB_NAME//_/-}"
+  IIB_NAME="${IIB_NAME//./-}"
+  IIB_NAME="$(echo "$IIB_NAME" | tr '[:upper:]' '[:lower:]')"
+  CATALOGSOURCE_NAME="rhdh-iib-${IIB_NAME}-${OLM_CHANNEL}"
+  DISPLAY_NAME_SUFFIX="${IIB_NAME}"
+fi
 
 # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
 # might be restricted in CI environments.
@@ -636,7 +664,7 @@ newIIBImage=${IIB_IMAGE}
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   # Defaulting to the hosted control plane behavior which has more chances to work
   CONTROL_PLANE_TECH=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
-    (echo '[WARN] Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
+    (warnf 'Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
   IS_HOSTED_CONTROL_PLANE="false"
   if [[ "${CONTROL_PLANE_TECH}" == "External" ]]; then
     # 'External' indicates that the control plane is hosted externally to the cluster
@@ -645,22 +673,22 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   fi
 
   if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
-    echo "[INFO] Detected an OpenShift cluster with a hosted control plane"
+    infof "Detected an OpenShift cluster with a hosted control plane"
     if [[ ! $(command -v umoci) ]]; then
       errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
       exit 1
     fi
-    newIIBImage=$(ocp_install_hosted_control_plane_cluster)
+    newIIBImage=$(ocp_install_hosted_control_plane_cluster) || exit
   else
-    newIIBImage=$(ocp_install_regular_cluster)
+    newIIBImage=$(ocp_install_regular_cluster) || exit
   fi
 else
   # K8s cluster with OLM installed
-  echo "[INFO] Detected a Kubernetes cluster"
-  newIIBImage=$(k8s_install)
+  infof "Detected a Kubernetes cluster"
+  newIIBImage=$(k8s_install) || exit
 fi
 
-echo "[DEBUG] newIIBImage=${newIIBImage}"
+debugf "newIIBImage=${newIIBImage}"
 
 NAMESPACE_CATALOGSOURCE="olm"
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
@@ -687,8 +715,14 @@ if [ -z "$TO_INSTALL" ]; then
   exit 0
 fi
 
+# Create project if necessary
+if ! invoke_cluster_cli get namespace "$NAMESPACE_SUBSCRIPTION" > /dev/null 2>&1; then
+  debugf "Namespace $NAMESPACE_SUBSCRIPTION does not exist; creating it"
+  invoke_cluster_cli create namespace "$NAMESPACE_SUBSCRIPTION"
+fi
+
 # Create OperatorGroup to allow installing all-namespaces operators in $NAMESPACE_SUBSCRIPTION
-echo "Creating OperatorGroup to allow all-namespaces operators to be installed"
+debugf "Creating OperatorGroup to allow all-namespaces operators to be installed"
 echo "apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
