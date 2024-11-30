@@ -64,6 +64,9 @@ fi
 
 # log into your OCP cluster before running this or you'll get null values for OCP vars!
 OCP_VER="v$(oc version -o json | jq -r '.openshiftVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
+if [[ $OCP_VER == "vnull" ]]; then # try releaseClientVersion = 4.16.14
+  OCP_VER="v$(oc version -o json | jq -r '.releaseClientVersion' | sed -r -e "s#([0-9]+\.[0-9]+)\..+#\1#")"
+fi
 OCP_ARCH="$(oc version -o json | jq -r '.serverVersion.platform' | sed -r -e "s#linux/##")"
 if [[ $OCP_ARCH == "amd64" ]]; then OCP_ARCH="x86_64"; fi
 # if logged in, this should return something like latest-v4.12-x86_64
@@ -225,11 +228,6 @@ function install_hosted_control_plane_cluster() {
   # to the underlying nodes, causing an issue mirroring internal images effectively.
   # This function works around this by locally modifying the bundles (replacing all refs to the internal registries
   # with their mirrors on quay.io), rebuilding and pushing the images to the internal cluster registry.
-  if [[ ! $(command -v umoci) ]]; then
-    errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci"
-    exit 1
-  fi
-
   mkdir -p "${TMPDIR}/rhdh/rhdh" >&2
   echo "[DEBUG] Rendering IIB $UPSTREAM_IIB as a local file..." >&2
   opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
@@ -352,6 +350,10 @@ fi
 newIIBImage=${IIB_IMAGE}
 if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
   echo "[INFO] Detected a cluster with a hosted control plane"
+  if [[ ! $(command -v umoci) ]]; then
+    errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
+    exit 1
+  fi
   newIIBImage=$(install_hosted_control_plane_cluster)
 else
   newIIBImage=$(install_regular_cluster)
