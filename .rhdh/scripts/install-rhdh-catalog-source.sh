@@ -95,8 +95,7 @@ else
     errorf "
 OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
 Check that you are correctly logged into the cluster and that OLM is installed.
-See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM.
-"
+See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
     exit 1
   fi
 fi
