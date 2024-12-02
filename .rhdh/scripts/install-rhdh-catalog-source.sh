@@ -770,15 +770,15 @@ To install on Kubernetes:
 
 2. Create an image pull secret to enable pulling the RHDH Database image from registry.redhat.io:
 
-kubectl -n ${NAMESPACE_SUBSCRIPTION} create secret docker-registry rh-pull-secret
-    --docker-server=registry.redhat.io
-    --docker-username=<user_name>
-    --docker-password=<password>
-    --docker-email=<email>
+kubectl -n ${NAMESPACE_SUBSCRIPTION} create secret docker-registry rh-pull-secret \\
+    --docker-server=registry.redhat.io \\
+    --docker-username=\"<user_name>\" \\
+    --docker-password=\"<password>\" \\
+    --docker-email=\"<email>\"
 
 3. Add the pull secret to the namespace default service account:
 
-kubectl -n ${NAMESPACE_SUBSCRIPTION} patch serviceaccount default -p '{"imagePullSecrets": [{"name": "rh-pull-secret"}]}'
+kubectl -n ${NAMESPACE_SUBSCRIPTION} patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"rh-pull-secret\"}]}'
 
 4. And then "
 fi
