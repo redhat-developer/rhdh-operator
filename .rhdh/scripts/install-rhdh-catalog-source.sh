@@ -764,17 +764,32 @@ Or "
 else
   echo -n "
 
-To install on Kubernetes, "
+To install on Kubernetes:
+
+1. Register an account on registry.redhat.io if you don't already have one.
+
+2. Create an image pull secret to enable pulling the RHDH Database image from registry.redhat.io:
+
+kubectl -n ${NAMESPACE_SUBSCRIPTION} create secret docker-registry rh-pull-secret
+    --docker-server=registry.redhat.io
+    --docker-username=<user_name>
+    --docker-password=<password>
+    --docker-email=<email>
+
+3. Add the pull secret to the namespace default service account:
+
+kubectl -n ${NAMESPACE_SUBSCRIPTION} patch serviceaccount default -p '{"imagePullSecrets": [{"name": "rh-pull-secret"}]}'
+
+4. And then "
 fi
 
 CLI_TOOL="kubectl"
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   CLI_TOOL="oc"
 fi
-
-echo "run this:
-
-echo \"apiVersion: rhdh.redhat.com/v1alpha3
+CR_EXAMPLE="
+cat <<EOF | ${CLI_TOOL} apply -f -
+apiVersion: rhdh.redhat.com/v1alpha3
 kind: Backstage
 metadata:
   name: developer-hub
@@ -790,8 +805,10 @@ spec:
       enabled: true
   database:
     enableLocalDb: true
-\" | ${CLI_TOOL} apply -f-
+EOF"
 
+echo "run this to create an RHDH instance:
+${CR_EXAMPLE}
 "
 
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
