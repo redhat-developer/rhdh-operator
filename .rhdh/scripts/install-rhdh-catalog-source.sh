@@ -467,17 +467,17 @@ EOF
       --docker-server=${kaniko_internal_registry_url} \
       --docker-username="${username}" \
       --docker-password="${password}" \
-      --docker-email="admin@internal-registry-ext.kaniko.example.com" >&2
+      --docker-email="admin@internal-registry-ext.kaniko.example.com" --dry-run=client -o=yaml | invoke_cluster_cli apply -f - >&2
   invoke_cluster_cli -n olm create secret docker-registry internal-reg-ext-auth-for-rhdh \
       --docker-server=${internal_registry_url} \
       --docker-username="${username}" \
       --docker-password="${password}" \
-      --docker-email="admin@internal-registry-ext.example.com" >&2
+      --docker-email="admin@internal-registry-ext.example.com" --dry-run=client -o=yaml | invoke_cluster_cli apply -f - >&2
   invoke_cluster_cli -n olm create secret docker-registry internal-reg-auth-for-rhdh \
     --docker-server=${internal_registry_url} \
       --docker-username="${username}" \
       --docker-password="${password}" \
-    --docker-email="admin@internal-registry.example.com" >&2
+    --docker-email="admin@internal-registry.example.com" --dry-run=client -o=yaml | invoke_cluster_cli apply -f - >&2
 
   # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
   update_refs_in_iib_bundles "$internal_registry_url" "localhost:$portFwdLocalPort" >&2
