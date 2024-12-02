@@ -553,11 +553,11 @@ if [[ "$#" -lt 1 ]]; then
 fi
 
 # minimum requirements
-if [[ ! $(command -v jq) ]]; then
+if ! command -v jq &> /dev/null; then
   errorf "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
   exit 1
 fi
-if [[ ! $(command -v skopeo) ]]; then
+if ! command -v skopeo &> /dev/null; then
   errorf "Please install skopeo 1.11+"
   exit 1
 fi
@@ -571,17 +571,17 @@ trap "rm -fr $TMPDIR || true" EXIT
 detect_ocp_and_set_env_var
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   debugf "Detected an OpenShift cluster"
-  if [[ ! $(command -v oc) ]]; then
+  if ! command -v oc &> /dev/null; then
     errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
     exit 1
   fi
   # Check we're logged into a cluster
-  if ! oc whoami > /dev/null 2>&1; then
+  if ! oc whoami &> /dev/null; then
     errorf "Not logged into an OpenShift cluster"
     exit 1
   fi
 else
-  if [[ ! $(command -v oc) && ! $(command -v kubectl) ]]; then
+  if !command -v oc &> /dev/null && ! command -v kubectl &> /dev/null; then
     errorf "Please install kubectl or invoke_cluster_cli 4.10+ (from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/)"
     exit 1
   fi
@@ -674,8 +674,12 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
 
   if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
     infof "Detected an OpenShift cluster with a hosted control plane"
-    if [[ ! $(command -v umoci) ]]; then
+    if ! command -v umoci &> /dev/null; then
       errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
+      exit 1
+    fi
+    if ! command -v opm &> /dev/null; then
+      errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
       exit 1
     fi
     newIIBImage=$(ocp_install_hosted_control_plane_cluster) || exit
@@ -685,6 +689,10 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
 else
   # K8s cluster with OLM installed
   infof "Detected a Kubernetes cluster"
+  if ! command -v opm &> /dev/null; then
+    errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
+    exit 1
+  fi
   newIIBImage=$(k8s_install) || exit
 fi
 
