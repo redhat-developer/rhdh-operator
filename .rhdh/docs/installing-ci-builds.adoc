@@ -6,10 +6,11 @@
 
 Regardless of the cluster provider, you will need the following tools:
 
+* `GNU grep`. See link:https://www.gnu.org/software/grep/[GNU grep].
 * `jq`. See link:https://jqlang.github.io/jq/download/[Download jq].
 * `opm`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/opm-cli[opm CLI].
-* `sed`. See link:https://www.gnu.org/software/sed/[GNU sed].
-* `skopeo`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
+* `GNU sed`. See link:https://www.gnu.org/software/sed/[GNU sed].
+* `Skopeo`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
 
 ===== OpenShift
 
@@ -17,7 +18,7 @@ Besides the prerequisites listed above, you will also need:
 
 * `oc`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[Installing the OpenShift CLI].
 * A login as an administrator using `oc login`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in_cli-developer-commands[Logging in to the OpenShift CLI] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-logging-in-web_cli-developer-commands[Logging in to the OpenShift CLI using a web browser].
-* `umoci` (used if the script detects that the cluster is has a hosted control plane). See link:https://github.com/opencontainers/umoci#install[Install].
+* `umoci` (used if the script detects that the cluster has a hosted control plane). See link:https://github.com/opencontainers/umoci#install[Install].
 
 ===== Kubernetes
 
