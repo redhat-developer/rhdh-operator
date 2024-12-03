@@ -87,12 +87,12 @@ function invoke_cluster_cli() {
   detect_ocp_and_set_env_var
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     if command -v oc &> /dev/null; then
-      oc $command "$@"
+      oc "$command" "$@"
     else
-      kubectl $command "$@"
+      kubectl "$command" "$@"
     fi
   else
-    kubectl $command "$@"
+    kubectl "$command" "$@"
   fi
 }
 
@@ -208,7 +208,7 @@ function update_refs_in_iib_bundles() {
   local my_registry="$2"
   # 2. Render the IIB locally, modify any references to the internal registries with their mirrors on Quay
     # and push the updates to the internal cluster registry
-    for bundleImg in $(cat "${TMPDIR}/rhdh/rhdh/render.yaml" | grep -E '^image: .*operator-bundle' | awk '{print $2}' | uniq); do
+    for bundleImg in $(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq); do
       originalBundleImg="$bundleImg"
       digest="${originalBundleImg##*@sha256:}"
       bundleImg="${bundleImg/registry.stage.redhat.io/quay.io}"
@@ -267,7 +267,7 @@ function ocp_install_hosted_control_plane_cluster() {
   internal_registry_url="image-registry.openshift-image-registry.svc:5000"
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
-  skopeo login -u kubeadmin -p $(oc whoami -t) --tls-verify=false $my_registry >&2
+  skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
   if oc -n openshift-marketplace get secret internal-reg-auth-for-rhdh &> /dev/null; then
     oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh >&2
   fi
@@ -275,16 +275,15 @@ function ocp_install_hosted_control_plane_cluster() {
     oc -n openshift-marketplace delete secret internal-reg-ext-auth-for-rhdh >&2
   fi
   oc -n openshift-marketplace create secret docker-registry internal-reg-ext-auth-for-rhdh \
-    --docker-server=${my_registry} \
+    --docker-server="${my_registry}" \
     --docker-username=kubeadmin \
-    --docker-password=$(oc whoami -t) \
+    --docker-password="$(oc whoami -t)" \
     --docker-email="admin@internal-registry-ext.example.com" >&2
   oc -n openshift-marketplace create secret docker-registry internal-reg-auth-for-rhdh \
-    --docker-server=${internal_registry_url} \
+    --docker-server="${internal_registry_url}" \
     --docker-username=kubeadmin \
-    --docker-password=$(oc whoami -t) \
+    --docker-password="$(oc whoami -t)" \
     --docker-email="admin@internal-registry.example.com" >&2
-#  oc registry login --registry="$my_registry" --auth-basic="kubeadmin:$(oc whoami -t)" --to="${REGISTRY_AUTH_FILE}" >&2
   for ns in rhdh-operator rhdh; do
     # To be able to push images under this scope in the internal image registry
     if ! oc get namespace "$ns" > /dev/null; then
@@ -440,8 +439,9 @@ EOF
 
   local registry_port_fwd_out="${TMPDIR}/k8s.registry_port_fwd.out.txt"
   invoke_cluster_cli port-forward "service/$registry_name" -n "$namespace" :5000 &> "${registry_port_fwd_out}" &
-  local port_fwd_pid=$!
-  debugf "Port-forwarding process: $port_fwd_pid" &>2
+  local port_fwd_pid
+  port_fwd_pid=$!
+  debugf "Port-forwarding process: $port_fwd_pid" >&2
   sleep 7
   # Check if the port-forward is running
   if ! kill -0 $port_fwd_pid &> /dev/null; then
@@ -449,9 +449,10 @@ EOF
       cat "${registry_port_fwd_out}"
       exit 1
   fi
-  trap "kill $port_fwd_pid || true" EXIT
+  trap 'kill ${port_fwd_pid} || true' EXIT
 
-  local portFwdLocalPort=$(grep -oP '127\.0\.0\.1:\K[0-9]+' "${registry_port_fwd_out}")
+  local portFwdLocalPort
+  portFwdLocalPort=$(grep -oP '127\.0\.0\.1:\K[0-9]+' "${registry_port_fwd_out}")
   if [[ -z "$portFwdLocalPort" ]]; then
       errorf "Failed to determine the local port. Logs:" >&2
       cat "${registry_port_fwd_out}"
@@ -459,25 +460,33 @@ EOF
   fi
   debugf "Port-forwarding from localhost:${portFwdLocalPort} to the cluster registry..." >&2
 
-  local kaniko_internal_registry_url="${registry_name}.${namespace}.svc.cluster.local:5000"
-  local internal_registry_url="localhost:${registrySvcNodePort}"
+  local kaniko_internal_registry_url
+  kaniko_internal_registry_url="${registry_name}.${namespace}.svc.cluster.local:5000"
+  local internal_registry_url
+  internal_registry_url="localhost:${registrySvcNodePort}"
 
   skopeo login -u "${username}" -p "${password}" --tls-verify=false "localhost:$portFwdLocalPort" >&2
   invoke_cluster_cli -n "${namespace}" create secret docker-registry kaniko-registry-secret \
-      --docker-server=${kaniko_internal_registry_url} \
+      --docker-server="${kaniko_internal_registry_url}" \
       --docker-username="${username}" \
       --docker-password="${password}" \
-      --docker-email="admin@internal-registry-ext.kaniko.example.com" --dry-run=client -o=yaml | invoke_cluster_cli apply -f - >&2
+      --docker-email="admin@internal-registry-ext.kaniko.example.com" \
+      --dry-run=client -o=yaml | \
+      invoke_cluster_cli apply -f - >&2
   invoke_cluster_cli -n olm create secret docker-registry internal-reg-ext-auth-for-rhdh \
-      --docker-server=${internal_registry_url} \
+      --docker-server="${internal_registry_url}" \
       --docker-username="${username}" \
       --docker-password="${password}" \
-      --docker-email="admin@internal-registry-ext.example.com" --dry-run=client -o=yaml | invoke_cluster_cli apply -f - >&2
+      --docker-email="admin@internal-registry-ext.example.com" \
+      --dry-run=client -o=yaml | \
+      invoke_cluster_cli apply -f - >&2
   invoke_cluster_cli -n olm create secret docker-registry internal-reg-auth-for-rhdh \
-    --docker-server=${internal_registry_url} \
+      --docker-server="${internal_registry_url}" \
       --docker-username="${username}" \
       --docker-password="${password}" \
-    --docker-email="admin@internal-registry.example.com" --dry-run=client -o=yaml | invoke_cluster_cli apply -f - >&2
+      --docker-email="admin@internal-registry.example.com" \
+      --dry-run=client -o=yaml | \
+      invoke_cluster_cli apply -f - >&2
 
   # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
   update_refs_in_iib_bundles "$internal_registry_url" "localhost:$portFwdLocalPort" >&2
@@ -488,8 +497,13 @@ EOF
 
   # 4. Rebuild the IIB image in the cluster using Kaniko
   debugf "Rebuilding the IIB Image using Kaniko in the cluster..." >&2
-  local timestamp=$(date +%s)
-  local kanikoJobName="kaniko-build-${timestamp}"
+  local timestamp
+  local kanikoJobName
+  local kanikoPod
+  local kanikoLogsPid
+  local localContext
+  timestamp=$(date +%s)
+  kanikoJobName="kaniko-build-${timestamp}"
   cat <<EOF | invoke_cluster_cli apply -f - >&2
 apiVersion: batch/v1
 kind: Job
@@ -534,14 +548,14 @@ spec:
             path: config.json
 EOF
 
-  local kanikoPod=$(invoke_cluster_cli -n "${namespace}" get pods --selector=job-name="${kanikoJobName}" -o jsonpath='{.items[0].metadata.name}' || exit 1)
+  kanikoPod=$(invoke_cluster_cli -n "${namespace}" get pods --selector=job-name="${kanikoJobName}" -o jsonpath='{.items[0].metadata.name}' || exit 1)
   debugf "Waiting for Kaniko pod to be ready..." >&2
   invoke_cluster_cli -n "${namespace}" wait --for=condition=Ready "pod/$kanikoPod" --timeout=60s >&2
   invoke_cluster_cli -n "${namespace}" logs -f "${kanikoPod}" >&2 &
   kanikoLogsPid=$!
-  trap "kill $kanikoLogsPid &>/dev/null || true" EXIT
+  trap 'kill ${kanikoLogsPid} &>/dev/null || true' EXIT
 
-  local localContext=context.tar.gz
+  localContext=context.tar.gz
   tar -czf "${localContext}" -C rhdh . >&2
   invoke_cluster_cli -n "${namespace}" cp "${localContext}" "${kanikoPod}:/workspace/${localContext}" >&2 || exit 1
 
@@ -588,7 +602,7 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     exit 1
   fi
 else
-  if !command -v oc &> /dev/null && ! command -v kubectl &> /dev/null; then
+  if ! command -v oc &> /dev/null && ! command -v kubectl &> /dev/null; then
     errorf "Please install kubectl or invoke_cluster_cli 4.10+ (from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/)"
     exit 1
   fi
