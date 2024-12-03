@@ -630,13 +630,13 @@ spec:
         - |
             while [ ! -f /workspace/context.tar.gz ]; do echo 'Waiting for the build context archive...'; sleep 2; done
             /kaniko/executor --context=tar:///workspace/context.tar.gz --dockerfile=rhdh.Dockerfile --destination=$kanikoResult
-        resources:
-          requests:
-            cpu: 250m
-            memory: 512Mi
-          limits:
-            cpu: 500m
-            memory: 1Gi
+        #resources:
+        #  requests:
+        #    cpu: 250m
+        #    memory: 512Mi
+        #  limits:
+        #    cpu: 500m
+        #    memory: 1Gi
         volumeMounts:
         - name: build-context
           mountPath: /workspace
