@@ -331,7 +331,7 @@ function k8s_install() {
     username=$(invoke_cluster_cli -n "${namespace}" get secret "${registry_name}-auth-creds" -o json | jq -r '.data.username' | base64 -d)
     password=$(invoke_cluster_cli -n "${namespace}" get secret "${registry_name}-auth-creds" -o json | jq -r '.data.password' | base64 -d)
   else
-    debugf "Generating auth secret for mirror registry. FYI, those creds will be stored in a secret named 'airgap-registry-auth-creds' in ${namespace} ..." >&2
+    debugf "Generating auth secret for mirror registry. FYI, those creds will be stored in a secret named '${registry_name}-auth-creds' in ${namespace} ..." >&2
     cat <<EOF | invoke_cluster_cli apply -f - >&2
 apiVersion: v1
 kind: Secret
@@ -509,6 +509,13 @@ spec:
         - |
             while [ ! -f /workspace/context.tar.gz ]; do echo 'Waiting for the build context archive...'; sleep 2; done
             /kaniko/executor --context=tar:///workspace/context.tar.gz --dockerfile=rhdh.Dockerfile --destination=$kanikoResult
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
         volumeMounts:
         - name: build-context
           mountPath: /workspace
@@ -718,8 +725,41 @@ spec:
   displayName: IIB testing catalog ${DISPLAY_NAME_SUFFIX}
 " > "$TMPDIR"/CatalogSource.yml && invoke_cluster_cli apply -f "$TMPDIR"/CatalogSource.yml
 
+OPERATOR_GROUP_MANIFEST="
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: ${TO_INSTALL:-rhdh}-operator-group
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+"
+
+SUBSCRIPTION_MANIFEST="
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: ${TO_INSTALL:-rhdh}
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+spec:
+  channel: $OLM_CHANNEL
+  installPlanApproval: Automatic
+  name: ${TO_INSTALL:-rhdh}
+  source: ${CATALOGSOURCE_NAME}
+  sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
+"
+
 if [ -z "$TO_INSTALL" ]; then
-  echo "Done. Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
+  echo -n "Done. "
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
+  else
+    echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following command:
+cat <<EOF | kubectl -n ${NAMESPACE_SUBSCRIPTION} apply -f -
+${OPERATOR_GROUP_MANIFEST}
+---
+${SUBSCRIPTION_MANIFEST}
+EOF
+"
+  fi
   exit 0
 fi
 
@@ -731,26 +771,10 @@ fi
 
 # Create OperatorGroup to allow installing all-namespaces operators in $NAMESPACE_SUBSCRIPTION
 debugf "Creating OperatorGroup to allow all-namespaces operators to be installed"
-echo "apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: rhdh-operator-group
-  namespace: ${NAMESPACE_SUBSCRIPTION}
-" > "$TMPDIR"/OperatorGroup.yml && invoke_cluster_cli apply -f "$TMPDIR"/OperatorGroup.yml
+echo "${OPERATOR_GROUP_MANIFEST}" > "$TMPDIR"/OperatorGroup.yml && invoke_cluster_cli apply -f "$TMPDIR"/OperatorGroup.yml
 
 # Create subscription for operator
-echo "apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: $TO_INSTALL
-  namespace: ${NAMESPACE_SUBSCRIPTION}
-spec:
-  channel: $OLM_CHANNEL
-  installPlanApproval: Automatic
-  name: $TO_INSTALL
-  source: ${CATALOGSOURCE_NAME}
-  sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
-" > "$TMPDIR"/Subscription.yml && invoke_cluster_cli apply -f "$TMPDIR"/Subscription.yml
+echo "${SUBSCRIPTION_MANIFEST}" > "$TMPDIR"/Subscription.yml && invoke_cluster_cli apply -f "$TMPDIR"/Subscription.yml
 
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
