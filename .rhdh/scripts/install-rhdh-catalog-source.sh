@@ -215,26 +215,65 @@ Please reach out to the RHDH Productization team.
   fi
 }
 
-function k8s_add_fsGroup_to_bundle_manifest() {
+function k8s_check_bundle_manifest_default_config() {
   set -euo pipefail
 
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    debugf "Skipping fsGroup handling on OCP cluster"
+    debugf "Skipping k8s_update_bundle_manifest_default_config handling on OCP cluster" >&2
     return 0
   fi
 
   local file="$1"
   if ! yq --exit-status 'tag == "!!map"' "$file" &>/dev/null; then
     # https://mikefarah.gitbook.io/yq/usage/tips-and-tricks#validating-yaml-files
-    debugf "Skipping $file for setting fsGroup (for K8s compatibility): not a valid YAML file"
+    debugf "Skipping $file for k8s_update_bundle_manifest_default_config (for K8s compatibility): not a valid YAML file" >&2
     return 0
   fi
   if [[ $(yq '.kind' "$file") != "ConfigMap" ]]; then
-    debugf "Skipping $file for setting fsGroup (for K8s compatibility): not a ConfigMap manifest"
+    debugf "Skipping $file k8s_update_bundle_manifest_default_config (for K8s compatibility): not a ConfigMap manifest" >&2
     return 0
   fi
+
   if [[ ! "$(yq '.metadata.name' "$file")" =~ -default-config$ ]]; then
-    debugf "Skipping $file for setting fsGroup (for K8s compatibility): not the operator default config ConfigMap"
+    debugf "Skipping $file for k8s_update_bundle_manifest_default_config (for K8s compatibility): not the operator default config ConfigMap" >&2
+    return 0
+  fi
+
+  echo "ok"
+}
+
+function k8s_update_service_type_in_bundle_manifest() {
+  set -euo pipefail
+
+  local file="$1"
+  local res
+  res=$(k8s_check_bundle_manifest_default_config "$file")
+  if [[ "${res}" != "ok" ]]; then
+    return 0
+  fi
+
+  local key="service.yaml"
+  if ! yq --exit-status ".data.\"${key}\"" "$file" &>/dev/null; then
+    debugf "Skipping missing key $key in $file"
+    return 0
+  fi
+
+  local val
+  local newValFile
+  val=$(yq --exit-status ".data.\"${key}\"" "$file")
+  newValFile="${file}.${key}.yaml"
+  echo "$val" | yq --exit-status 'with(.spec.type; . = "NodePort" | . style = "double")' > "${newValFile}"
+  yq -i ".data.\"${key}\" = load_str(\"$newValFile\")" "$file"
+  rm -f "${newValFile}"
+}
+
+function k8s_add_fsGroup_to_bundle_manifest() {
+  set -euo pipefail
+
+  local file="$1"
+  local res
+  res=$(k8s_check_bundle_manifest_default_config "$file")
+  if [[ "${res}" != "ok" ]]; then
     return 0
   fi
 
@@ -296,6 +335,7 @@ function update_refs_in_iib_bundles() {
 
             if [[ "${IS_OPENSHIFT}" != "true" ]]; then
               k8s_add_fsGroup_to_bundle_manifest "$file"
+              k8s_update_service_type_in_bundle_manifest "$file"
             fi
           fi
         done
