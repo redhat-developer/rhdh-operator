@@ -26,8 +26,8 @@ Besides the prerequisites listed above, you will also need:
 
 * `base64`
 * link:https://kubernetes.io/docs/tasks/tools/#kubectl[`kubectl`] or link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/openshift-cli-oc#cli-installing-cli_cli-developer-commands[`oc`]
-* Operator Lifecycle Manager (OLM)
-* `tar`
+* Operator Lifecycle Manager (OLM). See link:https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster[Installing OLM in your cluster].
+* link:https://www.gnu.org/software/tar/[`GNU tar`]
 * `umoci`. See link:https://github.com/opencontainers/umoci#install[Install].
 
 ==== Procedure
