@@ -14,6 +14,8 @@ NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 
 function logf() {
+  set -euo pipefail
+
   local prefix=$1
   local color=$2
   local msg=$3
@@ -70,10 +72,14 @@ Examples:
 }
 
 function is_openshift() {
+  set -euo pipefail
+
   oc get routes.route.openshift.io &> /dev/null || kubectl get routes.route.openshift.io &> /dev/null
 }
 
 function detect_ocp_and_set_env_var() {
+  set -euo pipefail
+
   if [[ "${IS_OPENSHIFT}" = "" ]]; then
     IS_OPENSHIFT=$(is_openshift && echo 'true' || echo 'false')
   fi
@@ -81,6 +87,8 @@ function detect_ocp_and_set_env_var() {
 
 # Wrapper function to call kubectl or oc
 function invoke_cluster_cli() {
+  set -euo pipefail
+
   local command=$1
   shift
 
@@ -97,6 +105,8 @@ function invoke_cluster_cli() {
 }
 
 function ocp_install_regular_cluster() {
+  set -euo pipefail
+
   # A regular cluster should support ImageContentSourcePolicy/ImageDigestMirrorSet resources
   ICSP_URL="quay.io/rhdh/"
   ICSP_URL_PRE=${ICSP_URL%%/*}
@@ -191,6 +201,8 @@ spec:
 }
 
 function render_iib() {
+  set -euo pipefail
+
   mkdir -p "${TMPDIR}/rhdh/rhdh"
   debugf "Rendering IIB $UPSTREAM_IIB as a local file..."
   opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
@@ -199,11 +211,13 @@ function render_iib() {
 [ERROR] 'opm render $UPSTREAM_IIB' returned an empty output, which likely means that this IIB Image does not contain any operators in it.
 Please reach out to the RHDH Productization team.
 "
-    exit 1
+    return 1
   fi
 }
 
 function update_refs_in_iib_bundles() {
+  set -euo pipefail
+
   local internal_registry_url="$1"
   local my_registry="$2"
   # 2. Render the IIB locally, modify any references to the internal registries with their mirrors on Quay
@@ -259,6 +273,7 @@ function ocp_install_hosted_control_plane_cluster() {
   # to the underlying nodes, causing an issue mirroring internal images effectively.
   # This function works around this by locally modifying the bundles (replacing all refs to the internal registries
   # with their mirrors on quay.io), rebuilding and pushing the images to the internal cluster registry.
+  set -euo pipefail
 
   render_iib >&2
 
@@ -312,6 +327,8 @@ function ocp_install_hosted_control_plane_cluster() {
 }
 
 function k8s_install() {
+  set -euo pipefail
+
   local namespace="rhdh-operator"
   local image="registry:2"
   local registry_name="local-registry"
@@ -428,13 +445,13 @@ EOF
   registrySvcNodePort=$(invoke_cluster_cli -n "${namespace}" get service "$registry_name" -o jsonpath='{.spec.ports[0].nodePort}')
   if [[ -z "$registrySvcNodePort" ]]; then
     errorf "NodePort not allocated for service/$registry_name or Service not found"
-    exit 1
+    return 1
   fi
 
   debugf "Waiting for deployment $registry_name in namespace $namespace to become ready..." >&2
   if ! invoke_cluster_cli rollout status deployment/$registry_name -n $namespace --timeout=5m &>/dev/null; then
     errorf "Timed out waiting for deployment $registry_name to be ready." >&2
-    exit 1
+    return 1
   fi
 
   local registry_port_fwd_out="${TMPDIR}/k8s.registry_port_fwd.out.txt"
@@ -447,32 +464,25 @@ EOF
   if ! kill -0 $port_fwd_pid &> /dev/null; then
       errorf "Port-forwarding to the cluster registry failed to start. Logs:" >&2
       cat "${registry_port_fwd_out}"
-      exit 1
+      return 1
   fi
-  trap 'kill ${port_fwd_pid} || true' EXIT
+  trap '[[ -n "${port_fwd_pid:-}" ]] && kill ${port_fwd_pid} || true' EXIT
 
   local portFwdLocalPort
   portFwdLocalPort=$(grep -oP '127\.0\.0\.1:\K[0-9]+' "${registry_port_fwd_out}")
   if [[ -z "$portFwdLocalPort" ]]; then
       errorf "Failed to determine the local port. Logs:" >&2
       cat "${registry_port_fwd_out}"
-      exit 1
+      return 1
   fi
   debugf "Port-forwarding from localhost:${portFwdLocalPort} to the cluster registry..." >&2
+  local internal_registry_url
+  internal_registry_url="localhost:${registrySvcNodePort}"
+  skopeo login -u "${username}" -p "${password}" --tls-verify=false "localhost:$portFwdLocalPort" >&2
 
   local kaniko_internal_registry_url
   kaniko_internal_registry_url="${registry_name}.${namespace}.svc.cluster.local:5000"
-  local internal_registry_url
-  internal_registry_url="localhost:${registrySvcNodePort}"
 
-  skopeo login -u "${username}" -p "${password}" --tls-verify=false "localhost:$portFwdLocalPort" >&2
-  invoke_cluster_cli -n "${namespace}" create secret docker-registry kaniko-registry-secret \
-      --docker-server="${kaniko_internal_registry_url}" \
-      --docker-username="${username}" \
-      --docker-password="${password}" \
-      --docker-email="admin@internal-registry-ext.kaniko.example.com" \
-      --dry-run=client -o=yaml | \
-      invoke_cluster_cli apply -f - >&2
   invoke_cluster_cli -n olm create secret docker-registry internal-reg-ext-auth-for-rhdh \
       --docker-server="${internal_registry_url}" \
       --docker-username="${username}" \
@@ -497,6 +507,13 @@ EOF
 
   # 4. Rebuild the IIB image in the cluster using Kaniko
   debugf "Rebuilding the IIB Image using Kaniko in the cluster..." >&2
+  invoke_cluster_cli -n "${namespace}" create secret docker-registry kaniko-registry-secret \
+      --docker-server="${kaniko_internal_registry_url}" \
+      --docker-username="${username}" \
+      --docker-password="${password}" \
+      --docker-email="admin@internal-registry-ext.kaniko.example.com" \
+      --dry-run=client -o=yaml | \
+      invoke_cluster_cli apply -f - >&2
   local timestamp
   local kanikoJobName
   local kanikoPod
@@ -548,18 +565,22 @@ spec:
             path: config.json
 EOF
 
-  kanikoPod=$(invoke_cluster_cli -n "${namespace}" get pods --selector=job-name="${kanikoJobName}" -o jsonpath='{.items[0].metadata.name}' || exit 1)
-  debugf "Waiting for Kaniko pod to be ready..." >&2
+  kanikoPod=$(invoke_cluster_cli -n "${namespace}" get pods --selector=job-name="${kanikoJobName}" -o jsonpath='{.items[0].metadata.name}')
+  if [ -z "$kanikoPod" ]; then
+    errorf "unable to determine the Kaniko Pod"
+    return 1
+  fi
+  debugf "Waiting for Kaniko pod $kanikoPod to be ready..." >&2
   invoke_cluster_cli -n "${namespace}" wait --for=condition=Ready "pod/$kanikoPod" --timeout=60s >&2
   invoke_cluster_cli -n "${namespace}" logs -f "${kanikoPod}" >&2 &
   kanikoLogsPid=$!
-  trap 'kill ${kanikoLogsPid} &>/dev/null || true' EXIT
+  trap '[[ -n "${kanikoLogsPid:-}" ]] && kill ${kanikoLogsPid} &>/dev/null || true' EXIT
 
   localContext=context.tar.gz
   tar -czf "${localContext}" -C rhdh . >&2
-  invoke_cluster_cli -n "${namespace}" cp "${localContext}" "${kanikoPod}:/workspace/${localContext}" >&2 || exit 1
+  invoke_cluster_cli -n "${namespace}" cp "${localContext}" "${kanikoPod}:/workspace/${localContext}" >&2
 
-  invoke_cluster_cli -n "${namespace}" wait --for=condition=complete "job/${kanikoJobName}" --timeout=300s >&2 || exit 1
+  invoke_cluster_cli -n "${namespace}" wait --for=condition=complete "job/${kanikoJobName}" --timeout=300s >&2
 
   debugf "IIB built and pushed to internal cluster registry: $result..." >&2
   printf "%s" "${result}"
@@ -700,9 +721,9 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
       errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
       exit 1
     fi
-    newIIBImage=$(ocp_install_hosted_control_plane_cluster) || exit
+    newIIBImage=$(ocp_install_hosted_control_plane_cluster)
   else
-    newIIBImage=$(ocp_install_regular_cluster) || exit
+    newIIBImage=$(ocp_install_regular_cluster)
   fi
 else
   # K8s cluster with OLM installed
@@ -715,7 +736,7 @@ else
     errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
     exit 1
   fi
-  newIIBImage=$(k8s_install) || exit
+  newIIBImage=$(k8s_install)
 fi
 
 debugf "newIIBImage=${newIIBImage}"
