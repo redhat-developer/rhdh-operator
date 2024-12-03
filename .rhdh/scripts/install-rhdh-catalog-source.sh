@@ -620,6 +620,7 @@ fi
 
 # if logged in, this should return something like latest-v4.12-x86_64
 IIB_TAG="latest-${OCP_VER}-${OCP_ARCH}"
+TO_INSTALL=""
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
@@ -649,18 +650,14 @@ else
   IIB_IMAGE="${UPSTREAM_IIB}"
 fi
 
-CATALOGSOURCE_NAME="${TO_INSTALL}-${OLM_CHANNEL}"
-DISPLAY_NAME_SUFFIX="${TO_INSTALL}"
-
 # Add CatalogSource for the IIB
-if [ -z "$TO_INSTALL" ]; then
-  IIB_NAME="${UPSTREAM_IIB##*:}"
-  IIB_NAME="${IIB_NAME//_/-}"
-  IIB_NAME="${IIB_NAME//./-}"
-  IIB_NAME="$(echo "$IIB_NAME" | tr '[:upper:]' '[:lower:]')"
-  CATALOGSOURCE_NAME="rhdh-iib-${IIB_NAME}-${OLM_CHANNEL}"
-  DISPLAY_NAME_SUFFIX="${IIB_NAME}"
-fi
+IIB_NAME="${UPSTREAM_IIB##*:}"
+IIB_NAME="${IIB_NAME//_/-}"
+IIB_NAME="${IIB_NAME//./-}"
+IIB_NAME="$(echo "$IIB_NAME" | tr '[:upper:]' '[:lower:]')"
+OPERATOR_NAME_TO_INSTALL=${TO_INSTALL:-rhdh}
+CATALOGSOURCE_NAME="${OPERATOR_NAME_TO_INSTALL}-${OLM_CHANNEL}"
+DISPLAY_NAME_SUFFIX="${IIB_NAME}"
 
 # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
 # might be restricted in CI environments.
@@ -729,7 +726,7 @@ OPERATOR_GROUP_MANIFEST="
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: ${TO_INSTALL:-rhdh}-operator-group
+  name: ${OPERATOR_NAME_TO_INSTALL}-operator-group
   namespace: ${NAMESPACE_SUBSCRIPTION}
 "
 
@@ -737,22 +734,24 @@ SUBSCRIPTION_MANIFEST="
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: ${TO_INSTALL:-rhdh}
+  name: ${OPERATOR_NAME_TO_INSTALL}
   namespace: ${NAMESPACE_SUBSCRIPTION}
 spec:
   channel: $OLM_CHANNEL
   installPlanApproval: Automatic
-  name: ${TO_INSTALL:-rhdh}
+  name: ${OPERATOR_NAME_TO_INSTALL}
   source: ${CATALOGSOURCE_NAME}
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 "
 
-if [ -z "$TO_INSTALL" ]; then
+if [ -z "${TO_INSTALL}" ]; then
+  echo
   echo -n "Done. "
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
   else
     echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following command:
+
 cat <<EOF | kubectl -n ${NAMESPACE_SUBSCRIPTION} apply -f -
 ${OPERATOR_GROUP_MANIFEST}
 ---
