@@ -6,7 +6,6 @@ images:
 - name: controller
   newName: quay.io/rhdh-community/operator
   newTag: 0.3.2
-
 patches:
 - patch: |-
     - op: replace
