@@ -29,6 +29,7 @@ Besides the prerequisites listed above, you will also need:
 * Operator Lifecycle Manager (OLM). See link:https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster[Installing OLM in your cluster].
 * link:https://www.gnu.org/software/tar/[`GNU tar`]
 * `umoci`. See link:https://github.com/opencontainers/umoci#install[Install].
+* `yq`. See link:https://github.com/mikefarah/yq/#install[Install.]
 
 ==== Procedure
 

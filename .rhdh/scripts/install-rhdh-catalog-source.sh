@@ -2,7 +2,7 @@
 #
 # Script to streamline installing an IIB image in an OpenShift or Kubernetes cluster for testing.
 #
-# Requires: oc (OCP) or kubectl (K8s), jq, umoci, base64, opm, skopeo
+# Requires: oc (OCP) or kubectl (K8s), jq, yq, umoci, base64, opm, skopeo
 
 set -euo pipefail
 
@@ -215,57 +215,107 @@ Please reach out to the RHDH Productization team.
   fi
 }
 
+function k8s_add_fsGroup_to_bundle_manifest() {
+  set -euo pipefail
+
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    debugf "Skipping fsGroup handling on OCP cluster"
+    return 0
+  fi
+
+  local file="$1"
+  if ! yq --exit-status 'tag == "!!map"' "$file" &>/dev/null; then
+    # https://mikefarah.gitbook.io/yq/usage/tips-and-tricks#validating-yaml-files
+    debugf "Skipping $file for setting fsGroup (for K8s compatibility): not a valid YAML file"
+    return 0
+  fi
+  if [[ $(yq '.kind' "$file") != "ConfigMap" ]]; then
+    debugf "Skipping $file for setting fsGroup (for K8s compatibility): not a ConfigMap manifest"
+    return 0
+  fi
+  if [[ ! "$(yq '.metadata.name' "$file")" =~ -default-config$ ]]; then
+    debugf "Skipping $file for setting fsGroup (for K8s compatibility): not the operator default config ConfigMap"
+    return 0
+  fi
+
+  local new_fsGroup_value="2000"
+  debugf "updating operator default config ConfigMap to add fsGroup for K8s compatibility: '${file}'"
+  for key in "db-statefulset.yaml" "deployment.yaml"; do
+    if ! yq --exit-status ".data.\"${key}\"" "$file" &>/dev/null; then
+      debugf "Skipping missing key $key in $file"
+      continue
+    fi
+    if yq ".data.\"${key}\"" "$file" | yq --exit-status '.spec.template.spec.securityContext | has("fsGroup")' &>/dev/null ; then
+      debugf "Skipping key $key in $file: spec.template.spec.securityContext.fsGroup already present"
+      continue
+    fi
+
+    # Add fsGroup - this is needed for the operands to run properly on non-OCP clusters
+    local val
+    local newValFile
+    val=$(yq --exit-status ".data.\"${key}\"" "$file")
+    newValFile="${file}.${key}.yaml"
+    echo "$val" | yq --exit-status 'with(.spec.template.spec.securityContext.fsGroup; . = '${new_fsGroup_value}')' > "${newValFile}"
+    yq -i ".data.\"${key}\" = load_str(\"$newValFile\")" "$file"
+    rm -f "${newValFile}"
+  done
+}
+
 function update_refs_in_iib_bundles() {
   set -euo pipefail
 
   local internal_registry_url="$1"
   local my_registry="$2"
   # 2. Render the IIB locally, modify any references to the internal registries with their mirrors on Quay
-    # and push the updates to the internal cluster registry
-    for bundleImg in $(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq); do
-      originalBundleImg="$bundleImg"
-      digest="${originalBundleImg##*@sha256:}"
-      bundleImg="${bundleImg/registry.stage.redhat.io/quay.io}"
-      bundleImg="${bundleImg/registry.redhat.io/quay.io}"
-      bundleImg="${bundleImg/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
-      debugf "$originalBundleImg => $bundleImg"
-      if skopeo inspect "docker://$bundleImg" &> /dev/null; then
-        newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
-        newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"
-        mkdir -p "bundles/$digest"
+  # and push the updates to the internal cluster registry
+  for bundleImg in $(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq); do
+    originalBundleImg="$bundleImg"
+    digest="${originalBundleImg##*@sha256:}"
+    bundleImg="${bundleImg/registry.stage.redhat.io/quay.io}"
+    bundleImg="${bundleImg/registry.redhat.io/quay.io}"
+    bundleImg="${bundleImg/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
+    debugf "$originalBundleImg => $bundleImg"
+    if skopeo inspect "docker://$bundleImg" &> /dev/null; then
+      newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
+      newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"
+      mkdir -p "bundles/$digest"
 
-        debugf "Copying and unpacking image $bundleImg locally..."
-        skopeo copy "docker://$bundleImg" "oci:./bundles/${digest}/src:latest"
-        umoci unpack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked" --rootless
+      debugf "Copying and unpacking image $bundleImg locally..."
+      skopeo copy "docker://$bundleImg" "oci:./bundles/${digest}/src:latest"
+      umoci unpack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked" --rootless
 
-        # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
-        debugf "Replacing refs to internal registry in bundle image $bundleImg..."
-        for folder in manifests metadata; do
-          for file in "./bundles/${digest}/unpacked/rootfs/${folder}"/*; do
-            if [ -f "$file" ]; then
-              debugf "replacing refs to internal registries in file '${file}'"
-              sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file"
-              sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file"
-              sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file"
+      # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
+      debugf "Replacing refs to internal registry in bundle image $bundleImg..."
+      for folder in manifests metadata; do
+        for file in "./bundles/${digest}/unpacked/rootfs/${folder}"/*; do
+          if [ -f "$file" ]; then
+            debugf "replacing refs to internal registries in file '${file}'"
+            sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file"
+            sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file"
+            sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file"
+
+            if [[ "${IS_OPENSHIFT}" != "true" ]]; then
+              k8s_add_fsGroup_to_bundle_manifest "$file"
             fi
-          done
+          fi
         done
+      done
 
-        # repack the image with the changes
-        debugf "Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
-        umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked"
+      # repack the image with the changes
+      debugf "Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
+      umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked"
 
-        # Push the bundle to the internal cluster registry
-        debugf "Pushing updated image: ./bundles/${digest}/src => ${newBundleImage}..."
-        skopeo copy --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
+      # Push the bundle to the internal cluster registry
+      debugf "Pushing updated image: ./bundles/${digest}/src => ${newBundleImage}..."
+      skopeo copy --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
 
-        sed -i "s#${originalBundleImg}#${newBundleImageAsInt}#g" "${TMPDIR}/rhdh/rhdh/render.yaml"
-      fi
-    done
+      sed -i "s#${originalBundleImg}#${newBundleImageAsInt}#g" "${TMPDIR}/rhdh/rhdh/render.yaml"
+    fi
+  done
 
-    # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
-    debugf "Regenerating IIB Dockerfile with updated refs..."
-    opm generate dockerfile rhdh/rhdh
+  # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
+  debugf "Regenerating IIB Dockerfile with updated refs..."
+  opm generate dockerfile rhdh/rhdh
 }
 
 function ocp_install_hosted_control_plane_cluster() {
@@ -728,6 +778,10 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
 else
   # K8s cluster with OLM installed
   infof "Detected a Kubernetes cluster"
+  if ! command -v yq &> /dev/null; then
+    errorf "Please install yq 4.44+. See https://github.com/mikefarah/yq/#install"
+    exit 1
+  fi
   if ! command -v umoci &> /dev/null; then
     errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
     exit 1
