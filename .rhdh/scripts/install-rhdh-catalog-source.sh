@@ -707,6 +707,10 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
 else
   # K8s cluster with OLM installed
   infof "Detected a Kubernetes cluster"
+  if ! command -v umoci &> /dev/null; then
+    errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
+    exit 1
+  fi
   if ! command -v opm &> /dev/null; then
     errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
     exit 1
