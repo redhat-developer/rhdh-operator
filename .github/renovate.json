@@ -21,7 +21,10 @@
   },
   "kustomize": {
     "enabled": false
-  },   
+  },
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
   "packageRules": [
     {
       "description": "Do NOT generate PRs to pin or apply digests to dockerfiles",
