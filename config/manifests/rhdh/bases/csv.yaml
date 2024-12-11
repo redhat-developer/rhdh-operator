@@ -46,7 +46,7 @@ spec:
     * [Product Documentation](https://access.redhat.com/documentation/en-us/red_hat_developer_hub)
     * [Life Cycle](https://access.redhat.com/node/7025299)
     * [Support Policies](https://access.redhat.com/policy/developerhub-support-policy)
-    * [Configuring external PostgreSQL databases](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.3/html/administration_guide_for_red_hat_developer_hub/assembly-configuring-external-postgresql-databases#assembly-configuring-external-postgresql-databases)
+    * [Configuring external PostgreSQL databases](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.3/html/administration_guide_for_red_hat_developer_hub/index#assembly-configuring-external-postgresql-databases)
 
   displayName: Red Hat Developer Hub Operator
   icon:
