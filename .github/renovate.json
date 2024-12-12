@@ -3,7 +3,6 @@
     "config:best-practices",
     ":gitSignOff",
     ":rebaseStalePrs",
-    "group:allNonMajor",
     "docker:disableMajor",
     "default:pinDigestsDisabled",
     "helpers:pinGitHubActionDigests"
@@ -26,6 +25,27 @@
     "gomodTidy"
   ],
   "packageRules": [
+    {
+      "enabled": false,
+      "groupName": "all minor dependencies",
+      "groupSlug": "all-minor",
+      "matchPackageNames": [
+        "*"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ]
+    },   
+    {
+      "groupName": "all patch dependencies",
+      "groupSlug": "all-patch",
+      "matchPackageNames": [
+        "*"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ]
+    },          
     {
       "description": "Do NOT generate PRs to pin or apply digests to dockerfiles",
       "enabled": false,
@@ -67,67 +87,6 @@
       "groupName": "All dockerfile images",      
       "automerge": true,
       "pinDigests": false
-    },
-    {
-      "description": "k8s go: disable minor updates in 1.y (these branches use go < 1.22)",
-      "enabled": false,
-      "groupName": "k8s-go 1.y",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchUpdateTypes": [
-         "minor"
-      ],
-      "matchBaseBranches": [
-        "/^release-1\\.3/",
-        "/^1\\.2\\.x/"
-      ],
-      "automerge": false,
-      "matchPackageNames": [
-        "k8s.io/api{/,}**",
-        "k8s.io/apimachinery{/,}**",
-        "k8s.io/client-go{/,}**",
-        "sigs.k8s.io{/,}**",
-        "github.com/openshift{/,}**"
-      ]
-    },
-    {
-      "description": "ginkgo: disable minor updates only in 1.y (disabled because Go 1.22+ is required since ginkgo 2.20.2)",
-      "enabled": false,
-      "groupName": "ginkgo 1.y",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchUpdateTypes": [
-        "minor"
-      ],
-      "matchBaseBranches": [
-        "/^release-1\\.3/",
-        "/^1\\.2\\.x/"
-      ],
-      "automerge": false,
-      "matchPackageNames": [
-        "github.com/onsi/ginkgo/v2{/,}**"
-      ]
-    },
-    {
-      "description": "gomega: patch updates only in 1.y (disabled since Go 1.22+ is required since gomega 1.34.2)",
-      "enabled": false,
-      "groupName": "gomega 1.y",
-      "matchDatasources": [
-        "go"
-      ],
-      "matchUpdateTypes": [
-        "minor"
-      ],
-      "matchBaseBranches": [
-        "/^release-1\\..*/",
-        "/^1\\.2\\.x/"
-      ],
-      "automerge": false,
-      "matchPackageNames": [
-        "github.com/onsi/gomega{/,}**"
-      ]
     },
     {
       "description": "Do NOT generate PRs for major go dependency updates ",
