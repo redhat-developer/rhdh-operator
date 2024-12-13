@@ -258,7 +258,7 @@ data:
                   path: /.backstage/health/v1/liveness
                   port: backend
                   scheme: HTTP
-                initialDelaySeconds: 60
+                initialDelaySeconds: 30
                 timeoutSeconds: 4
                 periodSeconds: 20
                 successThreshold: 1
