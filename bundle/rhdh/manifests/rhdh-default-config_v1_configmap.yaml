@@ -251,26 +251,38 @@ data:
                   type: RuntimeDefault
                 runAsNonRoot: true
                 allowPrivilegeEscalation: false
+              startupProbe:
+                # This gives enough time upon container startup before the liveness and readiness probes are triggered.
+                # Giving (120s = initialDelaySeconds + failureThreshold * periodSeconds) to account for the worst case scenario.
+                httpGet:
+                  path: /.backstage/health/v1/liveness
+                  port: backend
+                  scheme: HTTP
+                initialDelaySeconds: 60
+                timeoutSeconds: 4
+                periodSeconds: 20
+                successThreshold: 1
+                failureThreshold: 3
               readinessProbe:
                 failureThreshold: 3
                 httpGet:
-                  path: /healthcheck
-                  port: 7007
+                  path: /.backstage/health/v1/readiness
+                  port: backend
                   scheme: HTTP
-                initialDelaySeconds: 30
+                #initialDelaySeconds: 30
                 periodSeconds: 10
                 successThreshold: 2
-                timeoutSeconds: 2
+                timeoutSeconds: 4
               livenessProbe:
                 failureThreshold: 3
                 httpGet:
-                  path: /healthcheck
-                  port: 7007
+                  path: /.backstage/health/v1/liveness
+                  port: backend
                   scheme: HTTP
-                initialDelaySeconds: 60
+                #initialDelaySeconds: 60
                 periodSeconds: 10
                 successThreshold: 1
-                timeoutSeconds: 2
+                timeoutSeconds: 4
               ports:
                 - name: backend
                   containerPort: 7007
