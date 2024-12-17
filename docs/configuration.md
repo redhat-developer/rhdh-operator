@@ -42,7 +42,7 @@ Some objects, such as: app-config, configmap-files, secret-files, dynamic-plugin
 
 #### Object annotation for mounting a volume to a specific path
 
-Using **rhdh.redhat.com/mount-path** annotation it is possible to define the directory where **PersistentVolumeClaim** object will be mounted to Backstage Container.
+Using **rhdh.redhat.com/mount-path** annotation it is possible to define the directory where **PersistentVolumeClaim** object will be mounted.
 
 ```yaml
 apiVersion: v1
@@ -55,6 +55,28 @@ metadata:
 ```
   
 In the example above the PVC called **myclaim** will be mounted to **/mount/path/from/annotation** directory
+
+#### Object annotation for mounting a volume to specific container(s)
+
+Using **rhdh.redhat.com/containers** annotation it is possible to define the containers where **PersistentVolumeClaim** object will be mounted.
+
+Options:
+
+* No or empty annotation means the volume will be mounted to the Backstage container only
+* \* (asterik) means the volume will be mounted to all the containers
+* Otherwise comma separated names of container will be used
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+  annotations:
+    rhdh.redhat.com/mount-path: "init-dynamic-plugins,backstage-backend"
+...
+```
+In the example above the PVC called **myclaim** will be mounted to **init-dynamic-plugins** and **backstage-backend** containers
+
 
 ### Metadata Generation
   
