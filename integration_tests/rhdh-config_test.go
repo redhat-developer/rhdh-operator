@@ -45,18 +45,18 @@ var _ = When("create default rhdh", func() {
 			_, initCont := model.DynamicPluginsInitContainer(deploy.Spec.Template.Spec.InitContainers)
 
 			g.Expect(initCont.VolumeMounts).To(HaveLen(5))
-			g.Expect(initCont.VolumeMounts[0].MountPath).To(Equal("/dynamic-plugins-root"))
-			g.Expect(initCont.VolumeMounts[0].SubPath).To(BeEmpty())
-			g.Expect(initCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
-			g.Expect(initCont.VolumeMounts[1].SubPath).To(Equal(".npmrc"))
-			g.Expect(initCont.VolumeMounts[2].MountPath).To(Equal("/opt/app-root/src/.config/containers"))
-			g.Expect(initCont.VolumeMounts[3].MountPath).To(Equal("/opt/app-root/src/.npm/_cacache"))
-			g.Expect(initCont.VolumeMounts[3].SubPath).To(BeEmpty())
-			g.Expect(initCont.VolumeMounts[4].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins.yaml"))
-			g.Expect(initCont.VolumeMounts[4].SubPath).To(Equal("dynamic-plugins.yaml"))
-			g.Expect(initCont.VolumeMounts[4].Name).
+			g.Expect(initCont.VolumeMounts[4].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
+			g.Expect(initCont.VolumeMounts[4].SubPath).To(BeEmpty())
+			g.Expect(initCont.VolumeMounts[0].MountPath).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
+			g.Expect(initCont.VolumeMounts[0].SubPath).To(Equal(".npmrc"))
+			g.Expect(initCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/.config/containers"))
+			g.Expect(initCont.VolumeMounts[2].MountPath).To(Equal("/opt/app-root/src/.npm/_cacache"))
+			g.Expect(initCont.VolumeMounts[2].SubPath).To(BeEmpty())
+			g.Expect(initCont.VolumeMounts[3].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins.yaml"))
+			g.Expect(initCont.VolumeMounts[3].SubPath).To(Equal("dynamic-plugins.yaml"))
+			g.Expect(initCont.VolumeMounts[3].Name).
 				To(Equal(utils.GenerateVolumeNameFromCmOrSecret(model.DynamicPluginsDefaultName(backstageName))))
-			g.Expect(initCont.VolumeMounts[4].SubPath).To(Equal(model.DynamicPluginsFile))
+			g.Expect(initCont.VolumeMounts[3].SubPath).To(Equal(model.DynamicPluginsFile))
 
 			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
 			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
@@ -71,10 +71,10 @@ var _ = When("create default rhdh", func() {
 			g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 
 			g.Expect(mainCont.VolumeMounts).To(HaveLen(2))
-			g.Expect(mainCont.VolumeMounts[0].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
-			g.Expect(mainCont.VolumeMounts[0].SubPath).To(BeEmpty())
-			g.Expect(mainCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/default.app-config.yaml"))
-			g.Expect(mainCont.VolumeMounts[1].SubPath).To(Equal("default.app-config.yaml"))
+			g.Expect(mainCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
+			g.Expect(mainCont.VolumeMounts[1].SubPath).To(BeEmpty())
+			g.Expect(mainCont.VolumeMounts[0].MountPath).To(Equal("/opt/app-root/src/default.app-config.yaml"))
+			g.Expect(mainCont.VolumeMounts[0].SubPath).To(Equal("default.app-config.yaml"))
 
 			//g.Expect(mainCont.VolumeMounts[3].MountPath).To(Equal(fmt.Sprintf("/opt/app-root/src/backstage-%s-dynamic-plugins", backstageName)))
 
@@ -85,10 +85,7 @@ var _ = When("create default rhdh", func() {
 
 	It("replaces dynamic-plugins-root volume", func() {
 
-		// This test relies on the fact that RHDH default config for deployment contains
-		//       volumes:
-		//        - ephemeral:
-		//          name: dynamic-plugins-root
+		// This test relies on the fact that RHDH default deployment config  contains dynamic-plugins-root volume
 		// and check if it replaced with one defined in spec.deployment
 
 		ctx := context.Background()
@@ -99,6 +96,7 @@ var _ = When("create default rhdh", func() {
 		Expect(err).To(Not(HaveOccurred()))
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bs2.Spec, "")
+		volumeName := model.PvcsName(backstageName, "dynamic-plugins-root")
 
 		Eventually(func(g Gomega) {
 			By("getting the Deployment ")
@@ -109,7 +107,7 @@ var _ = When("create default rhdh", func() {
 			var bsvolume *corev1.Volume
 			for _, v := range deploy.Spec.Template.Spec.Volumes {
 
-				if v.Name == "dynamic-plugins-root" {
+				if v.Name == volumeName {
 					bsvolume = &v
 					break
 				}
