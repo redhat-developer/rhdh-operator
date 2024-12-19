@@ -134,6 +134,28 @@ func (b *BackstageDeployment) container() *corev1.Container {
 	return &b.deployment.Spec.Template.Spec.Containers[BackstageContainerIndex(b.deployment)]
 }
 
+func (b *BackstageDeployment) containerByName(name string) *corev1.Container {
+	for i, c := range b.deployment.Spec.Template.Spec.Containers {
+		if c.Name == name {
+			return &b.deployment.Spec.Template.Spec.Containers[i]
+		}
+	}
+	for i, c := range b.deployment.Spec.Template.Spec.InitContainers {
+		if c.Name == name {
+			return &b.deployment.Spec.Template.Spec.InitContainers[i]
+		}
+	}
+	return nil
+}
+
+func (b *BackstageDeployment) allContainers() []corev1.Container {
+	containers := []corev1.Container{}
+	spec := b.deployment.Spec.Template.Spec
+	containers = append(containers, spec.InitContainers...)
+	containers = append(containers, spec.Containers...)
+	return containers
+}
+
 func (b *BackstageDeployment) podSpec() *corev1.PodSpec {
 	return &b.deployment.Spec.Template.Spec
 }
