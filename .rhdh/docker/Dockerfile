@@ -10,33 +10,19 @@ USER 0
 ENV GOPATH=/go/
 
 # '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
-
-# Upstream sources
 # Downstream comment
+# RUN dnf -q -y update
+#/ Downstream comment
+
 ENV EXTERNAL_SOURCE=.
 ENV CONTAINER_SOURCE=/opt/app-root/src
 WORKDIR /workspace
-#/ Downstream comment
-
-# Downstream sources
-# Downstream uncomment
-# ENV EXTERNAL_SOURCE=$REMOTE_SOURCES/upstream1/app/distgit/containers/rhdh-operator
-# ENV CONTAINER_SOURCE=$REMOTE_SOURCES_DIR
-# WORKDIR $CONTAINER_SOURCE/
-#/ Downstream uncomment
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-# Downstream comment
 COPY $EXTERNAL_SOURCE/go.mod ./go.mod
 COPY $EXTERNAL_SOURCE/go.sum ./go.sum
 RUN go mod download
-#/ Downstream comment
-
-# Downstream uncomment
-# COPY $REMOTE_SOURCES/upstream1/cachito.env ./
-# RUN source ./cachito.env && rm -f ./cachito.env && mkdir -p /workspace
-#/ Downstream uncomment
 
 COPY $EXTERNAL_SOURCE/api/ ./api/
 COPY $EXTERNAL_SOURCE/cmd/ ./cmd/
@@ -58,24 +44,21 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # https://registry.access.redhat.com/ubi9/ubi-minimal
 FROM registry.access.redhat.com/ubi9-minimal:9.5-1733767867@sha256:dee813b83663d420eb108983a1c94c614ff5d3fcb5159a7bd0324f0edbe7fca1 AS runtime
 
-# debugging
+# Downstream uncomment
 RUN cat /cachi2/cachi2.env
+#/ Downstream uncomment
 
 # '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
+# Downstream comment
+# RUN microdnf update --setopt=install_weak_deps=0 -y 
+#/ Downstream comment
+
 RUN microdnf install -y openssl; microdnf clean -y all
 
 # RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
 COPY $EXTERNAL_SOURCE/LICENSE /licenses/
 
-# Upstream sources
-# Downstream comment
 ENV CONTAINER_SOURCE=/workspace
-#/ Downstream comment
-
-# Downstream sources
-# Downstream uncomment
-# ENV CONTAINER_SOURCE=$REMOTE_SOURCES_DIR
-#/ Downstream uncomment
 
 ENV HOME=/ \
     USER_NAME=backstage \
