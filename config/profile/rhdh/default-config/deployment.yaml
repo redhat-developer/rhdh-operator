@@ -19,6 +19,15 @@ spec:
       #securityContext:
       #   fsGroup: 1001
       volumes:
+        - ephemeral:
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 2Gi
+          name: dynamic-plugins-root
         - name: dynamic-plugins-npmrc
           secret:
             defaultMode: 420
@@ -35,7 +44,7 @@ spec:
         - name: install-dynamic-plugins
           command:
             - ./install-dynamic-plugins.sh
-            - /opt/app-root/src/dynamic-plugins-root
+            - /dynamic-plugins-root
           # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
           image: quay.io/rhdh/rhdh-hub-rhel9:next
           imagePullPolicy: IfNotPresent
@@ -46,11 +55,13 @@ spec:
               type: RuntimeDefault
             capabilities:
               drop:
-               - ALL
+                - ALL
           env:
             - name: NPM_CONFIG_USERCONFIG
               value: /opt/app-root/src/.npmrc.dynamic-plugins
           volumeMounts:
+            - mountPath: /dynamic-plugins-root
+              name: dynamic-plugins-root
             - mountPath: /opt/app-root/src/.npmrc.dynamic-plugins
               name: dynamic-plugins-npmrc
               readOnly: true
@@ -131,6 +142,9 @@ spec:
           env:
             - name: APP_CONFIG_backend_listen_port
               value: "7007"
+          volumeMounts:
+            - mountPath: /opt/app-root/src/dynamic-plugins-root
+              name: dynamic-plugins-root
           resources:
             requests:
               cpu: 250m
