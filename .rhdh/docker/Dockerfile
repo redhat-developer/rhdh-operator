@@ -3,7 +3,7 @@
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.5-1732786580@sha256:d10334368875b3daee4b5dce8e7910532d6b82f5c87c3dd893e17decc2060961 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:9.5-1733160835@sha256:e8e961aebb9d3acedcabb898129e03e6516b99244eb64330e5ca599af9c7aa3d AS builder
 # hadolint ignore=DL3002
 USER 0
 ENV GOPATH=/go/
@@ -45,7 +45,7 @@ RUN export ARCH="$(uname -m)" && if [[ ${ARCH} == "x86_64" ]]; then export ARCH=
 # Install openssl for FIPS support
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
 # https://registry.access.redhat.com/ubi9/ubi-minimal
-FROM registry.access.redhat.com/ubi9-minimal:9.5-1731604394@sha256:46f77b7dfba47b041de4c9d8516c24081fc92cc7743fca4a353e7f1c2a4beb19 AS runtime
+FROM registry.access.redhat.com/ubi9-minimal:9.5-1734497536@sha256:daa61d6103e98bccf40d7a69a0d4f8786ec390e2204fd94f7cc49053e9949360 AS runtime
 RUN microdnf update --setopt=install_weak_deps=0 -y && microdnf install -y openssl; microdnf clean -y all
 
 # RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
