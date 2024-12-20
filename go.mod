@@ -1,6 +1,8 @@
 module redhat-developer/red-hat-developer-hub-operator
 
-go 1.20
+go 1.21
+
+toolchain go1.22.10
 
 require (
 	github.com/onsi/ginkgo/v2 v2.17.1
@@ -10,7 +12,7 @@ require (
 	k8s.io/api v0.29.4
 	k8s.io/apimachinery v0.29.4
 	k8s.io/client-go v0.29.4
-	k8s.io/utils v0.0.0-20240310230437-4693a0247e57
+	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	sigs.k8s.io/controller-runtime v0.17.3
 )
 
