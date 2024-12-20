@@ -16,7 +16,6 @@ jobs:
           - main
           - release-1.4
           - release-1.3
-          - 1.2.x
     name: 'E2E Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
