@@ -49,8 +49,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.ref }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: "${{ github.event.pull_request.merge_commit_sha }}"
 
       # check changes in this commit for regex include and exclude matches; pipe to an env var
       - name: Check for changes to build
