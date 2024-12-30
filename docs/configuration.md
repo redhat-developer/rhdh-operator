@@ -12,21 +12,21 @@ The Default Configuration defines the structure of all Backstage instances withi
 
 ### Default Configuration Files
 
-| Key/File Name        | Object Kind                  | Object Name                                | Mandatory    | Multi| Version | Notes                                           |
-|----------------------|------------------------------|--------------------------------------------|--------------|-----|---------|-------------------------------------------------|
-| deployment.yaml      | appsv1.Deployment            | backstage-<cr-name>                        | Yes          | No  | >=0.1.x | Backstage deployment                            |
-| service.yaml         | corev1.Service               | backstage-<cr-name>                        | Yes          | No  | >=0.1.x | Backstage Service                               |
-| db-statefulset.yaml  | appsv1.StatefulSet           | backstage-psql-<cr-name>                   | For local DB | No  | >=0.1.x | PostgreSQL StatefulSet                          |
-| db-service.yaml      | corev1.Service               | backstage-psql-<cr-name>                   | For local DB | No  | >=0.1.x | PostgreSQL Service                              |
-| db-secret.yaml       | corev1.Secret                | backstage-psql-secret-<cr-name>            | For local DB | No  | >=0.1.x | Secret to connect Backstage to PGSQL            |
-| route.yaml           | openshift.Route              | backstage-<cr-name>                        | No (for OCP) | No  | >=0.1.x | Route exposing Backstage service                |
-| app-config.yaml      | corev1.ConfigMap             | backstage-appconfig-<cr-name>              | No           | No  | >=0.2.x | Backstage app-config.yaml                       |
-| configmap-files.yaml | corev1.ConfigMap             | backstage-files-<cr-name>                  | No           | No  | >=0.2.x | Backstage config file inclusions from configMap |
-| configmap-envs.yaml  | corev1.ConfigMap             | backstage-envs-<cr-name>                   | No           | No  | >=0.2.x | Backstage environment variables from ConfigMap  |
-| secret-files.yaml    | corev1.Secret                | backstage-files-<cr-name>                  | No           | No  | >=0.2.x | Backstage config file inclusions from Secret    |
-| secret-envs.yaml     | corev1.Secret                | backstage-envs-<cr-name>                   | No           | No  | >=0.2.x | Backstage environment variables from Secret     |
-| dynamic-plugins.yaml | corev1.ConfigMap             | backstage-dynamic-plugins-<cr-name>        | No           | No  | >=0.2.x | Dynamic plugins configuration                   |
-| pvcs.yaml            | corev1.PersistentVolumeClaim | backstage-&lt;cr-name&gt;-&lt;pvc-name&gt; | No           | Yes | >=0.4.x | List of PVC objects to be mounted to containers |
+| Key/File Name        | Object Kind                    | Object Name                                | Mandatory    | Multi | Version | Notes                                           |
+|----------------------|--------------------------------|--------------------------------------------|--------------|-------|---------|-------------------------------------------------|
+| deployment.yaml      | appsv1.Deployment              | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage deployment                            |
+| service.yaml         | corev1.Service                 | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage Service                               |
+| db-statefulset.yaml  | appsv1.StatefulSet             | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL StatefulSet                          |
+| db-service.yaml      | corev1.Service                 | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL Service                              |
+| db-secret.yaml       | corev1.Secret                  | backstage-psql-secret-<cr-name>            | For local DB | No    | >=0.1.x | Secret to connect Backstage to PGSQL            |
+| route.yaml           | openshift.Route                | backstage-<cr-name>                        | No (for OCP) | No    | >=0.1.x | Route exposing Backstage service                |
+| app-config.yaml      | corev1.ConfigMap               | backstage-appconfig-<cr-name>              | No           | No    | >=0.2.x | Backstage app-config.yaml                       |
+| configmap-files.yaml | corev1.ConfigMap               | backstage-files-<cr-name>                  | No           | No    | >=0.2.x | Backstage config file inclusions from configMap |
+| configmap-envs.yaml  | corev1.ConfigMap               | backstage-envs-<cr-name>                   | No           | No    | >=0.2.x | Backstage environment variables from ConfigMap  |
+| secret-files.yaml    | []corev1.Secret                | backstage-files-<cr-name>                  | No           | Yes   | >=0.2.x | Backstage config file inclusions from Secret    |
+| secret-envs.yaml     | []corev1.Secret                | backstage-envs-<cr-name>                   | No           | Yes   | >=0.2.x | Backstage environment variables from Secret     |
+| dynamic-plugins.yaml | corev1.ConfigMap               | backstage-dynamic-plugins-<cr-name>        | No           | No    | >=0.2.x | Dynamic plugins configuration                   |
+| pvcs.yaml            | []corev1.PersistentVolumeClaim | backstage-&lt;cr-name&gt;-&lt;pvc-name&gt; | No           | Yes   | >=0.4.x | List of PVC objects to be mounted to containers |
 
 **Meanings of "Mandatory" Column:**
 - **Yes** - Must be configured; deployment will fail otherwise.
@@ -36,13 +36,22 @@ The Default Configuration defines the structure of all Backstage instances withi
   
 You can see examples of default configurations as part of the [Operator Profiles](../config/profile) in the **default-config** directory.
 
-#### Default mount path
+### Default mount path
 
 Some objects, such as: app-config, configmap-files, secret-files, dynamic-plugins, pvcs, are mounted to the Backstage Container as files or directories. Default mount path is Container's WorkingDir, if not defined it falls to "/opt/app-root/src". 
 
-#### Object annotation for mounting a PVC volume to a specific path
+### Annotations
 
-Use **rhdh.redhat.com/mount-path** annotation to configure mount path for **PersistentVolumeClaim** volume.
+We use annotations to configure some objects. The following annotations are supported:
+
+#### rhdh.redhat.com/mount-path to configure mount path.
+
+If specified, the object will be mounted to the specified path, otherwise [Default mount path](#default-mount-path) will ve used. 
+It is possible to specify relative path, which will be appended to the default mount path.
+
+Supported objects: **pvcs, secret-files**.
+
+Examples:
 
 _**pvcs.yaml**_
 ```yaml
@@ -57,15 +66,29 @@ metadata:
   
 In the example above the PVC called **myclaim** will be mounted to **/mount/path/from/annotation** directory
 
-#### Object annotation for mounting a PVC volume to specific container(s)
+_**secret-files.yaml**_
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysecret
+  annotations:
+    rhdh.redhat.com/mount-path: /mount/path/from/annotation
+...
+```
+In the example above the Secret called **mysecret** will be mounted to **/mount/path/from/annotation** directory
 
-Use **rhdh.redhat.com/containers** annotation to configure containers where **PersistentVolumeClaim** volume will be mounted.
+#### rhdh.redhat.com/containers for mounting volume to specific container(s)
+
+Supported objects: **pvcs, secret-files, secret-envs**.
 
 Options:
 
-* No or empty annotation means the volume will be mounted to the Backstage container only
-* \* (asterisk) means the volume will be mounted to all the containers
+* No or empty annotation: the volume will be mounted to the Backstage container only
+* \* (asterisk): the volume will be mounted to all the containers
 * Otherwise, container names separated by commas will be used
+
+Examples:
 
 _**pvcs.yaml**_
 ```yaml
@@ -79,6 +102,18 @@ metadata:
 ```
 In the example above the PVC called **myclaim** will be mounted to **init-dynamic-plugins** and **backstage-backend** containers
 
+_**secret-envs.yaml**_
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysecret
+  annotations:
+    rhdh.redhat.com/containers: "*"
+...
+```
+In the example above the PVC called **myclaim** will be mounted to all the containers
 
 ### Metadata Generation
   
@@ -138,7 +173,7 @@ spec:
 The desired state of resources created by the Backstage Operator is defined in the Backstage Custom Resource Spec. Here’s an example of a simple Backstage CR:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha2
+apiVersion: rhdh.redhat.com/v1alpha3
 kind: Backstage
 metadata:
   name: mybackstage
@@ -160,7 +195,7 @@ For API version **v1alpha2** (Operator version **0.3.x**), the Backstage CR Spec
 
 * [application](#application-configuration)
 * [deployment](#deployment-configuration)
-* [database](#local-database-configuration)
+* [database](#database-configuration)
 * [rawRuntimeConfig](#raw-configuration)
   
 ### Application Configuration
@@ -209,7 +244,7 @@ The ConfigMap key/value defines the file name and content, and this app-config w
 **Note**: It is possible to define several **app-config** files inside one ConfigMap (even if there are no visible reasons for it) but since it is a Map, the order of how they are applied is not guaranteed. 
 On the other hand, Backstage application merges the chain of **app-config** files from first to last, so order is important. Taking this into account, keeping several **app-config** files inside one ConfigMap is **NOT recommended**. For this case consider defining several one-entry ConfigMaps instead.
 
-[Includes and Dynamic Data](https://backstage.io/docs/conf/writing/#includes-and-dynamic-data) (including [extra files](#extra-files) and [extra environment variables](#extra-env-variables)) support configuring additional ConfigMaps and Secrets.
+[Includes and Dynamic Data](https://backstage.io/docs/conf/writing/#includes-and-dynamic-data) (including [extra files](#extra-files) and [extra environment variables](#extra-environment-variables)) support configuring additional ConfigMaps and Secrets.
 
 #### Extra Files
 
@@ -417,7 +452,7 @@ MY_VAR = my-value
 
 #### Dynamic Plugins
 
-The Operator can configure [Dynamic Plugins](https://github.com/janus-idp/backstage-showcase/blob/main/docs/dynamic-plugins.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/default-config/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
+The Operator can configure [Dynamic Plugins](https://github.com/janus-idp/backstage-showcase/blob/main/docs/dynamic-plugins.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/profile/rhdh/default-config/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
 
 For example, the **dynamic-plugins-config** ConfigMap contains a simple Dynamic Plugins configuration, which includes predefined default plugins in **dynamic-plugins.default.yaml** and the GitHub plugin provided in the package located at `./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic`.
   
@@ -543,7 +578,7 @@ This is dictated by the following configuration:
 ```yaml
 spec:
   database:
-    enableLocalDb: [true]|false
+    enableLocalDb: [true] or false
 ```
 
 If local DB is enabled (which is simpler but not recommended for production), the Operator will:
