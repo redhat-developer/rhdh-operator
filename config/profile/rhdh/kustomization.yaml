@@ -19,8 +19,8 @@ resources:
 
 images:
 - name: controller
-  newName: quay.io/rhdh-community/operator
-  newTag: 0.5.0
+  newName: registry.redhat.io/rhdh/rhdh-rhel9-operator
+  newTag: "1.5"
 
 patches:
 - path: patches/env-patch.yaml
