@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: controller-manager
   labels:
-    control-plane: controller-manager
+    app: backstage-controller-manager
     app.kubernetes.io/name: deployment
     app.kubernetes.io/instance: controller-manager
     app.kubernetes.io/component: manager
@@ -13,14 +13,14 @@ metadata:
 spec:
   selector:
     matchLabels:
-      control-plane: controller-manager
+      app: backstage-controller-manager
   replicas: 1
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        control-plane: controller-manager
+        app: backstage-controller-manager
     spec:
       # Required because the operator does not work without a Service Account Token
       automountServiceAccountToken: true # NOSONAR
