@@ -5,7 +5,7 @@ kind: Kustomization
 resources:
 - bases/csv.yaml
 - ../../profile/rhdh
-- ../../samples
+- ../../samples/rhdh
 - ../../scorecard
 
 # [WEBHOOK] To enable webhooks, uncomment all the sections with [WEBHOOK] prefix.

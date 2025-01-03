@@ -1,0 +1,11 @@
+apiVersion: rhdh.redhat.com/v1alpha1
+kind: Backstage
+metadata:
+  labels:
+    app.kubernetes.io/name: backstage
+  #    app.kubernetes.io/instance: developer-hub
+  #    app.kubernetes.io/part-of: rhdh-operator
+  #    app.kubernetes.io/managed-by: kustomize
+  #    app.kubernetes.io/created-by: rhdh-operator
+  name: developer-hub
+spec: {}
