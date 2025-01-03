@@ -37,6 +37,10 @@ endif
 # - use environment variables to overwrite this value (e.g export CHANNELS="candidate,fast,stable")
 ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
+else
+ifeq ($(PROFILE), rhdh)
+BUNDLE_CHANNELS := --channels=fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+endif
 endif
 
 # DEFAULT_CHANNEL defines the default channel used in the bundle.
@@ -46,8 +50,22 @@ endif
 # - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
 ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
+else
+ifeq ($(PROFILE), rhdh)
+BUNDLE_DEFAULT_CHANNEL := --default-channel=fast
+endif
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+
+ifneq ($(origin BUNDLE_METADATA_PACKAGE_NAME), undefined)
+BUNDLE_METADATA_PACKAGE_NAME := $(BUNDLE_METADATA_PACKAGE_NAME)
+else
+ifeq ($(PROFILE), rhdh)
+BUNDLE_METADATA_PACKAGE_NAME := rhdh
+else
+BUNDLE_METADATA_PACKAGE_NAME := backstage-operator
+endif
+endif
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
