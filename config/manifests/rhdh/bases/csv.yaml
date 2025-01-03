@@ -1,19 +1,15 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  labels:
-    operatorframework.io/arch.amd64: supported
   annotations:
     capabilities: Seamless Upgrades
     categories: Developer Tools
     certified: 'true'
-    containerImage: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-rhel9-operator:1.3
+    containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.5
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
-      It comes with pre-built plug-ins and configuration settings, supports use of an external database, and can
-      help streamline the process of setting up a self-managed internal
-      developer portal for adopters who are just starting out.
-    operatorframework.io/suggested-namespace: rhdh-operator
-    operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
+      It comes with pre-built plug-ins and configuration settings, supports use of
+      an external database, and can help streamline the process of setting up a self-managed
+      internal developer portal for adopters who are just starting out.
     # Infrastructure Feature Test annotations - must be strings, not booleans - see https://issues.redhat.com/browse/RHIDP-294
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "false"
@@ -25,9 +21,13 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
+    operatorframework.io/suggested-namespace: rhdh-operator
+    operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
+    skipRange: '>=1.0.0 <1.5.0'
     support: Red Hat
-    skipRange: '>=1.0.0 <1.3.0'
+  labels:
+    operatorframework.io/arch.amd64: supported
   # name should fit the project name and version (i e backstage-operator.vX.Y.Z) , otherwise this CSV base will not be used
   name: backstage-operator.vX.Y.Z
   namespace: placeholder
@@ -39,7 +39,7 @@ spec:
 
     ## Telemetry data collection
 
-    The telemetry data collection feature is enabled by default. Red Hat Developer Hub sends telemetry data to Red Hat by using the `backstage-plugin-analytics-provider-segment` plugin. To disable this and to learn what data is being collected, see [Red Hat Developer Hub documentation on telemetry data collection](https://access.redhat.com/documentation/en-us/red_hat_developer_hub/1.3/html-single/administration_guide_for_red_hat_developer_hub/index#assembly-rhdh-telemetry_admin-rhdh).
+    The telemetry data collection feature is enabled by default. Red Hat Developer Hub sends telemetry data to Red Hat by using the `backstage-plugin-analytics-provider-segment` plugin. To disable this and to learn what data is being collected, see [Red Hat Developer Hub documentation on telemetry data collection](https://access.redhat.com/documentation/en-us/red_hat_developer_hub/1.5/html-single/administration_guide_for_red_hat_developer_hub/index#assembly-rhdh-telemetry_admin-rhdh).
 
     ## More Information
 
@@ -75,19 +75,11 @@ spec:
   - name: RHDH Operator (Downstream)
     url: https://gitlab.cee.redhat.com/rhidp/rhdh/
   maintainers:
-  - email: asoro@redhat.com
-    name: Armel Soro
-  - email: cdaley@redhat.com
-    name: Corey Daley
-  - email: gazarenk@redhat.com
-    name: Gennady Azarenkov
-  - email: nboldt@redhat.com
-    name: Nick Boldt
+    - email: rhdh-notifications@redhat.com
+      name: Red Hat Developer Team
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  # it is generated according to the project version
-  #version: 1.3.0
-  replaces: rhdh-operator.v1.2.0
+  replaces: rhdh-operator.v1.4.0
