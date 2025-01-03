@@ -272,6 +272,12 @@ ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
 
+.PHONY: bundles
+bundles: ## Generate bundle manifests and metadata, then validate generated files for all available profiles.
+	@for profile in $(PROFILES); do \
+  		$(MAKE) bundle PROFILE=$$profile; \
+  	done
+
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	#$(OPERATOR_SDK) generate kustomize manifests -q

@@ -50,7 +50,7 @@ jobs:
       - name: Check for outdated bundle
         id: bundle-diff-checker
         run: |
-          for profile in backstage.io rhdh; do make bundle PROFILE=${profile}; done
+          make bundles
           git status --porcelain
           # Since operator-sdk 1.26.0, `make bundle` changes the `createdAt` field from the bundle every time we run it.
           # The `git diff` below checks if only the createdAt field has changed. If is the only change, it is ignored.
