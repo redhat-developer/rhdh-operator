@@ -77,7 +77,8 @@ IMAGE_TAG_BASE := $(IMAGE_TAG_BASE)
 else
 IMAGE_TAG_BASE := quay.io/rhdh-community/operator
 ifeq ($(PROFILE), rhdh)
-	IMAGE_TAG_BASE := registry.redhat.io/rhdh/rhdh-rhel9-operator
+	# IMAGE_TAG_BASE := registry.redhat.io/rhdh/rhdh-rhel9-operator
+	IMAGE_TAG_BASE := quay.io/rhdh/rhdh-rhel9-operator
 endif
 endif
 
