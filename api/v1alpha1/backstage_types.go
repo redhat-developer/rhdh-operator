@@ -184,6 +184,7 @@ type BackstageStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:deprecatedversion:warning="Since 1.3.0 spec.application.image, spec.application.replicas, spec.application.imagePullSecrets are deprecated in favor of corresponding spec.deployment fields"
+// +operator-sdk:csv:customresourcedefinitions:displayName="Memcached App",resources={{Pod,v1,memcached-runner},{Deployment,v1,memcached-deployment}}
 
 // Backstage is the Schema for the backstages API
 type Backstage struct {
