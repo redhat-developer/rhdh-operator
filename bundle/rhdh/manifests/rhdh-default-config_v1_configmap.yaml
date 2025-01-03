@@ -210,7 +210,7 @@ data:
                   type: RuntimeDefault
                 capabilities:
                   drop:
-                   - ALL
+                    - ALL
               env:
                 - name: NPM_CONFIG_USERCONFIG
                   value: /opt/app-root/src/.npmrc.dynamic-plugins
