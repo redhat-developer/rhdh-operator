@@ -29,7 +29,8 @@ metadata:
     support: Red Hat
     skipRange: '>=1.0.0 <1.3.0'
   # name should fit the project name and version (i e backstage-operator.vX.Y.Z) , otherwise this CSV base will not be used
-  name: backstage-operator.v0.4.0
+  name: backstage-operator.vX.Y.Z
+  namespace: placeholder
 spec:
   description: |
     Red Hat Developer Hub is an enterprise-grade platform for building developer portals, containing a supported and opinionated framework. It comes with pre-built plug-ins and configuration settings, supports use of an external database, and can help streamline the process of setting up a self-managed internal developer portal for adopters who are just starting out. By implementing a unified and open platform designed to maximize developer skills, ease onboarding, and increase development productivity, focus can be centered on what really matters: writing great code. Red Hat Developer Hub also offers Software Templates to simplify the development process, which can reduce friction and frustration for development teams, boosting their productivity and increasing an organization's competitive advantage.

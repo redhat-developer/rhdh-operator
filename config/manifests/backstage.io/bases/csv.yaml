@@ -4,7 +4,7 @@ metadata:
   labels:
     operatorframework.io/arch.amd64: supported
   # name should fit the project name and version (i e backstage-operator.vX.Y.Z) , otherwise this CSV base will not be used
-  name: backstage-operator.v0.4.0
+  name: backstage-operator.vX.Y.Z
   annotations:
     description: Backstage Operator
 spec:
