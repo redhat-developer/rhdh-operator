@@ -8,7 +8,7 @@ namePrefix: backstage-
 
 resources:
 - ../../crd
-- ../../rbac
+- ../../rbac/external
 - ../../manager
 
 images:

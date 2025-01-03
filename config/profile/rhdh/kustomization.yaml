@@ -13,13 +13,13 @@ namePrefix: rhdh-
 
 resources:
 - ../../crd
-- ../../rbac
+- ../../rbac/rhdh
 - ../../manager
 - namespace.yaml
 
 images:
 - name: controller
-  newName: registry.redhat.io/rhdh/rhdh-rhel9-operator
+  newName: quay.io/rhdh/rhdh-rhel9-operator
   newTag: "1.5"
 
 patches:
