@@ -5,5 +5,5 @@ kind: Kustomization
 resources:
 - bases/csv.yaml
 - ../../profile/rhdh
-- ../../samples
+- ../../samples/rhdh
 - ../../scorecard

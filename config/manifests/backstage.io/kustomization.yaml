@@ -7,5 +7,5 @@ kind: Kustomization
 resources:
 - bases/csv.yaml
 - ../../profile/backstage.io
-- ../../samples
+- ../../samples/backstage.io
 - ../../scorecard
