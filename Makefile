@@ -1,9 +1,34 @@
+PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+
+# Profile directory: subdirectory of ./config/profile
+# In terms of Kustomize it is overlay directory
+# It also usually contains default-config directory
+# with set of Backstage Configuration YAML manifests
+# to use other config - add a directory with config,
+# use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
+PROFILE ?= rhdh
+PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.5.0
+ifneq ($(origin VERSION), undefined)
+VERSION := $(VERSION)
+IMAGE_TAG_VERSION ?= $(VERSION)
+else
+VERSION := 0.5.0
+IMAGE_TAG_VERSION := $(VERSION)
+ifeq ($(PROFILE), rhdh)
+	# transforming: 0.y.z => 1.y.z
+	MAJOR := $(shell echo $(VERSION) | cut -d. -f1)
+	INCREMENTED_MAJOR := $(shell expr $(MAJOR) + 1)
+	MINOR_PATCH := $(shell echo $(VERSION) | cut -d. -f2-)
+	VERSION := $(INCREMENTED_MAJOR).$(MINOR_PATCH)
+	IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
+endif
+endif
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -29,11 +54,18 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # quay.io/rhdh-community/operator-bundle:$VERSION and quay.io/rhdh-community/operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
+ifneq ($(origin IMAGE_TAG_BASE), undefined)
+IMAGE_TAG_BASE := $(IMAGE_TAG_BASE)
+else
+IMAGE_TAG_BASE := quay.io/rhdh-community/operator
+ifeq ($(PROFILE), rhdh)
+	IMAGE_TAG_BASE := registry.redhat.io/rhdh/rhdh-rhel9-operator
+endif
+endif
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(IMAGE_TAG_VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) --output-dir bundle/$(PROFILE) $(BUNDLE_METADATA_OPTS)
@@ -50,7 +82,7 @@ endif
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.37.0
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
+IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG_VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
 
@@ -83,14 +115,6 @@ SHELL = /usr/bin/env bash -o pipefail
 
 # Source packages outside of tests
 PKGS := $(shell go list ./... | grep -v /e2e)
-
-# Profile directory: subdirectory of ./config/profile
-# In terms of Kustomize it is overlay directory
-# It also usually contains default-config directory
-# with set of Backstage Configuration YAML manifests
-# to use other config - add a directory with config,
-# use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
-PROFILE ?= rhdh
 
 .PHONY: all
 all: build
@@ -241,7 +265,7 @@ deployment-manifest: build-installer ## Generate manifest to deploy operator. De
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(VERSION)
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG_VERSION)
 
 # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
