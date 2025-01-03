@@ -282,9 +282,16 @@ bundles: ## Generate bundle manifests and metadata, then validate generated file
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	#$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
+	@rm -f ./bundle/$(PROFILE)/manifests/$(PROFILE)-operator.clusterserviceversion.yaml || true
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle/$(PROFILE)
-	mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
+	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
+	@sed -i 's/-controller-manager/-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+	@sed -i 's/: controller-manager/: $(PROFILE_SHORT)-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+	@sed -i 's/backstage-operator/$(PROFILE_SHORT)-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+	@mv -f ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml ./bundle/$(PROFILE)/manifests/$(PROFILE)-operator.clusterserviceversion.yaml
+	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
+	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/bundle.Dockerfile
 
 ## to update the CSV with a new tagged version of the operator:
 ## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
