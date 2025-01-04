@@ -1952,7 +1952,7 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh/rhdh-hub-rhel9:1.4
-        image: quay.io/rhdh-community/operator:0.4.0
+        image: quay.io/rhdh-community/operator:0.4.1
         livenessProbe:
           httpGet:
             path: /healthz
