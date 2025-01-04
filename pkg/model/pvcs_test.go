@@ -62,6 +62,31 @@ func TestDefaultPvcs(t *testing.T) {
 
 }
 
+func TestMultiContainersPvc(t *testing.T) {
+	bs := bsv1.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pvc",
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").addToDefaultConfig("pvcs.yaml", "multi-pvc-containers.yaml")
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+	assert.Equal(t, 4, len(model.backstageDeployment.allContainers()))
+
+	assert.Equal(t, 3, len(model.backstageDeployment.podSpec().Volumes))
+	// myclaim1(default), myclaim2(listed), myclaim3(*)
+	assert.Equal(t, 3, len(model.backstageDeployment.containerByName("backstage-backend").VolumeMounts))
+	// myclaim2(listed), myclaim3(*)
+	assert.Equal(t, 2, len(model.backstageDeployment.containerByName("install-dynamic-plugins").VolumeMounts))
+	// myclaim3(*)
+	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-container").VolumeMounts))
+	// myclaim3(*)
+	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-init-container").VolumeMounts))
+
+}
+
 func TestSpecifiedPvcs(t *testing.T) {
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{

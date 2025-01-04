@@ -31,7 +31,7 @@ func addConfigMapEnvsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) {
 	}
 
 	for _, specCm := range spec.Application.ExtraEnvs.ConfigMaps {
-		utils.AddEnvVarsFrom(model.backstageDeployment.container(), utils.ConfigMapObjectKind, specCm.Name, specCm.Key)
+		model.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, ConfigMapObjectKind, specCm.Name, specCm.Key)
 	}
 }
 
@@ -63,7 +63,7 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
-	utils.AddEnvVarsFrom(m.backstageDeployment.container(), utils.ConfigMapObjectKind,
+	m.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
 		p.ConfigMap.Name, "")
 	return nil
 }

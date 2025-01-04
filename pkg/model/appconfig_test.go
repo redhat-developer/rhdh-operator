@@ -59,7 +59,6 @@ var (
 
 func TestDefaultAppConfig(t *testing.T) {
 
-	//bs := simpleTestBackstage()
 	bs := *appConfigTestBackstage.DeepCopy()
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")

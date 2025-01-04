@@ -89,9 +89,9 @@ func (b *DbStatefulSet) updateAndValidate(model *BackstageModel, backstage bsv1.
 	}
 
 	if backstage.Spec.IsAuthSecretSpecified() {
-		utils.SetDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
+		b.setDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
 	} else if model.LocalDbSecret != nil {
-		utils.SetDbSecretEnvVar(b.container(), model.LocalDbSecret.secret.Name)
+		b.setDbSecretEnvVar(b.container(), model.LocalDbSecret.secret.Name)
 	}
 	return nil
 }
@@ -111,4 +111,12 @@ func (b *DbStatefulSet) container() *corev1.Container {
 // returns DB pod
 func (b *DbStatefulSet) podSpec() *corev1.PodSpec {
 	return &b.statefulSet.Spec.Template.Spec
+}
+
+func (b *DbStatefulSet) setDbSecretEnvVar(container *corev1.Container, secretName string) {
+	//AddEnvVarsFrom(container, SecretObjectKind, secretName, "")
+	envFromSrc := corev1.EnvFromSource{}
+	envFromSrc.SecretRef = &corev1.SecretEnvSource{
+		LocalObjectReference: corev1.LocalObjectReference{Name: secretName}}
+	container.EnvFrom = append(container.EnvFrom, envFromSrc)
 }

@@ -3,6 +3,8 @@ package model
 import (
 	"fmt"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+
 	"golang.org/x/exp/maps"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -15,6 +17,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const SecretFilesObjectKey = "secret-files.yaml"
+
 type SecretFilesFactory struct{}
 
 func (f SecretFilesFactory) newBackstageObject() RuntimeObject {
@@ -22,11 +26,11 @@ func (f SecretFilesFactory) newBackstageObject() RuntimeObject {
 }
 
 type SecretFiles struct {
-	Secret *corev1.Secret
+	secrets *multiobject.MultiObject
 }
 
 func init() {
-	registerConfig("secret-files.yaml", SecretFilesFactory{}, false)
+	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true)
 }
 
 func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
@@ -42,7 +46,7 @@ func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) erro
 		}
 		mp, wSubpath := model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
 		keys := model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
-		utils.MountFilesFrom(&model.backstageDeployment.deployment.Spec.Template.Spec, model.backstageDeployment.container(), utils.SecretObjectKind,
+		model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, SecretObjectKind,
 			specSec.Name, mp, specSec.Key, wSubpath, keys)
 	}
 	return nil
@@ -50,13 +54,14 @@ func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) erro
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) Object() runtime.Object {
-	return p.Secret
+	return p.secrets
 }
 
+// implementation of RuntimeObject interface
 func (p *SecretFiles) setObject(obj runtime.Object) {
-	p.Secret = nil
+	p.secrets = nil
 	if obj != nil {
-		p.Secret = obj.(*corev1.Secret)
+		p.secrets = obj.(*multiobject.MultiObject)
 	}
 }
 
@@ -67,7 +72,7 @@ func (p *SecretFiles) EmptyObject() client.Object {
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
-	if p.Secret != nil {
+	if p.secrets != nil {
 		model.setRuntimeObject(p)
 		return true, nil
 	}
@@ -77,14 +82,32 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool,
 // implementation of RuntimeObject interface
 func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
 
-	keys := append(maps.Keys(p.Secret.Data), maps.Keys(p.Secret.StringData)...)
-	utils.MountFilesFrom(&m.backstageDeployment.deployment.Spec.Template.Spec, m.backstageDeployment.container(), utils.SecretObjectKind,
-		p.Secret.Name, m.backstageDeployment.defaultMountPath(), "", true, keys)
+	for _, item := range p.secrets.Items {
+		secret, ok := item.(*corev1.Secret)
+		if !ok {
+			return fmt.Errorf("payload is not corev1.Secret: %T", item)
+		}
+
+		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
+		mountPath, subPath, containers := m.backstageDeployment.getDefConfigMountInfo(item)
+		m.backstageDeployment.mountFilesFrom(containers, SecretObjectKind,
+			item.GetName(), mountPath, "", subPath != "", keys)
+	}
 	return nil
 }
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
-	p.Secret.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files"))
-	setMetaInfo(p.Secret, backstage, scheme)
+
+	for _, item := range p.secrets.Items {
+		secret := item.(*corev1.Secret)
+		if len(p.secrets.Items) == 1 {
+			// keep for backward compatibility
+			secret.Name = utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files")
+		} else {
+			utils.AddAnnotation(secret, ConfiguredNameAnnotation, item.GetName())
+			secret.Name = fmt.Sprintf("%s-%s", utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files"), secret.Name)
+		}
+		setMetaInfo(secret, backstage, scheme)
+	}
 }

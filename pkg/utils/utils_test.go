@@ -140,3 +140,22 @@ func TestBoolEnvVar(t *testing.T) {
 	t.Setenv("MyVar", "anything")
 	assert.True(t, BoolEnvVar("anything", true))
 }
+
+func TestFilterContainers(t *testing.T) {
+
+	containers := []string{"c1", "c2", "c3"}
+
+	cs := FilterContainers(containers, "")
+	assert.Nil(t, cs)
+
+	cs = FilterContainers(containers, "*")
+	assert.Equal(t, 3, len(cs))
+
+	cs = FilterContainers(containers, "c123")
+	assert.Equal(t, 0, len(cs))
+
+	cs = FilterContainers(containers, "c1,c2")
+	assert.Equal(t, 2, len(cs))
+	assert.Equal(t, "c1", cs[0])
+
+}

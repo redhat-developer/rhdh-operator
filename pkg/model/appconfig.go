@@ -5,8 +5,6 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	appsv1 "k8s.io/api/apps/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,8 +44,8 @@ func addAppConfigsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error
 
 	for _, specCm := range spec.Application.AppConfig.ConfigMaps {
 		mp, wSubpath := model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
-		updatePodWithAppConfig(model.backstageDeployment.deployment, model.backstageDeployment.container(), specCm.Name,
-			mp, specCm.Key, wSubpath /*model.ExternalConfig.AppConfigs[specCm.Name].Data*/, model.ExternalConfig.AppConfigKeys[specCm.Name])
+		updatePodWithAppConfig(model.backstageDeployment, model.backstageDeployment.container(), specCm.Name,
+			mp, specCm.Key, wSubpath, model.ExternalConfig.AppConfigKeys[specCm.Name])
 	}
 	return nil
 }
@@ -80,8 +78,8 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
-	updatePodWithAppConfig(m.backstageDeployment.deployment, m.backstageDeployment.container(), b.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
+func (b *AppConfig) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+	updatePodWithAppConfig(m.backstageDeployment, m.backstageDeployment.container(), b.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
 	return nil
 }
 
@@ -91,8 +89,8 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 }
 
 // updatePodWithAppConfig contrubutes to Volumes, container.VolumeMounts and contaiter.Args
-func updatePodWithAppConfig(deployment *appsv1.Deployment, container *corev1.Container, cmName, mountPath, key string, withSubPath bool, cmData []string) {
-	utils.MountFilesFrom(&deployment.Spec.Template.Spec, container, utils.ConfigMapObjectKind,
+func updatePodWithAppConfig(bsd *BackstageDeployment, container *corev1.Container, cmName, mountPath, key string, withSubPath bool, cmData []string) {
+	bsd.mountFilesFrom([]string{container.Name}, ConfigMapObjectKind,
 		cmName, mountPath, key, withSubPath, cmData)
 
 	for _, file := range cmData {
