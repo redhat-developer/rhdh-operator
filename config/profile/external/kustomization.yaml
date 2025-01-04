@@ -8,7 +8,7 @@ namePrefix: backstage-
 
 resources:
 - ../../crd
-- ../../rbac
+- ../../rbac/external
 #- ../../manager
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
 # crd/kustomization.yaml
@@ -131,4 +131,4 @@ resources:
 images:
 - name: controller
   newName: quay.io/rhdh-community/operator
-  newTag: 0.4.0
+  newTag: 0.5.0

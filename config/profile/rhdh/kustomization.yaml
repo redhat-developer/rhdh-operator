@@ -13,7 +13,7 @@ namePrefix: rhdh-
 
 resources:
 - ../../crd
-- ../../rbac
+- ../../rbac/rhdh
 - manager.yaml
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
 # crd/kustomization.yaml
@@ -135,8 +135,8 @@ resources:
 
 images:
 - name: controller
-  newName: quay.io/rhdh-community/operator
-  newTag: 0.5.0
+  newName: quay.io/rhdh/rhdh-rhel9-operator
+  newTag: "1.5"
 
 generatorOptions:
   disableNameSuffixHash: true

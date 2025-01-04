@@ -1,9 +1,34 @@
+PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+
+# Profile directory: subdirectory of ./config/profile
+# In terms of Kustomize it is overlay directory
+# It also usually contains default-config directory
+# with set of Backstage Configuration YAML manifests
+# to use other config - add a directory with config,
+# use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
+PROFILE ?= rhdh
+PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.5.0
+ifneq ($(origin VERSION), undefined)
+VERSION := $(VERSION)
+IMAGE_TAG_VERSION ?= $(VERSION)
+else
+VERSION := 0.5.0
+IMAGE_TAG_VERSION := $(VERSION)
+ifeq ($(PROFILE), rhdh)
+	# transforming: 0.y.z => 1.y.z
+	MAJOR := $(shell echo $(VERSION) | cut -d. -f1)
+	INCREMENTED_MAJOR := $(shell expr $(MAJOR) + 1)
+	MINOR_PATCH := $(shell echo $(VERSION) | cut -d. -f2-)
+	VERSION := $(INCREMENTED_MAJOR).$(MINOR_PATCH)
+	IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
+endif
+endif
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -12,6 +37,10 @@ VERSION ?= 0.5.0
 # - use environment variables to overwrite this value (e.g export CHANNELS="candidate,fast,stable")
 ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
+else
+ifeq ($(PROFILE), rhdh)
+BUNDLE_CHANNELS := --channels=fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+endif
 endif
 
 # DEFAULT_CHANNEL defines the default channel used in the bundle.
@@ -21,19 +50,41 @@ endif
 # - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
 ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
+else
+ifeq ($(PROFILE), rhdh)
+BUNDLE_DEFAULT_CHANNEL := --default-channel=fast
+endif
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
+
+ifneq ($(origin BUNDLE_METADATA_PACKAGE_NAME), undefined)
+BUNDLE_METADATA_PACKAGE_NAME := $(BUNDLE_METADATA_PACKAGE_NAME)
+else
+ifeq ($(PROFILE), rhdh)
+BUNDLE_METADATA_PACKAGE_NAME := rhdh
+else
+BUNDLE_METADATA_PACKAGE_NAME := backstage-operator
+endif
+endif
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # quay.io/rhdh-community/operator-bundle:$VERSION and quay.io/rhdh-community/operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
+ifneq ($(origin IMAGE_TAG_BASE), undefined)
+IMAGE_TAG_BASE := $(IMAGE_TAG_BASE)
+else
+IMAGE_TAG_BASE := quay.io/rhdh-community/operator
+ifeq ($(PROFILE), rhdh)
+	# IMAGE_TAG_BASE := registry.redhat.io/rhdh/rhdh-rhel9-operator
+	IMAGE_TAG_BASE := quay.io/rhdh/rhdh-rhel9-operator
+endif
+endif
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(IMAGE_TAG_VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) --output-dir bundle/$(PROFILE) $(BUNDLE_METADATA_OPTS)
@@ -49,8 +100,9 @@ endif
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.37.0
+OPM_VERSION ?= v1.23.0
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
+IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG_VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
 
@@ -83,14 +135,6 @@ SHELL = /usr/bin/env bash -o pipefail
 
 # Source packages outside of tests
 PKGS := $(shell go list ./... | grep -v /e2e)
-
-# Profile directory: subdirectory of ./config/profile
-# In terms of Kustomize it is overlay directory
-# It also usually contains default-config directory
-# with set of Backstage Configuration YAML manifests
-# to use other config - add a directory with config,
-# use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
-PROFILE ?= rhdh
 
 .PHONY: all
 all: build
@@ -241,20 +285,33 @@ deployment-manifest: build-installer ## Generate manifest to deploy operator. De
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(VERSION)
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG_VERSION)
 
 # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
 
+.PHONY: bundles
+bundles: ## Generate bundle manifests and metadata, then validate generated files for all available profiles.
+	@for profile in $(PROFILES); do \
+  		$(MAKE) bundle PROFILE=$$profile; \
+  	done
+
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
 	#$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
+	@rm -f ./bundle/$(PROFILE)/manifests/$(PROFILE)-operator.clusterserviceversion.yaml || true
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle/$(PROFILE)
-	mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
+	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
+	@sed -i 's/-controller-manager/-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+	@sed -i 's/: controller-manager/: $(PROFILE_SHORT)-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+	@sed -i 's/backstage-operator/$(PROFILE_SHORT)-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+	@mv -f ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml ./bundle/$(PROFILE)/manifests/$(PROFILE)-operator.clusterserviceversion.yaml
+	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
+	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/bundle.Dockerfile
 
 ## to update the CSV with a new tagged version of the operator:
 ## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
@@ -440,10 +497,9 @@ mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
 endef
 
 .PHONY: operator-sdk
-OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
 operator-sdk: ## Download operator-sdk locally if necessary.
 ifeq (,$(wildcard $(OPERATOR_SDK)))
-ifeq (, $(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPERATOR_SDK)) ;\
@@ -451,26 +507,19 @@ ifeq (, $(shell which operator-sdk 2>/dev/null))
 	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
 	chmod +x $(OPERATOR_SDK) ;\
 	}
-else
-OPERATOR_SDK = $(shell which operator-sdk)
-endif
 endif
 
 .PHONY: opm
-OPM = $(LOCALBIN)/opm
+OPM ?= $(LOCALBIN)/opm-$(OPM_VERSION)
 opm: ## Download opm locally if necessary.
 ifeq (,$(wildcard $(OPM)))
-ifeq (,$(shell which opm 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
-else
-OPM = $(shell which opm)
-endif
 endif
 
 ##@ Misc.
