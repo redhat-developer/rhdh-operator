@@ -37,9 +37,58 @@ A Configuration Profile consists of a directory with a specific structure named 
 
 ## Out-of-the-box Configuration Profiles
 
-As of September 2024, there are two predefined profiles:
+As of January 2025, there are three predefined profiles:
 
 * **rhdh**: The default profile, applied if no explicit PROFILE is specified. This profile contains configurations for the Red Hat Developer Hub.
 * **backstage.io**: A simple configuration for a bare Backstage instance, utilizing the image available at https://github.com/backstage/backstage/pkgs/container/backstage.
+* **external**: A basis for third-party configurations external to the Backstage repository.
 
-Additionally, there is a third profile, currently a work in progress (TBD), called "external," which is intended to be used as a template for third-party configurations external to the Backstage repository. This serves mostly as a placeholder for the time being.
+## Creating a New Profile
+User may want to create a new Configuration Profile for a specific use case, such as:
+* A custom Backstage Default Configuration by providing a specific default-config directory
+* A specific configuration for the Operator controller's deployment by providing patches for the base deployment manifest
+* A specific name, labels, or annotations for the Operator namespace by providing a specific namespace manifest
+* A specific template for ClusterServiceVersion (CSV) manifests by providing a specific CSV manifest in the config/manifests directory
+
+To create a new Configuration Profile and make it available for test, integration test, and deployment, create a directory with the profile name under the **./config/profile** directory. The directory should contain the following files:
+* **kustomization.yaml**: A Kustomize file defining the resources. See [config/profile/rhdh/kustomization.yaml](RHDH profile) for an example.
+* **default-config**: A directory containing the Operator Default Configuration. See the [Default Configuration](configuration.md#default-configuration) section for more information.
+* **namespace.yaml**: A Kubernetes manifest file defining the namespace for the Operator.
+* Optionally **patches**: A directory containing patches for the Operator deployment.
+
+To add a custom ClusterServiceVersion (CSV) manifest, create a directory with the profile name under the **./config/manifests** directory. The directory should contain the following files:
+* **kustomization.yaml**: A Kustomize file defining the resources. See [config/manifests/rhdh/kustomization.yaml](RHDH manifests) for an example.
+* **bases/csv.yaml**: A Kubernetes manifest file defining the ClusterServiceVersion.
+
+### External Profiles
+To create a Configuration Profile external to the Backstage Operator repository, create a directory following the same structure as above, and reference the **external** profile in **kustomization.yaml** through the repository URL. Here is an example:
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: backstage-system
+
+resources:
+  - https://github.com/redhat-developer/rhdh-operator/config/profile/external
+  - namespace.yaml
+
+namePrefix: backstage-
+
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - files:
+      - default-config/deployment.yaml
+      - default-config/service.yaml
+      - default-config/app-config.yaml
+    name: default-config
+```
+See more about how to [reference remote target in Kustomize](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/remoteBuild.md).
+
+To deploy the Operator with the external profile, you can use the following command:
+
+```bash
+kusomize build . | kubectl apply -f -
+```
+assuming you have installed Kustomize and run the command from the kustomization.yaml's directory.
