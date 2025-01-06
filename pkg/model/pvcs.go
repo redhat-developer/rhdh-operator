@@ -39,7 +39,7 @@ func addPvcsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) {
 			subPath = utils.ToRFC1123Label(pvcSpec.Name)
 		}
 
-		addPvc(model.backstageDeployment, pvcSpec.Name, mountPath, subPath)
+		addPvc(model.backstageDeployment, pvcSpec.Name, mountPath, subPath, nil)
 	}
 }
 
@@ -84,8 +84,9 @@ func (b *BackstagePvcs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) e
 			mountPath = filepath.Join(m.backstageDeployment.defaultMountPath(), volName)
 			subPath = volName
 		}
-		addPvc(m.backstageDeployment, pvc.Name, mountPath, subPath)
 
+		containers := utils.FilterContainers(m.backstageDeployment.allContainers(), pvc.GetAnnotations()[ContainersAnnotation])
+		addPvc(m.backstageDeployment, pvc.Name, mountPath, subPath, containers)
 	}
 	return nil
 }
@@ -99,7 +100,7 @@ func (b *BackstagePvcs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sc
 	}
 }
 
-func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string) {
+func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string, affectedContainers []corev1.Container) {
 
 	volName := utils.ToRFC1123Label(pvcName)
 	volSrc := corev1.VolumeSource{
@@ -110,7 +111,16 @@ func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string) {
 	bsd.deployment.Spec.Template.Spec.Volumes =
 		append(bsd.deployment.Spec.Template.Spec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
 
-	bsd.container().VolumeMounts = append(bsd.container().VolumeMounts,
-		corev1.VolumeMount{Name: volName, MountPath: mountPath, SubPath: subPath})
-
+	if affectedContainers == nil {
+		// if nothing specified mount to the Backstage container only
+		bsd.container().VolumeMounts = append(bsd.container().VolumeMounts,
+			corev1.VolumeMount{Name: volName, MountPath: mountPath, SubPath: subPath})
+	} else {
+		// else mount to the affectedContainers
+		for _, c := range affectedContainers {
+			update := bsd.containerByName(c.Name)
+			update.VolumeMounts = append(update.VolumeMounts,
+				corev1.VolumeMount{Name: volName, MountPath: mountPath, SubPath: subPath})
+		}
+	}
 }
