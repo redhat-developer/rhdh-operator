@@ -1,8 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: manager
-  namespace: operator
+  name: controller-manager
 spec:
   template:
     spec:

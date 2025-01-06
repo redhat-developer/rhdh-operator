@@ -26,8 +26,8 @@ patches:
 - path: patches/env-patch.yaml
   target:
     kind: Deployment
-    name: manager
-    namespace: rhdh-operator
+    name: controller-manager
+
 
 generatorOptions:
   disableNameSuffixHash: true
