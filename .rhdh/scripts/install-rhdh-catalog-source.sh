@@ -12,6 +12,7 @@ IS_OPENSHIFT=""
 
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
+UPSTREAM_IIB_OVERRIDE=""
 
 function logf() {
   set -euo pipefail
@@ -60,6 +61,7 @@ Options:
   -v 1.y                       : Install from iib quay.io/rhdh/iib:1.y-\$OCP_VER-\$OCP_ARCH (eg., 1.4-v4.14-x86_64)
   --latest                     : Install from iib quay.io/rhdh/iib:latest-\$OCP_VER-\$OCP_ARCH (eg., latest-v4.14-x86_64) [default]
   --next                       : Install from iib quay.io/rhdh/iib:next-\$OCP_VER-\$OCP_ARCH (eg., next-v4.14-x86_64)
+  --catalog-source             : Install from specified catalog source, like brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.18
   --install-operator <NAME>    : Install operator named \$NAME after creating CatalogSource
 
 Examples:
@@ -758,13 +760,19 @@ while [[ "$#" -gt 0 ]]; do
       IIB_TAG="${2}-${OCP_VER}-$OCP_ARCH";
       OLM_CHANNEL="fast-${2}"
       shift 1;;
+    '--catalog-source') UPSTREAM_IIB_OVERRIDE="$2"; shift 1;;
     '-h'|'--help') usage; exit 0;;
     *) errorf "Unknown parameter is used: $1."; usage; exit 1;;
   esac
   shift 1
 done
 
-UPSTREAM_IIB="quay.io/rhdh/iib:${IIB_TAG}";
+if [[ $UPSTREAM_IIB_OVERRIDE ]]; then
+  UPSTREAM_IIB="$UPSTREAM_IIB_OVERRIDE"
+else
+  UPSTREAM_IIB="quay.io/rhdh/iib:${IIB_TAG}"
+fi
+
 # shellcheck disable=SC2086
 UPSTREAM_IIB_MANIFEST="$(skopeo inspect docker://${UPSTREAM_IIB} --raw || exit 2)"
 if [[ $UPSTREAM_IIB_MANIFEST == *"Error parsing image name "* ]] || [[ $UPSTREAM_IIB_MANIFEST == *"manifest unknown"* ]]; then
@@ -781,8 +789,13 @@ IIB_NAME="${IIB_NAME//_/-}"
 IIB_NAME="${IIB_NAME//./-}"
 IIB_NAME="$(echo "$IIB_NAME" | tr '[:upper:]' '[:lower:]')"
 OPERATOR_NAME_TO_INSTALL=${TO_INSTALL:-rhdh}
-CATALOGSOURCE_NAME="${OPERATOR_NAME_TO_INSTALL}-${OLM_CHANNEL}"
-DISPLAY_NAME_SUFFIX="${IIB_NAME}"
+if [[ $UPSTREAM_IIB_OVERRIDE == "brew.registry.redhat.io/rh-osbs/iib-pub-pending"* ]]; then
+  CATALOGSOURCE_NAME="brew-registry-stage"
+  DISPLAY_NAME_SUFFIX="brew-registry-stage"
+else
+  CATALOGSOURCE_NAME="${OPERATOR_NAME_TO_INSTALL}-${OLM_CHANNEL}"
+  DISPLAY_NAME_SUFFIX="${IIB_NAME}"
+fi
 
 # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
 # might be restricted in CI environments.
@@ -851,8 +864,8 @@ spec:
   secrets:
   - internal-reg-auth-for-rhdh
   - internal-reg-ext-auth-for-rhdh
-  publisher: IIB testing ${DISPLAY_NAME_SUFFIX}
-  displayName: IIB testing catalog ${DISPLAY_NAME_SUFFIX}
+  publisher: ${DISPLAY_NAME_SUFFIX}
+  displayName: ${DISPLAY_NAME_SUFFIX}
 " > "$TMPDIR"/CatalogSource.yml && invoke_cluster_cli apply -f "$TMPDIR"/CatalogSource.yml
 
 OPERATOR_GROUP_MANIFEST="

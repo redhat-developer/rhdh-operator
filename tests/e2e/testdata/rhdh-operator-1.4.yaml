@@ -1758,26 +1758,46 @@ data:
                   type: RuntimeDefault
                 runAsNonRoot: true
                 allowPrivilegeEscalation: false
+              startupProbe:
+                # This gives enough time upon container startup before the liveness and readiness probes are triggered.
+                # Giving (120s = initialDelaySeconds + failureThreshold * periodSeconds) to account for the worst case scenario.
+                httpGet:
+                  path: /.backstage/health/v1/liveness
+                  port: backend
+                  scheme: HTTP
+                initialDelaySeconds: 30
+                timeoutSeconds: 4
+                periodSeconds: 20
+                successThreshold: 1
+                failureThreshold: 3
               readinessProbe:
                 failureThreshold: 3
                 httpGet:
-                  path: /healthcheck
-                  port: 7007
+                  path: /.backstage/health/v1/readiness
+                  port: backend
                   scheme: HTTP
-                initialDelaySeconds: 30
+                # Both liveness and readiness probes won't be triggered until the startup probe is successful.
+                # The startup probe is already configured to give enough time for the application to be started.
+                # So removing the additional delay here allows the readiness probe to be checked right away after the startup probe,
+                # which helps make the application available faster to the end-user.
+                #initialDelaySeconds: 30
                 periodSeconds: 10
                 successThreshold: 2
-                timeoutSeconds: 2
+                timeoutSeconds: 4
               livenessProbe:
                 failureThreshold: 3
                 httpGet:
-                  path: /healthcheck
-                  port: 7007
+                  path: /.backstage/health/v1/liveness
+                  port: backend
                   scheme: HTTP
-                initialDelaySeconds: 60
+                # Both liveness and readiness probes won't be triggered until the startup probe is successful.
+                # The startup probe is already configured to give enough time for the application to be started.
+                # So removing the additional delay here allows the readiness probe to be checked right away after the startup probe,
+                # which helps make the application available faster to the end-user.
+                #initialDelaySeconds: 60
                 periodSeconds: 10
                 successThreshold: 1
-                timeoutSeconds: 2
+                timeoutSeconds: 4
               ports:
                 - name: backend
                   containerPort: 7007
@@ -1932,7 +1952,7 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh/rhdh-hub-rhel9:1.4
-        image: quay.io/rhdh-community/operator:0.4.0
+        image: quay.io/rhdh-community/operator:0.4.1
         livenessProbe:
           httpGet:
             path: /healthz
