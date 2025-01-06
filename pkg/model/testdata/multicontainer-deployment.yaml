@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name:  <to_be_replaced> # placeholder for 'backstage-<cr-name>'
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+  template:
+    metadata:
+      labels:
+        rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+    spec:
+      initContainers:
+        - image: 'quay.io/rhdh/rhdh-hub-rhel9:next'
+          name: install-dynamic-plugins
+        - image: 'quay.io/rhdh/rhdh-hub-rhel9:next'
+          name: another-init-container
+      containers:
+        - name: backstage-backend
+          image: quay.io/rhdh/rhdh-hub-rhel9:next
+        - name: another-container
+          image: quay.io/rhdh/rhdh-hub-rhel9:next
