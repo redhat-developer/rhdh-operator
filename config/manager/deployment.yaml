@@ -4,17 +4,13 @@ metadata:
   name: controller-manager
   labels:
     app: backstage-controller-manager
-    app.kubernetes.io/name: deployment
-    app.kubernetes.io/instance: controller-manager
-    app.kubernetes.io/component: manager
-    app.kubernetes.io/created-by: backstage-operator
-    app.kubernetes.io/part-of: backstage-operator
-    app.kubernetes.io/managed-by: kustomize
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: backstage-controller-manager
-  replicas: 1
+  strategy:
+    type: RollingUpdate
   template:
     metadata:
       annotations:

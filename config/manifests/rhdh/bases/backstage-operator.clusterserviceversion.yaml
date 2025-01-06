@@ -2,47 +2,10 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
   annotations:
-    alm-examples: |-
-      [
-        {
-          "apiVersion": "rhdh.redhat.com/v1alpha1",
-          "kind": "Backstage",
-          "metadata": {
-            "labels": {
-              "app.kubernetes.io/name": "backstage"
-            },
-            "name": "developer-hub"
-          },
-          "spec": {}
-        },
-        {
-          "apiVersion": "rhdh.redhat.com/v1alpha2",
-          "kind": "Backstage",
-          "metadata": {
-            "labels": {
-              "app.kubernetes.io/name": "backstage"
-            },
-            "name": "developer-hub"
-          },
-          "spec": {}
-        },
-        {
-          "apiVersion": "rhdh.redhat.com/v1alpha3",
-          "kind": "Backstage",
-          "metadata": {
-            "labels": {
-              "app.kubernetes.io/name": "backstage"
-            },
-            "name": "developer-hub"
-          },
-          "spec": {}
-        }
-      ]
     capabilities: Seamless Upgrades
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.5
-    createdAt: "2025-01-03T22:26:25Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -59,14 +22,12 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     operatorframework.io/suggested-namespace: rhdh-operator
     operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.37.0
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
     skipRange: '>=1.0.0 <1.5.0'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
-  name: rhdh-operator.v1.5.0
+  name: backstage-operator.v0.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -88,10 +49,11 @@ spec:
       kind: Backstage
       name: backstages.rhdh.redhat.com
       version: v1alpha2
-    - description: Backstage is the Schema for the Red Hat Developer Hub backstages
-        API. It comes with pre-built plug-ins, configuration settings, and deployment
-        mechanisms, which can help streamline the process of setting up a self-managed
-        internal developer portal for adopters who are just starting out.
+    - description: |-
+        Backstage is the Schema for the Red Hat Developer Hub backstages API.
+        It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
+        which can help streamline the process of setting up a self-managed internal
+        developer portal for adopters who are just starting out.
       displayName: Red Hat Developer Hub
       kind: Backstage
       name: backstages.rhdh.redhat.com
@@ -118,227 +80,8 @@ spec:
     mediatype: image/png
   install:
     spec:
-      clusterPermissions:
-      - rules:
-        - apiGroups:
-          - ""
-          resources:
-          - configmaps
-          - persistentvolumeclaims
-          - secrets
-          - services
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - ""
-          resources:
-          - persistentvolumes
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
-          - apps
-          resources:
-          - deployments
-          - statefulsets
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - rhdh.redhat.com
-          resources:
-          - backstages
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - rhdh.redhat.com
-          resources:
-          - backstages/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - rhdh.redhat.com
-          resources:
-          - backstages/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - route.openshift.io
-          resources:
-          - routes
-          - routes/custom-host
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - authentication.k8s.io
-          resources:
-          - tokenreviews
-          verbs:
-          - create
-        - apiGroups:
-          - authorization.k8s.io
-          resources:
-          - subjectaccessreviews
-          verbs:
-          - create
-        serviceAccountName: rhdh-operator
-      deployments:
-      - label:
-          app: rhdh-operator
-        name: rhdh-operator
-        spec:
-          replicas: 1
-          selector:
-            matchLabels:
-              app: rhdh-operator
-          strategy:
-            type: RollingUpdate
-          template:
-            metadata:
-              annotations:
-                kubectl.kubernetes.io/default-container: manager
-              labels:
-                app: rhdh-operator
-                app.kubernetes.io/component: rhdh-operator
-                app.kubernetes.io/managed-by: olm
-            spec:
-              affinity:
-                nodeAffinity:
-                  requiredDuringSchedulingIgnoredDuringExecution:
-                    nodeSelectorTerms:
-                    - matchExpressions:
-                      - key: kubernetes.io/arch
-                        operator: In
-                        values:
-                        - amd64
-                      - key: kubernetes.io/os
-                        operator: In
-                        values:
-                        - linux
-              automountServiceAccountToken: true
-              containers:
-              - args:
-                - --health-probe-bind-address=:8081
-                - --metrics-bind-address=:8443
-                - --metrics-secure=true
-                - --leader-elect
-                command:
-                - /manager
-                env:
-                - name: OPERATOR_NAME
-                  value: rhdh-operator
-                - name: POD_NAME
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.name
-                - name: RELATED_IMAGE_postgresql
-                  value: quay.io/fedora/postgresql-15:latest
-                - name: RELATED_IMAGE_backstage
-                  value: quay.io/rhdh/rhdh-hub-rhel9:next
-                image: quay.io/rhdh/rhdh-rhel9-operator:1.5
-                livenessProbe:
-                  httpGet:
-                    path: /healthz
-                    port: health
-                  initialDelaySeconds: 15
-                  periodSeconds: 20
-                name: manager
-                ports:
-                - containerPort: 8081
-                  name: health
-                - containerPort: 8443
-                  name: metrics
-                readinessProbe:
-                  httpGet:
-                    path: /readyz
-                    port: health
-                  initialDelaySeconds: 5
-                  periodSeconds: 10
-                resources:
-                  limits:
-                    cpu: 500m
-                    ephemeral-storage: 20Mi
-                    memory: 1Gi
-                  requests:
-                    cpu: 10m
-                    memory: 128Mi
-                securityContext:
-                  allowPrivilegeEscalation: false
-                  capabilities:
-                    drop:
-                    - ALL
-                volumeMounts:
-                - mountPath: /default-config
-                  name: default-config
-              securityContext:
-                runAsNonRoot: true
-              serviceAccountName: rhdh-operator
-              terminationGracePeriodSeconds: 10
-              volumes:
-              - configMap:
-                  name: rhdh-default-config
-                name: default-config
-      permissions:
-      - rules:
-        - apiGroups:
-          - ""
-          resources:
-          - configmaps
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
-        - apiGroups:
-          - coordination.k8s.io
-          resources:
-          - leases
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - create
-          - patch
-        serviceAccountName: rhdh-operator
-    strategy: deployment
+      deployments: null
+    strategy: ""
   installModes:
   - supported: false
     type: OwnNamespace
@@ -362,16 +105,11 @@ spec:
     url: https://gitlab.cee.redhat.com/rhidp/rhdh/
   maintainers:
   - email: rhdh-notifications@redhat.com
-    name: Red Hat Developer Team
+    name: Red Hat Developer Hub Team
   maturity: alpha
   minKubeVersion: 1.25.0
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  relatedImages:
-  - image: quay.io/fedora/postgresql-15:latest
-    name: postgresql
-  - image: quay.io/rhdh/rhdh-hub-rhel9:next
-    name: backstage
   replaces: rhdh-operator.v1.4.0
-  version: 1.5.0
+  version: 0.0.0
