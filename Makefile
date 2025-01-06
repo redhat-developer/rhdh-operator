@@ -2,8 +2,8 @@ PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec 
 
 # Profile directory: subdirectory of ./config/profile
 # In terms of Kustomize it is overlay directory
-# It also usually contains default-config directory
-# with set of Backstage Configuration YAML manifests
+# It also contains default-config directory
+# with set of Backstage Default Configuration YAML manifests
 # to use other config - add a directory with config,
 # use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
 PROFILE ?= rhdh
