@@ -9,7 +9,7 @@
 # 1. make deployment-manifest
 # 2. sed -i "s/backstage-operator/rhdh-operator/g" tests/e2e/testdata/rhdh-operator-*.yaml
 # 3. sed -i "s/backstage-system/rhdh-operator/g" tests/e2e/testdata/rhdh-operator-*.yaml
-# 4. sed -i "s/backstage-controller-manager/rhdh-controller-manager/g" tests/e2e/testdata/rhdh-operator-*.yaml
+# 4. sed -i "s/backstage-controller-manager/rhdh-operator/g" tests/e2e/testdata/rhdh-operator-*.yaml
 #
 
 apiVersion: v1
@@ -22,7 +22,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: namespace
     app.kubernetes.io/part-of: rhdh-operator
-    control-plane: controller-manager
+    app: rhdh-operator
   name: rhdh-operator
 ---
 apiVersion: apiextensions.k8s.io/v1
@@ -1216,7 +1216,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: serviceaccount
     app.kubernetes.io/part-of: rhdh-operator
-  name: rhdh-controller-manager
+  name: rhdh-operator
   namespace: rhdh-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1463,7 +1463,7 @@ roleRef:
   name: rhdh-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: rhdh-controller-manager
+  name: rhdh-operator
   namespace: rhdh-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1483,7 +1483,7 @@ roleRef:
   name: rhdh-manager-role
 subjects:
 - kind: ServiceAccount
-  name: rhdh-controller-manager
+  name: rhdh-operator
   namespace: rhdh-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1502,7 +1502,7 @@ roleRef:
   name: rhdh-metrics-auth-role
 subjects:
 - kind: ServiceAccount
-  name: rhdh-controller-manager
+  name: rhdh-operator
   namespace: rhdh-operator
 ---
 apiVersion: v1
@@ -1882,8 +1882,8 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: service
     app.kubernetes.io/part-of: rhdh-operator
-    control-plane: controller-manager
-  name: rhdh-controller-manager-metrics-service
+    app: rhdh-operator
+  name: rhdh-operator-metrics-service
   namespace: rhdh-operator
 spec:
   ports:
@@ -1892,7 +1892,7 @@ spec:
     protocol: TCP
     targetPort: metrics
   selector:
-    control-plane: controller-manager
+    app: rhdh-operator
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1904,20 +1904,20 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: deployment
     app.kubernetes.io/part-of: rhdh-operator
-    control-plane: controller-manager
-  name: rhdh-controller-manager
+    app: rhdh-operator
+  name: rhdh-operator
   namespace: rhdh-operator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      control-plane: controller-manager
+      app: rhdh-operator
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        control-plane: controller-manager
+        app: rhdh-operator
     spec:
       affinity:
         nodeAffinity:
@@ -1989,7 +1989,7 @@ spec:
           name: default-config
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: rhdh-controller-manager
+      serviceAccountName: rhdh-operator
       terminationGracePeriodSeconds: 10
       volumes:
       - configMap:
