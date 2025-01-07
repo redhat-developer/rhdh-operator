@@ -9,6 +9,7 @@ resources:
 - ../../scorecard
 
 patches:
+# Replace the name of the sample resources
 - target:
     kind: Backstage
     name: .*
