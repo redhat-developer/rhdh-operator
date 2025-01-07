@@ -12,8 +12,7 @@ metadata:
               "app.kubernetes.io/name": "backstage"
             },
             "name": "developer-hub"
-          },
-          "spec": {}
+          }
         },
         {
           "apiVersion": "rhdh.redhat.com/v1alpha2",
@@ -23,8 +22,7 @@ metadata:
               "app.kubernetes.io/name": "backstage"
             },
             "name": "developer-hub"
-          },
-          "spec": {}
+          }
         },
         {
           "apiVersion": "rhdh.redhat.com/v1alpha3",
@@ -34,15 +32,14 @@ metadata:
               "app.kubernetes.io/name": "backstage"
             },
             "name": "developer-hub"
-          },
-          "spec": {}
+          }
         }
       ]
     capabilities: Seamless Upgrades
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.5
-    createdAt: "2025-01-07T13:47:23Z"
+    createdAt: "2025-01-07T13:58:56Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed

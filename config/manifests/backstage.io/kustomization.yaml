@@ -7,5 +7,5 @@ kind: Kustomization
 resources:
 - bases/backstage-operator.clusterserviceversion.yaml
 - ../../profile/backstage.io
-- ../../samples/backstage.io
+- ../../samples
 - ../../scorecard

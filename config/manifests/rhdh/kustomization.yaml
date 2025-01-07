@@ -5,5 +5,14 @@ kind: Kustomization
 resources:
 - bases/backstage-operator.clusterserviceversion.yaml
 - ../../profile/rhdh
-- ../../samples/rhdh
+- ../../samples
 - ../../scorecard
+
+patches:
+- target:
+    kind: Backstage
+    name: .*
+  patch: |-
+    - op: replace
+      path: /metadata/name
+      value: developer-hub
