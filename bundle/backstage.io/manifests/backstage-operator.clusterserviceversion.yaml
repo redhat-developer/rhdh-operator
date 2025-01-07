@@ -35,7 +35,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-01-07T13:58:54Z"
+    createdAt: "2025-01-07T16:55:26Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -165,7 +165,7 @@ spec:
           - subjectaccessreviews
           verbs:
           - create
-        serviceAccountName: backstage-operator
+        serviceAccountName: backstage-controller-manager
       deployments:
       - label:
           app: operator
@@ -245,7 +245,7 @@ spec:
                   name: default-config
               securityContext:
                 runAsNonRoot: true
-              serviceAccountName: backstage-operator
+              serviceAccountName: backstage-controller-manager
               terminationGracePeriodSeconds: 10
               volumes:
               - configMap:
@@ -284,7 +284,7 @@ spec:
           verbs:
           - create
           - patch
-        serviceAccountName: backstage-operator
+        serviceAccountName: backstage-controller-manager
     strategy: deployment
   installModes:
   - supported: false

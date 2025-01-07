@@ -6,7 +6,7 @@ metadata:
     control-plane: controller-manager
     app.kubernetes.io/name: backstage-operator
     app.kubernetes.io/managed-by: kustomize
-  name: operator-metrics-monitor
+  name: controller-manager-metrics-monitor
   namespace: system
 spec:
   endpoints:

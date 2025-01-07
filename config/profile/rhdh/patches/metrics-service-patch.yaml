@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: rhdh-operator
-  name: operator-metrics-service
-spec:
-  selector:
-    app: rhdh-operator

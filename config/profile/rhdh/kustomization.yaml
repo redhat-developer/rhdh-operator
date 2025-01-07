@@ -27,10 +27,6 @@ patches:
   target:
     kind: Deployment
     name: operator
-- path: patches/metrics-service-patch.yaml
-  target:
-    kind: Service
-    name: operator-metrics-service
 
 generatorOptions:
   disableNameSuffixHash: true

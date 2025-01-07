@@ -15,5 +15,5 @@ roleRef:
   name: manager-role
 subjects:
 - kind: ServiceAccount
-  name: operator
+  name: controller-manager
   namespace: system

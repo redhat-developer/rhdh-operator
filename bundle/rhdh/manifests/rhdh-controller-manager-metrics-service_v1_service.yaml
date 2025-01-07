@@ -3,7 +3,6 @@ kind: Service
 metadata:
   creationTimestamp: null
   labels:
-    app: operator
     app.kubernetes.io/component: metrics
     app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: controller-manager-metrics-service
@@ -11,7 +10,7 @@ metadata:
     app.kubernetes.io/name: service
     app.kubernetes.io/part-of: backstage-operator
     control-plane: controller-manager
-  name: backstage-operator-metrics-service
+  name: rhdh-controller-manager-metrics-service
 spec:
   ports:
   - name: metrics
@@ -19,6 +18,6 @@ spec:
     protocol: TCP
     targetPort: metrics
   selector:
-    app: operator
+    control-plane: controller-manager
 status:
   loadBalancer: {}

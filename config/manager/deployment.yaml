@@ -94,7 +94,7 @@ spec:
         volumeMounts:
           - mountPath: /default-config
             name: default-config
-      serviceAccountName: operator
+      serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
       - name: default-config

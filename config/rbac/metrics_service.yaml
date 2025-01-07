@@ -2,7 +2,6 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    app: operator
     control-plane: controller-manager
     app.kubernetes.io/name: service
     app.kubernetes.io/instance: controller-manager-metrics-service
@@ -10,7 +9,7 @@ metadata:
     app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/part-of: backstage-operator
     app.kubernetes.io/managed-by: kustomize
-  name: operator-metrics-service
+  name: controller-manager-metrics-service
   namespace: system
 spec:
   ports:
@@ -19,4 +18,4 @@ spec:
       protocol: TCP
       targetPort: metrics
   selector:
-    app: operator
+    control-plane: controller-manager
