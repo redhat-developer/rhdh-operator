@@ -35,7 +35,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-01-07T13:28:03Z"
+    createdAt: "2025-01-07T13:47:21Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -169,6 +169,7 @@ spec:
       deployments:
       - label:
           app: operator
+          control-plane: controller-manager
         name: backstage-operator
         spec:
           replicas: 1
@@ -183,6 +184,7 @@ spec:
                 kubectl.kubernetes.io/default-container: manager
               labels:
                 app: operator
+                control-plane: controller-manager
             spec:
               affinity:
                 nodeAffinity:

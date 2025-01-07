@@ -3,7 +3,9 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: controller
+    control-plane: controller-manager
+    app.kubernetes.io/name: backstage-operator
+    app.kubernetes.io/managed-by: kustomize
   name: operator-metrics-monitor
   namespace: system
 spec:
@@ -16,4 +18,4 @@ spec:
         insecureSkipVerify: true
   selector:
     matchLabels:
-      app: operator
+      control-plane: controller-manager

@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: service
     app.kubernetes.io/part-of: backstage-operator
+    control-plane: controller-manager
   name: backstage-operator-metrics-service
 spec:
   ports:

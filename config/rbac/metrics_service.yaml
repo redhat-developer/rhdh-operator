@@ -3,6 +3,7 @@ kind: Service
 metadata:
   labels:
     app: operator
+    control-plane: controller-manager
     app.kubernetes.io/name: service
     app.kubernetes.io/instance: controller-manager-metrics-service
     app.kubernetes.io/component: metrics
