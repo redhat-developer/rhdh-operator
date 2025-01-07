@@ -308,9 +308,9 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	$(OPERATOR_SDK) bundle validate ./bundle/$(PROFILE)
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
-	@sed -i 's/-controller-manager/-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
-	@sed -i 's/: controller-manager/: $(PROFILE_SHORT)-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
-	@sed -i 's/backstage-operator/$(PROFILE_SHORT)-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+#	@sed -i 's/-controller-manager/-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+#	@sed -i 's/: controller-manager/: $(PROFILE_SHORT)-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
+#	@sed -i 's/backstage-operator/$(PROFILE_SHORT)-operator/g' ./bundle/$(PROFILE)/manifests/*.yaml
 	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
 	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/bundle.Dockerfile
 

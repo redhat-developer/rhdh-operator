@@ -13,7 +13,7 @@ namePrefix: rhdh-
 
 resources:
 - ../../crd
-- ../../rbac/rhdh
+- ../../rbac
 - ../../manager
 - namespace.yaml
 
@@ -23,11 +23,10 @@ images:
   newTag: "1.5"
 
 patches:
-- path: patches/env-patch.yaml
+- path: patches/deployment-patch.yaml
   target:
     kind: Deployment
-    name: controller-manager
-
+    name: operator
 
 generatorOptions:
   disableNameSuffixHash: true

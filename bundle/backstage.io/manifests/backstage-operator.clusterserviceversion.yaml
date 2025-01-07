@@ -35,7 +35,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-01-07T11:35:26Z"
+    createdAt: "2025-01-07T13:28:03Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -168,13 +168,13 @@ spec:
         serviceAccountName: backstage-operator
       deployments:
       - label:
-          app: backstage-operator
+          app: operator
         name: backstage-operator
         spec:
           replicas: 1
           selector:
             matchLabels:
-              app: backstage-operator
+              app: operator
           strategy:
             type: RollingUpdate
           template:
@@ -182,7 +182,7 @@ spec:
               annotations:
                 kubectl.kubernetes.io/default-container: manager
               labels:
-                app: backstage-operator
+                app: operator
             spec:
               affinity:
                 nodeAffinity:

@@ -1,4 +1,0 @@
-resources:
-- ../_common
-# Metrics
-- metrics_service.yaml

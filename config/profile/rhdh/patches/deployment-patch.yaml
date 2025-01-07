@@ -1,9 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: controller-manager
+  name: operator
+  labels:
+    app: rhdh-operator
 spec:
+  selector:
+    matchLabels:
+      app: rhdh-operator
   template:
+    metadata:
+      labels:
+        app: rhdh-operator
+        app.kubernetes.io/component: rhdh-operator
+        app.kubernetes.io/managed-by: olm
     spec:
       containers:
         - name: manager

@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: controller-manager
+  name: operator
   labels:
-    app: backstage-controller-manager
+    app: operator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: backstage-controller-manager
+      app: operator
   strategy:
     type: RollingUpdate
   template:
@@ -16,7 +16,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        app: backstage-controller-manager
+        app: operator
     spec:
       # Required because the operator does not work without a Service Account Token
       automountServiceAccountToken: true # NOSONAR
@@ -92,7 +92,7 @@ spec:
         volumeMounts:
           - mountPath: /default-config
             name: default-config
-      serviceAccountName: controller-manager
+      serviceAccountName: operator
       terminationGracePeriodSeconds: 10
       volumes:
       - name: default-config

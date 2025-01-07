@@ -13,7 +13,7 @@ namePrefix: backstage-
 
 resources:
 - ../../crd
-- ../../rbac/backstage.io
+- ../../rbac
 - ../../manager
 - namespace.yaml
 
