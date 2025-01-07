@@ -47,18 +47,18 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Check for outdated bundle
-        id: bundle-diff-checker
+      - name: Check for outdated bundle or manifests
+        id: manifests-diff-checker
         run: |
           make bundles
           git status --porcelain
           # Since operator-sdk 1.26.0, `make bundle` changes the `createdAt` field from the bundle every time we run it.
           # The `git diff` below checks if only the createdAt field has changed. If is the only change, it is ignored.
           # Inspired from https://github.com/operator-framework/operator-sdk/issues/6285#issuecomment-1415350333
-          echo "MANIFESTS_CHANGED=$(if git diff --quiet -I'^    createdAt: ' bundle; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+          echo "MANIFESTS_CHANGED=$(if git diff --quiet -I'^    createdAt: ' bundle config; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
       - name: Commit any manifest changes
-        if: ${{ steps.bundle-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
+        if: ${{ steps.manifests-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
@@ -72,7 +72,7 @@ jobs:
 
       - name: Comment on PR if bundle manifests were updated
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
-        if: ${{ !cancelled() && steps.bundle-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
+        if: ${{ !cancelled() && steps.manifests-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
         continue-on-error: true
         env:
           GH_BLOB_VIEWER_BASE_URL: ${{github.event.pull_request.head.repo.html_url}}/blob/${{github.event.pull_request.head.ref}}
@@ -84,10 +84,3 @@ jobs:
               repo: context.repo.repo,
               body: '⚠️ <b>Files changed in bundle generation!</b><br/><br/>Those changes to the operator bundle manifests should have been pushed automatically to your PR branch.'
             })
-
-      - name: Check if the CSV for RHDH needs to be updated
-        run: |
-          echo "Checking that the RBAC roles of the downstream RHDH operator are not out of sync with the upstream CSV..."
-          diff -U 1 \
-            <(yq '.spec.install.spec.clusterPermissions' bundle/rhdh/manifests/rhdh-operator.clusterserviceversion.yaml | grep -v 'serviceAccountName: ') \
-            <(yq '.spec.install.spec.clusterPermissions' .rhdh/bundle/manifests/rhdh-operator.clusterserviceversion.yaml | grep -v 'serviceAccountName: ')
