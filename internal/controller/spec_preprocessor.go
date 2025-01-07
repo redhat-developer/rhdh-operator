@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -70,7 +71,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	if bsSpec.Application.AppConfig != nil {
 		for _, ac := range bsSpec.Application.AppConfig.ConfigMaps {
 			cm := &corev1.ConfigMap{Data: map[string]string{}}
-			if hashingData, err = r.addExtConfig(&result, ctx, cm, backstage.Name, ac.Name, ns, addToWatch(ac), hashingData); err != nil {
+			if hashingData, err = r.addExtConfig(ctx, cm, backstage.Name, ac.Name, ns, addToWatch(ac), hashingData); err != nil {
 				return result, err
 			}
 			result.AppConfigKeys[ac.Name] = maps.Keys(cm.Data)
@@ -81,7 +82,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.ConfigMaps != nil {
 		for _, ef := range bsSpec.Application.ExtraFiles.ConfigMaps {
 			cm := &corev1.ConfigMap{Data: map[string]string{}, BinaryData: map[string][]byte{}}
-			if hashingData, err = r.addExtConfig(&result, ctx, cm, backstage.Name, ef.Name, ns, addToWatch(ef), hashingData); err != nil {
+			if hashingData, err = r.addExtConfig(ctx, cm, backstage.Name, ef.Name, ns, addToWatch(ef), hashingData); err != nil {
 				return result, err
 			}
 			result.ExtraFileConfigMapKeys[ef.Name] = model.NewDataObjectKeys(cm.Data, cm.BinaryData)
@@ -92,7 +93,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	if bsSpec.Application.ExtraFiles != nil && bsSpec.Application.ExtraFiles.Secrets != nil {
 		for _, ef := range bsSpec.Application.ExtraFiles.Secrets {
 			secret := &corev1.Secret{Data: map[string][]byte{}, StringData: map[string]string{}}
-			if hashingData, err = r.addExtConfig(&result, ctx, secret, backstage.Name, ef.Name, ns, addToWatch(ef), hashingData); err != nil {
+			if hashingData, err = r.addExtConfig(ctx, secret, backstage.Name, ef.Name, ns, addToWatch(ef), hashingData); err != nil {
 				return result, err
 			}
 			result.ExtraFileSecretKeys[ef.Name] = model.NewDataObjectKeys(secret.StringData, secret.Data)
@@ -103,7 +104,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	if bsSpec.Application.ExtraEnvs != nil && bsSpec.Application.ExtraEnvs.ConfigMaps != nil {
 		for _, ee := range bsSpec.Application.ExtraEnvs.ConfigMaps {
 			cm := &corev1.ConfigMap{Data: map[string]string{}, BinaryData: map[string][]byte{}}
-			if hashingData, err = r.addExtConfig(&result, ctx, cm, backstage.Name, ee.Name, ns, true, hashingData); err != nil {
+			if hashingData, err = r.addExtConfig(ctx, cm, backstage.Name, ee.Name, ns, true, hashingData); err != nil {
 				return result, err
 			}
 			result.ExtraEnvConfigMapKeys[ee.Name] = model.NewDataObjectKeys(cm.Data, cm.BinaryData)
@@ -114,7 +115,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	if bsSpec.Application.ExtraEnvs != nil && bsSpec.Application.ExtraEnvs.Secrets != nil {
 		for _, ee := range bsSpec.Application.ExtraEnvs.Secrets {
 			secret := &corev1.Secret{Data: map[string][]byte{}, StringData: map[string]string{}}
-			if hashingData, err = r.addExtConfig(&result, ctx, secret, backstage.Name, ee.Name, ns, true, hashingData); err != nil {
+			if hashingData, err = r.addExtConfig(ctx, secret, backstage.Name, ee.Name, ns, true, hashingData); err != nil {
 				return result, err
 			}
 			//result.ExtraEnvSecrets[secret.Name] = *secret
@@ -137,7 +138,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	// Process DynamicPlugins
 	if bsSpec.Application.DynamicPluginsConfigMapName != "" {
 		cm := &corev1.ConfigMap{}
-		if hashingData, err = r.addExtConfig(&result, ctx, cm, backstage.Name, bsSpec.Application.DynamicPluginsConfigMapName, ns, true, hashingData); err != nil {
+		if hashingData, err = r.addExtConfig(ctx, cm, backstage.Name, bsSpec.Application.DynamicPluginsConfigMapName, ns, true, hashingData); err != nil {
 			return result, err
 		}
 		result.DynamicPlugins = *cm
@@ -153,7 +154,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 // addExtConfig makes object watchable by Operator adding ExtConfigSyncLabel label and BackstageNameAnnotation
 // and adding its content (marshalled object) to make it watchable by Operator and able to refresh the Pod if needed
 // (Pod refresh will be called if external configuration hash changed)
-func (r *BackstageReconciler) addExtConfig(config *model.ExternalConfig, ctx context.Context, obj client.Object, backstageName, objectName, ns string, addToWatch bool, hashingData []byte) ([]byte, error) {
+func (r *BackstageReconciler) addExtConfig(ctx context.Context, obj client.Object, backstageName, objectName, ns string, addToWatch bool, hashingData []byte) ([]byte, error) {
 
 	lg := log.FromContext(ctx)
 
@@ -232,13 +233,27 @@ func concatData(original []byte, obj client.Object) []byte {
 		binaryData = v.Data
 	}
 
-	for k, v := range stringData {
-		data = append(data, []byte(k+v)...)
+	// sort the keys to make sure the order and the hash eventually is consistent
+	stringKeys := make([]string, 0, len(stringData))
+	for k := range stringData {
+		stringKeys = append(stringKeys, k)
+	}
+	sort.Strings(stringKeys)
+
+	binaryKeys := make([]string, 0, len(binaryData))
+	for k := range binaryData {
+		binaryKeys = append(binaryKeys, k)
+	}
+	sort.Strings(binaryKeys)
+
+	// append the data to the original data
+	for _, k := range stringKeys {
+		data = append(data, []byte(k+stringData[k])...)
 	}
 
-	for k, v := range binaryData {
+	for _, k := range binaryKeys {
 		data = append(data, []byte(k)...)
-		data = append(data, v...)
+		data = append(data, binaryData[k]...)
 	}
 
 	return data

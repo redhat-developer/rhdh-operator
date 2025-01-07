@@ -84,3 +84,16 @@ func TestExtConfigChanged(t *testing.T) {
 	assert.Equal(t, "false", cm.Labels[model.ExtConfigSyncLabel])
 
 }
+
+// TestExtConfigChanged tests if concatData returns the same data when the order of the keys is different
+func TestExtConcatData(t *testing.T) {
+	cm := corev1.ConfigMap{}
+
+	cm.Data = map[string]string{"key1": "value1", "key2": "value2", "key3": "value3", "key4": "value4"}
+	original := []byte("original")
+	data1 := concatData(original, &cm)
+
+	cm.Data = map[string]string{"key4": "value4", "key2": "value2", "key3": "value3", "key1": "value1"}
+	assert.Equal(t, data1, concatData(original, &cm))
+
+}
