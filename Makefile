@@ -48,13 +48,12 @@ endif
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
 # - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
 # - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
-ifneq ($(origin DEFAULT_CHANNEL), undefined)
-BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
-else
+DEFAULT_CHANNEL ?= alpha
 ifeq ($(PROFILE), rhdh)
-BUNDLE_DEFAULT_CHANNEL := --default-channel=fast
+DEFAULT_CHANNEL := fast
 endif
-endif
+BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
+
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 ifneq ($(origin BUNDLE_METADATA_PACKAGE_NAME), undefined)
@@ -377,29 +376,47 @@ OPENSHIFT_OLM_NAMESPACE = openshift-marketplace
 
 .PHONY: deploy-olm
 deploy-olm: ## Deploy the operator with OLM
-	$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f config/samples/catalog-operator-group.yaml
-	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | sed "s/{{OLM_NAMESPACE}}/$(subst /,\/,$(OLM_NAMESPACE))/g" | $(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
+	sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" config/samples/catalog-operator-group.yaml | \
+		$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
+	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | \
+		sed "s/{{DEFAULT_CHANNEL}}/$(subst /,\/,$(DEFAULT_CHANNEL))/g" | \
+		sed "s/{{BUNDLE_METADATA_PACKAGE_NAME}}/$(subst /,\/,$(BUNDLE_METADATA_PACKAGE_NAME))/g" | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		sed "s/{{OLM_NAMESPACE}}/$(subst /,\/,$(OLM_NAMESPACE))/g" | \
+		$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
 
 .PHONY: deploy-olm-openshift
 deploy-olm-openshift: ## Deploy the operator with OLM
-	$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f config/samples/catalog-operator-group.yaml
-	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | sed "s/{{OLM_NAMESPACE}}/$(subst /,\/,$(OPENSHIFT_OLM_NAMESPACE))/g" | $(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
+	sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" config/samples/catalog-operator-group.yaml | \
+		$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
+	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | \
+		sed "s/{{DEFAULT_CHANNEL}}/$(subst /,\/,$(DEFAULT_CHANNEL))/g" | \
+		sed "s/{{BUNDLE_METADATA_PACKAGE_NAME}}/$(subst /,\/,$(BUNDLE_METADATA_PACKAGE_NAME))/g" | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		sed "s/{{OLM_NAMESPACE}}/$(subst /,\/,$(OPENSHIFT_OLM_NAMESPACE))/g" | \
+		$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
 
 .PHONY: undeploy-olm
 undeploy-olm: ## Un-deploy the operator with OLM
-	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete subscriptions.operators.coreos.com backstage-operator
-	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete operatorgroup backstage-operator-group
-	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete clusterserviceversion backstage-operator.v$(VERSION)
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete subscriptions.operators.coreos.com $(PROFILE_SHORT)-operator
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete operatorgroup $(PROFILE_SHORT)-operator-group
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete clusterserviceversion $(PROFILE_SHORT)-operator.v$(VERSION)
 
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in the default namespace for catalogsource
-	-$(KUBECTL) delete catalogsource backstage-operator -n $(OLM_NAMESPACE)
-	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | $(KUBECTL) apply -n $(OLM_NAMESPACE) -f -
+	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OLM_NAMESPACE)
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | \
+		sed "s/{{PROFILE}}/$(subst /,\/,$(PROFILE))/g" | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		$(KUBECTL) apply -n $(OLM_NAMESPACE) -f -
 
 .PHONY: catalog-update
 catalog-update-openshift: ## Update catalog source in the default namespace for catalogsource
-	-$(KUBECTL) delete catalogsource backstage-operator -n $(OPENSHIFT_OLM_NAMESPACE)
-	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | $(KUBECTL) apply -n $(OPENSHIFT_OLM_NAMESPACE) -f -
+	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OPENSHIFT_OLM_NAMESPACE)
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | \
+		sed "s/{{PROFILE}}/$(subst /,\/,$(PROFILE))/g" | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		$(KUBECTL) apply -n $(OPENSHIFT_OLM_NAMESPACE) -f -
 
 # Deploy on Openshift cluster using OLM (by default installed on Openshift)
 .PHONY: deploy-openshift
