@@ -18,7 +18,7 @@ ifneq ($(origin VERSION), undefined)
 VERSION := $(VERSION)
 IMAGE_TAG_VERSION ?= $(VERSION)
 else
-VERSION := 0.5.0
+VERSION ?= 0.5.0
 IMAGE_TAG_VERSION := $(VERSION)
 ifeq ($(PROFILE), rhdh)
 	# transforming: 0.y.z => 1.y.z
