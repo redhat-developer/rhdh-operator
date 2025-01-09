@@ -305,11 +305,11 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 		--output-dir ./config/manifests/$(PROFILE)/
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
-	$(OPERATOR_SDK) bundle validate ./bundle/$(PROFILE)
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 	@sed -i 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
 	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
 	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/bundle.Dockerfile
+	$(OPERATOR_SDK) bundle validate ./bundle/$(PROFILE)
 
 ## to update the CSV with a new tagged version of the operator:
 ## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
