@@ -2,7 +2,7 @@
 
 ## The Goal
 The Goal of [Backstage](https://backstage.io) Operator project is creating Kubernetes Operator for configuring, installing and synchronizing Backstage instance on Kubernetes/OpenShift. 
-The initial target is in support of Red Hat's assemblies of Backstage - specifically supporting [dynamic-plugins](https://github.com/janus-idp/backstage-showcase/blob/main/docs/dynamic-plugins.md) on OpenShift. This includes [Red Hat Developer Hub (RHDH)](https://developers.redhat.com/rhdh) but may be flexible enough to install any compatible Backstage instance on Kubernetes. See additional information under [Configuration](docs/configuration.md).
+The initial target is in support of Red Hat's assemblies of Backstage - specifically supporting [dynamic-plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md) on OpenShift. This includes [Red Hat Developer Hub (RHDH)](https://developers.redhat.com/rhdh) but may be flexible enough to install any compatible Backstage instance on Kubernetes. See additional information under [Configuration](docs/configuration.md).
 The Operator provides clear and flexible configuration options to satisfy a wide range of expectations, from "no configuration for default quick start" to "highly customized configuration for production".
 
 [More documentation...](#more-documentation)
@@ -72,7 +72,7 @@ Forwarding from [::1]:17007 -> 7007
 
 ## Telemetry data collection
 
-The telemetry data collection feature is enabled by default. The default configuration uses image with backstage-plugin-analytics-provider-segment plugin enabled and configured. To disable this and to learn what data is being collected, see https://github.com/janus-idp/backstage-showcase/blob/main/docs/index.md#telemetry-collection
+The telemetry data collection feature is enabled by default. The default configuration uses image with backstage-plugin-analytics-provider-segment plugin enabled and configured. To disable this and to learn what data is being collected, see https://github.com/redhat-developer/rhdh/blob/main/docs/index.md#telemetry-collection
 
 ## Contributing and reporting issues
 
