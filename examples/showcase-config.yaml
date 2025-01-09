@@ -20,7 +20,7 @@ data:
          spec:
            containers:
              - name: backstage
-               image: quay.io.com/redhat-developer/rhdh
+               image: quay.io/rhdh-community/rhdh
                imagePullPolicy: IfNotPresent
                ports:
                  - name: http
