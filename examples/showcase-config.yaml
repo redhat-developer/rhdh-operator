@@ -20,7 +20,7 @@ data:
          spec:
            containers:
              - name: backstage
-               image: quay.io/janus-idp/backstage-showcase
+               image: quay.io.com/redhat-developer/rhdh
                imagePullPolicy: IfNotPresent
                ports:
                  - name: http
