@@ -74,7 +74,15 @@ jobs:
             **/*.md
             **/*.adoc
             .rhdh/**
-            tests/**
+            tests/** 
+
+      - name: List all changed files (for troubleshooting)
+        env:
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          for file in ${ALL_CHANGED_FILES}; do
+            echo "$file was changed"
+          done
 
       - name: Setup Go
         # run this stage only if there are changes that match the includes and not the excludes
