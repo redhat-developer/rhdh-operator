@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY: quay.io
+  REGISTRY: ${{ vars.REGISTRY }}
 
 jobs:
   authorize:
@@ -100,7 +100,7 @@ jobs:
           BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //") # 0.0.1
           echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
 
-      - name: Login to quay.io
+      - name: Login to registry (${{env.REGISTRY}})
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
@@ -118,6 +118,9 @@ jobs:
 
           export CONTAINER_TOOL=podman 
           export VERSION=${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }} 
+          export REGISTRY_WITH_ORG=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}
+          export OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME:-operator}
+          export IMAGE_TAG_BASE=${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}
 
           set -ex
 
@@ -125,12 +128,14 @@ jobs:
           CONTAINER_TOOL=${CONTAINER_TOOL} VERSION=${VERSION} make lint release-build
 
           # now copy images from local cache to quay, using 0.0.1-pr-123-f00cafe and 0.0.1-pr-123 tags
-          for image in operator operator-bundle operator-catalog; do
-            podman push -q quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION%-*}
+          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
+            podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION%-*}
           done
         env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
           # to avoid throttling on RHD org, use GH token
           GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
       - name: Comment image links in PR
