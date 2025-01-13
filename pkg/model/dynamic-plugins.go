@@ -54,7 +54,7 @@ func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) e
 		return nil
 	}
 
-	c, ic := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	_, ic := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if ic == nil {
 		return fmt.Errorf("validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
 	}
@@ -64,7 +64,7 @@ func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) e
 		return fmt.Errorf("dynamic plugin configMap expects exactly one Data key named '%s' ", DynamicPluginsFile)
 	}
 
-	utils.MountFilesFrom(&model.backstageDeployment.deployment.Spec.Template.Spec, &model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers[c], utils.ConfigMapObjectKind,
+	model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
 		dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
 
 	return nil
@@ -103,7 +103,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
 func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backstage) error {
 
-	c, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
 		return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
 	}
@@ -116,7 +116,7 @@ func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backsta
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
 
-	utils.MountFilesFrom(&model.backstageDeployment.deployment.Spec.Template.Spec, &model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers[c], utils.ConfigMapObjectKind,
+	model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
 		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
 
 	return nil

@@ -4,6 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"k8s.io/utils/ptr"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
@@ -34,7 +37,7 @@ func TestDefaultSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretFilesObjectKey, "raw-secret-files.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
 
@@ -46,6 +49,38 @@ func TestDefaultSecretFiles(t *testing.T) {
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))
 
+}
+
+func TestDefaultMultiSecretFiles(t *testing.T) {
+
+	bs := bsv1.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bs",
+		},
+		Spec: bsv1.BackstageSpec{
+			Database: &bsv1.Database{
+				EnableLocalDb: ptr.To(false),
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
+		addToDefaultConfig(SecretFilesObjectKey, "raw-multi-secret.yaml")
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	mo := model.getRuntimeObjectByType(&SecretFiles{}).Object().(*multiobject.MultiObject)
+	assert.Equal(t, 3, len(mo.Items))
+	// data1,data2,data3+data4,data5
+	assert.Equal(t, 4, len(model.backstageDeployment.container().VolumeMounts))
+	// data1,data2,data5
+	assert.Equal(t, 3, len(model.backstageDeployment.containerByName("install-dynamic-plugins").VolumeMounts))
+	// data5
+	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-container").VolumeMounts))
+	assert.Equal(t, 3, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
 }
 
 func TestSpecifiedSecretFiles(t *testing.T) {
