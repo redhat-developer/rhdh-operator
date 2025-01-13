@@ -13,7 +13,6 @@ spec:
       labels:
         app: rhdh-operator
         app.kubernetes.io/component: rhdh-operator
-        app.kubernetes.io/managed-by: olm
     spec:
       containers:
         - name: manager
