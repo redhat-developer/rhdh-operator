@@ -60,7 +60,7 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 			cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", fromDeploymentManifest)
 			_, err := helper.Run(cmd)
 			Expect(err).ShouldNot(HaveOccurred())
-			EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).WithArguments(managerPodLabel).Should(Succeed())
+			EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).WithArguments("app=rhdh-operator").Should(Succeed())
 
 			cmd = exec.Command(helper.GetPlatformTool(), "-n", ns, "create", "-f", "-")
 			stdin, err := cmd.StdinPipe()

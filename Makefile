@@ -1,39 +1,79 @@
+PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+
+# Profile directory: subdirectory of ./config/profile
+# In terms of Kustomize it is overlay directory
+# It also contains default-config directory
+# with set of Backstage Default Configuration YAML manifests
+# to use other config - add a directory with config,
+# use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
+PROFILE ?= rhdh
+PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
+
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
+# Set a default VERSION if it is not defined
+ifeq ($(origin VERSION), undefined)
 VERSION ?= 0.5.0
+DEFAULT_VERSION := true
+else
+DEFAULT_VERSION := false
+endif
+
+# IMAGE_TAG_VERSION is the image tag, which might be different from VERSION.
+# For example, the RHDH profile uses 1.y as image tags if VERSION is 1.y.z
+IMAGE_TAG_VERSION = $(VERSION)
+
+ifeq ($(PROFILE), rhdh)
+	# Profile-specific settings
+	ifeq ($(DEFAULT_VERSION), true)
+		# transforming: 0.y.z => 1.y.z. Only if VERSION was not explicitly overridden by the user
+		MAJOR := $(shell echo $(VERSION) | cut -d. -f1)
+		INCREMENTED_MAJOR := $(shell expr $(MAJOR) + 1)
+		MINOR_PATCH := $(shell echo $(VERSION) | cut -d. -f2-)
+		VERSION := $(INCREMENTED_MAJOR).$(MINOR_PATCH)
+		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
+	endif
+
+	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
+	IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator
+	DEFAULT_CHANNEL ?= fast
+	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
+else
+	# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
+    # This variable is used to construct full image tags for bundle and catalog images.
+    #
+    # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
+    # quay.io/rhdh-community/operator-bundle:$VERSION and quay.io/rhdh-community/operator-catalog:$VERSION.
+    IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
+
+	# DEFAULT_CHANNEL defines the default channel used in the bundle.
+	# Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
+	# To re-generate a bundle for any other default channel without changing the default setup, you can:
+	# - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
+	# - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
+	DEFAULT_CHANNEL ?= alpha
+
+	# BUNDLE_METADATA_PACKAGE_NAME is the name of the package in the bundle
+	BUNDLE_METADATA_PACKAGE_NAME ?= backstage-operator
+endif
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
 # - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=candidate,fast,stable)
 # - use environment variables to overwrite this value (e.g export CHANNELS="candidate,fast,stable")
-ifneq ($(origin CHANNELS), undefined)
-BUNDLE_CHANNELS := --channels=$(CHANNELS)
-endif
-
-# DEFAULT_CHANNEL defines the default channel used in the bundle.
-# Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
-# To re-generate a bundle for any other default channel without changing the default setup, you can:
-# - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
-# - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
-ifneq ($(origin DEFAULT_CHANNEL), undefined)
-BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
-endif
+CHANNELS ?= $(DEFAULT_CHANNEL)
+BUNDLE_CHANNELS ?= --channels=$(CHANNELS)
+BUNDLE_DEFAULT_CHANNEL ?= --default-channel=$(DEFAULT_CHANNEL)
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
-
-# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
-# This variable is used to construct full image tags for bundle and catalog images.
-#
-# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# quay.io/rhdh-community/operator-bundle:$VERSION and quay.io/rhdh-community/operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
+BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(IMAGE_TAG_VERSION)
 
 # BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
 BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) --output-dir bundle/$(PROFILE) $(BUNDLE_METADATA_OPTS)
@@ -49,8 +89,9 @@ endif
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.37.0
+OPM_VERSION ?= v1.23.0
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
+IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG_VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.28.0
 
@@ -83,14 +124,6 @@ SHELL = /usr/bin/env bash -o pipefail
 
 # Source packages outside of tests
 PKGS := $(shell go list ./... | grep -v /e2e)
-
-# Profile directory: subdirectory of ./config/profile
-# In terms of Kustomize it is overlay directory
-# It also usually contains default-config directory
-# with set of Backstage Configuration YAML manifests
-# to use other config - add a directory with config,
-# use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
-PROFILE ?= rhdh
 
 .PHONY: all
 all: build
@@ -241,20 +274,32 @@ deployment-manifest: build-installer ## Generate manifest to deploy operator. De
 BUNDLE_IMGS ?= $(BUNDLE_IMG)
 
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(VERSION)
+CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG_VERSION)
 
 # Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
 ifneq ($(origin CATALOG_BASE_IMG), undefined)
 FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
 endif
 
+.PHONY: bundles
+bundles: ## Generate bundle manifests and metadata, then validate generated files for all available profiles.
+	@for profile in $(PROFILES); do \
+  		$(MAKE) bundle PROFILE=$$profile; \
+  	done
+
 .PHONY: bundle
 bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	#$(OPERATOR_SDK) generate kustomize manifests -q
+	$(OPERATOR_SDK) generate kustomize manifests -q --interactive=false \
+		--apis-dir ./api/ \
+		--input-dir ./config/manifests/$(PROFILE)/ \
+		--output-dir ./config/manifests/$(PROFILE)/
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
+	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
+	@sed -i 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
+	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
+	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/bundle.Dockerfile
 	$(OPERATOR_SDK) bundle validate ./bundle/$(PROFILE)
-	mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 
 ## to update the CSV with a new tagged version of the operator:
 ## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
@@ -321,29 +366,47 @@ OPENSHIFT_OLM_NAMESPACE = openshift-marketplace
 
 .PHONY: deploy-olm
 deploy-olm: ## Deploy the operator with OLM
-	$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f config/samples/catalog-operator-group.yaml
-	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | sed "s/{{OLM_NAMESPACE}}/$(subst /,\/,$(OLM_NAMESPACE))/g" | $(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
+	sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" config/samples/catalog-operator-group.yaml | \
+		$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
+	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | \
+		sed "s/{{DEFAULT_CHANNEL}}/$(subst /,\/,$(DEFAULT_CHANNEL))/g" | \
+		sed "s/{{BUNDLE_METADATA_PACKAGE_NAME}}/$(subst /,\/,$(BUNDLE_METADATA_PACKAGE_NAME))/g" | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		sed "s/{{OLM_NAMESPACE}}/$(subst /,\/,$(OLM_NAMESPACE))/g" | \
+		$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
 
 .PHONY: deploy-olm-openshift
 deploy-olm-openshift: ## Deploy the operator with OLM
-	$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f config/samples/catalog-operator-group.yaml
-	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | sed "s/{{OLM_NAMESPACE}}/$(subst /,\/,$(OPENSHIFT_OLM_NAMESPACE))/g" | $(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
+	sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" config/samples/catalog-operator-group.yaml | \
+		$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
+	sed "s/{{VERSION}}/$(subst /,\/,$(VERSION))/g" config/samples/catalog-subscription-template.yaml | \
+		sed "s/{{DEFAULT_CHANNEL}}/$(subst /,\/,$(DEFAULT_CHANNEL))/g" | \
+		sed "s/{{BUNDLE_METADATA_PACKAGE_NAME}}/$(subst /,\/,$(BUNDLE_METADATA_PACKAGE_NAME))/g" | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		sed "s/{{OLM_NAMESPACE}}/$(subst /,\/,$(OPENSHIFT_OLM_NAMESPACE))/g" | \
+		$(KUBECTL) -n ${OPERATOR_NAMESPACE} apply -f -
 
 .PHONY: undeploy-olm
 undeploy-olm: ## Un-deploy the operator with OLM
-	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete subscriptions.operators.coreos.com backstage-operator
-	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete operatorgroup backstage-operator-group
-	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete clusterserviceversion backstage-operator.v$(VERSION)
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete subscriptions.operators.coreos.com $(PROFILE_SHORT)-operator
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete operatorgroup $(PROFILE_SHORT)-operator-group
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete clusterserviceversion $(PROFILE_SHORT)-operator.v$(VERSION)
 
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in the default namespace for catalogsource
-	-$(KUBECTL) delete catalogsource backstage-operator -n $(OLM_NAMESPACE)
-	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | $(KUBECTL) apply -n $(OLM_NAMESPACE) -f -
+	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OLM_NAMESPACE)
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | \
+		sed "s/{{PROFILE}}/$(subst /,\/,$(PROFILE))/g" | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		$(KUBECTL) apply -n $(OLM_NAMESPACE) -f -
 
 .PHONY: catalog-update
 catalog-update-openshift: ## Update catalog source in the default namespace for catalogsource
-	-$(KUBECTL) delete catalogsource backstage-operator -n $(OPENSHIFT_OLM_NAMESPACE)
-	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | $(KUBECTL) apply -n $(OPENSHIFT_OLM_NAMESPACE) -f -
+	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OPENSHIFT_OLM_NAMESPACE)
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | \
+		sed "s/{{PROFILE}}/$(subst /,\/,$(PROFILE))/g" | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		$(KUBECTL) apply -n $(OPENSHIFT_OLM_NAMESPACE) -f -
 
 # Deploy on Openshift cluster using OLM (by default installed on Openshift)
 .PHONY: deploy-openshift
@@ -440,10 +503,9 @@ mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
 endef
 
 .PHONY: operator-sdk
-OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
 operator-sdk: ## Download operator-sdk locally if necessary.
 ifeq (,$(wildcard $(OPERATOR_SDK)))
-ifeq (, $(shell which operator-sdk 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPERATOR_SDK)) ;\
@@ -451,26 +513,19 @@ ifeq (, $(shell which operator-sdk 2>/dev/null))
 	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
 	chmod +x $(OPERATOR_SDK) ;\
 	}
-else
-OPERATOR_SDK = $(shell which operator-sdk)
-endif
 endif
 
 .PHONY: opm
-OPM = $(LOCALBIN)/opm
+OPM ?= $(LOCALBIN)/opm-$(OPM_VERSION)
 opm: ## Download opm locally if necessary.
 ifeq (,$(wildcard $(OPM)))
-ifeq (,$(shell which opm 2>/dev/null))
 	@{ \
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
-else
-OPM = $(shell which opm)
-endif
 endif
 
 ##@ Misc.

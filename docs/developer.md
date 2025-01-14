@@ -71,9 +71,9 @@ You can use it for manual and automated ([such as](../integration_tests/README.m
 Since v0.3.0 Operator has a facility to support different predefined runtime configurations, we call it Configuration Profile.
 You can see them as a subdirectories of /config/profile: 
 
-* **default** (default as for v0.3.0) - OOTB supporting Red Hat Developer Hub runtime
+* **rhdh** (default as for v0.3.0) - OOTB supporting Red Hat Developer Hub runtime. See [The `rhdh` profile](./profiles.md#the-rhdh-profile) for more details about the specific customizations.
 * **backstage.io** - bare backstage image
-* **external** - empty profile you can feed your configuration from outside (instructions TBD)
+* **external** - empty profile you can feed your configuration from outside. More details in [External profiles](./profiles.md#external-profiles)
 
 #### Deploy
 
@@ -106,6 +106,17 @@ If needed install it using:
 ```sh
 make install-olm
 ```
+
+#### Generate the bundle manifests
+
+Th bundle manifests for each profile are stored in the [`bundle`](../bundle) directory.
+You can run any of the [`make`](../Makefile) targets below to regenerate the bundle manifests:
+- `make bundle [PROFILE=<profile>]` for the specified profile
+- `make bundles` for all available profiles
+
+Note that these commands try to idempotently regenerate the bundle manifests from the per-profile base CSV ([example](../config/manifests/rhdh/bases/backstage-operator.clusterserviceversion.yaml)) and/or [`operator-sdk` marker comments](https://sdk.operatorframework.io/docs/building-operators/golang/references/markers/) in the [API](../api) source code. Beware that some fields from the base CSV may be overwritten next time the bundle is regenerated. Refer to [CSV fields](https://sdk.operatorframework.io/docs/olm-integration/generation/#csv-fields) for more details. 
+
+Also note that the [`pr-bundle-diff-checks.yaml`](https://github.com/redhat-developer/rhdh-operator/actions/workflows/pr-bundle-diff-checks.yaml) Workflow automates this for you when you create a Pull Request, and it would push any changes to the bundle manifests in your PR branch.
 
 #### Build and push images
 

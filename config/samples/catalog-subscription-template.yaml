@@ -1,11 +1,11 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: backstage-operator
+  name: {{PROFILE_SHORT}}-operator
 spec:
-  channel: alpha
+  channel: {{DEFAULT_CHANNEL}}
   installPlanApproval: Automatic
-  name: backstage-operator
-  source: backstage-operator
+  name: {{BUNDLE_METADATA_PACKAGE_NAME}}
+  source: {{PROFILE_SHORT}}-operator
   sourceNamespace: {{OLM_NAMESPACE}}
-  startingCSV: backstage-operator.v{{VERSION}}
+  startingCSV: {{PROFILE_SHORT}}-operator.v{{VERSION}}
