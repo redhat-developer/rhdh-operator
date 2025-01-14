@@ -92,3 +92,16 @@ To deploy the Operator with the external profile, you can use the following comm
 kusomize build . | kubectl apply -f -
 ```
 assuming you have installed Kustomize and run the command from the kustomization.yaml's directory.
+
+## Platform patches
+
+Certain Profiles may need additional patches to the Operator default configuration. For example, the Red Hat Developer Hub (RHDH) Profile requires additional patches to the Operator deployment manifest to work correctly with container's filesystem on vanilla Kubernetes vs Openshift.
+For this purpose, the Operator provides a way to apply additional patches to the Profile's default configuration. These patches are provided as a YAML files with the same name as the default configuration file, but with the **.{PlatformID}** extension.
+For the time being (v0.5), there are two PlatformIDs: **k8s** for vanilla Kubernetes and **ocp** for Openshift platform.
+
+Patch application is done by the Operator during the deployment process as following:
+1. The Operator reads and applies the default configuration file from the Profile's directory (e g deployment.yaml).
+2. The Operator recognizes current platform and checks if there is a patch file with the same name as the default configuration file, but with the **.{PlatformID}** extension (e g deployment.yaml.k8s).
+3. If the patch file is found, the Operator reads and applies it to the default configuration.
+
+**Note:** For the most of the cases, when your organization has a specific platform or environment requirements, you may NOT need to provide additional patches to the Operator deployment. 

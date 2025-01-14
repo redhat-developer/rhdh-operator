@@ -335,10 +335,10 @@ function update_refs_in_iib_bundles() {
             sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file"
             sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file"
 
-            if [[ "${IS_OPENSHIFT}" != "true" ]]; then
-              k8s_add_fsGroup_to_bundle_manifest "$file"
-              k8s_update_service_type_in_bundle_manifest "$file"
-            fi
+#            if [[ "${IS_OPENSHIFT}" != "true" ]]; then
+#              k8s_add_fsGroup_to_bundle_manifest "$file"
+#              k8s_update_service_type_in_bundle_manifest "$file"
+#            fi
           fi
         done
       done

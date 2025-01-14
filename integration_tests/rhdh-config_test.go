@@ -36,6 +36,14 @@ var _ = When("create default rhdh", func() {
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
 
+			ss := &appsv1.StatefulSet{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DbStatefulSetName(backstageName)}, ss)
+			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
+
+			serv := &corev1.Service{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.ServiceName(backstageName)}, serv)
+			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
+
 			//By("creating /opt/app-root/src/dynamic-plugins.xml ")
 			appConfig := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DynamicPluginsDefaultName(backstageName)}, appConfig)
@@ -76,7 +84,18 @@ var _ = When("create default rhdh", func() {
 			g.Expect(mainCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 			g.Expect(mainCont.VolumeMounts[1].SubPath).To(Equal("default.app-config.yaml"))
 
-			//g.Expect(mainCont.VolumeMounts[3].MountPath).To(Equal(fmt.Sprintf("/opt/app-root/src/backstage-%s-dynamic-plugins", backstageName)))
+			// check the platform patch for security context
+			if isOpenshiftCluster() {
+				// no patch, so default
+				g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
+				g.Expect(ss.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
+				g.Expect(serv.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+			} else {
+				// k8s (patched)
+				g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(Not(BeNil()))
+				g.Expect(ss.Spec.Template.Spec.SecurityContext.FSGroup).To(Not(BeNil()))
+				g.Expect(serv.Spec.Type).To(Equal(corev1.ServiceTypeNodePort))
+			}
 
 		}, 10*time.Second, time.Second).Should(Succeed())
 

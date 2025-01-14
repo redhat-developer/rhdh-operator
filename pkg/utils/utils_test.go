@@ -127,6 +127,7 @@ func TestPlatformPatchMerge(t *testing.T) {
 	depl, ok := obj[0].(*appsv1.Deployment)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, int32(1), *depl.Spec.Replicas)
+	assert.Nil(t, depl.Spec.Template.Spec.SecurityContext)
 
 	// k8s (patched)
 	t.Setenv("TEST_PLATFORM", "k8s")
@@ -137,6 +138,8 @@ func TestPlatformPatchMerge(t *testing.T) {
 	depl, ok = obj[0].(*appsv1.Deployment)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, int32(2), *depl.Spec.Replicas)
+	assert.NotNil(t, *depl.Spec.Template.Spec.SecurityContext)
+	assert.Equal(t, int64(1001), *depl.Spec.Template.Spec.SecurityContext.FSGroup)
 
 }
 
