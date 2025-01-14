@@ -35,7 +35,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2024-12-13T14:46:15Z"
+    createdAt: "2025-01-13T22:27:55Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -46,13 +46,29 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - kind: Backstage
+    - description: Backstage is the Schema for the Red Hat Developer Hub backstages
+        API. It comes with pre-built plug-ins, configuration settings, and deployment
+        mechanisms, which can help streamline the process of setting up a self-managed
+        internal developer portal for adopters who are just starting out.
+      displayName: Red Hat Developer Hub
+      kind: Backstage
       name: backstages.rhdh.redhat.com
       version: v1alpha1
-    - kind: Backstage
+    - description: Backstage is the Schema for the Red Hat Developer Hub backstages
+        API. It comes with pre-built plug-ins, configuration settings, and deployment
+        mechanisms, which can help streamline the process of setting up a self-managed
+        internal developer portal for adopters who are just starting out.
+      displayName: Red Hat Developer Hub
+      kind: Backstage
       name: backstages.rhdh.redhat.com
       version: v1alpha2
-    - kind: Backstage
+    - description: |-
+        Backstage is the Schema for the Red Hat Developer Hub backstages API.
+        It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
+        which can help streamline the process of setting up a self-managed internal
+        developer portal for adopters who are just starting out.
+      displayName: Red Hat Developer Hub
+      kind: Backstage
       name: backstages.rhdh.redhat.com
       version: v1alpha3
   description: |
@@ -152,25 +168,22 @@ spec:
         serviceAccountName: backstage-controller-manager
       deployments:
       - label:
-          app.kubernetes.io/component: manager
-          app.kubernetes.io/created-by: backstage-operator
-          app.kubernetes.io/instance: controller-manager
-          app.kubernetes.io/managed-by: kustomize
-          app.kubernetes.io/name: deployment
-          app.kubernetes.io/part-of: backstage-operator
+          app: operator
           control-plane: controller-manager
-        name: backstage-controller-manager
+        name: backstage-operator
         spec:
           replicas: 1
           selector:
             matchLabels:
-              control-plane: controller-manager
-          strategy: {}
+              app: operator
+          strategy:
+            type: RollingUpdate
           template:
             metadata:
               annotations:
                 kubectl.kubernetes.io/default-container: manager
               labels:
+                app: operator
                 control-plane: controller-manager
             spec:
               affinity:
@@ -284,7 +297,6 @@ spec:
     type: AllNamespaces
   keywords:
   - Backstage
-  - RHDH
   links:
   - name: Backstage Operator
     url: https://github.com/redhat-developer/rhdh-operator

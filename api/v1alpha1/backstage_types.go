@@ -184,8 +184,12 @@ type BackstageStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:deprecatedversion:warning="Since 1.3.0 spec.application.image, spec.application.replicas, spec.application.imagePullSecrets are deprecated in favor of corresponding spec.deployment fields"
+// +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"
 
-// Backstage is the Schema for the backstages API
+// Backstage is the Schema for the Red Hat Developer Hub backstages API.
+// It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
+// which can help streamline the process of setting up a self-managed internal
+// developer portal for adopters who are just starting out.
 type Backstage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
