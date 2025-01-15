@@ -120,7 +120,7 @@ data:`
 func TestPlatformPatchMerge(t *testing.T) {
 
 	// ocp (no patch, so default)
-	t.Setenv("TEST_PLATFORM", "ocp")
+	t.Setenv(PlatformEnvVar, "ocp")
 	obj, err := ReadYamlFiles("testdata/deployment.yaml", &appsv1.Deployment{}, *util_test_scheme)
 	assert.NoError(t, err)
 
@@ -130,7 +130,7 @@ func TestPlatformPatchMerge(t *testing.T) {
 	assert.Nil(t, depl.Spec.Template.Spec.SecurityContext)
 
 	// k8s (patched)
-	t.Setenv("TEST_PLATFORM", "k8s")
+	t.Setenv(PlatformEnvVar, "k8s")
 
 	obj, err = ReadYamlFiles("testdata/deployment.yaml", &appsv1.Deployment{}, *util_test_scheme)
 	assert.NoError(t, err)

@@ -17,8 +17,6 @@ import (
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +31,13 @@ import (
 const maxK8sResourceNameLength = 63
 
 const (
+	// Optional environment variable to force the platform
+	// If not set, the operator will try to detect the platform
+	// In general, it is not recommended to set this variable, if only it is really not possible to detect the platform or for the testing purposes
+	PlatformEnvVar = "PLATFORM_backstage"
+	// OpenShift platform
 	PlatformOCP = "ocp"
+	// Vanilla Kubernetes platform
 	PlatformK8s = "k8s"
 )
 
@@ -278,7 +282,7 @@ func FilterContainers(allContainers []string, filter string) []string {
 }
 
 func getPlatform() string {
-	if p := os.Getenv("TEST_PLATFORM"); p != "" {
+	if p := os.Getenv(PlatformEnvVar); p != "" {
 		return p
 	}
 	if ocp, _ := IsOpenshift(); ocp {
