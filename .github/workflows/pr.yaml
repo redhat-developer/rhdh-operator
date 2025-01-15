@@ -18,23 +18,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      # check changes in this commit for regex include and exclude matches; pipe to an env var
-      - name: Check for changes to build
+      # check changes in this commit for regex include and exclude matches
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@d6e91a2266cdb9d62096cebf1e8546899c6aa18f # v45.0.6
+        with:
+          files: |
+            .github/workflows/pr.yaml
+            Makefile
+            **/*.go
+            bundle/**
+            config/**
+            go.mod
+            go.sum
+          files_ignore: |
+            **/*.md
+            **/*.adoc
+            .rhdh/** 
+
+      - name: List all changed files (for troubleshooting)
+        env:
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          # don't fail if nothing returned by grep
-          set +e 
-          CHANGES="$(git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | \
-            grep -E "workflows/pr.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go" | \
-            grep -v -E "/.rhdh/")";
-          echo "Changed files for this commit:"
-          echo "=============================="
-          echo "$CHANGES"
-          echo "=============================="
-          {
-            echo 'CHANGES<<EOF'
-            echo $CHANGES
-            echo EOF
-          } >> "$GITHUB_ENV"
+          for file in ${ALL_CHANGED_FILES}; do
+            echo "$file was changed"
+          done
 
       - name: Setup Go
         uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
@@ -47,35 +55,35 @@ jobs:
 
       - name: Start Minikube
         # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
-        uses: medyagh/setup-minikube@latest
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
 
       - name: Run Controller
         # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make install run &
 
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make test
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
         # perform it on backstage.io for speed
-        if: ${{ env.CHANGES != '' }}
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: RHDH specific Integration test
         # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: Run Gosec Security Scanner
         run: make gosec
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@48ab28a6f5dbc2a99bf1e0131198dd8f1df78169 # v3
+        uses: github/codeql-action/upload-sarif@b6a472f63d85b9c78a3ac5e89422239fc15e9b3c # v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: gosec.sarif

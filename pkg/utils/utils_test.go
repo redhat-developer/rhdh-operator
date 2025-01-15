@@ -170,7 +170,7 @@ func TestBoolEnvVar(t *testing.T) {
 
 func TestFilterContainers(t *testing.T) {
 
-	containers := []corev1.Container{{Name: "c1"}, {Name: "c2"}, {Name: "c3"}}
+	containers := []string{"c1", "c2", "c3"}
 
 	cs := FilterContainers(containers, "")
 	assert.Nil(t, cs)
@@ -183,6 +183,6 @@ func TestFilterContainers(t *testing.T) {
 
 	cs = FilterContainers(containers, "c1,c2")
 	assert.Equal(t, 2, len(cs))
-	assert.Equal(t, "c1", cs[0].Name)
+	assert.Equal(t, "c1", cs[0])
 
 }

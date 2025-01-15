@@ -1,8 +1,8 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: backstage-operator
+  name: {{PROFILE_SHORT}}-operator
 spec:
   sourceType: grpc
   image: {{CATALOG_IMG}}
-  displayName: Backstage Operator
+  displayName: "Upstream Backstage Operator (profile: {{PROFILE}})"

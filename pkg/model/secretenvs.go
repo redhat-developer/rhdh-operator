@@ -1,7 +1,10 @@
 package model
 
 import (
+	"fmt"
+
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -11,6 +14,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const SecretEnvsObjectKey = "secret-envs.yaml"
+
 type SecretEnvsFactory struct{}
 
 func (f SecretEnvsFactory) newBackstageObject() RuntimeObject {
@@ -18,16 +23,11 @@ func (f SecretEnvsFactory) newBackstageObject() RuntimeObject {
 }
 
 type SecretEnvs struct {
-	Secret *corev1.Secret
+	secrets *multiobject.MultiObject
 }
 
 func init() {
-	registerConfig("secret-envs.yaml", SecretEnvsFactory{}, false)
-}
-
-// implementation of RuntimeObject interface
-func (p *SecretEnvs) Object() runtime.Object {
-	return p.Secret
+	registerConfig(SecretEnvsObjectKey, SecretEnvsFactory{}, true)
 }
 
 func addSecretEnvsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
@@ -36,15 +36,22 @@ func addSecretEnvsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error
 	}
 
 	for _, specSec := range spec.Application.ExtraEnvs.Secrets {
-		utils.AddEnvVarsFrom(model.backstageDeployment.container(), utils.SecretObjectKind, specSec.Name, specSec.Key)
+		model.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, SecretObjectKind, specSec.Name, specSec.Key)
 	}
 	return nil
 }
 
+// implementation of RuntimeObject interface
+func (p *SecretEnvs) Object() runtime.Object {
+	return p.secrets
+}
+
+// implementation of RuntimeObject interface
 func (p *SecretEnvs) setObject(obj runtime.Object) {
-	p.Secret = nil
+	p.secrets = nil
 	if obj != nil {
-		p.Secret = obj.(*corev1.Secret)
+		// p.Secret = obj.(*corev1.Secret)
+		p.secrets = obj.(*multiobject.MultiObject)
 	}
 }
 
@@ -55,7 +62,7 @@ func (p *SecretEnvs) EmptyObject() client.Object {
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
-	if p.Secret != nil {
+	if p.secrets != nil {
 		model.setRuntimeObject(p)
 		return true, nil
 	}
@@ -64,13 +71,33 @@ func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, 
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
-	utils.AddEnvVarsFrom(m.backstageDeployment.container(), utils.SecretObjectKind,
-		p.Secret.Name, "")
+
+	for _, item := range p.secrets.Items {
+		_, ok := item.(*corev1.Secret)
+		if !ok {
+			return fmt.Errorf("payload is not corev1.Secret: %T", item)
+		}
+		toContainers := utils.FilterContainers(m.backstageDeployment.allContainers(), item.GetAnnotations()[ContainersAnnotation])
+		if toContainers == nil {
+			toContainers = []string{BackstageContainerName()}
+		}
+		m.backstageDeployment.addEnvVarsFrom(toContainers, SecretObjectKind, item.GetName(), "")
+	}
+
 	return nil
 }
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
-	p.Secret.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs"))
-	setMetaInfo(p.Secret, backstage, scheme)
+	for _, item := range p.secrets.Items {
+		secret := item.(*corev1.Secret)
+		utils.AddAnnotation(secret, ConfiguredNameAnnotation, item.GetName())
+		if len(p.secrets.Items) == 1 {
+			// keep for backward compatibility
+			secret.Name = utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs")
+		} else {
+			secret.Name = fmt.Sprintf("%s-%s", utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs"), secret.Name)
+		}
+		setMetaInfo(secret, backstage, scheme)
+	}
 }

@@ -259,17 +259,17 @@ func BoolEnvVar(envvar string, def bool) bool {
 	return def
 }
 
-func FilterContainers(allContainers []corev1.Container, filter string) []corev1.Container {
+func FilterContainers(allContainers []string, filter string) []string {
 	if filter == "*" {
 		return allContainers
 	} else if filter == "" {
 		return nil
 	}
 
-	filtered := []corev1.Container{}
+	filtered := []string{}
 	for _, c := range allContainers {
 		for _, cname := range strings.Split(filter, ",") {
-			if c.Name == strings.TrimSpace(cname) {
+			if c == strings.TrimSpace(cname) {
 				filtered = append(filtered, c)
 			}
 		}

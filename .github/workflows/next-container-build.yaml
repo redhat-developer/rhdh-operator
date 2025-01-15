@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY: quay.io
+  REGISTRY: ${{ vars.REGISTRY }}
 
 jobs:
   next-build:
@@ -29,27 +29,41 @@ jobs:
         with:
           fetch-depth: 0
 
-      # check changes in this commit for regex include and exclude matches; pipe to an env var
-      - name: Check for changes to build
+      # check changes in this commit for regex include and exclude matches
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@d6e91a2266cdb9d62096cebf1e8546899c6aa18f # v45.0.6
+        with:
+          files: |
+            .github/workflows/next-container-build.yaml
+            Makefile
+            **/*.go
+            bundle/**
+            config/**
+            go.mod
+            go.sum
+            LICENSE
+            **/Dockerfile
+            **/Containerfile
+            **/*.Dockerfile
+            **/.dockerignore
+          files_ignore: |
+            **/*.md
+            **/*.adoc
+            .rhdh/**
+            tests/** 
+
+      - name: List all changed files (for troubleshooting)
+        env:
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          # don't fail if nothing returned by grep
-          set +e 
-          CHANGES="$(git diff --name-only HEAD~1 | \
-            grep -E "workflows/.+-container-build.yaml|Makefile|bundle/|config/|go.mod|go.sum|.+\.go|docker/|\.dockerignore" | \
-            grep -v -E ".+_test.go|/.rhdh/")";
-          echo "Changed files for this commit:"
-          echo "=============================="
-          echo "$CHANGES"
-          echo "=============================="
-          {
-            echo 'CHANGES<<EOF'
-            echo $CHANGES
-            echo EOF
-          } >> "$GITHUB_ENV"
+          for file in ${ALL_CHANGED_FILES}; do
+            echo "$file was changed"
+          done
 
       - name: Get the last commit short SHA
         # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
@@ -58,14 +72,14 @@ jobs:
 
       - name: Setup Go
         # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
+        if: steps.changed-files.outputs.any_changed == 'true'
         uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
         with:
           go-version-file: 'go.mod'
 
-      - name: Login to quay.io
+      - name: Login to registry (${{env.REGISTRY}})
         # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
+        if: steps.changed-files.outputs.any_changed == 'true'
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -74,7 +88,7 @@ jobs:
 
       - name: Build and push operator, bundle, and catalog images
         # run this stage only if there are changes that match the includes and not the excludes
-        if: ${{ env.CHANGES != '' }}
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: |
           # install skopeo, podman
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
@@ -87,6 +101,9 @@ jobs:
           fi
 
           export VERSION=${{ env.BASE_VERSION }}
+          export REGISTRY_WITH_ORG=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}
+          export OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME:-operator}
+          export IMAGE_TAG_BASE=${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}
 
           set -ex
 
@@ -94,11 +111,13 @@ jobs:
           CONTAINER_TOOL=${CONTAINER_TOOL} VERSION=${VERSION} make release-build
 
           # now copy images from local cache to quay, using 0.0.1-next-f00cafe, 0.0.1-next, and next tags
-          for image in operator operator-bundle operator-catalog; do
-            podman push -q quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${VERSION}-${{ env.SHORT_SHA }}
-            skopeo --insecure-policy copy --all docker://quay.io/rhdh-community/${image}:${VERSION} docker://quay.io/rhdh-community/${image}:${latestNext}
+          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
+            podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
+            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}-${{ env.SHORT_SHA }}
+            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${latestNext}
           done
         env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
           # to avoid throttling on RHD org, use GH token
           GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
