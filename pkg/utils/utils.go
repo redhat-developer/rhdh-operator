@@ -155,7 +155,8 @@ func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) ([]
 }
 
 func readPlatformPatch(path string) ([]byte, error) {
-	b, err := os.ReadFile(path + "." + getPlatform())
+	fpath := filepath.Clean(path + "." + getPlatform())
+	b, err := os.ReadFile(fpath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
