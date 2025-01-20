@@ -63,7 +63,7 @@ metadata:
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
-  name: backstage-operator.v0.4.1
+  name: backstage-operator.v0.4.2
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -364,4 +364,4 @@ spec:
   - image: quay.io/rhdh/rhdh-hub-rhel9:1.4
     name: backstage
   replaces: rhdh-operator.v1.2.0
-  version: 0.4.1
+  version: 0.4.2
