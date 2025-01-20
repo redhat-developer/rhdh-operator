@@ -152,6 +152,16 @@ data:
             resources:
               requests:
                 storage: 1Gi
+  db-statefulset.yaml.k8s: |-
+    # if securityContext not present in AKS/EKS, the error is like this:
+    # Error: EACCES: permission denied, open '/dynamic-plugins-root/backstage-plugin-scaffolder-backend-module-github-dynamic-0.2.2.tgz'
+    # fsGroup doesn not work for Openshift
+    spec:
+      template:
+        spec:
+          securityContext:
+            # any group id
+            fsGroup: 1001
   deployment.yaml: |-
     apiVersion: apps/v1
     kind: Deployment
@@ -309,6 +319,16 @@ data:
                   memory: 2.5Gi
                   ephemeral-storage: 5Gi
               workingDir: /opt/app-root/src
+  deployment.yaml.k8s: |-
+    # if securityContext not present in AKS/EKS, the error is like this:
+    # Error: EACCES: permission denied, open '/dynamic-plugins-root/backstage-plugin-scaffolder-backend-module-github-dynamic-0.2.2.tgz'
+    # fsGroup doesn not work for Openshift
+    spec:
+      template:
+        spec:
+          securityContext:
+            # any group id
+            fsGroup: 1001
   dynamic-plugins.yaml: |-
     apiVersion: v1
     kind: ConfigMap
@@ -360,6 +380,9 @@ data:
           protocol: TCP
           port: 9464
           targetPort: 9464
+  service.yaml.k8s: |
+    spec:
+      type: NodePort
 kind: ConfigMap
 metadata:
   name: rhdh-default-config
