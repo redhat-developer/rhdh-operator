@@ -14,6 +14,9 @@ import (
 	"strconv"
 	"strings"
 
+	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
+	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,6 +29,17 @@ import (
 )
 
 const maxK8sResourceNameLength = 63
+
+const (
+	// Optional environment variable to force the platform
+	// If not set, the operator will try to detect the platform
+	// In general, it is not recommended to set this variable, if only it is really not possible to detect the platform or for the testing purposes
+	PlatformEnvVar = "PLATFORM_backstage"
+	// OpenShift platform
+	PlatformOCP = "ocp"
+	// Vanilla Kubernetes platform
+	PlatformK8s = "k8s"
+)
 
 func SetKubeLabels(labels map[string]string, backstageName string) map[string]string {
 	if labels == nil {
@@ -76,15 +90,19 @@ func BackstageDbAppLabelValue(backstageName string) string {
 }
 
 // ReadYamls reads and unmarshalls yaml with potentially multiple objects of the same type
-func ReadYamls(manifest []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
+// manifest - yaml content
+// platformPatch - yaml content with platform specific patch, to be merged with manifest if exists
+// templ - template object to create new objects
+// scheme - runtime.Scheme
+func ReadYamls(manifest []byte, platformPatch []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
 
 	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
 
 	objects := []client.Object{}
-
 	for {
 		// make a new object from template
 		obj := reflect.New(reflect.ValueOf(templ).Elem().Type()).Interface().(client.Object)
+
 		err := dec.Decode(obj)
 
 		if errors.Is(err, io.EOF) {
@@ -97,6 +115,21 @@ func ReadYamls(manifest []byte, templ runtime.Object, scheme runtime.Scheme) ([]
 		if err := checkObjectKind(obj, &scheme); err != nil {
 			return nil, err
 		}
+
+		// merge platform patch if exists
+		if platformPatch != nil {
+
+			merged, err := merge2.MergeStrings(string(platformPatch), string(manifest), false, kyaml.MergeOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("failed to merge platform patch: %w", err)
+			}
+
+			err = yaml.Unmarshal([]byte(merged), obj)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal merged YAML: %w", err)
+			}
+		}
+
 		objects = append(objects, obj)
 	}
 
@@ -108,11 +141,29 @@ func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) ([]
 	if _, err := os.Stat(fpath); err != nil {
 		return nil, err
 	}
-	b, err := os.ReadFile(fpath)
+	conf, err := os.ReadFile(fpath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read YAML file: %w", err)
 	}
-	return ReadYamls(b, templ, scheme)
+
+	// Read platform patch if exists
+	pp, err := readPlatformPatch(fpath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read platform patch: %w", err)
+	}
+	return ReadYamls(conf, pp, templ, scheme)
+}
+
+func readPlatformPatch(path string) ([]byte, error) {
+	fpath := filepath.Clean(path + "." + getPlatform())
+	b, err := os.ReadFile(fpath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read platform patch: %w", err)
+	}
+	return b, nil
 }
 
 func checkObjectKind(object client.Object, scheme *runtime.Scheme) error {
@@ -229,4 +280,14 @@ func FilterContainers(allContainers []string, filter string) []string {
 		}
 	}
 	return filtered
+}
+
+func getPlatform() string {
+	if p := os.Getenv(PlatformEnvVar); p != "" {
+		return p
+	}
+	if ocp, _ := IsOpenshift(); ocp {
+		return PlatformOCP
+	}
+	return PlatformK8s
 }

@@ -1,0 +1,9 @@
+# if securityContext not present in AKS/EKS, the error is like this:
+# Error: EACCES: permission denied, open '/dynamic-plugins-root/backstage-plugin-scaffolder-backend-module-github-dynamic-0.2.2.tgz'
+# fsGroup doesn not work for Openshift
+spec:
+  template:
+    spec:
+      securityContext:
+        # any group id
+        fsGroup: 1001

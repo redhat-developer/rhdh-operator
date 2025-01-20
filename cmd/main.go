@@ -5,6 +5,8 @@ import (
 	"flag"
 	"os"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -12,7 +14,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -123,7 +124,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	isOpenShift, err := isOpenshift()
+	isOpenShift, err := utils.IsOpenshift()
 	if err != nil {
 		setupLog.Error(err, "unable to detect if a cluster is OpenShift. Make sure your cluster is running and accessible")
 		os.Exit(1)
@@ -156,27 +157,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-// Automatically detects if the cluster the operator running on is OpenShift
-func isOpenshift() (bool, error) {
-	restConfig := ctrl.GetConfigOrDie()
-	dcl, err := discovery.NewDiscoveryClientForConfig(restConfig)
-	if err != nil {
-		return false, err
-	}
-
-	apiList, err := dcl.ServerGroups()
-	if err != nil {
-		return false, err
-	}
-
-	apiGroups := apiList.Groups
-	for i := 0; i < len(apiGroups); i++ {
-		if apiGroups[i].Name == "route.openshift.io" {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }

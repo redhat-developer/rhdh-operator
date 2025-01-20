@@ -244,64 +244,6 @@ function k8s_check_bundle_manifest_default_config() {
   echo "ok"
 }
 
-function k8s_update_service_type_in_bundle_manifest() {
-  set -euo pipefail
-
-  local file="$1"
-  local res
-  res=$(k8s_check_bundle_manifest_default_config "$file")
-  if [[ "${res}" != "ok" ]]; then
-    return 0
-  fi
-
-  local key="service.yaml"
-  if ! yq --exit-status ".data.\"${key}\"" "$file" &>/dev/null; then
-    debugf "Skipping missing key $key in $file"
-    return 0
-  fi
-
-  local val
-  local newValFile
-  val=$(yq --exit-status ".data.\"${key}\"" "$file")
-  newValFile="${file}.${key}.yaml"
-  echo "$val" | yq --exit-status 'with(.spec.type; . = "NodePort" | . style = "double")' > "${newValFile}"
-  yq -i ".data.\"${key}\" = load_str(\"$newValFile\")" "$file"
-  rm -f "${newValFile}"
-}
-
-function k8s_add_fsGroup_to_bundle_manifest() {
-  set -euo pipefail
-
-  local file="$1"
-  local res
-  res=$(k8s_check_bundle_manifest_default_config "$file")
-  if [[ "${res}" != "ok" ]]; then
-    return 0
-  fi
-
-  local new_fsGroup_value="2000"
-  debugf "updating operator default config ConfigMap to add fsGroup for K8s compatibility: '${file}'"
-  for key in "db-statefulset.yaml" "deployment.yaml"; do
-    if ! yq --exit-status ".data.\"${key}\"" "$file" &>/dev/null; then
-      debugf "Skipping missing key $key in $file"
-      continue
-    fi
-    if yq ".data.\"${key}\"" "$file" | yq --exit-status '.spec.template.spec.securityContext | has("fsGroup")' &>/dev/null ; then
-      debugf "Skipping key $key in $file: spec.template.spec.securityContext.fsGroup already present"
-      continue
-    fi
-
-    # Add fsGroup - this is needed for the operands to run properly on non-OCP clusters
-    local val
-    local newValFile
-    val=$(yq --exit-status ".data.\"${key}\"" "$file")
-    newValFile="${file}.${key}.yaml"
-    echo "$val" | yq --exit-status 'with(.spec.template.spec.securityContext.fsGroup; . = '${new_fsGroup_value}')' > "${newValFile}"
-    yq -i ".data.\"${key}\" = load_str(\"$newValFile\")" "$file"
-    rm -f "${newValFile}"
-  done
-}
-
 function update_refs_in_iib_bundles() {
   set -euo pipefail
 
@@ -334,11 +276,6 @@ function update_refs_in_iib_bundles() {
             sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file"
             sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file"
             sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file"
-
-            if [[ "${IS_OPENSHIFT}" != "true" ]]; then
-              k8s_add_fsGroup_to_bundle_manifest "$file"
-              k8s_update_service_type_in_bundle_manifest "$file"
-            fi
           fi
         done
       done
