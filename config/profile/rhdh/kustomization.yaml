@@ -42,4 +42,7 @@ configMapGenerator:
   - default-config/route.yaml
   - default-config/secret-envs.yaml
   - default-config/service.yaml
+  - default-config/deployment.yaml.k8s
+  - default-config/db-statefulset.yaml.k8s
+  - default-config/service.yaml.k8s
   name: default-config
