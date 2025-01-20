@@ -127,7 +127,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		if overlayExist {
 			// new object to replace default, not merge
 			templ = backstageObject.EmptyObject()
-			if objs, err := utils.ReadYamls([]byte(overlay), templ, *scheme); err != nil {
+			if objs, err := utils.ReadYamls([]byte(overlay), nil, templ, *scheme); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
 					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 				}
