@@ -176,8 +176,11 @@ func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpoin
 	fmt.Fprintln(GinkgoWriter, host)
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(host).ShouldNot(BeEmpty())
-	baseUrl := fmt.Sprintf("https://%s", host)
 
+	VerifyBackstageAppAccess(g, fmt.Sprintf("https://%s", host), tests)
+}
+
+func VerifyBackstageAppAccess(g Gomega, baseUrl string, tests []ApiEndpointTest) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true, // #nosec G402 -- test code only, not used in production
@@ -213,6 +216,7 @@ func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpoin
 			g.Expect(bodyStr).Should(tt.BodyMatcher, "context: "+tt.Endpoint)
 		}
 	}
+
 	allTests := append(defaultApiEndpointTests, tests...)
 	for _, tt := range allTests {
 		performTest(tt)
