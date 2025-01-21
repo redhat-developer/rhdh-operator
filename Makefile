@@ -447,7 +447,7 @@ ENVTEST_VERSION ?= release-0.17
 GOLANGCI_LINT_VERSION ?= v1.59.1
 GOIMPORTS_VERSION ?= v0.16.1
 GOSEC_VERSION ?= v2.20.0
-GINKGO_VERSION ?= v2.22.1
+GINKGO_VERSION ?= v2.22.2
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats

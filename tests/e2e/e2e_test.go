@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -299,6 +300,53 @@ subjects:
 						} else {
 							By("ensuring the route is reachable", func() {
 								ensureRouteIsReachable(ns, tt.crName, tt.additionalApiEndpointTests)
+							})
+						}
+					} else {
+						// This is how we currently instruct users to deploy the application on vanilla K8s clusters,
+						// where an Ingress resource is not created OOTB by the Operator.
+						// TODO(rm3l): this is until https://issues.redhat.com/browse/RHIDP-2176 is supported.
+						//   For now, we want to make sure the tests cover the same area as on OpenShift, i.e.,
+						//   making sure that the application is reachable end-to-end from a user standpoint.
+						if os.Getenv("BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS") == "true" {
+							ingressDomain := os.Getenv("BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN")
+							if ingressDomain == "" {
+								Fail("Ingress Domain should be configured via the BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN env var")
+							}
+							ingressHost := fmt.Sprintf("%s.%s", tt.crName, ingressDomain)
+							By("manually creating a K8s Ingress", func() {
+								cmd := exec.Command(helper.GetPlatformTool(), "-n", ns, "create", "-f", "-")
+								stdin, err := cmd.StdinPipe()
+								ExpectWithOffset(1, err).NotTo(HaveOccurred())
+								go func() {
+									defer stdin.Close()
+									_, _ = io.WriteString(stdin, fmt.Sprintf(`
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: %[1]s
+spec:
+  rules:
+  - host: %[2]s
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: backstage-%[1]s
+            port:
+              name: http-backend
+`, tt.crName, ingressHost))
+								}()
+								_, err = helper.Run(cmd)
+								Expect(err).ShouldNot(HaveOccurred())
+							})
+
+							By("ensuring the application is fully reachable", func() {
+								Eventually(helper.VerifyBackstageAppAccess, 8*time.Minute, time.Second).
+									WithArguments(fmt.Sprintf("http://%s", ingressHost), tt.additionalApiEndpointTests).
+									Should(Succeed())
 							})
 						}
 					}
