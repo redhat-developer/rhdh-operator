@@ -56,7 +56,7 @@ jobs:
       - name: Start Minikube
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
+        uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
 
       - name: Run Controller
         # run this stage only if there are changes that match the includes and not the excludes
