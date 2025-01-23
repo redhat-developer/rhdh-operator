@@ -7,7 +7,7 @@ toolchain go1.22.9
 require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/openshift/api v0.0.0-20250121121031-ef08cf6072f8
+	github.com/openshift/api v0.0.0-20250122200206-f7ed4f5fd98d
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
