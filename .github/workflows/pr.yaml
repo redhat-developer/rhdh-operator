@@ -56,7 +56,7 @@ jobs:
       - name: Start Minikube
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
+        uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
 
       - name: Run Controller
         # run this stage only if there are changes that match the includes and not the excludes
@@ -83,7 +83,7 @@ jobs:
         run: make gosec
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@b6a472f63d85b9c78a3ac5e89422239fc15e9b3c # v3
+        uses: github/codeql-action/upload-sarif@ee117c905ab18f32fa0f66c2fe40ecc8013f3e04 # v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: gosec.sarif
