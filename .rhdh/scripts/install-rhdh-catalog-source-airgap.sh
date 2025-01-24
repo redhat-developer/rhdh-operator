@@ -79,6 +79,7 @@ Options:
   --to-dir </path/to/dir>                : Mirror images into the specified directory. Needs to be an absolute path. This is useful if you are working in a fully disconnected environment and you must manually transfer the images to your network. From there, you will be able to re-run this script with '--from-dir' to push the images to your private registry.
   --from-dir </path/to/dir/with/images>  : Load images from the specified directory. Needs to be an absolute path. This is useful if you are working in a fully disconnected environment. In this case, you would use '--to-dir' first to mirror images to a specified directory, then transfer this dir over to your disconnected network. From there, you will be able to re-run this script with '--from-dir' to push the images to your private registry.
   --install-operator <true|false>        : Install the RHDH operator right after creating CatalogSource (default: false)
+  --extra-images <list>                  : Comma-separated list of extra images to mirror
 
 Examples:
   # Install the Catalog Source by pushing the images to the internal OCP mirror registry,
@@ -110,6 +111,7 @@ INSTALL_OPERATOR="false"
 TO_DIR=""
 FROM_DIR=""
 FILTERED_VERSIONS=(1.3 1.4 1.5)
+EXTRA_IMAGES=()
 
 RELATED_IMAGES=()
 
@@ -117,6 +119,7 @@ while [[ "$#" -gt 0 ]]; do
   case $1 in
     '--index-image') INDEX_IMAGE="$2"; shift 1;;
     '--filter-versions') IFS=',' read -r -a FILTERED_VERSIONS <<< "$2"; shift 1;;
+    '--extra-images') IFS=',' read -r -a EXTRA_IMAGES <<< "$2"; shift 1;;
     '--to-registry') TO_REGISTRY="$2"; shift 1;;
     '--to-dir') TO_DIR=$(realpath "$2"); shift 1;;
     '--from-dir') FROM_DIR="$2"; shift 1;;
@@ -188,8 +191,8 @@ if [[ -n "${TO_DIR}" ]]; then
   TMPDIR="${TO_DIR}"
 else
   TMPDIR=$(mktemp -d)
-  # shellcheck disable=SC2064
-  trap "rm -fr $TMPDIR || true" EXIT
+  ## shellcheck disable=SC2064
+  ## trap "rm -fr $TMPDIR || true" EXIT
 fi
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
@@ -238,6 +241,66 @@ function render_index() {
   if [ ! -s "${local_index_file}" ]; then
     errorf "[ERROR] 'opm render $INDEX_IMAGE' returned an empty output, which likely means that this index Image does not contain the rhdh operator."
     return 1
+  fi
+}
+
+function mirror_extra_images() {
+  debugf "Extra images: ${EXTRA_IMAGES[@]}..."
+  for img in "${EXTRA_IMAGES[@]}"; do
+    if [[ "$img" == *"@sha256:"* ]]; then
+      imgDigest="${img##*@sha256:}"
+      imgDir="./extraImages/${img%@*}/sha256_$imgDigest"
+      targetImg="${TO_REGISTRY}/${img%@*}:$imgDigest"
+    elif [[ "$img" == *":"* ]]; then
+      imgDir="./extraImages/${img%:*}/tag_$imgTag"
+      imgTag="${img##*:}"
+      targetImg="${TO_REGISTRY}/${img%:*}:$imgTag"
+    else
+      imgDir="./extraImages/${img}/tag_latest"
+      targetImg="${TO_REGISTRY}/${img}:latest"
+    fi
+    if [[ -n "$TO_REGISTRY" ]]; then
+      mirror_image_to_registry "$img" "$targetImg"
+    else
+      if [ ! -d "$imgDir" ]; then
+        mkdir -p "${imgDir}"
+        mirror_image_to_archive "$img" "$imgDir"
+      fi
+    fi
+  done
+}
+
+function mirror_extra_images_from_dir() {
+  BASE_DIR="${FROM_DIR}/extraImages"
+  debugf "Extra images from ${BASE_DIR}..."
+  if [ -d "${BASE_DIR}" ]; then
+    # Iterate over all directories named "sha256_*"
+    find "$BASE_DIR" -type d -name "sha256_*" | while read -r sha256_dir; do
+      relative_path=${sha256_dir#"$BASE_DIR/"}
+      sha256_hash=${sha256_dir##*/sha256_}
+      parent_path=$(dirname "$relative_path")
+      debugf "parent_path: $parent_path"
+      extraImg="${parent_path}:${sha256_hash}"
+      debugf "Extra-image: $extraImg"
+      if [[ -n "$TO_REGISTRY" ]]; then
+        targetImg="${TO_REGISTRY}/${extraImg%@*}"
+        push_image_from_archive "$sha256_dir" "$targetImg"
+      fi
+    done
+
+    # Iterate over all directories named "tag_*"
+    find "$BASE_DIR" -type d -name "tag_*" | while read -r tag_dir; do
+      relative_path=${tag_dir#"$BASE_DIR/"}
+      tag_hash=${tag_dir##*/tag_}
+      parent_path=$(dirname "$relative_path")
+      debugf "parent_path: $parent_path"
+      extraImg="${parent_path}:${tag_hash}"
+      debugf "Extra-image: $extraImg"
+      if [[ -n "$TO_REGISTRY" ]]; then
+        targetImg="${TO_REGISTRY}/${extraImg%:*}"
+        push_image_from_archive "$tag_dir" "$targetImg"
+      fi
+    done
   fi
 }
 
@@ -445,9 +508,11 @@ if [[ -n "$TO_REGISTRY" ]]; then
 fi
 
 if [[ -z "${FROM_DIR}" ]]; then
+  mirror_extra_images
   render_index
   process_related_images
 else
+  mirror_extra_images_from_dir
   process_images_from_dir
 fi
 
