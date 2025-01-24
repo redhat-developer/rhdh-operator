@@ -56,8 +56,11 @@ function check_tool() {
 function usage() {
   echo "
 This script streamlines the installation of the RHDH Operator in a disconnected OpenShift or Kubernetes cluster.
-The CatalogSource is created in the 'openshift-marketplace' namespace on OpenShift or 'olm' namespace on Kubernetes,
-and is named 'operatorName-channelName', eg., rhdh-catalog
+It supports partially disconnected as well as fully disconnected environments.
+In a partially disconnected environment, the host from which this script is executed has access to the Red Hat ecosystem catalog,
+and can push the images directly to the mirror registry and the cluster.
+In a fully disconnected environment however, everything needs to be mirrored to disk first, then transferred over to the
+disconnected environment (usually via a bastion host), from where we can connect to the mirror registry and the cluster.
 
 Usage:
   $0 [OPTIONS]
@@ -104,7 +107,6 @@ FILTERED_VERSIONS=(1.3 1.4 1.5)
 EXTRA_IMAGES=()
 
 RELATED_IMAGES=()
-
 
 # example usage:
 # ./prepare-restricted-environment.sh \
