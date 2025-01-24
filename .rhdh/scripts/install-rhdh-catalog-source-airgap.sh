@@ -508,13 +508,13 @@ if [[ -n "$TO_REGISTRY" ]]; then
 fi
 
 if [[ -z "${FROM_DIR}" ]]; then
-  mirror_extra_images
   render_index
   process_related_images
 else
-  mirror_extra_images_from_dir
   process_images_from_dir
+  mirror_extra_images_from_dir
 fi
+mirror_extra_images
 
 # create OLM resources
 manifestsTargetDir="${TMPDIR}"
@@ -538,8 +538,8 @@ metadata:
   namespace: ${nsOperator}
 EOF
 
-NAMESPACE_CATALOGSOURCE="FIXME"
-my_operator_index="CHANGEME"
+NAMESPACE_CATALOGSOURCE='$NAMESPACE_CATALOGSOURCE'
+my_operator_index='$CATALOG_IMAGE'
 if [[ -n "${TO_REGISTRY}" ]]; then
   # It assumes that the user is also connected to a cluster
   detect_ocp_and_set_env_var
@@ -587,15 +587,14 @@ metadata:
 spec:
   sourceType: grpc
   image: ${my_operator_index}
-#  secrets:
-#  - internal-reg-auth-for-rhdh
-#  - internal-reg-ext-auth-for-rhdh
+  secrets:
+  # Create this image pull secret if your mirror registry requires auth
+  - reg-pull-secret
   publisher: "Red Hat"
   displayName: "Red Hat Developer Hub (Airgapped)"
 EOF
 
-  if [[ "$INSTALL_OPERATOR" = "true" ]]; then
-    cat <<EOF > "${manifestsTargetDir}/subscription.yaml"
+cat <<EOF > "${manifestsTargetDir}/subscription.yaml"
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -608,11 +607,95 @@ spec:
   source: rhdh-catalog
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 EOF
-  fi
 
 if [[ -n "${TO_REGISTRY}" ]]; then
-  invoke_cluster_cli apply -f "${manifestsTargetDir}"
+  cat <<EOF > "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: rhdh-idms
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${TO_REGISTRY}/registry.redhat.io/rhel9
+    source: registry.redhat.io/rhel9
+  - mirrors:
+    - ${TO_REGISTRY}/registry.redhat.io/rhdh
+    source: registry.redhat.io/rhdh
+  - mirrors:
+    - ${TO_REGISTRY}/registry.redhat.io/rhdh
+    source: registry.redhat.io/rhdh
+EOF
+  # Also include mirrors to extra-images
+  if [[ -n "${FROM_DIR}" ]]; then
+    BASE_DIR="${FROM_DIR}/extraImages"
+    if [ -d "${BASE_DIR}" ]; then
+      # Iterate over all directories named "sha256_*"
+      find "$BASE_DIR" -type d -name "sha256_*" | while read -r sha256_dir; do
+        relative_path=${sha256_dir#"$BASE_DIR/"}
+        sha256_hash=${sha256_dir##*/sha256_}
+        parent_path=$(dirname "$relative_path")
+        extraImg="${parent_path}"
+        targetImg="${extraImg%@*}"
+        cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+  - mirrors:
+    - ${TO_REGISTRY}/${targetImg}
+    source: ${targetImg}
+EOF
+      done
+
+      # Iterate over all directories named "tag_*"
+      find "$BASE_DIR" -type d -name "tag_*" | while read -r tag_dir; do
+        relative_path=${tag_dir#"$BASE_DIR/"}
+        tag_hash=${tag_dir##*/tag_}
+        parent_path=$(dirname "$relative_path")
+        extraImg="${parent_path}"
+        targetImg="${extraImg%:*}"
+        cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+  - mirrors:
+    - ${TO_REGISTRY}/${targetImg}
+    source: ${targetImg}
+EOF
+      done
+    fi
+  fi
+  # Iterate from the --extra-images passed on the CLI
+  debugf "Extra images from CLI: ${EXTRA_IMAGES[@]}..."
+  for img in "${EXTRA_IMAGES[@]}"; do
+    if [[ "$img" == *"@sha256:"* ]]; then
+      targetImg="${img%@*}"
+    elif [[ "$img" == *":"* ]]; then
+      targetImg="${img%:*}"
+    else
+      targetImg="${img}"
+    fi
+    cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+  - mirrors:
+    - ${TO_REGISTRY}/${targetImg}
+    source: ${targetImg}
+EOF
+  done
+
+  # Create the IDMS (OCP-specific) and CatalogSource
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+     invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+  fi
+  invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
 fi
+
+cat <<EOF > "${manifestsTargetDir}/subscription.yaml"
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhdh-operator
+  namespace: ${nsOperator}
+spec:
+  channel: fast
+  installPlanApproval: Automatic
+  name: rhdh
+  source: rhdh-catalog
+  sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
+EOF
 
 if [[ "$INSTALL_OPERATOR" != "true" ]]; then
   echo
@@ -621,7 +704,7 @@ if [[ "$INSTALL_OPERATOR" != "true" ]]; then
     if [[ "${IS_OPENSHIFT}" = "true" ]]; then
       echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
     else
-      echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following command:
+      echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following commands:
 
       kubectl -n ${nsOperator} apply -f ${manifestsTargetDir}/namespace.yaml
       kubectl -n ${nsOperator} apply -f ${manifestsTargetDir}/operatorGroup.yaml
@@ -633,6 +716,11 @@ if [[ "$INSTALL_OPERATOR" != "true" ]]; then
 fi
 
 if [[ -n "${TO_REGISTRY}" ]]; then
+  # Install the operator
+  for manifest in namespace operatorGroup subscription; do
+    invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
+  done
+
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
     CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
