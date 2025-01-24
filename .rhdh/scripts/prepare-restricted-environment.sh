@@ -97,7 +97,7 @@ INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.17"
 OPERATOR_NAME="rhdh-operator"
 
 TO_REGISTRY=""
-INSTALL_OPERATOR="false"
+INSTALL_OPERATOR="true"
 TO_DIR=""
 FROM_DIR=""
 FILTERED_VERSIONS=(1.3 1.4 1.5)
