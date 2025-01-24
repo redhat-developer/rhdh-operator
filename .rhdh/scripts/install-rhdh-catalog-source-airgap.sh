@@ -6,6 +6,8 @@
 
 set -euo pipefail
 
+SCRIPT_PATH=$(realpath "$0")
+
 NC='\033[0m'
 
 IS_OPENSHIFT=""
@@ -244,21 +246,36 @@ function render_index() {
   fi
 }
 
+function extract_last_two_elements() {
+  local input="$1"
+  local IFS='/'
+
+  read -ra parts <<< "$input"
+
+  local length=${#parts[@]}
+  if [ $length -ge 2 ]; then
+   echo "${parts[-2]}/${parts[-1]}"
+  else
+   echo "${parts[*]}"
+  fi
+}
+
 function mirror_extra_images() {
   debugf "Extra images: ${EXTRA_IMAGES[@]}..."
   for img in "${EXTRA_IMAGES[@]}"; do
     if [[ "$img" == *"@sha256:"* ]]; then
       imgDigest="${img##*@sha256:}"
       imgDir="./extraImages/${img%@*}/sha256_$imgDigest"
-      targetImg="${TO_REGISTRY}/${img%@*}:$imgDigest"
+      targetImg="${TO_REGISTRY}/$(extract_last_two_elements "${img%@*}"):$imgDigest"
     elif [[ "$img" == *":"* ]]; then
       imgDir="./extraImages/${img%:*}/tag_$imgTag"
       imgTag="${img##*:}"
-      targetImg="${TO_REGISTRY}/${img%:*}:$imgTag"
+      targetImg="${TO_REGISTRY}/$(extract_last_two_elements "${img%:*}"):$imgTag"
     else
       imgDir="./extraImages/${img}/tag_latest"
-      targetImg="${TO_REGISTRY}/${img}:latest"
+      targetImg="${TO_REGISTRY}/$(extract_last_two_elements "${img}"):latest"
     fi
+
     if [[ -n "$TO_REGISTRY" ]]; then
       mirror_image_to_registry "$img" "$targetImg"
     else
@@ -280,7 +297,7 @@ function mirror_extra_images_from_dir() {
       sha256_hash=${sha256_dir##*/sha256_}
       parent_path=$(dirname "$relative_path")
       debugf "parent_path: $parent_path"
-      extraImg="${parent_path}:${sha256_hash}"
+      extraImg="$(extract_last_two_elements "${parent_path}"):${sha256_hash}"
       debugf "Extra-image: $extraImg"
       if [[ -n "$TO_REGISTRY" ]]; then
         targetImg="${TO_REGISTRY}/${extraImg%@*}"
@@ -294,7 +311,7 @@ function mirror_extra_images_from_dir() {
       tag_hash=${tag_dir##*/tag_}
       parent_path=$(dirname "$relative_path")
       debugf "parent_path: $parent_path"
-      extraImg="${parent_path}:${tag_hash}"
+      extraImg="$(extract_last_two_elements "${parent_path}"):${tag_hash}"
       debugf "Extra-image: $extraImg"
       if [[ -n "$TO_REGISTRY" ]]; then
         targetImg="${TO_REGISTRY}/${extraImg%:*}"
@@ -351,7 +368,7 @@ function process_related_images() {
             relatedImageDigest="${relatedImage##*@sha256:}"
             imgDir="./images/${relatedImage%@*}/sha256_$relatedImageDigest"
             if [[ -n "$TO_REGISTRY" ]]; then
-              targetImg="${TO_REGISTRY}/${relatedImage%@*}:$relatedImageDigest"
+              targetImg="${TO_REGISTRY}/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
               mirror_image_to_registry "$relatedImage" "$targetImg"
               debugf "replacing image refs in file '${file}'"
               sed -i 's#'$relatedImage'#'$targetImg'#g' "$file"
@@ -371,7 +388,7 @@ function process_related_images() {
           umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked"
           
           # Push the bundle to the mirror registry
-          newBundleImage="${TO_REGISTRY}/${bundleImg%@*}:${digest}"
+          newBundleImage="${TO_REGISTRY}/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
           debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
           skopeo copy --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
 
@@ -444,7 +461,7 @@ function process_images_from_dir() {
             continue
           fi
           if [[ -n "$TO_REGISTRY" ]]; then
-            targetImg="${TO_REGISTRY}/${relatedImage%@*}:$relatedImageDigest"
+            targetImg="${TO_REGISTRY}/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
             push_image_from_archive "$imgDir" "$targetImg"
             debugf "replacing image refs in file '${file}'"
             sed -i 's#'$relatedImage'#'$targetImg'#g' "$file"
@@ -459,7 +476,7 @@ function process_images_from_dir() {
         umoci repack --image "${TMPDIR}/bundles/${digest}/src:latest" "${TMPDIR}/bundles/${digest}/unpacked"
 
         # Push the bundle to the mirror registry
-        newBundleImage="${TO_REGISTRY}/${bundleImg%@*}:${digest}"
+        newBundleImage="${TO_REGISTRY}/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
         debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
         skopeo copy --dest-tls-verify=false "oci:${TMPDIR}/bundles/${digest}/src:latest" "docker://${newBundleImage}"
 
@@ -505,6 +522,10 @@ check_tool "umoci"
 check_tool "skopeo"
 if [[ -n "$TO_REGISTRY" ]]; then
   check_tool "podman"
+fi
+
+if [[ -n "${TO_DIR}" ]]; then
+  cp -vr "${SCRIPT_PATH}" "${TO_DIR}/install.sh"
 fi
 
 if [[ -z "${FROM_DIR}" ]]; then
@@ -609,6 +630,7 @@ spec:
 EOF
 
 if [[ -n "${TO_REGISTRY}" ]]; then
+  # IDMS will only work on regular OCP clusters. It doesn't work on ROSA or clusters with hosted control planes like on IBM Cloud.
   cat <<EOF > "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -617,14 +639,14 @@ metadata:
 spec:
   imageDigestMirrors:
   - mirrors:
-    - ${TO_REGISTRY}/registry.redhat.io/rhel9
-    source: registry.redhat.io/rhel9
+    - ${TO_REGISTRY}/rhel9/postgresql-15
+    source: registry.redhat.io/rhel9/postgresql-15
   - mirrors:
-    - ${TO_REGISTRY}/registry.redhat.io/rhdh
+    - ${TO_REGISTRY}/rhdh
     source: registry.redhat.io/rhdh
   - mirrors:
-    - ${TO_REGISTRY}/registry.redhat.io/rhdh
-    source: registry.redhat.io/rhdh
+    - ${TO_REGISTRY}/openshift4/ose-kube-rbac-proxy
+    source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
 EOF
   # Also include mirrors to extra-images
   if [[ -n "${FROM_DIR}" ]]; then
@@ -637,9 +659,10 @@ EOF
         parent_path=$(dirname "$relative_path")
         extraImg="${parent_path}"
         targetImg="${extraImg%@*}"
+        targetImgLastTwo=$(extract_last_two_elements "$targetImg")
         cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
   - mirrors:
-    - ${TO_REGISTRY}/${targetImg}
+    - ${TO_REGISTRY}/${targetImgLastTwo}
     source: ${targetImg}
 EOF
       done
@@ -651,9 +674,10 @@ EOF
         parent_path=$(dirname "$relative_path")
         extraImg="${parent_path}"
         targetImg="${extraImg%:*}"
+        targetImgLastTwo=$(extract_last_two_elements "$targetImg")
         cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
   - mirrors:
-    - ${TO_REGISTRY}/${targetImg}
+    - ${TO_REGISTRY}/${targetImgLastTwo}
     source: ${targetImg}
 EOF
       done
@@ -669,9 +693,10 @@ EOF
     else
       targetImg="${img}"
     fi
+    targetImgLastTwo=$(extract_last_two_elements "$targetImg")
     cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
   - mirrors:
-    - ${TO_REGISTRY}/${targetImg}
+    - ${TO_REGISTRY}/${targetImgLastTwo}
     source: ${targetImg}
 EOF
   done
@@ -699,7 +724,21 @@ EOF
 
 if [[ "$INSTALL_OPERATOR" != "true" ]]; then
   echo
-  echo -n "Done. "
+  echo "Done. "
+  if [[ -n "${TO_DIR}" ]]; then
+    echo "
+${TO_DIR} should now contain all the images and resources needed to install the Red Hat Developer Hub operator. Next steps:
+
+1. Transfer ${TO_DIR} over to your disconnected environment
+2. In your disconnected environment, run the 'install.sh' script (located in your export dir) with the '--from-dir' and '--to-registry' options, like so:
+
+# Make sure you are connected to the mirror registry and the target cluster
+/path/to/export-dir/install.sh \
+  --from-dir /path/to/export-dir \
+  --to-registry \$mirror_registry_url \
+  --install-operator <true|false>
+    "
+  fi
   if [[ -n "${TO_REGISTRY}" ]]; then
     if [[ "${IS_OPENSHIFT}" = "true" ]]; then
       echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
