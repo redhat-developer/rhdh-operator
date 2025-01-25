@@ -243,31 +243,35 @@ function ocp_prepare_internal_registry() {
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
   skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
-  if oc -n openshift-marketplace get secret internal-reg-auth-for-rhdh &> /dev/null; then
-    oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh >&2
-  fi
-  if oc -n openshift-marketplace get secret internal-reg-ext-auth-for-rhdh &> /dev/null; then
-    oc -n openshift-marketplace delete secret internal-reg-ext-auth-for-rhdh >&2
-  fi
-  oc -n openshift-marketplace create secret docker-registry internal-reg-ext-auth-for-rhdh \
-    --docker-server="${my_registry}" \
-    --docker-username=kubeadmin \
-    --docker-password="$(oc whoami -t)" \
-    --docker-email="admin@internal-registry-ext.example.com" >&2
-  oc -n openshift-marketplace create secret docker-registry internal-reg-auth-for-rhdh \
-    --docker-server="${internal_registry_url}" \
-    --docker-username=kubeadmin \
-    --docker-password="$(oc whoami -t)" \
-    --docker-email="admin@internal-registry.example.com" >&2
-  for ns in openshift4 rhdh rhel9; do
+  for ns in rhdh-operator openshift4 rhdh rhel9; do
     # To be able to push images under this scope in the internal image registry
-    if ! oc get namespace "$ns" > /dev/null; then
+    if ! oc get namespace "$ns" &> /dev/null; then
       oc create namespace "$ns" >&2
     fi
     oc adm policy add-cluster-role-to-user system:image-signer system:serviceaccount:${ns}:default >&2 || true
   done
+  for ns in rhdh-operator openshift-marketplace; do
+    if oc -n ${ns} get secret internal-reg-ext-auth-for-rhdh &> /dev/null; then
+      oc -n ${ns} delete secret internal-reg-ext-auth-for-rhdh >&2
+    fi
+    oc -n ${ns} create secret docker-registry internal-reg-ext-auth-for-rhdh \
+      --docker-server="${my_registry}" \
+      --docker-username=kubeadmin \
+      --docker-password="$(oc whoami -t)" \
+      --docker-email="admin@internal-registry-ext.example.com" >&2
+    if oc -n ${ns} get secret internal-reg-auth-for-rhdh &> /dev/null; then
+      oc -n ${ns} delete secret internal-reg-auth-for-rhdh >&2
+    fi
+    oc -n ${ns} create secret docker-registry internal-reg-auth-for-rhdh \
+      --docker-server="${internal_registry_url}" \
+      --docker-username=kubeadmin \
+      --docker-password="$(oc whoami -t)" \
+      --docker-email="admin@internal-registry.example.com" >&2
+    oc adm policy add-cluster-role-to-user system:image-signer system:serviceaccount:${ns}:default >&2 || true
+  done
   oc policy add-role-to-user system:image-puller system:serviceaccount:openshift-marketplace:default -n openshift-marketplace >&2 || true
   oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:default -n rhdh-operator >&2 || true
+  oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:rhdh-operator -n rhdh-operator >&2 || true
 }
 
 function buildRegistryUrl() {
@@ -283,6 +287,15 @@ function buildRegistryUrl() {
     fi
   else
     echo "${TO_REGISTRY}"
+  fi
+}
+
+function buildCatalogImageUrl() {
+  if [[ -n "$TO_REGISTRY" ]]; then
+    tag=${INDEX_IMAGE##*:}; [[ "$INDEX_IMAGE" == "$tag" ]] && tag="latest"
+    echo "$(buildRegistryUrl "${1:-external}")/rhdh/index:${tag}"
+  else
+    echo ""
   fi
 }
 
@@ -505,7 +518,7 @@ function process_bundles() {
     if [[ -n "$TO_REGISTRY" ]]; then
       infof "Building the catalog image locally."
       pushd "rhdh"
-      my_operator_index="$(buildRegistryUrl)/rhdh/index:latest"
+      my_operator_index="$(buildCatalogImageUrl)"
       podman build -t "$my_operator_index" -f "./rhdh.Dockerfile" --no-cache .
 
       infof "Deploying your catalog image to the $my_operator_index registry."
@@ -589,7 +602,7 @@ function process_bundles_from_dir() {
 
   if [[ -n "$TO_REGISTRY" ]]; then
     pushd "${TMPDIR}/rhdh"
-    my_operator_index="$(buildRegistryUrl)/rhdh/index:latest"
+    my_operator_index="$(buildCatalogImageUrl)"
     debugf "Building the catalog image locally: $my_operator_index"
     podman build -t "$my_operator_index" -f "./rhdh.Dockerfile" --no-cache .
 
@@ -703,7 +716,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   else
     NAMESPACE_CATALOGSOURCE="olm"
   fi
-  my_operator_index="$(buildRegistryUrl "internal")/rhdh/index:latest"
+  my_operator_index="$(buildCatalogImageUrl "internal")"
 fi
 
 cat <<EOF > "${manifestsTargetDir}/catalogSource.yaml"
@@ -818,6 +831,9 @@ EOF
         --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
      invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
   fi
+  debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
+  invoke_cluster_cli -n ${nsOperator} patch serviceaccount default \
+      -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
   invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
 fi
 
@@ -886,7 +902,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   else
     echo -n "
 
-  To install on Kubernetes, run: "
+  To install on Kubernetes: "
   fi
 
   CLI_TOOL="kubectl"
@@ -894,12 +910,11 @@ if [[ -n "${TO_REGISTRY}" ]]; then
     CLI_TOOL="oc"
   fi
   CR_EXAMPLE="
-  cat <<EOF | ${CLI_TOOL} apply -f -
+  cat <<EOF | ${CLI_TOOL} -n ${nsOperator} apply -f -
   apiVersion: rhdh.redhat.com/v1alpha3
   kind: Backstage
   metadata:
     name: developer-hub
-    namespace: ${nsOperator}
   spec:
     application:
       appConfig:
@@ -915,6 +930,13 @@ if [[ -n "${TO_REGISTRY}" ]]; then
 
   echo "run this to create an RHDH instance:
   ${CR_EXAMPLE}
+
+Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
+be able to pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
+
+${CLI_TOOL} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
+
+More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
   "
 
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
