@@ -39,14 +39,18 @@ const (
 	PlatformOCP = "ocp"
 	// Vanilla Kubernetes platform
 	PlatformK8s = "k8s"
+
+	BackstageAppLabel      = "app.kubernetes.io/name"
+	BackstageAppName       = "backstage"
+	BackstageInstanceLabel = "app.kubernetes.io/instance"
 )
 
 func SetKubeLabels(labels map[string]string, backstageName string) map[string]string {
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels["app.kubernetes.io/name"] = "backstage"
-	labels["app.kubernetes.io/instance"] = backstageName
+	labels[BackstageAppLabel] = BackstageAppName
+	labels[BackstageInstanceLabel] = backstageName
 
 	return labels
 }

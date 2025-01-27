@@ -52,7 +52,7 @@ func (b *DbStatefulSet) setObject(obj runtime.Object) {
 func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if b.statefulSet == nil {
 		if model.localDbEnabled {
-			return false, fmt.Errorf("LocalDb StatefulSet not configured, make sure there is db-statefulset.yaml.yaml in default or raw configuration")
+			return false, fmt.Errorf("LocalDb StatefulSet not configured, make sure there is db-statefulset.yaml in default or raw configuration")
 		}
 		return false, nil
 	} else {

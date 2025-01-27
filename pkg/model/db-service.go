@@ -47,7 +47,7 @@ func (b *DbService) setObject(obj runtime.Object) {
 func (b *DbService) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if b.service == nil {
 		if model.localDbEnabled {
-			return false, fmt.Errorf("LocalDb Service not initialized, make sure there is db-service.yaml.yaml in default or raw configuration")
+			return false, fmt.Errorf("LocalDb Service not initialized, make sure there is db-service.yaml in default or raw configuration")
 		}
 		return false, nil
 	} else {

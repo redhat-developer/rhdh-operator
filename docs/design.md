@@ -84,5 +84,11 @@ As you can see, the Operator injects environment variables to the Backstage cont
 Kubernetes doesn’t allow you to change environment variables after a Pod has been created, so in order to update enviromnent variables when ConfigMap or Secret changed Operator refreshes the Pod the same way as mentioned [here](#updating-mounted-files) 
 
 
-### Networking
-TODO
+## Status
+
+Backstage Custom Resource contains **Deployed** condition in the Status field. 
+It is updated by the Operator and can have the following values:
+- **DeployInProgress** - Backstage Deployment is not available yet. The current state of Deployment can be seen in the message field
+- **Deployed** - Backstage Deployment is being created and application is available
+- **DeployFailed** - Backstage Deployment creation failed. The actual error can be seen in the message field 
+
