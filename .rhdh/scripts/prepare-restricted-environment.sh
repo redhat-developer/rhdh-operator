@@ -55,11 +55,11 @@ function check_tool() {
 
 function usage() {
   echo "
-This script streamlines the installation of the RHDH Operator in a disconnected OpenShift or Kubernetes cluster.
+This script streamlines the installation of the Red Hat Developer Hub Operator in a disconnected OpenShift or Kubernetes cluster.
 It supports partially disconnected as well as fully disconnected environments.
-In a partially disconnected environment, the host from which this script is executed has access to the Red Hat ecosystem catalog,
+In a partially disconnected environment, the host from which this script is executed has access to the Internet and the Red Hat ecosystem catalog,
 and can push the images directly to the mirror registry and the cluster.
-In a fully disconnected environment however, everything needs to be mirrored to disk first, then transferred over to the
+In a fully disconnected environment however, everything needs to be mirrored to disk first, then transferred to the
 disconnected environment (usually via a bastion host), from where we can connect to the mirror registry and the cluster.
 
 Usage:
@@ -67,14 +67,32 @@ Usage:
 
 Options:
   --index-image <operator-index-image>   : Operator index image (default: registry.redhat.io/redhat/redhat-operator-index:v4.17)
-  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: 1.3,1.4,1.5)
-  --to-registry <registry_url>           : Mirror the images into the specified registry, assuming you are already logged into it. If this is not set and --to-dir is not set, it will attempt to use the builtin OCP registry if the target cluster is OCP. Otherwise, it will error out. It also assumes you are logged into the target disconnected cluster as well.
-  --to-dir </path/to/dir>                : Mirror images into the specified directory. Needs to be an absolute path. This is useful if you are working in a fully disconnected environment and you must manually transfer the images to your network. From there, you will be able to re-run this script with '--from-dir' to push the images to your private registry.
-  --from-dir </path/to/dir/with/images>  : Load images from the specified directory. Needs to be an absolute path. This is useful if you are working in a fully disconnected environment. In this case, you would use '--to-dir' first to mirror images to a specified directory, then transfer this dir over to your disconnected network. From there, you will be able to re-run this script with '--from-dir' to push the images to your private registry.
-  --install-operator <true|false>        : Install the RHDH operator right after creating CatalogSource (default: false)
+  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: 1.3,1.4)
+  --to-registry <registry_url>           : Mirror the images into the specified registry, assuming you are already logged into it.
+                                            If this is not set and --to-dir is not set, it will attempt to use the builtin OCP registry
+                                            if the target cluster is OCP. Otherwise, it will error out.
+                                            It also assumes you are logged into the target cluster as well.
+  --to-dir </absolute/path/to/dir>       : Mirror images into the specified directory. Needs to be an absolute path.
+                                            This is useful if you are working in a fully disconnected environment and
+                                            you must manually transfer the images to your network.
+                                            From there, you will be able to re-run this script with '--from-dir' to push
+                                            the images to your private registry.
+  --from-dir </absolute/path/to/dir>     : Load images from the specified directory. Needs to be an absolute path.
+                                            This is useful if you are working in a fully disconnected environment.
+                                            In this case, you would use '--to-dir' first to mirror images to a specified directory,
+                                            then transfer this dir over to your disconnected network.
+                                            From there, you will be able to re-run this script with '--from-dir' to push
+                                            the images to your private registry.
+  --install-operator <true|false>        : Install the RHDH operator right after creating the CatalogSource (default: true)
   --extra-images <list>                  : Comma-separated list of extra images to mirror
+  --use-oc-mirror <true|false>           : Whether to use the 'oc-mirror' tool (default: false).
+                                            This is the recommended way for mirroring on regular OpenShift clusters.
+                                            Bear in mind however that this relies on resources like ImageContentSourcePolicy,
+                                            which don't seem to work well on ROSA clusters or clusters with hosted control
+                                            planes (like HyperShift or Red Hat OpenShift on IBM Cloud).
 
 Examples:
+
   # Install the Catalog Source by pushing the images to the internal OCP mirror registry,
   #   because it detected that it is connected to an OCP cluster.
   $0
@@ -91,8 +109,7 @@ Examples:
   # install the operator by using the images from the specified directory.
   $0 \\
     --from-dir  /path/to/my/dir \\
-    --to-registry registry.example.com \\
-    --install-operator true
+    --to-registry registry.example.com
 "
 }
 
@@ -103,8 +120,10 @@ TO_REGISTRY=""
 INSTALL_OPERATOR="true"
 TO_DIR=""
 FROM_DIR=""
-FILTERED_VERSIONS=(1.3 1.4 1.5)
+FILTERED_VERSIONS=(1.3 1.4)
 EXTRA_IMAGES=()
+USE_OC_MIRROR="false"
+OC_MIRROR_FLAGS=""
 
 RELATED_IMAGES=()
 
@@ -115,6 +134,7 @@ RELATED_IMAGES=()
 # --to-dir /path/to/dir (to support exporting images to a dir, which can be transferred to the bastion host)
 # --to-registry "$MY_MIRROR_REGISTRY" (either this or to-dir needs to specified, both can be specified)
 # --install-operator "true"
+# --use-oc-mirror "false"
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
@@ -148,16 +168,13 @@ while [[ "$#" -gt 0 ]]; do
     '--to-dir') TO_DIR=$(realpath "$2"); shift 1;;
     '--from-dir') FROM_DIR="$2"; shift 1;;
     '--install-operator') INSTALL_OPERATOR="$2"; shift 1;;
+    '--use-oc-mirror') USE_OC_MIRROR="$2"; shift 1;;
+    '--oc-mirror-flags') OC_MIRROR_FLAGS="$2"; shift 1;;
     '-h'|'--help') usage; exit 0;;
     *) errorf "Unknown parameter is used: $1."; usage; exit 1;;
   esac
   shift 1
 done
-
-if [[ "$INSTALL_OPERATOR" != "true" && "$INSTALL_OPERATOR" != "false" ]]; then
-  errorf "Invalid argument for --install-operator. Must be 'true' or 'false'".
-  exit 1
-fi
 
 function is_openshift() {
   set -euo pipefail
@@ -197,6 +214,10 @@ function invoke_cluster_cli() {
 ##########################################################################################
 
 # Pre-checks
+if [[ "${USE_OC_MIRROR}" = "true" ]]; then
+  check_tool "oc-mirror"
+fi
+
 if [[ -n "${FROM_DIR}" && -n "${TO_DIR}" ]]; then
   errorf "--from-dir and --to-dir are mutually exclusive. Please specify only one of them."
   exit 1
@@ -243,7 +264,8 @@ function ocp_prepare_internal_registry() {
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
   skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
-  for ns in rhdh-operator openshift4 rhdh rhel9; do
+  podman login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
+  for ns in rhdh-operator openshift4 rhdh rhel9 oc-mirror; do
     # To be able to push images under this scope in the internal image registry
     if ! oc get namespace "$ns" &> /dev/null; then
       oc create namespace "$ns" >&2
@@ -648,16 +670,254 @@ detect_ocp_and_set_env_var
 if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
   ocp_prepare_internal_registry
 fi
-if [[ -z "${FROM_DIR}" ]]; then
-  render_index
-  process_bundles
-else
-  process_bundles_from_dir
-  mirror_extra_images_from_dir
-fi
-mirror_extra_images
 
-# create OLM resources
+if [[ "${USE_OC_MIRROR}" = "true" ]]; then
+  NAMESPACE_CATALOGSOURCE="openshift-marketplace"
+  ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
+  if [[ -z "${FROM_DIR}" ]]; then
+    # Direct to registry
+    cat <<EOF > "${TMPDIR}/imageset-config.yaml"
+    apiVersion: mirror.openshift.io/v1alpha2
+    kind: ImageSetConfiguration
+    mirror:
+      operators:
+      - catalog: ${INDEX_IMAGE}
+        packages:
+        - name: rhdh
+          channels:
+          - name: fast
+EOF
+    for v in "${FILTERED_VERSIONS[@]}"; do
+      cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+          - name: fast-${v}
+EOF
+    done
+    nbExtraImgs=${#EXTRA_IMAGES[@]}
+    if [ $nbExtraImgs -ge 1 ]; then
+      cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+      additionalImages:
+EOF
+      for extraImg in "${EXTRA_IMAGES[@]}"; do
+        cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+      - name: "$extraImg"
+EOF
+      done
+    fi
+
+    if [[ -n "${TO_DIR}" ]]; then
+      cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+    storageConfig:
+      local:
+        # Do not delete or modify metadata generated by the oc-mirror plugin,
+        # use the same storage backend every time run the oc-mirror plugin for the same mirror
+        path: ./metadata
+EOF
+      oc mirror --config="${TMPDIR}/imageset-config.yaml" file://"${TO_DIR}" --dest-skip-tls $OC_MIRROR_FLAGS | tee "${ocMirrorLogFile}"
+      if [[ "${TO_DIR}" != "${TMPDIR}" ]]; then
+        cp -f "${TMPDIR}/imageset-config.yaml" "${TO_DIR}/imageset-config.yaml"
+      fi
+    fi
+    if [[ -n "$TO_REGISTRY" ]]; then
+      oc mirror --config="${TMPDIR}/imageset-config.yaml" "docker://${registryUrl}/oc-mirror" --dest-skip-tls $OC_MIRROR_FLAGS | tee "${ocMirrorLogFile}"
+    fi
+
+  else
+    # from dir
+    if [[ -n "${TO_REGISTRY}" ]]; then
+      registryUrl=$(buildRegistryUrl)
+#      cat <<EOF >> "${FROM_DIR}/imageset-config.yaml"
+#    storageConfig:
+#      registry:
+#        # Do not delete or modify metadata generated by the oc-mirror plugin,
+#        # use the same storage backend every time run the oc-mirror plugin for the same mirror
+#        imageURL: ${registryUrl}/mirror/metadata
+#EOF
+      oc mirror --config="${FROM_DIR}/imageset-config.yaml" --from "${FROM_DIR}" "docker://${registryUrl}" --dest-skip-tls $OC_MIRROR_FLAGS | tee "${ocMirrorLogFile}"
+    fi
+  fi
+
+  if [ -f "${ocMirrorLogFile}" ]; then
+    # The xargs here is to trim whitespaces
+    catalogSourceLocation=$(sed -n -e 's/^Writing CatalogSource manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" |xargs)
+    icspLocation=$(sed -n -e 's/^Writing ICSP manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" |xargs)
+    if [[ -n "${icspLocation}" ]]; then
+      if [[ -n "${TO_REGISTRY}" ]]; then
+        invoke_cluster_cli apply -f ${TMPDIR}/${icspLocation}/imageContentSourcePolicy.yaml
+      fi
+    fi
+    if [[ -n "${catalogSourceLocation}" ]]; then
+      # Replace the name
+      yq -i '.metadata.name = "rhdh-catalog"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      yq -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      if [[ -n "${TO_REGISTRY}" ]]; then
+        invoke_cluster_cli apply -f ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      fi
+    fi
+  fi
+else
+  if [[ -z "${FROM_DIR}" ]]; then
+    render_index
+    process_bundles
+  else
+    process_bundles_from_dir
+    mirror_extra_images_from_dir
+  fi
+  mirror_extra_images
+
+  # create OLM resources
+  manifestsTargetDir="${TMPDIR}"
+  if [[ -n "${FROM_DIR}" ]]; then
+    manifestsTargetDir="${FROM_DIR}"
+  fi
+
+  NAMESPACE_CATALOGSOURCE='$NAMESPACE_CATALOGSOURCE'
+  my_operator_index='$CATALOG_IMAGE'
+  if [[ -n "${TO_REGISTRY}" ]]; then
+    # It assumes that the user is also connected to a cluster
+    detect_ocp_and_set_env_var
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      debugf "Detected an OpenShift cluster"
+      if ! command -v oc &> /dev/null; then
+        errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
+        exit 1
+      fi
+      # Check we're logged into a cluster
+      if ! oc whoami &> /dev/null; then
+        errorf "Not logged into an OpenShift cluster"
+        exit 1
+      fi
+    else
+      if ! command -v oc &> /dev/null && ! command -v kubectl &> /dev/null; then
+        errorf "Please install kubectl or oc 4.10+ (from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/)"
+        exit 1
+      fi
+      debugf "Falling back to a standard K8s cluster"
+      # Check that OLM is installed
+      if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &> /dev/null; then
+        errorf "
+    OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
+    Check that you are correctly logged into the cluster and that OLM is installed.
+    See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
+        exit 1
+      fi
+    fi
+
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      NAMESPACE_CATALOGSOURCE="openshift-marketplace"
+    else
+      NAMESPACE_CATALOGSOURCE="olm"
+    fi
+    my_operator_index="$(buildCatalogImageUrl "internal")"
+  fi
+
+  cat <<EOF > "${manifestsTargetDir}/catalogSource.yaml"
+  apiVersion: operators.coreos.com/v1alpha1
+  kind: CatalogSource
+  metadata:
+    name: rhdh-catalog
+    namespace: ${NAMESPACE_CATALOGSOURCE}
+  spec:
+    sourceType: grpc
+    image: ${my_operator_index}
+    secrets:
+    - internal-reg-auth-for-rhdh
+    - internal-reg-ext-auth-for-rhdh
+    # Create this image pull secret if your mirror registry requires auth
+    - reg-pull-secret
+    publisher: "Red Hat"
+    displayName: "Red Hat Developer Hub (Airgapped)"
+EOF
+
+  if [[ -n "${TO_REGISTRY}" ]]; then
+    # IDMS will only work on regular OCP clusters. It doesn't work on ROSA or clusters with hosted control planes like on IBM Cloud.
+    registry_url_internal=$(buildRegistryUrl)
+    cat <<EOF > "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+  apiVersion: config.openshift.io/v1
+  kind: ImageDigestMirrorSet
+  metadata:
+    name: rhdh-idms
+  spec:
+    imageDigestMirrors:
+    - mirrors:
+      - ${registry_url_internal}/rhel9/postgresql-15
+      source: registry.redhat.io/rhel9/postgresql-15
+    - mirrors:
+      - ${registry_url_internal}/rhdh
+      source: registry.redhat.io/rhdh
+    - mirrors:
+      - ${registry_url_internal}/openshift4/ose-kube-rbac-proxy
+      source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
+EOF
+    # Also include mirrors to extra-images
+    if [[ -n "${FROM_DIR}" ]]; then
+      BASE_DIR="${FROM_DIR}/extraImages"
+      if [ -d "${BASE_DIR}" ]; then
+        # Iterate over all directories named "sha256_*"
+        find "$BASE_DIR" -type d -name "sha256_*" | while read -r sha256_dir; do
+          relative_path=${sha256_dir#"$BASE_DIR/"}
+          sha256_hash=${sha256_dir##*/sha256_}
+          parent_path=$(dirname "$relative_path")
+          extraImg="${parent_path}"
+          targetImg="${extraImg%@*}"
+          targetImgLastTwo=$(extract_last_two_elements "$targetImg")
+          cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+    - mirrors:
+      - ${registry_url_internal}/${targetImgLastTwo}
+      source: ${targetImg}
+EOF
+        done
+
+        # Iterate over all directories named "tag_*"
+        find "$BASE_DIR" -type d -name "tag_*" | while read -r tag_dir; do
+          relative_path=${tag_dir#"$BASE_DIR/"}
+          tag_hash=${tag_dir##*/tag_}
+          parent_path=$(dirname "$relative_path")
+          extraImg="${parent_path}"
+          targetImg="${extraImg%:*}"
+          targetImgLastTwo=$(extract_last_two_elements "$targetImg")
+          cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+    - mirrors:
+      - ${registry_url_internal}/${targetImgLastTwo}
+      source: ${targetImg}
+EOF
+        done
+      fi
+    fi
+    # Iterate from the --extra-images passed on the CLI
+    debugf "Extra images from CLI: ${EXTRA_IMAGES[@]}..."
+    for img in "${EXTRA_IMAGES[@]}"; do
+      if [[ "$img" == *"@sha256:"* ]]; then
+        targetImg="${img%@*}"
+      elif [[ "$img" == *":"* ]]; then
+        targetImg="${img%:*}"
+      else
+        targetImg="${img}"
+      fi
+      targetImgLastTwo=$(extract_last_two_elements "$targetImg")
+      cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+    - mirrors:
+      - ${registry_url_internal}/${targetImgLastTwo}
+      source: ${targetImg}
+EOF
+    done
+
+    # Create the IDMS (OCP-specific) and CatalogSource
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+       invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+    fi
+    debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
+    invoke_cluster_cli -n ${nsOperator} patch serviceaccount default \
+        -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
+    invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
+  fi
+fi
+
+if [[ -n "${TO_REGISTRY}" && "${IS_OPENSHIFT}" = "true" ]]; then
+  infof "Disabling the default Red Hat Ecosystem Catalog."
+  invoke_cluster_cli patch OperatorHub cluster --type json \
+      --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+fi
+
 manifestsTargetDir="${TMPDIR}"
 if [[ -n "${FROM_DIR}" ]]; then
   manifestsTargetDir="${FROM_DIR}"
@@ -678,164 +938,6 @@ metadata:
   name: rhdh-operator-group
   namespace: ${nsOperator}
 EOF
-
-NAMESPACE_CATALOGSOURCE='$NAMESPACE_CATALOGSOURCE'
-my_operator_index='$CATALOG_IMAGE'
-if [[ -n "${TO_REGISTRY}" ]]; then
-  # It assumes that the user is also connected to a cluster
-  detect_ocp_and_set_env_var
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    debugf "Detected an OpenShift cluster"
-    if ! command -v oc &> /dev/null; then
-      errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
-      exit 1
-    fi
-    # Check we're logged into a cluster
-    if ! oc whoami &> /dev/null; then
-      errorf "Not logged into an OpenShift cluster"
-      exit 1
-    fi
-  else
-    if ! command -v oc &> /dev/null && ! command -v kubectl &> /dev/null; then
-      errorf "Please install kubectl or oc 4.10+ (from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/)"
-      exit 1
-    fi
-    debugf "Falling back to a standard K8s cluster"
-    # Check that OLM is installed
-    if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &> /dev/null; then
-      errorf "
-  OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
-  Check that you are correctly logged into the cluster and that OLM is installed.
-  See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
-      exit 1
-    fi
-  fi
-
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    NAMESPACE_CATALOGSOURCE="openshift-marketplace"
-  else
-    NAMESPACE_CATALOGSOURCE="olm"
-  fi
-  my_operator_index="$(buildCatalogImageUrl "internal")"
-fi
-
-cat <<EOF > "${manifestsTargetDir}/catalogSource.yaml"
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: rhdh-catalog
-  namespace: ${NAMESPACE_CATALOGSOURCE}
-spec:
-  sourceType: grpc
-  image: ${my_operator_index}
-  secrets:
-  - internal-reg-auth-for-rhdh
-  - internal-reg-ext-auth-for-rhdh
-  # Create this image pull secret if your mirror registry requires auth
-  - reg-pull-secret
-  publisher: "Red Hat"
-  displayName: "Red Hat Developer Hub (Airgapped)"
-EOF
-
-cat <<EOF > "${manifestsTargetDir}/subscription.yaml"
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: rhdh-operator
-  namespace: ${nsOperator}
-spec:
-  channel: fast
-  installPlanApproval: Automatic
-  name: rhdh
-  source: rhdh-catalog
-  sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
-EOF
-
-if [[ -n "${TO_REGISTRY}" ]]; then
-  # IDMS will only work on regular OCP clusters. It doesn't work on ROSA or clusters with hosted control planes like on IBM Cloud.
-  registry_url_internal=$(buildRegistryUrl)
-  cat <<EOF > "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: rhdh-idms
-spec:
-  imageDigestMirrors:
-  - mirrors:
-    - ${registry_url_internal}/rhel9/postgresql-15
-    source: registry.redhat.io/rhel9/postgresql-15
-  - mirrors:
-    - ${registry_url_internal}/rhdh
-    source: registry.redhat.io/rhdh
-  - mirrors:
-    - ${registry_url_internal}/openshift4/ose-kube-rbac-proxy
-    source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
-EOF
-  # Also include mirrors to extra-images
-  if [[ -n "${FROM_DIR}" ]]; then
-    BASE_DIR="${FROM_DIR}/extraImages"
-    if [ -d "${BASE_DIR}" ]; then
-      # Iterate over all directories named "sha256_*"
-      find "$BASE_DIR" -type d -name "sha256_*" | while read -r sha256_dir; do
-        relative_path=${sha256_dir#"$BASE_DIR/"}
-        sha256_hash=${sha256_dir##*/sha256_}
-        parent_path=$(dirname "$relative_path")
-        extraImg="${parent_path}"
-        targetImg="${extraImg%@*}"
-        targetImgLastTwo=$(extract_last_two_elements "$targetImg")
-        cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
-  - mirrors:
-    - ${registry_url_internal}/${targetImgLastTwo}
-    source: ${targetImg}
-EOF
-      done
-
-      # Iterate over all directories named "tag_*"
-      find "$BASE_DIR" -type d -name "tag_*" | while read -r tag_dir; do
-        relative_path=${tag_dir#"$BASE_DIR/"}
-        tag_hash=${tag_dir##*/tag_}
-        parent_path=$(dirname "$relative_path")
-        extraImg="${parent_path}"
-        targetImg="${extraImg%:*}"
-        targetImgLastTwo=$(extract_last_two_elements "$targetImg")
-        cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
-  - mirrors:
-    - ${registry_url_internal}/${targetImgLastTwo}
-    source: ${targetImg}
-EOF
-      done
-    fi
-  fi
-  # Iterate from the --extra-images passed on the CLI
-  debugf "Extra images from CLI: ${EXTRA_IMAGES[@]}..."
-  for img in "${EXTRA_IMAGES[@]}"; do
-    if [[ "$img" == *"@sha256:"* ]]; then
-      targetImg="${img%@*}"
-    elif [[ "$img" == *":"* ]]; then
-      targetImg="${img%:*}"
-    else
-      targetImg="${img}"
-    fi
-    targetImgLastTwo=$(extract_last_two_elements "$targetImg")
-    cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
-  - mirrors:
-    - ${registry_url_internal}/${targetImgLastTwo}
-    source: ${targetImg}
-EOF
-  done
-
-  # Create the IDMS (OCP-specific) and CatalogSource
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    infof "Disabling the default Red Hat Ecosystem Catalog."
-    invoke_cluster_cli patch OperatorHub cluster --type json \
-        --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
-     invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
-  fi
-  debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
-  invoke_cluster_cli -n ${nsOperator} patch serviceaccount default \
-      -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
-  invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
-fi
 
 cat <<EOF > "${manifestsTargetDir}/subscription.yaml"
 apiVersion: operators.coreos.com/v1alpha1
