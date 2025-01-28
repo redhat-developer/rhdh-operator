@@ -5,7 +5,7 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/rhdh-community/operator
-  newTag: 0.3.4
+  newTag: 0.3.6
 patches:
 - patch: |-
     - op: replace
