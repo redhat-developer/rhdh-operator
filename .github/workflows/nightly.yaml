@@ -53,7 +53,7 @@ jobs:
 
       - name: Start Minikube
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
+        uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
 
       - name: Run E2E tests (Operator Upgrade path)
         if: ${{ matrix.test_upgrade == 'true' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
