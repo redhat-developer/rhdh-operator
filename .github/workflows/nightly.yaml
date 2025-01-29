@@ -52,11 +52,20 @@ jobs:
 
       - name: Start Minikube
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: medyagh/setup-minikube@d8c0eb871f6f455542491d86a574477bd3894533 # v0.0.18
+        uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
+        with:
+          addons: ingress
+
+      - name: Build Ingress Domain
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          echo "K8S_INGRESS_DOMAIN=$(minikube ip).sslip.io" >> $GITHUB_ENV
 
       - name: Run E2E tests
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
+          BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS: 'true'
+          BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN: ${{ env.K8S_INGRESS_DOMAIN }}
           IMG: ${{ env.OPERATOR_IMAGE }}
         run: make test-e2e
