@@ -10,14 +10,6 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"k8s.io/apimachinery/pkg/types"
 
 	openshift "github.com/openshift/api/route/v1"
@@ -52,16 +44,6 @@ const (
 	// True by default
 	WatchExtConfig = "WATCH_EXT_CONF_backstage"
 )
-
-var watchedConfigSelector = metav1.LabelSelector{
-	MatchExpressions: []metav1.LabelSelectorRequirement{
-		{
-			Key:      model.ExtConfigSyncLabel,
-			Values:   []string{"true"},
-			Operator: metav1.LabelSelectorOpIn,
-		},
-	},
-}
 
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
@@ -132,8 +114,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to clean backstage objects ", err)
 	}
 
-	setStatusCondition(&backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionTrue, bs.BackstageConditionReasonDeployed, "")
-
+	r.setDeploymentStatus(ctx, &backstage)
 	return ctrl.Result{}, nil
 }
 
@@ -229,6 +210,28 @@ func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object
 	return nil
 }
 
+func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *bs.Backstage) {
+	deploy := &appsv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: backstage.GetNamespace()}, deploy); err != nil {
+		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, err.Error())
+		return
+	}
+
+	if deploy.Status.ReadyReplicas == deploy.Status.Replicas {
+		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionTrue, bs.BackstageConditionReasonDeployed, "")
+	} else {
+		msg := "Deployment status:"
+		for _, c := range deploy.Status.Conditions {
+			if c.Type == appsv1.DeploymentAvailable {
+				msg += " Available: " + c.Message
+			} else if c.Type == appsv1.DeploymentProgressing {
+				msg += " Progressing: " + c.Message
+			}
+		}
+		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonInProgress, msg)
+	}
+}
+
 func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionType, status metav1.ConditionStatus, reason bs.BackstageConditionReason, msg string) {
 	meta.SetStatusCondition(&backstage.Status.Conditions, metav1.Condition{
 		Type:               string(condType),
@@ -239,108 +242,16 @@ func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionT
 	})
 }
 
-// requestByLabel returns a request with current Namespace and Backstage Object name taken from label
-// or empty request object if label not found
-func (r *BackstageReconciler) requestByLabel(ctx context.Context, object client.Object) []reconcile.Request {
-
-	lg := log.FromContext(ctx)
-
-	backstageName := object.GetAnnotations()[model.BackstageNameAnnotation]
-	if backstageName == "" {
-		//lg.V(1).Info(fmt.Sprintf("warning: %s annotation is not defined for %s, Backstage instances will not be reconciled in this loop", model.BackstageNameAnnotation, object.GetName()))
-		return []reconcile.Request{}
-	}
-
-	nn := types.NamespacedName{
-		Namespace: object.GetNamespace(),
-		Name:      backstageName,
-	}
-
-	backstage := bs.Backstage{}
-	if err := r.Get(ctx, nn, &backstage); err != nil {
-		if !errors.IsNotFound(err) {
-			lg.Error(err, "request by label failed, get Backstage ")
-		}
-		return []reconcile.Request{}
-	}
-
-	ec, err := r.preprocessSpec(ctx, backstage)
-	if err != nil {
-		lg.Error(err, "request by label failed, preprocess Backstage ")
-		return []reconcile.Request{}
-	}
-
-	deploy := &appsv1.Deployment{}
-	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: object.GetNamespace()}, deploy); err != nil {
-		if errors.IsNotFound(err) {
-			lg.V(1).Info("request by label, deployment not found", "name", model.DeploymentName(backstage.Name))
-		} else {
-			lg.Error(err, "request by label failed, get Deployment ", "error ", err)
-		}
-		return []reconcile.Request{}
-	}
-
-	newHash := ec.WatchingHash
-	oldHash := deploy.Spec.Template.ObjectMeta.GetAnnotations()[model.ExtConfigHashAnnotation]
-	if newHash == oldHash {
-		lg.V(1).Info("request by label, hash are equal", "hash", newHash)
-		return []reconcile.Request{}
-	}
-
-	lg.V(1).Info("enqueuing reconcile for", object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), "new hash: ", newHash, "old hash: ", oldHash)
-	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: backstage.Name, Namespace: object.GetNamespace()}}}
-
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
-	pred, err := predicate.LabelSelectorPredicate(watchedConfigSelector)
-	if err != nil {
-		return fmt.Errorf("failed to construct the predicate for matching secrets. This should not happen: %w", err)
-	}
-
-	secretMeta := &metav1.PartialObjectMetadata{}
-	secretMeta.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "Secret",
-	})
-
-	configMapMeta := &metav1.PartialObjectMetadata{}
-	configMapMeta.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    "ConfigMap",
-	})
 
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&bs.Backstage{})
 
-	// Watch in all the cases but WatchExtConfig == false
-	if utils.BoolEnvVar(WatchExtConfig, true) {
-		b.WatchesMetadata(
-			secretMeta,
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-				return r.requestByLabel(ctx, o)
-			}),
-			builder.WithPredicates(pred, predicate.Funcs{
-				DeleteFunc: func(e event.DeleteEvent) bool { return true },
-				UpdateFunc: func(e event.UpdateEvent) bool { return true },
-				//CreateFunc: func(e event.CreateEvent) bool { return true },
-			}),
-		).
-			WatchesMetadata(
-				configMapMeta,
-				handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-					return r.requestByLabel(ctx, o)
-				}),
-				builder.WithPredicates(pred, predicate.Funcs{
-					DeleteFunc: func(e event.DeleteEvent) bool { return true },
-					UpdateFunc: func(e event.UpdateEvent) bool { return true },
-					//CreateFunc: func(e event.CreateEvent) bool { return true },
-				}))
+	if err := r.addWatchers(b); err != nil {
+		return err
 	}
+
 	return b.Complete(r)
 }
 

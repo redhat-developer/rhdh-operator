@@ -215,4 +215,28 @@ var _ = When("create default backstage", func() {
 		//}, time.Minute, time.Second).Should(Succeed())
 	})
 
+	It("creates backstage and checks the status", func() {
+		if !*testEnv.UseExistingCluster {
+			Skip("Real cluster required")
+		}
+
+		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
+
+		Eventually(func(g Gomega) {
+			bs := &bsv1.Backstage{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(bs.Status.Conditions).To(HaveLen(1))
+			g.Expect(bs.Status.Conditions[0].Reason).To(Equal("DeployInProgress"))
+		}, time.Minute, time.Second).Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			bs := &bsv1.Backstage{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(bs.Status.Conditions).To(HaveLen(1))
+			g.Expect(bs.Status.Conditions[0].Reason).To(Equal("Deployed"))
+		}, 3*time.Minute, time.Second).Should(Succeed())
+
+	})
 })
