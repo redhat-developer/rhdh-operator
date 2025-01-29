@@ -13,6 +13,7 @@ IS_OPENSHIFT=""
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 UPSTREAM_IIB_OVERRIDE=""
+INSTALL_PLAN_APPROVAL="Automatic"
 
 function logf() {
   set -euo pipefail
@@ -58,11 +59,12 @@ Usage:
   $0 [OPTIONS]
 
 Options:
-  -v 1.y                       : Install from iib quay.io/rhdh/iib:1.y-\$OCP_VER-\$OCP_ARCH (eg., 1.4-v4.14-x86_64)
-  --latest                     : Install from iib quay.io/rhdh/iib:latest-\$OCP_VER-\$OCP_ARCH (eg., latest-v4.14-x86_64) [default]
-  --next                       : Install from iib quay.io/rhdh/iib:next-\$OCP_VER-\$OCP_ARCH (eg., next-v4.14-x86_64)
-  --catalog-source             : Install from specified catalog source, like brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.18
-  --install-operator <NAME>    : Install operator named \$NAME after creating CatalogSource
+  -v 1.y                              : Install from iib quay.io/rhdh/iib:1.y-\$OCP_VER-\$OCP_ARCH (eg., 1.4-v4.14-x86_64)
+  --latest                            : Install from iib quay.io/rhdh/iib:latest-\$OCP_VER-\$OCP_ARCH (eg., latest-v4.14-x86_64) [default]
+  --next                              : Install from iib quay.io/rhdh/iib:next-\$OCP_VER-\$OCP_ARCH (eg., next-v4.14-x86_64)
+  --catalog-source                    : Install from specified catalog source, like brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.18
+  --install-operator <NAME>           : Install operator named \$NAME after creating CatalogSource
+  --install-plan-approval <STRATEGY>  : Specify the install plan strategy for the subscription (default: Automatic)
 
 Examples:
   $0 \\
@@ -689,17 +691,40 @@ TO_INSTALL=""
 while [[ "$#" -gt 0 ]]; do
   case $1 in
     '--install-operator')
-      TO_INSTALL="$2"; shift 1;;
+      TO_INSTALL="$2"
+      shift 1
+      ;;
     '--next'|'--latest')
       # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
-      IIB_TAG="${1/--/}-${OCP_VER}-$OCP_ARCH";;
+      IIB_TAG="${1/--/}-${OCP_VER}-$OCP_ARCH"
+      ;;
     '-v')
-      IIB_TAG="${2}-${OCP_VER}-$OCP_ARCH";
+      IIB_TAG="${2}-${OCP_VER}-$OCP_ARCH"
       OLM_CHANNEL="fast-${2}"
-      shift 1;;
-    '--catalog-source') UPSTREAM_IIB_OVERRIDE="$2"; shift 1;;
-    '-h'|'--help') usage; exit 0;;
-    *) errorf "Unknown parameter is used: $1."; usage; exit 1;;
+      shift 1
+      ;;
+    '--catalog-source')
+      UPSTREAM_IIB_OVERRIDE="$2"
+      shift 1
+      ;;
+    '--install-plan-approval')
+      if [[ "$2" != "Manual" && "$2" != "Automatic" ]]; then
+        errorf "Unknown parameter used: $2. Must be Manual or Automatic."
+        usage
+        exit 1
+      fi
+      INSTALL_PLAN_APPROVAL="$2"
+      shift 1
+      ;;
+    '-h'|'--help')
+      usage
+      exit 0
+      ;;
+    *)
+      errorf "Unknown parameter is used: $1."
+      usage
+      exit 1
+      ;;
   esac
   shift 1
 done
@@ -821,7 +846,7 @@ metadata:
   namespace: ${NAMESPACE_SUBSCRIPTION}
 spec:
   channel: $OLM_CHANNEL
-  installPlanApproval: Automatic
+  installPlanApproval: ${INSTALL_PLAN_APPROVAL}
   name: ${OPERATOR_NAME_TO_INSTALL}
   source: ${CATALOGSOURCE_NAME}
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
