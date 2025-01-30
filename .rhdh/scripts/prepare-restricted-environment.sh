@@ -13,6 +13,7 @@ NC='\033[0m'
 IS_OPENSHIFT=""
 
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
+NAMESPACE_OPERATOR="rhdh-operator"
 OLM_CHANNEL="fast"
 
 function logf() {
@@ -906,7 +907,7 @@ EOF
        invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     fi
     debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
-    invoke_cluster_cli -n ${nsOperator} patch serviceaccount default \
+    invoke_cluster_cli -n ${NAMESPACE_OPERATOR} patch serviceaccount default \
         -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
     invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
   fi
@@ -923,12 +924,11 @@ if [[ -n "${FROM_DIR}" ]]; then
   manifestsTargetDir="${FROM_DIR}"
 fi
 
-nsOperator="rhdh-operator"
 cat <<EOF > "${manifestsTargetDir}/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ${nsOperator}
+  name: ${NAMESPACE_OPERATOR}
 EOF
 
 cat <<EOF > "${manifestsTargetDir}/operatorGroup.yaml"
@@ -936,7 +936,7 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: rhdh-operator-group
-  namespace: ${nsOperator}
+  namespace: ${NAMESPACE_OPERATOR}
 EOF
 
 cat <<EOF > "${manifestsTargetDir}/subscription.yaml"
@@ -944,7 +944,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: rhdh-operator
-  namespace: ${nsOperator}
+  namespace: ${NAMESPACE_OPERATOR}
 spec:
   channel: fast
   installPlanApproval: Automatic
@@ -976,9 +976,9 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
     else
       echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following commands:
 
-      kubectl -n ${nsOperator} apply -f ${manifestsTargetDir}/namespace.yaml
-      kubectl -n ${nsOperator} apply -f ${manifestsTargetDir}/operatorGroup.yaml
-      kubectl -n ${nsOperator} apply -f ${manifestsTargetDir}/subscription.yaml
+      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/namespace.yaml
+      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/operatorGroup.yaml
+      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/subscription.yaml
       "
     fi
   fi
@@ -998,7 +998,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
     echo -n "
 
   To install, go to:
-  https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${nsOperator}?catalogType=OperatorBackedService
+  https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_OPERATOR}?catalogType=OperatorBackedService
 
   Or "
   else
@@ -1012,7 +1012,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
     CLI_TOOL="oc"
   fi
   CR_EXAMPLE="
-  cat <<EOF | ${CLI_TOOL} -n ${nsOperator} apply -f -
+  cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
   apiVersion: rhdh.redhat.com/v1alpha3
   kind: Backstage
   metadata:
@@ -1044,7 +1044,7 @@ More details about image pull secrets in https://kubernetes.io/docs/tasks/config
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     echo "
   Once deployed, Developer Hub will be available at
-  https://backstage-developer-hub-${nsOperator}.${CLUSTER_ROUTER_BASE}
+  https://backstage-developer-hub-${NAMESPACE_OPERATOR}.${CLUSTER_ROUTER_BASE}
   "
   fi
 fi
