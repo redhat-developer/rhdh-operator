@@ -907,8 +907,6 @@ EOF
        invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     fi
     debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
-    invoke_cluster_cli -n ${NAMESPACE_OPERATOR} patch serviceaccount default \
-        -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
     invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
   fi
 fi
@@ -991,6 +989,9 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   for manifest in namespace operatorGroup subscription; do
     invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
   done
+
+  invoke_cluster_cli -n ${NAMESPACE_OPERATOR} patch serviceaccount default \
+    -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
 
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
