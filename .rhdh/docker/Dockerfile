@@ -3,7 +3,7 @@
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.5-1738267444@sha256:d4692022b557e93afdf89d4b28ae07cbb7e2a0cdbf13d031c5891e9494ac4eef AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:9.5-1738746453@sha256:0fd141b7324f9f1be3dad356e3d0e071d219211dd5a5449b3610b2b9661b3874 AS builder
 # hadolint ignore=DL3002
 USER 0
 ENV GOPATH=/go/
