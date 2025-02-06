@@ -257,15 +257,6 @@ fi
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
-REGISTRY_AUTH_DIR=$(mktemp -d)
-## shellcheck disable=SC2064
-trap "rm -fr $REGISTRY_AUTH_DIR || true" EXIT
-# Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
-# might be restricted in CI environments.
-# This also ensures that the credentials don't conflict with any existing creds for the same registry
-export REGISTRY_AUTH_FILE="${REGISTRY_AUTH_DIR}/.auth.json"
-debugf "REGISTRY_AUTH_FILE: $REGISTRY_AUTH_FILE"
-
 function ocp_prepare_internal_registry() {
   set -euo pipefail
 
