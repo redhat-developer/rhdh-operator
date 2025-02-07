@@ -304,6 +304,8 @@ function ocp_prepare_internal_registry() {
   debugf "Exposing cluster registry..." >&2
   internal_registry_url="image-registry.openshift-image-registry.svc:5000"
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
+  # https://access.redhat.com/solutions/6022011
+  oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"disableRedirect":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
   skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
   podman login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
