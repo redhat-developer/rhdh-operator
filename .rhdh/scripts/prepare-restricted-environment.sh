@@ -257,14 +257,46 @@ fi
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
-REGISTRY_AUTH_DIR=$(mktemp -d)
-## shellcheck disable=SC2064
-trap "rm -fr $REGISTRY_AUTH_DIR || true" EXIT
-# Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
-# might be restricted in CI environments.
-# This also ensures that the credentials don't conflict with any existing creds for the same registry
-export REGISTRY_AUTH_FILE="${REGISTRY_AUTH_DIR}/.auth.json"
-debugf "REGISTRY_AUTH_FILE: $REGISTRY_AUTH_FILE"
+function merge_registry_auth() {
+  set -euo pipefail
+
+  currentRegistryAuthFile="${REGISTRY_AUTH_FILE:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json}"
+  debugf "currentRegistryAuthFile: $currentRegistryAuthFile"
+  if [ ! -f "${currentRegistryAuthFile}" ]; then
+    debugf "Missing registry auth file. Will proceed without any existing auth against the registry hosting the index image: $INDEX_IMAGE"
+    return
+  fi
+  REGISTRY_AUTH_DIR=$(mktemp -d)
+  ## shellcheck disable=SC2064
+  trap "rm -fr $REGISTRY_AUTH_DIR || true" EXIT
+  # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
+  # might be restricted in CI environments.
+  # This also ensures that the credentials don't conflict with any existing creds for the same registry
+  export REGISTRY_AUTH_FILE="${REGISTRY_AUTH_DIR}/.auth.json"
+  debugf "REGISTRY_AUTH_FILE: $REGISTRY_AUTH_FILE"
+
+  # Merge existing authentication from currentRegistryAuthFile into REGISTRY_AUTH_FILE
+  images=("${INDEX_IMAGE}")
+  if [[ -n "${TO_REGISTRY}" ]]; then
+    images+=("$(buildRegistryUrl)")
+  fi
+  registries=()
+  for img in "${images[@]}"; do
+    reg=$(echo "$img" | cut -d'/' -f1)
+    [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
+  done
+  tmpFile=$(mktemp)
+  ## shellcheck disable=SC2064
+  trap "rm -f $tmpFile || true" EXIT
+  echo '{"auths": {' > "$tmpFile"
+  for reg in "${registries[@]}"; do
+    echo "  \"$reg\": .auths.\"$reg\"," >> "$tmpFile"
+  done
+  sed -i '$ s/,$//' "$tmpFile"
+  echo '}}' >> "$tmpFile"
+  debugf "yq filter: $(cat "$tmpFile")"
+  yq -o=json "$(cat "$tmpFile")" "${currentRegistryAuthFile}" > "${REGISTRY_AUTH_FILE}"
+}
 
 function ocp_prepare_internal_registry() {
   set -euo pipefail
@@ -680,6 +712,8 @@ detect_ocp_and_set_env_var
 if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
   ocp_prepare_internal_registry
 fi
+
+merge_registry_auth
 
 if [[ "${USE_OC_MIRROR}" = "true" ]]; then
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
