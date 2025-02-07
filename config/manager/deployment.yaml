@@ -31,17 +31,17 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                - key: kubernetes.io/arch
-                  operator: In
-                  values:
-                    - amd64
-#                    - arm64
-#                    - ppc64le
-#                    - s390x
-                - key: kubernetes.io/os
-                  operator: In
-                  values:
-                    - linux
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                  #                    - arm64
+                  #                    - ppc64le
+                  #                    - s390x
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
       securityContext:
         runAsNonRoot: true
         # (user): For common cases that do not require escalating privileges
@@ -52,51 +52,52 @@ spec:
         # seccompProfile:
         #   type: RuntimeDefault
       containers:
-      - command:
-        - /manager
-        args:
-          - --health-probe-bind-address=:8081
-          - --metrics-bind-address=:8443
-          - --metrics-secure=true
-          - --leader-elect
-        image: controller:latest
-        name: manager
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - "ALL"
-        ports:
-          - name: health
-            containerPort: 8081
-          - name: metrics
-            containerPort: 8443
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: health
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: health
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        resources:
-          limits:
-            cpu: 500m
-            memory: 1Gi
-            ephemeral-storage: 20Mi
-          requests:
-            cpu: 10m
-            memory: 128Mi
-        volumeMounts:
-          - mountPath: /default-config
-            name: default-config
+        - command:
+            - /manager
+          args:
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=:8443
+            - --metrics-secure=true
+            - --leader-elect
+          image: controller:latest
+          name: manager
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+          ports:
+            - name: health
+              containerPort: 8081
+            - name: metrics
+              containerPort: 8443
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+              ephemeral-storage: 20Mi
+            requests:
+              cpu: 10m
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /default-config
+              name: default-config
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
-      - name: default-config
-        configMap:
-          name: default-config
+        - name: default-config
+          configMap:
+            name: default-config
