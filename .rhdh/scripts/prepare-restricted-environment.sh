@@ -819,15 +819,29 @@ EOF
       if [[ "${TO_DIR}" != "${TMPDIR}" ]]; then
         cp -f "${TMPDIR}/imageset-config.yaml" "${TO_DIR}/imageset-config.yaml"
       fi
+      # targetCatalog needs to exist in the target registry. Copying a fake image..
+      mirror_image_to_archive "registry.redhat.io/ubi9/ubi:latest" "${TO_DIR}/rhdh-catalog"
     fi
     if [[ -n "$TO_REGISTRY" ]]; then
+      registryUrl=$(buildRegistryUrl)
+      if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
+        registryUrl+="/oc-mirror"
+      fi
+      # targetCatalog needs to exist in the target registry. Copying a fake image..
+      catalog_reg_path="rhdh-catalog"
+      if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
+        catalog_reg_path="oc-mirror/rhdh-catalog"
+      fi
+      my_operator_index="$(buildCatalogImageUrl external "${catalog_reg_path}")"
+      mirror_image_to_registry "registry.redhat.io/ubi9/ubi:latest" "${my_operator_index}-tmp"
+
       "${OC_MIRROR_PATH}" \
         --config="${TMPDIR}/imageset-config.yaml" \
-        "docker://${registryUrl}/oc-mirror" \
+        "docker://${registryUrl}" \
         --skip-missing \
         --dest-skip-tls \
         --continue-on-error \
-        --max-nested-paths=1 \
+        --max-nested-paths=2 \
         $OC_MIRROR_FLAGS \
         | tee "${ocMirrorLogFile}"
     fi
@@ -846,29 +860,12 @@ EOF
 
       # Rendering index, so as to manually build and push the targetCatalog (defined in the imageset).
       # The target catalog needs to exist in the target registry.
-      render_index
-
-      pushd "${TMPDIR}"
-      if [ ! -f "rhdh/rhdh.Dockerfile" ]; then
-        debugf "\t Regenerating Dockerfile so the index can be rebuilt..."
-        opm generate dockerfile rhdh/rhdh
-      fi
-      infof "Building the catalog image locally."
-
-      pushd "rhdh"
       catalog_reg_path="rhdh-catalog"
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
         catalog_reg_path="oc-mirror/rhdh-catalog"
       fi
       my_operator_index="$(buildCatalogImageUrl external "${catalog_reg_path}")"
-      podman build -t "$my_operator_index" -f "./rhdh.Dockerfile" --no-cache .
-      infof "Deploying your catalog image to the $my_operator_index registry."
-      skopeo copy --remove-signatures --src-tls-verify=false --dest-tls-verify=false --all \
-        "containers-storage:$my_operator_index" \
-        "docker://$my_operator_index"
-      popd
-
-      popd
+      push_image_from_archive "${FROM_DIR}/rhdh-catalog" "${my_operator_index}-tmp"
 
       "${OC_MIRROR_PATH}" \
         --config="${FROM_DIR}/imageset-config.yaml" \
@@ -887,18 +884,18 @@ EOF
     catalogSourceLocation=$(sed -n -e 's/^Writing CatalogSource manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" |xargs)
     icspLocation=$(sed -n -e 's/^Writing ICSP manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" |xargs)
     if [[ -n "${icspLocation}" ]]; then
+      debugf "ICSP parent location: ${TMPDIR}/${icspLocation}"
       if [[ -n "${TO_REGISTRY}" ]]; then
         invoke_cluster_cli apply -f ${TMPDIR}/${icspLocation}/imageContentSourcePolicy.yaml
       fi
     fi
     if [[ -n "${catalogSourceLocation}" ]]; then
       # Replace some metadata and add the default list of secrets
+      debugf "catalogSource parent location: ${TMPDIR}/${catalogSourceLocation}"
       yq -i '.metadata.name = "rhdh-catalog"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
       yq -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
-      yq -i '
-        .spec.secrets += ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]
-        | .spec.secrets //= ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]
-      ' ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      yq -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' \
+        ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
       if [[ -n "${TO_REGISTRY}" ]]; then
         invoke_cluster_cli apply -f ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
       fi
