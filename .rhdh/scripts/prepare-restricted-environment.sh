@@ -256,7 +256,7 @@ if [[ -z "${TO_REGISTRY}" && -z "${TO_DIR}" ]]; then
     if [[ -n "${FROM_DIR}" ]]; then
       errorf "--to-registry is needed when --from-dir is specified."
     else
-      errorf "Please specify either --to-registry or --to-dir (not both)."
+      errorf "Please specify either --to-registry or --to-dir (not both). Or log into your OCP cluster to automatically use its integrated image registry."
     fi
     exit 1
   fi
