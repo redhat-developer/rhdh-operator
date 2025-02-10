@@ -68,7 +68,8 @@ Usage:
 
 Options:
   --index-image <operator-index-image>   : Operator index image (default: registry.redhat.io/redhat/redhat-operator-index:v4.17)
-  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: 1.3,1.4)
+  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: 1.3,1.4).
+                                            Specify '*' to disable version filtering and include all channels and all versions. Useful for CI index images for example.
   --to-registry <registry_url>           : Mirror the images into the specified registry, assuming you are already logged into it.
                                             If this is not set and --to-dir is not set, it will attempt to use the builtin OCP registry
                                             if the target cluster is OCP. Otherwise, it will error out.
@@ -126,6 +127,7 @@ EXTRA_IMAGES=()
 USE_OC_MIRROR="false"
 OC_MIRROR_FLAGS=""
 
+NO_VERSION_FILTER="false"
 RELATED_IMAGES=()
 
 # example usage:
@@ -163,7 +165,13 @@ while [[ "$#" -gt 0 ]]; do
 
     # New options
     '--index-image') INDEX_IMAGE="$2"; shift 1;;
-    '--filter-versions') IFS=',' read -r -a FILTERED_VERSIONS <<< "$2"; shift 1;;
+    '--filter-versions')
+      if [[ "$2" == "*" ]]; then
+        NO_VERSION_FILTER="true"
+      else
+        IFS=',' read -r -a FILTERED_VERSIONS <<< "$2"
+      fi
+      shift 1;;
     '--extra-images') IFS=',' read -r -a EXTRA_IMAGES <<< "$2"; shift 1;;
     '--to-registry') TO_REGISTRY="$2"; shift 1;;
     '--to-dir') TO_DIR=$(realpath "$2"); shift 1;;
@@ -379,33 +387,38 @@ function render_index() {
   prod_operator_package_name="rhdh"
   prod_operator_name="${prod_operator_package_name}-operator"
   debugf "Fetching metadata for the ${prod_operator_package_name} operator catalog channel, packages, and bundles."
-  chanFilterList=""
-  bundleFilterList=""
-  chanEntriesFilterList=""
-  for v in "${FILTERED_VERSIONS[@]}"; do
-    chanFilterList+='(.schema == "olm.channel" and .package == "'${prod_operator_package_name}'" and .name == "fast-'$v'") or '
-    bundleFilterList+='(.schema == "olm.bundle" and .name == "'$prod_operator_name'.v'$v'*") or '
-    chanEntriesFilterList+='.name == "'$prod_operator_name'.v'$v'*" or '
-  done
-  chanFilterList="${chanFilterList%"or "}"
-  bundleFilterList="${bundleFilterList%"or "}"
-  chanEntriesFilterList="${chanEntriesFilterList%"or "}"
-  debugf "chanFilterList=$chanFilterList"
-  debugf "chanEntriesFilterList=$chanEntriesFilterList"
-  debugf "bundleFilterList=$bundleFilterList"
 
   # Filtering out to keep only the elements related to RHDH and to the versions selected
-  opm render "${INDEX_IMAGE}" --output=yaml | \
-    yq 'select(
-        (.schema == "olm.package" and .name == "'${prod_operator_package_name}'")
-        or
-        (.schema == "olm.channel" and .package == "'${prod_operator_package_name}'" and .name == "fast")
-        or
-        '"$chanFilterList"'
-        or
-        '"$bundleFilterList"'
-      )' | yq '.entries |= map(select('"$chanEntriesFilterList"'))' \
-      > "${local_index_file}"
+  if [[ "${NO_VERSION_FILTER}" == "true" ]]; then
+    opm render "${INDEX_IMAGE}" --output=yaml > "${local_index_file}"
+  else
+    chanFilterList=""
+    bundleFilterList=""
+    chanEntriesFilterList=""
+    for v in "${FILTERED_VERSIONS[@]}"; do
+      chanFilterList+='(.schema == "olm.channel" and .package == "'${prod_operator_package_name}'" and .name == "fast-'$v'") or '
+      bundleFilterList+='(.schema == "olm.bundle" and .name == "'$prod_operator_name'.v'$v'*") or '
+      chanEntriesFilterList+='.name == "'$prod_operator_name'.v'$v'*" or '
+    done
+    chanFilterList="${chanFilterList%"or "}"
+    bundleFilterList="${bundleFilterList%"or "}"
+    chanEntriesFilterList="${chanEntriesFilterList%"or "}"
+    debugf "chanFilterList=$chanFilterList"
+    debugf "chanEntriesFilterList=$chanEntriesFilterList"
+    debugf "bundleFilterList=$bundleFilterList"
+
+    opm render "${INDEX_IMAGE}" --output=yaml | \
+      yq 'select(
+          (.schema == "olm.package" and .name == "'${prod_operator_package_name}'")
+          or
+          (.schema == "olm.channel" and .package == "'${prod_operator_package_name}'" and .name == "fast")
+          or
+          '"$chanFilterList"'
+          or
+          '"$bundleFilterList"'
+        )' | yq '.entries |= map(select('"$chanEntriesFilterList"'))' \
+        > "${local_index_file}"
+  fi
 
   debugf "Got $(cat "${local_index_file}" | wc -l) lines of JSON from the index!"
 
@@ -745,11 +758,18 @@ if [[ "${USE_OC_MIRROR}" = "true" ]]; then
           channels:
           - name: fast
 EOF
-    for v in "${FILTERED_VERSIONS[@]}"; do
+    if [[ "${NO_VERSION_FILTER}" != "true" ]]; then
       cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+        channels:
+          - name: fast
+EOF
+      for v in "${FILTERED_VERSIONS[@]}"; do
+        cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
           - name: fast-${v}
 EOF
-    done
+      done
+
+    fi
     nbExtraImgs=${#EXTRA_IMAGES[@]}
     if [ $nbExtraImgs -ge 1 ]; then
       cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
