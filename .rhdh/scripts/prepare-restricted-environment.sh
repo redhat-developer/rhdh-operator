@@ -266,13 +266,16 @@ function merge_registry_auth() {
     debugf "Missing registry auth file. Will proceed without any existing auth against the registry hosting the index image: $INDEX_IMAGE"
     return
   fi
-  REGISTRY_AUTH_DIR=$(mktemp -d)
+  # TODO(rm3l): Overriding XDG_RUNTIME_DIR so it can work with "oc-mirror v1", which does not work with REGISTRY_AUTH_FILE.
+  # Remove this when oc-mirror v2 is out of TP.
+  export XDG_RUNTIME_DIR=$(mktemp -d)
+  mkdir -p "${XDG_RUNTIME_DIR}/containers"
   ## shellcheck disable=SC2064
-  trap "rm -fr $REGISTRY_AUTH_DIR || true" EXIT
+  trap "rm -fr $XDG_RUNTIME_DIR || true" EXIT
   # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
   # might be restricted in CI environments.
   # This also ensures that the credentials don't conflict with any existing creds for the same registry
-  export REGISTRY_AUTH_FILE="${REGISTRY_AUTH_DIR}/.auth.json"
+  export REGISTRY_AUTH_FILE="${XDG_RUNTIME_DIR}/containers/auth.json"
   debugf "REGISTRY_AUTH_FILE: $REGISTRY_AUTH_FILE"
 
   # Merge existing authentication from currentRegistryAuthFile into REGISTRY_AUTH_FILE
@@ -718,6 +721,15 @@ fi
 merge_registry_auth
 
 if [[ "${USE_OC_MIRROR}" = "true" ]]; then
+  # TODO(rm3l): oc-mirror v1 always loads the docker creds first:
+  # https://github.com/openshift/oc-mirror/blob/main/pkg/image/credentials.go
+  # But we want to use our own credentials file, which is not possible until oc-mirror v2 (currently tech preview)
+  if [ -f ~/.docker/config.json ]; then
+    debugf "Temporarily moving ~/.docker/config.json to ~/.docker/config.json.bak, so as to work with oc-mirror v1"
+    mv -f ~/.docker/config.json ~/.docker/config.json.bak || true
+    trap "mv -f ~/.docker/config.json.bak ~/.docker/config.json || true" EXIT
+  fi
+
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
   if [[ -z "${FROM_DIR}" ]]; then
