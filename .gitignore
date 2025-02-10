@@ -43,3 +43,5 @@ rhdh-operator-*.yaml
 !tests/e2e/testdata/rhdh-operator-*.yaml
 rhdh-disconnected-install/
 rhdh-disconnected-install.Dockerfile
+
+.oc-mirror.log
