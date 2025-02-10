@@ -888,9 +888,13 @@ EOF
       fi
     fi
     if [[ -n "${catalogSourceLocation}" ]]; then
-      # Replace the name
+      # Replace some metadata and add the default list of secrets
       yq -i '.metadata.name = "rhdh-catalog"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
       yq -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      yq -i '
+        .spec.secrets += ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]
+        | .spec.secrets //= ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]
+      ' ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
       if [[ -n "${TO_REGISTRY}" ]]; then
         invoke_cluster_cli apply -f ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
       fi
