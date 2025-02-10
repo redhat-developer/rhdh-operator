@@ -6,11 +6,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+      rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
   template:
     metadata:
       labels:
-        rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+        rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
     spec:
       automountServiceAccountToken: false
       # if securityContext not present in AKS/EKS, the error is like this:
@@ -40,6 +40,8 @@ spec:
             secretName: dynamic-plugins-registry-auth
         - emptyDir: {}
           name: npmcacache
+        - name: temp
+          emptyDir: {}
       initContainers:
         - name: install-dynamic-plugins
           command:
@@ -49,6 +51,7 @@ spec:
           image: quay.io/rhdh/rhdh-hub-rhel9:next
           imagePullPolicy: IfNotPresent
           securityContext:
+            readOnlyRootFilesystem: true
             runAsNonRoot: true
             allowPrivilegeEscalation: false
             seccompProfile:
@@ -71,6 +74,8 @@ spec:
               readOnly: true
             - mountPath: /opt/app-root/src/.npm/_cacache
               name: npmcacache
+            - mountPath: /tmp
+              name: temp
           workingDir: /opt/app-root/src
           resources:
             requests:
@@ -145,6 +150,8 @@ spec:
           volumeMounts:
             - mountPath: /opt/app-root/src/dynamic-plugins-root
               name: dynamic-plugins-root
+            - mountPath: /tmp
+              name: temp
           resources:
             requests:
               cpu: 250m

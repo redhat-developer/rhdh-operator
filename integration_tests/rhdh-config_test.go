@@ -52,24 +52,57 @@ var _ = When("create default rhdh", func() {
 			g.Expect(deploy.Spec.Template.Spec.InitContainers).To(HaveLen(1))
 			_, initCont := model.DynamicPluginsInitContainer(deploy.Spec.Template.Spec.InitContainers)
 
-			g.Expect(initCont.VolumeMounts).To(HaveLen(5))
-			g.Expect(initCont.VolumeMounts[0].MountPath).To(Equal("/dynamic-plugins-root"))
-			g.Expect(initCont.VolumeMounts[0].SubPath).To(BeEmpty())
-			g.Expect(initCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
-			g.Expect(initCont.VolumeMounts[1].SubPath).To(Equal(".npmrc"))
-			g.Expect(initCont.VolumeMounts[2].MountPath).To(Equal("/opt/app-root/src/.config/containers"))
-			g.Expect(initCont.VolumeMounts[3].MountPath).To(Equal("/opt/app-root/src/.npm/_cacache"))
-			g.Expect(initCont.VolumeMounts[3].SubPath).To(BeEmpty())
-			g.Expect(initCont.VolumeMounts[4].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins.yaml"))
-			g.Expect(initCont.VolumeMounts[4].SubPath).To(Equal("dynamic-plugins.yaml"))
-			g.Expect(initCont.VolumeMounts[4].Name).
-				To(Equal(utils.GenerateVolumeNameFromCmOrSecret(model.DynamicPluginsDefaultName(backstageName))))
-			g.Expect(initCont.VolumeMounts[4].SubPath).To(Equal(model.DynamicPluginsFile))
+			initContainerExpectedVolumeMounts := []corev1.VolumeMount{
+				{
+					Name:      "dynamic-plugins-root",
+					MountPath: "/dynamic-plugins-root",
+					SubPath:   "",
+				},
+				{
+					Name:      "dynamic-plugins-npmrc",
+					MountPath: "/opt/app-root/src/.npmrc.dynamic-plugins",
+					SubPath:   ".npmrc",
+				},
+				{
+					Name:      "dynamic-plugins-registry-auth",
+					MountPath: "/opt/app-root/src/.config/containers",
+					SubPath:   "",
+				},
+				{
+					Name:      "npmcacache",
+					MountPath: "/opt/app-root/src/.npm/_cacache",
+					SubPath:   "",
+				},
+				{
+					Name:      utils.GenerateVolumeNameFromCmOrSecret(model.DynamicPluginsDefaultName(backstageName)),
+					MountPath: "/opt/app-root/src/dynamic-plugins.yaml",
+					SubPath:   "dynamic-plugins.yaml",
+				},
+				{
+					Name:      "temp",
+					MountPath: "/tmp",
+					SubPath:   "",
+				},
+			}
+
+			g.Expect(initCont.VolumeMounts).To(HaveLen(len(initContainerExpectedVolumeMounts)))
+
+			for _, evm := range initContainerExpectedVolumeMounts {
+				found := false
+				for _, vm := range initCont.VolumeMounts {
+					if vm.Name == evm.Name {
+						found = true
+						g.Expect(vm.MountPath).To(Equal(evm.MountPath))
+						g.Expect(vm.SubPath).To(Equal(evm.SubPath))
+					}
+				}
+				g.Expect(found).To(BeTrue())
+			}
 
 			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
 			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
 
-			g.Expect(deploy.Spec.Template.Spec.Volumes).To(HaveLen(6))
+			g.Expect(deploy.Spec.Template.Spec.Volumes).To(HaveLen(7))
 			g.Expect(deploy.Spec.Template.Spec.Containers).To(HaveLen(1))
 			mainCont := deploy.Spec.Template.Spec.Containers[model.BackstageContainerIndex(deploy)]
 			g.Expect(mainCont.Args).To(HaveLen(4))
@@ -78,11 +111,34 @@ var _ = When("create default rhdh", func() {
 			g.Expect(mainCont.Args[2]).To(Equal("--config"))
 			g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 
-			g.Expect(mainCont.VolumeMounts).To(HaveLen(2))
-			g.Expect(mainCont.VolumeMounts[0].MountPath).To(Equal("/opt/app-root/src/dynamic-plugins-root"))
-			g.Expect(mainCont.VolumeMounts[0].SubPath).To(BeEmpty())
-			g.Expect(mainCont.VolumeMounts[1].MountPath).To(Equal("/opt/app-root/src/default.app-config.yaml"))
-			g.Expect(mainCont.VolumeMounts[1].SubPath).To(Equal("default.app-config.yaml"))
+			mainContainerExpectedVolumeMounts := []corev1.VolumeMount{
+				{
+					MountPath: "/opt/app-root/src/dynamic-plugins-root",
+					SubPath:   "",
+				},
+				{
+					MountPath: "/opt/app-root/src/default.app-config.yaml",
+					SubPath:   "default.app-config.yaml",
+				},
+				{
+					MountPath: "/tmp",
+					SubPath:   "",
+				},
+			}
+
+			g.Expect(mainCont.VolumeMounts).To(HaveLen(len(mainContainerExpectedVolumeMounts)))
+
+			for _, evm := range mainContainerExpectedVolumeMounts {
+				found := false
+				for _, vm := range mainCont.VolumeMounts {
+					if evm.MountPath == vm.MountPath {
+						found = true
+						g.Expect(vm.MountPath).To(Equal(evm.MountPath))
+						g.Expect(vm.SubPath).To(Equal(evm.SubPath))
+					}
+				}
+				g.Expect(found).To(BeTrue())
+			}
 
 			// check the platform patch for security context
 			if isOpenshiftCluster() {
