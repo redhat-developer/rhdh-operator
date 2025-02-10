@@ -305,7 +305,7 @@ function merge_registry_auth() {
   if [[ -n "${TO_REGISTRY}" ]]; then
     images+=("$(buildRegistryUrl)")
   fi
-  registries=()
+  registries=("registry.redhat.io" "quay.io")
   for img in "${images[@]}"; do
     reg=$(echo "$img" | cut -d'/' -f1)
     [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
