@@ -747,6 +747,11 @@ fi
 
 merge_registry_auth
 
+manifestsTargetDir="${TMPDIR}"
+if [[ -n "${FROM_DIR}" ]]; then
+  manifestsTargetDir="${FROM_DIR}"
+fi
+
 if [[ "${USE_OC_MIRROR}" = "true" ]]; then
   # TODO(rm3l): oc-mirror v1 always loads the docker creds first:
   # https://github.com/openshift/oc-mirror/blob/main/pkg/image/credentials.go
@@ -1051,11 +1056,6 @@ if [[ -n "${TO_REGISTRY}" && "${IS_OPENSHIFT}" = "true" ]]; then
   infof "Disabling the default Red Hat Ecosystem Catalog."
   invoke_cluster_cli patch OperatorHub cluster --type json \
       --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
-fi
-
-manifestsTargetDir="${TMPDIR}"
-if [[ -n "${FROM_DIR}" ]]; then
-  manifestsTargetDir="${FROM_DIR}"
 fi
 
 cat <<EOF > "${manifestsTargetDir}/namespace.yaml"
