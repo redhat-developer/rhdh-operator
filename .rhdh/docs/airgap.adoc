@@ -29,8 +29,6 @@ Below are the prerequisites regardless of the target disconnected environment.
 
 === Mirroring and deploying the RHDH Operator
 
-WARNING: Note that calling the mirroring script below with `--use-oc-mirror true` may not work against the internal OpenShift cluster registry when it tries to expose and configure it. But you can use it against your own mirror registry.
-
 [#_partially_disconnected_environments]
 ==== Partially disconnected environments
 
