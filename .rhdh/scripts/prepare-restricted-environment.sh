@@ -856,7 +856,11 @@ EOF
       infof "Building the catalog image locally."
 
       pushd "rhdh"
-      my_operator_index="$(buildCatalogImageUrl external rhdh-catalog)"
+      catalog_reg_path="rhdh-catalog"
+      if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
+        catalog_reg_path="oc-mirror/rhdh-catalog"
+      fi
+      my_operator_index="$(buildCatalogImageUrl external "${catalog_reg_path}")"
       podman build -t "$my_operator_index" -f "./rhdh.Dockerfile" --no-cache .
       infof "Deploying your catalog image to the $my_operator_index registry."
       skopeo copy --remove-signatures --src-tls-verify=false --dest-tls-verify=false --all \
