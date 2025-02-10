@@ -55,7 +55,7 @@ Besides the prerequisites listed above, you will also need:
 
 # NOTES:
 # 1. Omit `--to-registry` if you are connected against an OpenShift cluster and want the script to expose the internal cluster registry and use that for mirroring.
-# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror` (which makes sense only if targetting OpenShift).
+# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
 
 bash prepare-restricted-environment.sh \
     [--to-registry my.registry.example.com/namespace] \
@@ -69,10 +69,12 @@ bash prepare-restricted-environment.sh \
 
 # NOTES:
 # 1. Omit `--to-registry` if you are connected against an OpenShift cluster and want the script to expose the internal cluster registry and use that for mirroring.
-# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror` (which makes sense only if targetting OpenShift)
+# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
+# 3. Specify `*` for `--filter-versions` to disable version filtering. It will include all channels of the rhdh package from the index image.
 
 bash prepare-restricted-environment.sh \
     --index-image "quay.io/rhdh/iib:next-v4.18-x86_64" \
+    [--filter-versions '*'] \
     [--to-registry my.registry.example.com/namespace] \
     [--use-oc-mirror true]
 ----
@@ -120,7 +122,7 @@ Besides the prerequisites listed above, you will also need:
 #
 
 # NOTES:
-# 1. Omit `--use-oc-mirror` if you don't want to use `oc-mirror` (which makes sense only if targetting OpenShift)
+# 1. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
 
 bash prepare-restricted-environment.sh \
     --to-dir /absolute/path/to/my/mirror/folder \
@@ -133,11 +135,13 @@ bash prepare-restricted-environment.sh \
 #
 
 # NOTES:
-# 1. Omit `--use-oc-mirror` if you don't want to use `oc-mirror` (which makes sense only if targetting OpenShift)
+# 1. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
+# 2. Specify `*` for `--filter-versions` to disable version filtering. It will include all channels of the rhdh package from the index image.
 
 bash prepare-restricted-environment.sh \
     --index-image "quay.io/rhdh/iib:next-v4.18-x86_64" \
     --to-dir /absolute/path/to/my/mirror/folder \
+    [--filter-versions '*'] \
     [--use-oc-mirror true]
 ----
 +
@@ -158,6 +162,8 @@ Besides the prerequisites listed above, you will also need on this machine:
 
 **Procedure**
 
+NOTE: If you used `oc-mirror` to mirror to disk, you must also use `oc-mirror` when mirroring from disk, since `oc-mirror` uses a different folder layout.
+
 . Download and execute the mirroring script to install the RHDH Operator catalog and mirror the related images: link:../scripts/prepare-restricted-environment.sh[`prepare-restricted-environment.sh`]
 +
 [source,console]
@@ -165,7 +171,7 @@ Besides the prerequisites listed above, you will also need on this machine:
 
 # NOTES:
 # 1. Omit `--to-registry` if you are connected against an OpenShift cluster and want the script to expose the internal cluster registry and use that for mirroring.
-# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror` (which makes sense only if targetting OpenShift)
+# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
 
 bash prepare-restricted-environment.sh \
     --from-dir /absolute/path/to/my/mirror/folder \
