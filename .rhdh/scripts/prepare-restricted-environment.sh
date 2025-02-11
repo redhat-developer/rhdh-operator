@@ -68,8 +68,12 @@ Usage:
 
 Options:
   --index-image <operator-index-image>   : Operator index image (default: registry.redhat.io/redhat/redhat-operator-index:v4.17)
+  --ci-index <true|false>                : Indicates that the index image is a CI build. Unsupported.
+                                            Setting this to 'true' causes the script to replace all references to the internal RH registries
+                                            with quay.io when mirroring images. Relevant only if '--use-oc-mirror' is 'false'. Default: false
   --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: 1.3,1.4).
-                                            Specify '*' to disable version filtering and include all channels and all versions. Useful for CI index images for example.
+                                            Specify '*' to disable version filtering and include all channels and all versions.
+                                            Useful for CI index images for example.
   --to-registry <registry_url>           : Mirror the images into the specified registry, assuming you are already logged into it.
                                             If this is not set and --to-dir is not set, it will attempt to use the builtin OCP registry
                                             if the target cluster is OCP. Otherwise, it will error out.
@@ -92,7 +96,7 @@ Options:
                                             Bear in mind however that this relies on resources like ImageContentSourcePolicy,
                                             which don't seem to work well on ROSA clusters or clusters with hosted control
                                             planes (like HyperShift or Red Hat OpenShift on IBM Cloud).
-  --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror'). Expected to be in the system PATH.
+  --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
 
 Examples:
@@ -114,11 +118,18 @@ Examples:
   $0 \\
     --from-dir  /path/to/my/dir \\
     --to-registry registry.example.com
+
+  # Install the Catalog Source from a CI index image by pushing the images to the internal OCP mirror registry,
+  #   because it detected that it is connected to an OCP cluster.
+  # It will automatically replace all references to the internal RH registries with quay.io
+  $0 \\
+    --ci-index true
 "
 }
 
 INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.17"
 OPERATOR_NAME="rhdh-operator"
+IS_CI_INDEX_IMAGE="false"
 
 TO_REGISTRY=""
 INSTALL_OPERATOR="true"
@@ -168,6 +179,7 @@ while [[ "$#" -gt 0 ]]; do
 
     # New options
     '--index-image') INDEX_IMAGE="$2"; shift 1;;
+    '--ci-index') IS_CI_INDEX_IMAGE="$2"; shift 1;;
     '--filter-versions')
       if [[ "$2" == "*" ]]; then
         NO_VERSION_FILTER="true"
@@ -489,6 +501,7 @@ function mirror_extra_images() {
       fi
     fi
   done
+  debugf "... done."
 }
 
 function mirror_extra_images_from_dir() {
@@ -537,10 +550,25 @@ function mirror_extra_images_from_dir() {
   fi
 }
 
+function replaceInternalRegIfNeeded() {
+  img="$1"
+  if [[ "${IS_CI_INDEX_IMAGE}" == "true" ]]; then
+    replacement="${2:-quay.io}"
+
+    for reg in registry.stage.redhat.io registry.redhat.io; do
+      img="${img/$reg\/rhdh/$replacement\/rhdh}"
+    done
+    img="${img/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/$replacement\/rhdh\/}"
+  fi
+  echo "$img"
+}
+
 function process_bundles() {
 
   for bundleImg in $(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq); do
     debugf "bundleImg=$bundleImg"
+    originalBundleImg="$bundleImg"
+    bundleImg=$(replaceInternalRegIfNeeded "$bundleImg")
     digest="${bundleImg##*@sha256:}"
     if skopeo inspect "docker://$bundleImg" &> /dev/null; then
       mkdir -p "bundles/$digest"
@@ -573,11 +601,27 @@ function process_bundles() {
             all_related_images+=($related_images)
           fi
           for relatedImage in "${all_related_images[@]}"; do
-            relatedImageDigest="${relatedImage##*@sha256:}"
-            imgDir="./images/${relatedImage%@*}/sha256_$relatedImageDigest"
+            imgDir="./images/"
+            if [[ "$relatedImage" == *"@sha256:"* ]]; then
+              relatedImageDigest="${relatedImage##*@sha256:}"
+              imgDir+="${relatedImage%@*}/sha256_$relatedImageDigest"
+              lastTwo=$(extract_last_two_elements "${relatedImage%@*}")
+              targetImg="$(buildRegistryUrl)/${lastTwo}:$relatedImageDigest"
+              internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:$relatedImageDigest"
+            elif [[ "$relatedImage" == *":"* ]]; then
+              relatedImageTag="${relatedImage##*:}"
+              imgDir+="${relatedImage%:*}/tag_$relatedImageTag"
+              lastTwo=$(extract_last_two_elements "${relatedImage%:*}")
+              targetImg="$(buildRegistryUrl)/${lastTwo}:$relatedImageTag"
+              internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:$relatedImageTag"
+            else
+              imgDir+="${relatedImage}/tag_latest"
+              lastTwo=$(extract_last_two_elements "${relatedImage}")
+              targetImg="$(buildRegistryUrl)/${lastTwo}:latest"
+              internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:latest"
+            fi
+
             if [[ -n "$TO_REGISTRY" ]]; then
-              targetImg="$(buildRegistryUrl)/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
-              internalTargetImg="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
               mirror_image_to_registry "$relatedImage" "$targetImg"
               debugf "replacing $relatedImage in file '${file}' => $internalTargetImg"
               sed -i 's#'$relatedImage'#'$internalTargetImg'#g' "$file"
@@ -602,7 +646,7 @@ function process_bundles() {
           debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
           skopeo copy --remove-signatures --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
 
-          sed -i "s#${bundleImg}#${newBundleImageInternal}#g" "./rhdh/rhdh/render.yaml"
+          sed -i "s#${originalBundleImg}#${newBundleImageInternal}#g" "./rhdh/rhdh/render.yaml"
       fi
     fi
   done
@@ -664,15 +708,27 @@ function process_bundles_from_dir() {
           all_related_images+=($related_images)
         fi
         for relatedImage in "${all_related_images[@]}"; do
-          relatedImageDigest="${relatedImage##*@sha256:}"
-          imgDir="${FROM_DIR}/images/${relatedImage%@*}/sha256_$relatedImageDigest"
+          imgDir="${FROM_DIR}/images/"
+          if [[ "$relatedImage" == *"@sha256:"* ]]; then
+            relatedImageDigest="${relatedImage##*@sha256:}"
+            imgDir+="${relatedImage%@*}/sha256_$relatedImageDigest"
+            targetImg="$(buildRegistryUrl)/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
+            targetImgInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
+          elif [[ "$relatedImage" == *":"* ]]; then
+            relatedImageTag="${relatedImage##*:}"
+            imgDir+="${relatedImage%:*}/tag_$relatedImageTag"
+            targetImg="$(buildRegistryUrl)/$(extract_last_two_elements "${relatedImage%:*}"):$relatedImageTag"
+            targetImgInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${relatedImage%:*}"):$relatedImageTag"
+          else
+            imgDir+="${relatedImage}/tag_latest"
+            targetImg="$(buildRegistryUrl)/$(extract_last_two_elements "${relatedImage}"):latest"
+            targetImgInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${relatedImage}"):latest"
+          fi
           if [ ! -d "$imgDir" ]; then
             warnf "Skipping related image $relatedImage not found mirrored in dir: $FROM_DIR/images"
             continue
           fi
           if [[ -n "$TO_REGISTRY" ]]; then
-            targetImg="$(buildRegistryUrl)/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
-            targetImgInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
             push_image_from_archive "$imgDir" "$targetImg"
             debugf "replacing $relatedImage in file '${file}' => $targetImgInternal"
             sed -i 's#'$relatedImage'#'$targetImgInternal'#g' "$file"
@@ -709,15 +765,19 @@ function process_bundles_from_dir() {
 }
 
 function mirror_image_to_registry() {
-  local src_image=$1
-  local dest_image=$2
+  local src_image
+  src_image=$(replaceInternalRegIfNeeded "$1")
+  local dest_image
+  dest_image=$2
   echo "Mirroring $src_image to $dest_image..."
   skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image"
 }
 
 function mirror_image_to_archive() {
-  local src_image=$1
-  local archive_path=$2
+  local src_image
+  dest_image=$(replaceInternalRegIfNeeded "$1")
+  local archive_path
+  archive_path=$2
   debugf "Saving $src_image to $archive_path..."
   skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
 }
