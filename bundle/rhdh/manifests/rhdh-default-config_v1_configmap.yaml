@@ -266,6 +266,7 @@ data:
                   type: RuntimeDefault
                 runAsNonRoot: true
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
               startupProbe:
                 # This gives enough time upon container startup before the liveness and readiness probes are triggered.
                 # Giving (120s = initialDelaySeconds + failureThreshold * periodSeconds) to account for the worst case scenario.
