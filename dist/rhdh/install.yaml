@@ -1,28 +1,14 @@
-# /!\ EDIT ONLY IF NECESSARY
-#
-# Generated using `make deployment-manifest` against the release-1.4 branch.
-# Used to test the upgrade paths of the operator.
-# So this needs to reflect exactly what a user
-# would get if they deploy that version of the operator.
-#
-# Steps to generate an RHDH Operator manifest from the source branch:
-# 1. make deployment-manifest
-# 2. sed -i "s/backstage-operator/rhdh-operator/g" tests/e2e/testdata/rhdh-operator-*.yaml
-# 3. sed -i "s/backstage-system/rhdh-operator/g" tests/e2e/testdata/rhdh-operator-*.yaml
-# 4. sed -i "s/backstage-controller-manager/rhdh-operator/g" tests/e2e/testdata/rhdh-operator-*.yaml
-#
-
 apiVersion: v1
 kind: Namespace
 metadata:
   labels:
     app.kubernetes.io/component: manager
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: system
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: namespace
-    app.kubernetes.io/part-of: rhdh-operator
-    app: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
+    control-plane: controller-manager
   name: rhdh-operator
 ---
 apiVersion: apiextensions.k8s.io/v1
@@ -47,7 +33,11 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Backstage is the Schema for the backstages API
+        description: |-
+          Backstage is the Schema for the Red Hat Developer Hub backstages API.
+          It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
+          which can help streamline the process of setting up a self-managed internal
+          developer portal for adopters who are just starting out.
         properties:
           apiVersion:
             description: |-
@@ -416,7 +406,11 @@ spec:
   - name: v1alpha2
     schema:
       openAPIV3Schema:
-        description: Backstage is the Schema for the backstages API
+        description: |-
+          Backstage is the Schema for the Red Hat Developer Hub backstages API.
+          It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
+          which can help streamline the process of setting up a self-managed internal
+          developer portal for adopters who are just starting out.
         properties:
           apiVersion:
             description: |-
@@ -797,7 +791,11 @@ spec:
   - name: v1alpha3
     schema:
       openAPIV3Schema:
-        description: Backstage is the Schema for the backstages API
+        description: |-
+          Backstage is the Schema for the Red Hat Developer Hub backstages API.
+          It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
+          which can help streamline the process of setting up a self-managed internal
+          developer portal for adopters who are just starting out.
         properties:
           apiVersion:
             description: |-
@@ -1211,12 +1209,12 @@ kind: ServiceAccount
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: controller-manager
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: serviceaccount
-    app.kubernetes.io/part-of: rhdh-operator
-  name: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
+  name: rhdh-controller-manager
   namespace: rhdh-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1224,11 +1222,11 @@ kind: Role
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: leader-election-role
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: role
-    app.kubernetes.io/part-of: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-leader-election-role
   namespace: rhdh-operator
 rules:
@@ -1269,11 +1267,11 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: backstage-editor-role
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/part-of: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-backstage-editor-role
 rules:
 - apiGroups:
@@ -1300,11 +1298,11 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: backstage-viewer-role
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/part-of: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-backstage-viewer-role
 rules:
 - apiGroups:
@@ -1408,11 +1406,11 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: metrics-auth-role
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: metrics-auth-role
-    app.kubernetes.io/part-of: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-metrics-auth-role
 rules:
 - apiGroups:
@@ -1433,11 +1431,11 @@ kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/component: metrics-rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: metrics-reader
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/part-of: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-metrics-reader
 rules:
 - nonResourceURLs:
@@ -1450,11 +1448,11 @@ kind: RoleBinding
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: leader-election-rolebinding
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: rolebinding
-    app.kubernetes.io/part-of: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-leader-election-rolebinding
   namespace: rhdh-operator
 roleRef:
@@ -1463,7 +1461,7 @@ roleRef:
   name: rhdh-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: rhdh-operator
+  name: rhdh-controller-manager
   namespace: rhdh-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1471,11 +1469,11 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: manager-rolebinding
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: clusterrolebinding
-    app.kubernetes.io/part-of: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-manager-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -1483,7 +1481,7 @@ roleRef:
   name: rhdh-manager-role
 subjects:
 - kind: ServiceAccount
-  name: rhdh-operator
+  name: rhdh-controller-manager
   namespace: rhdh-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1491,10 +1489,10 @@ kind: ClusterRoleBinding
 metadata:
   labels:
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: metrics-auth-rolebinding
     app.kubernetes.io/name: metrics-auth-rolebinding
-    app.kubernetes.io/part-of: rhdh-operator
+    app.kubernetes.io/part-of: backstage-operator
   name: rhdh-metrics-auth-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -1502,7 +1500,7 @@ roleRef:
   name: rhdh-metrics-auth-role
 subjects:
 - kind: ServiceAccount
-  name: rhdh-operator
+  name: rhdh-controller-manager
   namespace: rhdh-operator
 ---
 apiVersion: v1
@@ -1659,7 +1657,17 @@ data:
             resources:
               requests:
                 storage: 1Gi
-  deployment.yaml: |-
+  db-statefulset.yaml.k8s: |-
+    # if securityContext not present in AKS/EKS, the error is like this:
+    # Error: EACCES: permission denied, open '/dynamic-plugins-root/backstage-plugin-scaffolder-backend-module-github-dynamic-0.2.2.tgz'
+    # fsGroup doesn not work for Openshift
+    spec:
+      template:
+        spec:
+          securityContext:
+            # any group id
+            fsGroup: 1001
+  deployment.yaml: |
     apiVersion: apps/v1
     kind: Deployment
     metadata:
@@ -1668,11 +1676,11 @@ data:
       replicas: 1
       selector:
         matchLabels:
-          rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
       template:
         metadata:
           labels:
-            rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+            rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
         spec:
           automountServiceAccountToken: false
           # if securityContext not present in AKS/EKS, the error is like this:
@@ -1702,6 +1710,8 @@ data:
                 secretName: dynamic-plugins-registry-auth
             - emptyDir: {}
               name: npmcacache
+            - name: temp
+              emptyDir: {}
           initContainers:
             - name: install-dynamic-plugins
               command:
@@ -1711,13 +1721,14 @@ data:
               image: quay.io/rhdh/rhdh-hub-rhel9:next
               imagePullPolicy: IfNotPresent
               securityContext:
+                readOnlyRootFilesystem: true
                 runAsNonRoot: true
                 allowPrivilegeEscalation: false
                 seccompProfile:
                   type: RuntimeDefault
                 capabilities:
                   drop:
-                   - ALL
+                    - ALL
               env:
                 - name: NPM_CONFIG_USERCONFIG
                   value: /opt/app-root/src/.npmrc.dynamic-plugins
@@ -1733,6 +1744,8 @@ data:
                   readOnly: true
                 - mountPath: /opt/app-root/src/.npm/_cacache
                   name: npmcacache
+                - mountPath: /tmp
+                  name: temp
               workingDir: /opt/app-root/src
               resources:
                 requests:
@@ -1807,6 +1820,8 @@ data:
               volumeMounts:
                 - mountPath: /opt/app-root/src/dynamic-plugins-root
                   name: dynamic-plugins-root
+                - mountPath: /tmp
+                  name: temp
               resources:
                 requests:
                   cpu: 250m
@@ -1816,6 +1831,16 @@ data:
                   memory: 2.5Gi
                   ephemeral-storage: 5Gi
               workingDir: /opt/app-root/src
+  deployment.yaml.k8s: |-
+    # if securityContext not present in AKS/EKS, the error is like this:
+    # Error: EACCES: permission denied, open '/dynamic-plugins-root/backstage-plugin-scaffolder-backend-module-github-dynamic-0.2.2.tgz'
+    # fsGroup doesn not work for Openshift
+    spec:
+      template:
+        spec:
+          securityContext:
+            # any group id
+            fsGroup: 1001
   dynamic-plugins.yaml: |-
     apiVersion: v1
     kind: ConfigMap
@@ -1867,6 +1892,9 @@ data:
           protocol: TCP
           port: 9464
           targetPort: 9464
+  service.yaml.k8s: |
+    spec:
+      type: NodePort
 kind: ConfigMap
 metadata:
   name: rhdh-default-config
@@ -1877,13 +1905,13 @@ kind: Service
 metadata:
   labels:
     app.kubernetes.io/component: metrics
-    app.kubernetes.io/created-by: rhdh-operator
+    app.kubernetes.io/created-by: backstage-operator
     app.kubernetes.io/instance: controller-manager-metrics-service
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: service
-    app.kubernetes.io/part-of: rhdh-operator
-    app: rhdh-operator
-  name: rhdh-operator-metrics-service
+    app.kubernetes.io/part-of: backstage-operator
+    control-plane: controller-manager
+  name: rhdh-controller-manager-metrics-service
   namespace: rhdh-operator
 spec:
   ports:
@@ -1892,19 +1920,14 @@ spec:
     protocol: TCP
     targetPort: metrics
   selector:
-    app: rhdh-operator
+    control-plane: controller-manager
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app.kubernetes.io/component: manager
-    app.kubernetes.io/created-by: rhdh-operator
-    app.kubernetes.io/instance: controller-manager
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: deployment
-    app.kubernetes.io/part-of: rhdh-operator
     app: rhdh-operator
+    control-plane: controller-manager
   name: rhdh-operator
   namespace: rhdh-operator
 spec:
@@ -1912,12 +1935,16 @@ spec:
   selector:
     matchLabels:
       app: rhdh-operator
+  strategy:
+    type: RollingUpdate
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
         app: rhdh-operator
+        app.kubernetes.io/component: rhdh-operator
+        control-plane: controller-manager
     spec:
       affinity:
         nodeAffinity:
@@ -1951,8 +1978,8 @@ spec:
         - name: RELATED_IMAGE_postgresql
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
-          value: quay.io/rhdh/rhdh-hub-rhel9:1.4
-        image: quay.io/rhdh-community/operator:0.4.2
+          value: quay.io/rhdh/rhdh-hub-rhel9:next
+        image: quay.io/rhdh/rhdh-rhel9-operator:1.6
         livenessProbe:
           httpGet:
             path: /healthz
@@ -1984,12 +2011,13 @@ spec:
           capabilities:
             drop:
             - ALL
+          readOnlyRootFilesystem: true
         volumeMounts:
         - mountPath: /default-config
           name: default-config
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: rhdh-operator
+      serviceAccountName: rhdh-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
       - configMap:
