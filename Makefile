@@ -256,6 +256,12 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	- $(CONTAINER_TOOL) buildx rm project-v3-builder
 	rm -f Dockerfile.cross
 
+.PHONY: build-installers
+build-installers: ## Generate a consolidated YAML with CRDs and deployment for all available profiles.
+	@for profile in $(PROFILES); do \
+  		$(MAKE) build-installer PROFILE=$$profile; \
+  	done
+
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist/$(PROFILE)
@@ -265,8 +271,8 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 
 .PHONY: deployment-manifest
 deployment-manifest: build-installer ## Generate manifest to deploy operator. Deprecated. Use 'make build-installer' instead.
-	cp -f dist/$(PROFILE)/install.yaml rhdh-operator-${VERSION}.yaml
-	@echo "Generated operator script rhdh-operator-${VERSION}.yaml"
+	cp -f dist/$(PROFILE)/install.yaml $(PROFILE)-operator-${VERSION}.yaml
+	@echo "Generated operator script $(PROFILE)-operator-${VERSION}.yaml"
 
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
