@@ -50,12 +50,12 @@ jobs:
       - name: Check for outdated bundle or manifests
         id: manifests-diff-checker
         run: |
-          make bundles
+          make bundles build-installers
           git status --porcelain
           # Since operator-sdk 1.26.0, `make bundle` changes the `createdAt` field from the bundle every time we run it.
           # The `git diff` below checks if only the createdAt field has changed. If is the only change, it is ignored.
           # Inspired from https://github.com/operator-framework/operator-sdk/issues/6285#issuecomment-1415350333
-          echo "MANIFESTS_CHANGED=$(if git diff --quiet -I'^    createdAt: ' bundle config; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
+          echo "MANIFESTS_CHANGED=$(if git diff --quiet -I'^    createdAt: ' bundle config dist; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
       - name: Commit any manifest changes
         if: ${{ steps.manifests-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
@@ -66,11 +66,11 @@ jobs:
           git pull --rebase --autostash
           git add -A .
           git commit \
-            -m "Regenerate bundle manifests" \
+            -m "Regenerate bundle/installer manifests" \
             -m "Co-authored-by: $GITHUB_ACTOR <$GITHUB_ACTOR@users.noreply.github.com>"
           git push
 
-      - name: Comment on PR if bundle manifests were updated
+      - name: Comment on PR if manifests were updated
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
         if: ${{ !cancelled() && steps.manifests-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
         continue-on-error: true
@@ -82,5 +82,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⚠️ <b>Files changed in bundle generation!</b><br/><br/>Those changes to the operator bundle manifests should have been pushed automatically to your PR branch.'
+              body: '⚠️ <b>Files changed in bundle and installer generation!</b><br/><br/>Those changes to the operator bundle/installer manifests should have been pushed automatically to your PR branch.'
             })
