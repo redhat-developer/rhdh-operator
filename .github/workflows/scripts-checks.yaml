@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - '**.sh'
+      - '.github/workflows/scripts-checks.yaml'
     branches: [ main ]
   pull_request:
     paths:
       - '**.sh'
+      - '.github/workflows/scripts-checks.yaml'
     branches: [ 'main' ]
 
 permissions:
@@ -29,7 +31,7 @@ jobs:
 
       - id: ShellCheck
         name: Differential ShellCheck
-        uses: redhat-plumbers-in-action/differential-shellcheck@5fa026e4797665181a0f7c6fa4a73c09348ae78c # v5
+        uses: redhat-plumbers-in-action/differential-shellcheck@bd6b077b70e188dbffa6675f35bca5639d2540ec # v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
