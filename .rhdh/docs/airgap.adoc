@@ -1,106 +1,211 @@
-==== Installing Red Hat Developer Hub (RHDH) in restricted environments
+== Deploying the Red Hat Developer Hub (RHDH) Operator and RHDH instances in disconnected environments
 
-WARNING: The procedure below will not work properly on OpenShift clusters with hosted control planes, like link:https://hypershift-docs.netlify.app/[HyperShift] or link:https://www.redhat.com/en/blog/red-hat-openshift-service-aws-hosted-control-planes-now-available[ROSA with hosted control planes]. This is due to a limitation preventing link:https://docs.openshift.com/container-platform/4.14/rest_api/operator_apis/imagecontentsourcepolicy-operator-openshift-io-v1alpha1.html[`ImageContentSourcePolicy`] resources from being propagated to the cluster nodes. There is currently no workaround for these clusters.
+A disconnected or restricted environment is an environment that does not have full access to the internet. So the cluster will not be able to pull any images from public registries like the Red Hat Ecosystem Catalog.
 
-On an OpenShift cluster operating in a restricted network, public resources are not available.
-However, deploying the RHDH Operator and running RHDH requires the following public resources:
+Deploying the RHDH Operator and running RHDH requires the following public resources:
 
 * Operator images (bundle, operator, catalog)
 * Operands images (RHDH, PostgreSQL)
 
-To make these resources available, we will need to replace them with their copies in a mirror registry accessible by the OpenShift cluster.
+To make these resources available, you will need to replace them with their copies in a mirror registry accessible by the cluster.
 
-We provide a helper script that mirrors all the necessary images and does the necessary plumbing to ensure those images will be used when installing the RHDH Operator and creating RHDH instances.
+We provide a helper script that mirrors all the necessary images and does all the heavy lifting to ensure those images will be used when installing the RHDH Operator and creating RHDH instances.
 
-This requires a target mirror registry, which you should already have if your OpenShift cluster is already ready to operate on a restricted network.
+This requires a target mirror registry, which you should already have if your cluster is already operating on a restricted network. If not and if you have an OpenShift cluster, you may want to expose and leverage the internal cluster registry.
 
-However, if you are preparing your cluster for disconnected usage, the script can also deploy a mirror registry in the cluster and use it for the mirroring process.
+Note that you can mirror the images to a mirror registry in a link:#_partially_disconnected_environments[partially disconnected environment] or in a link:#_fully_disconnected_environments[fully disconnected environment].
+
+Below are the prerequisites regardless of the target disconnected environment.
 
 *Prerequisites*
 
-* An active `oc` session with administrative permissions to the OpenShift cluster. See link:https://docs.openshift.com/container-platform/4.14/cli_reference/openshift_cli/getting-started-cli.html[Getting started with the OpenShift CLI].
+* `GNU sed`. See link:https://www.gnu.org/software/sed/[GNU sed].
+* (*Optional*) `oc-mirror` (the OpenShift Client mirror plugin) if you want to mirror using `oc-mirror` on OpenShift. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html-single/disconnected_environments/index#installation-oc-mirror-installing-plugin_about-installing-oc-mirror-v2[Installing the oc-mirror OpenShift CLI plugin].
+* `Skopeo 1.17+`. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
+* `umoci`. See link:https://github.com/opencontainers/umoci#install[Install].
+* `yq v4.44+`. See link:https://github.com/mikefarah/yq#install[Install].
+* (*Required on non-OpenShift clusters*) The cluster needs to have the Operator Lifecycle Manager installed and already working in disconnected environments. See link:https://github.com/operator-framework/operator-lifecycle-manager/blob/master/doc/install/install.md#installing-olm[Installing OLM].
+* (*Required on non-OpenShift clusters*) A mirror registry reachable from the cluster.
+
+=== Mirroring and deploying the RHDH Operator
+
+[#_partially_disconnected_environments]
+==== Partially disconnected environments
+
+In a partially disconnected environment, you (or the machine where you are running the mirroring tool) has direct access to the mirror registry.
+
+Besides the prerequisites listed above, you will also need:
+
+*Prerequisites*
+
 * An active `oc registry` session to the `registry.redhat.io` Red Hat Ecosystem Catalog. See link:https://access.redhat.com/RegistryAuthentication[Red Hat Container Registry Authentication].
-* `opm`. See link:https://docs.openshift.com/container-platform/4.14/cli_reference/opm/cli-opm-install.html[Installing the opm CLI].
-* `jq`. See link:https://jqlang.github.io/jq/download/[Download jq].
-* `podman`. See link:https://podman.io/docs/installation[Podman Installation Instructions].
-* `skopeo` version 1.14 or higher. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
-* If you already have a mirror registry for your cluster, an active `skopeo` session with administrative access to this registry is required. See link:https://github.com/containers/skopeo#authenticating-to-a-registry[Authenticating to a registry] and link:https://docs.openshift.com/container-platform/4.14/installing/disconnected_install/installing-mirroring-installation-images.html[Mirroring images for a disconnected installation].
-+
-NOTE: The internal OpenShift cluster image registry cannot be used as target mirror registry. See link:https://docs.openshift.com/container-platform/4.14/installing/disconnected_install/installing-mirroring-installation-images.html#installation-about-mirror-registry_installing-mirroring-installation-images[About the mirror registry].
-* If you prefer to create your own mirror registry, refer to link:https://docs.openshift.com/container-platform/4.14/installing/disconnected_install/installing-mirroring-creating-registry.html[Creating a mirror registry with mirror registry for Red Hat OpenShift].
-* If you don't already have a mirror registry and want the helper script to create one for you:
-** `curl`. On Red Hat Enterprise Linux, this is available by installing the `curl` package; for other platforms, see link:https://curl.se/[the cURL website].
-+
-[source,console]
-----
-$ sudo yum install curl
-----
-** `htpasswd` from your package manager. On Red Hat Enterprise Linux, this is available by installing the `httpd-tools` package:
-+
-[source,console]
-----
-$ sudo yum install httpd-tools
-----
+* An active `skopeo` session with administrative access to the target mirror registry is required. See link:https://github.com/containers/skopeo#authenticating-to-a-registry[Authenticating to a registry]. The script can detect if you are connected to an OpenShift cluster and will automatically expose the cluster registry, unless you specify the target registry to mirror to.
+* `opm`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/opm-cli#olm-about-opm_cli-opm-install[Installing the opm CLI].
+* `podman 5.3+`. See link:https://podman.io/docs/installation[Podman Installation Instructions].
 
 **Procedure**
 
-. Download and execute the mirroring script to install a custom Operator catalog and mirror the related images: `prepare-restricted-environment.sh` (link:https://github.com/redhat-developer/rhdh-operator/blob/main/.rhdh/scripts/prepare-restricted-environment.sh[source])
+. Download and execute the mirroring script to install the RHDH Operator catalog and mirror the related images: link:../scripts/prepare-restricted-environment.sh[`prepare-restricted-environment.sh`]
 +
 [source,console]
 ----
-$ #
-$ # For GA releases
-$ #
+#
+# For GA releases
+#
 
-$ # if you don't already have a target mirror registry
-$ # and want the script to create one for you.
-$ bash prepare-restricted-environment.sh \
-   --prod_operator_index "registry.redhat.io/redhat/redhat-operator-index:v4.14" \
-   --prod_operator_package_name "rhdh" \
-   --prod_operator_bundle_name "rhdh-operator" \
-   --prod_operator_version "v1.1.0"
+# NOTES:
+# 1. Omit `--to-registry` if you are connected against an OpenShift cluster and want the script to expose the internal cluster registry and use that for mirroring.
+# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
 
-$ # or, if you already have a target mirror registry
-$ bash prepare-restricted-environment.sh \
-   --prod_operator_index "registry.redhat.io/redhat/redhat-operator-index:v4.14" \
-   --prod_operator_package_name "rhdh" \
-   --prod_operator_bundle_name "rhdh-operator" \
-   --prod_operator_version "v1.1.0" \
-   --use_existing_mirror_registry "<my_registry>"
+bash prepare-restricted-environment.sh \
+    [--to-registry my.registry.example.com/namespace] \
+    [--use-oc-mirror true]
 
-$ #----------------------------------------------------
+#----------------------------------------------------
 
-$ #
-$ # For CI Builds
-$ #
+#
+# For CI Builds
+#
 
-$ # if you don't already have a target mirror registry
-$ # and want the script to create one for you.
-$ bash prepare-restricted-environment.sh \
-   --prod_operator_index "quay.io/rhdh/iib:latest-v4.14-x86_64" \
-   --prod_operator_package_name "rhdh" \
-   --prod_operator_bundle_name "rhdh-operator" \
-   --prod_operator_version "v1.1.0"
+# NOTES:
+# 1. Omit `--to-registry` if you are connected against an OpenShift cluster and want the script to expose the internal cluster registry and use that for mirroring.
+# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
+# 3. Specify `*` for `--filter-versions` to disable version filtering. It will include all channels of the rhdh package from the index image.
+# 4. '--ci-index true' causes the script to replace all references
+  to the internal Red Hat registries with quay.io
 
-$ # or, if you already have a target mirror registry
-$ bash prepare-restricted-environment.sh \
-   --prod_operator_index "quay.io/rhdh/iib:latest-v4.14-x86_64" \
-   --prod_operator_package_name "rhdh" \
-   --prod_operator_bundle_name "rhdh-operator" \
-   --prod_operator_version "v1.1.0" \
-   --use_existing_mirror_registry "<my_registry>"
+bash prepare-restricted-environment.sh \
+    --index-image "quay.io/rhdh/iib:next-v4.18-x86_64" \
+    --ci-index true \
+    [--filter-versions '*'] \
+    [--to-registry my.registry.example.com/namespace] \
+    [--use-oc-mirror true]
 ----
 +
-Be patient, the script can take several minutes to complete.
-Once done, you can make sure your cluster is disconnected from the public internet and install the RHDH operator.
-. Log in as an _administrator_ to the OpenShift web console.
-. In the *Administrator* view of the OpenShift web console, go to *Operators* → *OperatorHub* and search for *Red Hat Developer Hub*.
+Be patient, the script can take several minutes to complete. It will automatically install the RHDH Operator.
+
+*Verification*
+
+* On OpenShift, you should see the Red Hat Developer Hub Operator in the list of Installed Operators in the web console.
+* In a vanilla Kubernetes cluster, you can check the list of Pods running in the `rhdh-operator` namespace:
 +
-image::images/airgap/rhdh_catalog_operatorhub.png[RHDH CatalogSource from Operator Hub]
-. Install the Red Hat Developer Hub Operator. For more info, see https://docs.openshift.com/container-platform/4.14/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster[Installing from OperatorHub using the web console].
+[source,console]
+----
+kubectl -n rhdh-operator get pods
+----
+
+[#_fully_disconnected_environments]
+==== Fully disconnected environments
+
+In a fully disconnected environment, you usually need to connect to an intermediate bastion host or may even need to move physically there in order to reach the target mirror registry. In this context, you will need to follow the process below:
+
+. link:#_mirroring_to_disk[*Mirror all the required images to disk*].
+. *Manually transfer* the mirror folder from the step above to the network of the disconnected mirror registry.
+. In the disconnected environment, link:#_mirroring_from_disk[*mirror the images from disk*] to the target mirror registry and install the operator.
+
+[#_mirroring_to_disk]
+===== Mirroring to disk
+
+Besides the prerequisites listed above, you will also need:
+
+*Prerequisites*
+
+* An active `oc registry` session to the `registry.redhat.io` Red Hat Ecosystem Catalog. See link:https://access.redhat.com/RegistryAuthentication[Red Hat Container Registry Authentication].
+* `opm`. See link:https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/cli_tools/opm-cli#olm-about-opm_cli-opm-install[Installing the opm CLI].
+* `podman 5.3+`. See link:https://podman.io/docs/installation[Podman Installation Instructions].
+
+**Procedure**
+
+. Download and execute the mirroring script to mirror the related images to disk: link:../scripts/prepare-restricted-environment.sh[`prepare-restricted-environment.sh`]
 +
-image::images/airgap/rhdh_operator_install_ok.png[RHDH Operator Successful installation]
-. Create an OpenShift project to be used by your Backstage instance.
+[source,console]
+----
+#
+# For GA releases
+#
+
+# NOTES:
+# 1. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
+
+bash prepare-restricted-environment.sh \
+    --to-dir /absolute/path/to/my/mirror/folder \
+    [--use-oc-mirror true]
+
+#----------------------------------------------------
+
+#
+# For CI Builds
+#
+
+# NOTES:
+# 1. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
+# 2. Specify `*` for `--filter-versions` to disable version filtering. It will include all channels of the rhdh package from the index image.
+# 3. '--ci-index true' causes the script to replace all references
+  to the internal Red Hat registries with quay.io
+
+bash prepare-restricted-environment.sh \
+    --index-image "quay.io/rhdh/iib:next-v4.18-x86_64" \
+    --ci-index true \
+    --to-dir /absolute/path/to/my/mirror/folder \
+    [--filter-versions '*'] \
+    [--use-oc-mirror true]
+----
++
+Be patient, the script can take several minutes to complete. It will pull all the necessary images into the directory specified in `--to-dir`.
+
+. Now transfer the directory specified in `--to-dir` to your disconnected environment.
+
+[#_mirroring_from_disk]
+===== Mirroring from disk
+
+This needs to be executed on a machine which has access to both the cluster and the target mirror registry in your fully disconnected environment.
+
+Besides the prerequisites listed above, you will also need on this machine:
+
+*Prerequisites*
+
+* `podman 5.3+`. See link:https://podman.io/docs/installation[Podman Installation Instructions].
+
+**Procedure**
+
+NOTE: If you used `oc-mirror` to mirror to disk, you must also use `oc-mirror` when mirroring from disk, since `oc-mirror` uses a different folder layout.
+
+. Download and execute the mirroring script to install the RHDH Operator catalog and mirror the related images: link:../scripts/prepare-restricted-environment.sh[`prepare-restricted-environment.sh`]
++
+[source,console]
+----
+
+# NOTES:
+# 1. Omit `--to-registry` if you are connected against an OpenShift cluster and want the script to expose the internal cluster registry and use that for mirroring.
+# 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
+
+bash prepare-restricted-environment.sh \
+    --from-dir /absolute/path/to/my/mirror/folder \
+    [--to-registry my.registry.example.com/namespace] \
+    [--use-oc-mirror true]
+----
++
+Be patient, the script can take several minutes to complete. It will automatically install the RHDH Operator.
+
+*Verification*
+
+* On OpenShift, you should see the Red Hat Developer Hub Operator in the list of Installed Operators in the web console.
+* In a vanilla Kubernetes cluster, you can check the list of Pods running in the `rhdh-operator` namespace:
++
+[source,console]
+----
+kubectl -n rhdh-operator get pods
+----
+
+=== Deploying RHDH
+
+Once the Operator has been installed in your disconnected cluster, you can proceed to deploying an Operator-backed instance of RHDH.
+
+==== OpenShift
+
+*Procedure*
+
+. Create a namespace project to be used by your Backstage instance.
 For more information about creating a project in OpenShift, see the https://docs.openshift.com/container-platform/4.14/applications/projects/working-with-projects.html#creating-a-project-using-the-web-console_projects[Red Hat OpenShift documentation].
 . Switch to the *Developer* perspective in your Red Hat OpenShift web console.
 . Click *+Add*.
@@ -112,3 +217,33 @@ For more information about creating a project in OpenShift, see the https://docs
 +
 image::images/rhdh_from_operator.png[RHDH from Operator]
 . See link:openshift.adoc#_configurations_for_operator_backed_rhdh[Configurations for Operator-backed RHDH] for further details about configuring your RHDH instance.
+
+==== Kubernetes
+
+On a vanilla Kubernetes, you can create a Custom Resource (CR) using `kubectl`, like so:
+
+[source,yaml]
+----
+cat <<EOF | kubectl -n rhdh-operator apply -f -
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: developer-hub
+spec:
+  application:
+    route:
+      enabled: false
+  database:
+    enableLocalDb: true
+EOF
+----
+
+Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
+
+[source,console]
+----
+kubectl -n $YOUR_NAMESPACE patch serviceaccount default \
+    -p '{"imagePullSecrets": [{"name": "$YOUR_PULL_SECRET_NAME"}]}'
+----
+
+More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
