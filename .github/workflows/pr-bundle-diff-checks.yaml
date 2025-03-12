@@ -12,7 +12,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   authorize:
@@ -82,5 +82,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '⚠️ <b>Files changed in bundle and installer generation!</b><br/><br/>Those changes to the operator bundle/installer manifests should have been pushed automatically to your PR branch.'
+              body: '⚠️ <b>Files changed in bundle and installer generation!</b><br/><br/>Those changes to the operator bundle/installer manifests should have been pushed automatically to your PR branch.<br/><br/><b>NOTE: </b>If the PR checks are stuck after this additional commit, manually close the PR and immediately reopen it to trigger the checks again.'
             })
