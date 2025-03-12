@@ -1,10 +1,12 @@
 package model
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/exp/maps"
-
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,6 +16,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 )
+
+const defaultAppConfigFileName = "default.app-config.yaml"
 
 type AppConfigFactory struct{}
 
@@ -78,8 +82,56 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
+	err := b.updateDefaultBaseUrls(backstage)
+	if err != nil {
+		return err
+	}
 	updatePodWithAppConfig(m.backstageDeployment, m.backstageDeployment.container(), b.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
+	return nil
+}
+
+func (b *AppConfig) updateDefaultBaseUrls(backstage bsv1.Backstage) error {
+	if !backstage.Spec.IsRouteEnabled() {
+		return nil
+	}
+	isOcp, err := utils.IsOpenshift()
+	if err != nil {
+		return err
+	}
+	if !isOcp {
+		return nil
+	}
+	host := fmt.Sprintf("%s-%s", RouteName(backstage.Name), backstage.Namespace)
+	appendIngressDomain := true
+	if backstage.Spec.Application != nil && backstage.Spec.Application.Route != nil {
+		// Per the Route spec, if a user specifies both the host and subdomain, the host takes precedence.
+		if backstage.Spec.Application.Route.Host != "" {
+			host = backstage.Spec.Application.Route.Host
+			appendIngressDomain = false
+		} else if backstage.Spec.Application.Route.Subdomain != "" {
+			host = backstage.Spec.Application.Route.Subdomain
+		}
+	}
+	if appendIngressDomain {
+		var domain string
+		domain, err = utils.GetOCPIngressDomain()
+		if err != nil {
+			return err
+		}
+		if domain == "" {
+			klog.V(1).Info("no cluster ingress domain found, skipping setting the default baseUrls")
+			return nil
+		}
+		host += fmt.Sprintf(".%s", domain)
+	}
+	baseUrl := fmt.Sprintf("https://%s", host)
+	defaultAppConfig := b.ConfigMap.Data[defaultAppConfigFileName]
+	if defaultAppConfig == "" {
+		return nil
+	}
+	b.ConfigMap.Data[defaultAppConfigFileName] = strings.ReplaceAll(defaultAppConfig, "http://localhost:7007", baseUrl)
+
 	return nil
 }
 
