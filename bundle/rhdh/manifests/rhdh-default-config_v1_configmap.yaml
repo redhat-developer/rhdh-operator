@@ -7,6 +7,17 @@ data:
       name: my-backstage-config-cm1 # placeholder for <bs>-default-appconfig
     data:
       default.app-config.yaml: |
+        ###########################################################################################################
+        # /!\ WARNING
+        #
+        # This is the default app-config file created and managed by the Operator for your CR.
+        # Do NOT edit this manually in the Cluster, as your changes will be overridden by the Operator upon the
+        # next reconciliation.
+        # If you want to customize the application configuration, you should create your own app-config ConfigMap
+        # and reference it in your CR.
+        # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/configuring/provisioning-and-using-your-custom-configuration#provisioning-your-custom-configuration
+        # for more details.
+        ###########################################################################################################
         backend:
           auth:
             externalAccess:
@@ -343,6 +354,18 @@ data:
       name: default-dynamic-plugins #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name
     data:
       "dynamic-plugins.yaml": |
+        ###########################################################################################################
+        # /!\ WARNING
+        #
+        # This is the default dynamic plugins configuration file created and managed by the Operator for your CR.
+        # Do NOT edit this manually in the Cluster, as your changes will be overridden by the Operator upon the
+        # next reconciliation.
+        # If you want to customize the dynamic plugins, you should create your own dynamic-plugins ConfigMap
+        # and reference it in your CR.
+        # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/installing_and_viewing_plugins_in_red_hat_developer_hub/rhdh-installing-rhdh-plugins_title-plugins-rhdh-about#proc-config-dynamic-plugins-rhdh-operator_rhdh-installing-rhdh-plugins
+        # for more details or https://github.com/redhat-developer/rhdh-operator/blob/main/examples/rhdh-cr.yaml
+        # for an example.
+        ###########################################################################################################
         includes:
           - dynamic-plugins.default.yaml
         plugins: []
