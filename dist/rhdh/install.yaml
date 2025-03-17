@@ -1523,6 +1523,9 @@ data:
         # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/configuring/provisioning-and-using-your-custom-configuration#provisioning-your-custom-configuration
         # for more details.
         ###########################################################################################################
+        app:
+          # Default value. Might be updated on OCP based on the ingress domain and spec.application.route field
+          baseUrl: http://localhost:7007
         backend:
           auth:
             externalAccess:
@@ -1531,6 +1534,11 @@ data:
                   subject: legacy-default-config
                   # This is a default value, which you should change by providing your own app-config
                   secret: "pl4s3Ch4ng3M3"
+          # Default value. Might be updated on OCP based on the ingress domain and spec.application.route field
+          baseUrl: http://localhost:7007
+          cors:
+            # Default value. Might be updated on OCP based on the ingress domain and spec.application.route field
+            origin: http://localhost:7007
         auth:
           providers: {}
   db-secret.yaml: |-
