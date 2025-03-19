@@ -518,10 +518,25 @@ spec:
         caCertificate: "caCertificatecontent"
 ```
   
-Here, the user can specify some of the OpenShift Route specifications fields. The names of the Backstage `spec.application.route` fields correspond to the names of Route specifications fields and follow the same default rules if not specified.
+Here, the user can specify some of the OpenShift Route specifications fields. The names of the Backstage `spec.application.route` fields correspond to the names of Route specification fields and follow the same default rules if not specified.
 
 Also note that securing Routes with external certificates in TLS secrets (via the `spec.application.route.tls.externalCertificateSecretName` CR field) is a Technology Preview feature in OpenShift. It requires enabling the `RouteExternalCertificate` OpenShift Feature Gate and might not be functionally complete. See [Creating a route with externally managed certificate](https://docs.openshift.com/container-platform/4.16/networking/routes/secured-routes.html#nw-ingress-route-secret-load-external-cert_secured-routes) for more details.
-  
+
+##### Default base URLs
+
+The [Route](#route) parameters might affect the base URLs fields set by the Operator in the default app-config ConfigMap (named `backstage-appconfig-<CR_name>`) injected when reconciling a given CR.
+The following app-config fields in this default app-config: `app.baseUrl`, `backend.baseUrl` and `backend.cors.origin` might be updated, per the following rules:
+
+- No change if the cluster is not OpenShift
+- No change if `spec.application.route.enabled` is explicitly set to `false`
+- The base URLs are set to `https://<spec.application.route.host>` if `spec.application.route.host` is set in the Backstage CR
+- The base URLs are set to `https://<spec.application.route.subdomain>.<cluster_ingress_domain>` if `spec.application.route.subdomain` is set in the Backstage CR. `<cluster_ingress_domain>` is the OpenShift ingress domain. See [The Ingress configuration asset](https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/networking/networking-operators#nw-ne-openshift-ingress_configuring-ingress) for more details. 
+- The base URLs are set to `https://backstage-<CR_name>-<namespace>.<cluster_ingress_domain>`, which is the domain set by default for the Route created by the Operator. `<cluster_ingress_domain>` is the OpenShift ingress domain. See [The Ingress configuration asset](https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/networking/networking-operators#nw-ne-openshift-ingress_configuring-ingress) for more details.
+
+Note that this behavior is done on a best-effort basis and only on OpenShift.
+
+In any case (error or on non-OpenShift clusters), users still have the ability to override such defaults by providing custom app-config ConfigMap(s), as depicted in the [app-config](#app-config) section.
+
 ### Deployment Configuration
   
 Since **v1alpha2** (Operator version **0.3.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
