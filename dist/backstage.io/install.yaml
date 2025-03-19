@@ -1362,6 +1362,12 @@ rules:
   - update
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+- apiGroups:
   - rhdh.redhat.com
   resources:
   - backstages

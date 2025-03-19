@@ -35,7 +35,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-03-17T13:04:24Z"
+    createdAt: "2025-03-19T10:35:42Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -114,6 +114,12 @@ spec:
           - patch
           - update
           - watch
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - ingresses
+          verbs:
+          - get
         - apiGroups:
           - rhdh.redhat.com
           resources:
