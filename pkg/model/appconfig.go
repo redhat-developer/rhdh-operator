@@ -91,13 +91,18 @@ func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstag
 	return nil
 }
 
+// updateDefaultBaseUrls detects if it is running on OCP and tries to set the baseUrl in the default app-config,
+// per the cluster ingress domain and the Route spec.
+// Note that this is purposely done on a best effort basis. So it is not considered an issue if the cluster ingress domain
+// could not be determined, since the user can always set it explicitly in their custom app-config.
 func (b *AppConfig) updateDefaultBaseUrls(backstage bsv1.Backstage) error {
 	if !backstage.Spec.IsRouteEnabled() {
 		return nil
 	}
 	isOcp, err := utils.IsOpenshift()
 	if err != nil {
-		return err
+		klog.V(1).Infof("could not determine if whether we are running on OCP, skipping setting the default baseUrls: %v", err)
+		return nil
 	}
 	if !isOcp {
 		return nil
@@ -117,7 +122,8 @@ func (b *AppConfig) updateDefaultBaseUrls(backstage bsv1.Backstage) error {
 		var domain string
 		domain, err = utils.GetOCPIngressDomain()
 		if err != nil {
-			return err
+			klog.V(1).Infof("could not get cluster ingress domain, skipping setting the default baseUrls: %v", err)
+			return nil
 		}
 		if domain == "" {
 			klog.V(1).Info("no cluster ingress domain found, skipping setting the default baseUrls")
