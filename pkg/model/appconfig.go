@@ -17,8 +17,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const defaultAppConfigFileName = "default.app-config.yaml"
-
 type AppConfigFactory struct{}
 
 // factory method to create App Config object
@@ -132,11 +130,9 @@ func (b *AppConfig) updateDefaultBaseUrls(backstage bsv1.Backstage) error {
 		host += fmt.Sprintf(".%s", domain)
 	}
 	baseUrl := fmt.Sprintf("https://%s", host)
-	defaultAppConfig := b.ConfigMap.Data[defaultAppConfigFileName]
-	if defaultAppConfig == "" {
-		return nil
+	for k, v := range b.ConfigMap.Data {
+		b.ConfigMap.Data[k] = strings.ReplaceAll(v, ": http://localhost:7007", ": "+baseUrl)
 	}
-	b.ConfigMap.Data[defaultAppConfigFileName] = strings.ReplaceAll(defaultAppConfig, "http://localhost:7007", baseUrl)
 
 	return nil
 }
