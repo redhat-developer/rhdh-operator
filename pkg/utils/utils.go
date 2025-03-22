@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -14,6 +15,10 @@ import (
 	"strconv"
 	"strings"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/klog/v2"
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 
@@ -294,4 +299,40 @@ func getPlatform() string {
 		return PlatformOCP
 	}
 	return PlatformK8s
+}
+
+// GetOCPIngressDomain returns the OpenShift Ingress domain
+func GetOCPIngressDomain() (string, error) {
+	cl, err := client.New(ctrl.GetConfigOrDie(), client.Options{})
+	if err != nil {
+		return "", fmt.Errorf("could not create OCP client to retrieve the ingress domain): %v", err)
+	}
+
+	ingressConfig := &unstructured.Unstructured{}
+	ingressConfig.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "config.openshift.io",
+		Kind:    "Ingress",
+		Version: "v1",
+	})
+
+	err = cl.Get(context.Background(), client.ObjectKey{
+		Name:      "cluster",
+		Namespace: "",
+	}, ingressConfig)
+	if err != nil {
+		if k8serrors.IsNotFound(err) || meta.IsNoMatchError(err) {
+			klog.V(1).Info("no cluster ingress config found")
+			return "", nil
+		}
+		return "", err
+	}
+	domain, found, err := unstructured.NestedString(ingressConfig.Object, "spec", "domain")
+	if err != nil {
+		return "", err
+	}
+	if !found {
+		klog.V(1).Info("spec.domain in Ingress cluster config not found")
+		return "", nil
+	}
+	return domain, nil
 }

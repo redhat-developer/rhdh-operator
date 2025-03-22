@@ -1,9 +1,11 @@
 package integration_tests
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onsi/gomega/format"
+	"github.com/onsi/gomega/gcustom"
 	"github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -168,4 +170,42 @@ func (matcher *BeEnvVarForContainerMatcher) FailureMessage(actual interface{}) s
 func (matcher *BeEnvVarForContainerMatcher) NegatedFailureMessage(actual interface{}) string {
 	objectName, _ := actual.(string)
 	return fmt.Sprintf("Expected container not to contain EnvVar %s", objectName)
+}
+
+type AppConfigData struct {
+	App struct {
+		BaseUrl string `yaml:"baseUrl"`
+	} `yaml:"app"`
+	Backend struct {
+		BaseUrl string `yaml:"baseUrl"`
+		Cors    struct {
+			Origin string `yaml:"origin"`
+		} `yaml:"cors"`
+	} `yaml:"backend"`
+}
+
+func HaveAppConfigBaseUrl(expected string) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(actual corev1.ConfigMap) (bool, error) {
+		y, ok := actual.Data["default.app-config.yaml"]
+		if !ok {
+			return false, errors.New("expected to find `default.app-config.yaml` in the default app-config ConfigMap")
+		}
+		var appConfig AppConfigData
+		err := ReadYaml([]byte(y), &appConfig)
+		if err != nil {
+			return false, fmt.Errorf("could not parse `default.app-config.yaml` into an AppConfig struct: %w", err)
+		}
+		if appConfig.App.BaseUrl != expected {
+			return false, nil
+		}
+		if appConfig.Backend.BaseUrl != expected {
+			return false, nil
+		}
+		if appConfig.Backend.Cors.Origin != expected {
+			return false, nil
+		}
+		return true, nil
+	}).WithTemplate(
+		"Expected the default app-config ConfigMap:\n{{.FormattedActual}}\n{{.To}} have the default baseUrls and CORS origin set to:\n{{format .Data 1}}",
+		expected)
 }
