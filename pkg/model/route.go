@@ -1,6 +1,10 @@
 package model
 
 import (
+	"fmt"
+
+	"k8s.io/klog/v2"
+
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
@@ -134,4 +138,35 @@ func (b *BackstageRoute) updateAndValidate(model *BackstageModel, _ bsv1.Backsta
 func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	b.route.SetName(RouteName(backstage.Name))
 	setMetaInfo(b.route, backstage, scheme)
+}
+
+// buildOpenShiftBaseUrl returns the base URL that should be considered as default on OpenShift,
+// per the cluster ingress domain and the Route spec.
+func buildOpenShiftBaseUrl(model *BackstageModel, backstage bsv1.Backstage) string {
+	if !model.isOpenshift {
+		return ""
+	}
+	if !backstage.Spec.IsRouteEnabled() {
+		return ""
+	}
+	host := fmt.Sprintf("%s-%s", RouteName(backstage.Name), backstage.Namespace)
+	appendIngressDomain := true
+	if backstage.Spec.Application != nil && backstage.Spec.Application.Route != nil {
+		// Per the Route spec, if a user specifies both the host and subdomain, the host takes precedence.
+		if backstage.Spec.Application.Route.Host != "" {
+			host = backstage.Spec.Application.Route.Host
+			appendIngressDomain = false
+		} else if backstage.Spec.Application.Route.Subdomain != "" {
+			host = backstage.Spec.Application.Route.Subdomain
+		}
+	}
+	if appendIngressDomain {
+		d := model.ExternalConfig.OpenShiftIngressDomain
+		if d == "" {
+			klog.V(1).Info("no cluster ingress domain found, skipping setting the default baseUrls")
+			return ""
+		}
+		host = fmt.Sprintf("%s.%s", host, d)
+	}
+	return fmt.Sprintf("https://%s", host)
 }

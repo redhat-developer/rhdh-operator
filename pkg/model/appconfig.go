@@ -3,11 +3,11 @@ package model
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"golang.org/x/exp/maps"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -81,60 +81,64 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 
 // implementation of RuntimeObject interface
 func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
-	err := b.updateDefaultBaseUrls(backstage)
-	if err != nil {
-		return err
-	}
+	b.updateDefaultBaseUrls(m, backstage)
 	updatePodWithAppConfig(m.backstageDeployment, m.backstageDeployment.container(), b.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
 	return nil
 }
 
-// updateDefaultBaseUrls detects if it is running on OCP and tries to set the baseUrl in the default app-config,
-// per the cluster ingress domain and the Route spec.
+// updateDefaultBaseUrls tries to set the baseUrl in the default app-config.
 // Note that this is purposely done on a best effort basis. So it is not considered an issue if the cluster ingress domain
 // could not be determined, since the user can always set it explicitly in their custom app-config.
-func (b *AppConfig) updateDefaultBaseUrls(backstage bsv1.Backstage) error {
-	if !backstage.Spec.IsRouteEnabled() {
-		return nil
-	}
-	isOcp, err := utils.IsOpenshift()
-	if err != nil {
-		klog.V(1).Infof("could not determine if whether we are running on OCP, skipping setting the default baseUrls: %v", err)
-		return nil
-	}
-	if !isOcp {
-		return nil
-	}
-	host := fmt.Sprintf("%s-%s", RouteName(backstage.Name), backstage.Namespace)
-	appendIngressDomain := true
-	if backstage.Spec.Application != nil && backstage.Spec.Application.Route != nil {
-		// Per the Route spec, if a user specifies both the host and subdomain, the host takes precedence.
-		if backstage.Spec.Application.Route.Host != "" {
-			host = backstage.Spec.Application.Route.Host
-			appendIngressDomain = false
-		} else if backstage.Spec.Application.Route.Subdomain != "" {
-			host = backstage.Spec.Application.Route.Subdomain
-		}
-	}
-	if appendIngressDomain {
-		var domain string
-		domain, err = utils.GetOCPIngressDomain()
-		if err != nil {
-			klog.V(1).Infof("could not get cluster ingress domain, skipping setting the default baseUrls: %v", err)
-			return nil
-		}
-		if domain == "" {
-			klog.V(1).Info("no cluster ingress domain found, skipping setting the default baseUrls")
-			return nil
-		}
-		host += fmt.Sprintf(".%s", domain)
-	}
-	baseUrl := fmt.Sprintf("https://%s", host)
-	for k, v := range b.ConfigMap.Data {
-		b.ConfigMap.Data[k] = strings.ReplaceAll(v, ": http://localhost:7007", ": "+baseUrl)
+func (b *AppConfig) updateDefaultBaseUrls(m *BackstageModel, backstage bsv1.Backstage) {
+	baseUrl := buildOpenShiftBaseUrl(m, backstage)
+	if baseUrl == "" {
+		klog.V(1).Info("[warn] no cluster ingress domain found, skipping setting the default baseUrls")
+		return
 	}
 
-	return nil
+	for k, v := range b.ConfigMap.Data {
+		updated, err := getAppConfigContentWithBaseUrlUpdated(v, baseUrl)
+		if err != nil {
+			klog.V(1).Infof("[warn] could not update base url in default app-config %q for backstage %s: %v",
+				k, backstage.Name, err)
+			continue
+		}
+		b.ConfigMap.Data[k] = updated
+	}
+}
+
+func getAppConfigContentWithBaseUrlUpdated(content string, baseUrl string) (string, error) {
+	var appConfigData map[string]any
+	err := yaml.Unmarshal([]byte(content), &appConfigData)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode app-config YAML: %w", err)
+	}
+	app, ok := appConfigData["app"].(map[string]any)
+	if !ok {
+		app = make(map[string]any)
+		appConfigData["app"] = app
+	}
+	app["baseUrl"] = baseUrl
+
+	backend, ok := appConfigData["backend"].(map[string]any)
+	if !ok {
+		backend = make(map[string]any)
+		appConfigData["backend"] = backend
+	}
+	backend["baseUrl"] = baseUrl
+
+	backendCors, ok := backend["cors"].(map[string]any)
+	if !ok {
+		backendCors = make(map[string]any)
+		backend["cors"] = backendCors
+	}
+	backendCors["origin"] = baseUrl
+
+	updated, err := yaml.Marshal(&appConfigData)
+	if err != nil {
+		return "", fmt.Errorf("failed to serialize updated app-config YAML: %w", err)
+	}
+	return string(updated), nil
 }
 
 func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
@@ -142,7 +146,7 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 	setMetaInfo(b.ConfigMap, backstage, scheme)
 }
 
-// updatePodWithAppConfig contrubutes to Volumes, container.VolumeMounts and contaiter.Args
+// updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args
 func updatePodWithAppConfig(bsd *BackstageDeployment, container *corev1.Container, cmName, mountPath, key string, withSubPath bool, cmData []string) {
 	bsd.mountFilesFrom([]string{container.Name}, ConfigMapObjectKind,
 		cmName, mountPath, key, withSubPath, cmData)
