@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gcustom"
 	"github.com/onsi/gomega/types"
@@ -184,7 +185,7 @@ type AppConfigData struct {
 	} `yaml:"backend"`
 }
 
-func HaveAppConfigBaseUrl(expected string) types.GomegaMatcher {
+func HaveAppConfigBaseUrl(expectedPattern string) types.GomegaMatcher {
 	return gcustom.MakeMatcher(func(actual corev1.ConfigMap) (bool, error) {
 		y, ok := actual.Data["default.app-config.yaml"]
 		if !ok {
@@ -195,17 +196,13 @@ func HaveAppConfigBaseUrl(expected string) types.GomegaMatcher {
 		if err != nil {
 			return false, fmt.Errorf("could not parse `default.app-config.yaml` into an AppConfig struct: %w", err)
 		}
-		if appConfig.App.BaseUrl != expected {
-			return false, nil
-		}
-		if appConfig.Backend.BaseUrl != expected {
-			return false, nil
-		}
-		if appConfig.Backend.Cors.Origin != expected {
-			return false, nil
-		}
-		return true, nil
+		return HaveEach(MatchRegexp(expectedPattern)).Match(
+			[]string{
+				appConfig.App.BaseUrl,
+				appConfig.Backend.BaseUrl,
+				appConfig.Backend.Cors.Origin,
+			})
 	}).WithTemplate(
 		"Expected the default app-config ConfigMap:\n{{.FormattedActual}}\n{{.To}} have the default baseUrls and CORS origin set to:\n{{format .Data 1}}",
-		expected)
+		expectedPattern)
 }

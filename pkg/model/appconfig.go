@@ -92,12 +92,11 @@ func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstag
 func (b *AppConfig) updateDefaultBaseUrls(m *BackstageModel, backstage bsv1.Backstage) {
 	baseUrl := buildOpenShiftBaseUrl(m, backstage)
 	if baseUrl == "" {
-		klog.V(1).Info("[warn] no cluster ingress domain found, skipping setting the default baseUrls")
 		return
 	}
 
 	for k, v := range b.ConfigMap.Data {
-		updated, err := getAppConfigContentWithBaseUrlUpdated(v, baseUrl)
+		updated, err := getAppConfigContentWithBaseUrlsUpdated(v, baseUrl)
 		if err != nil {
 			klog.V(1).Infof("[warn] could not update base url in default app-config %q for backstage %s: %v",
 				k, backstage.Name, err)
@@ -107,7 +106,7 @@ func (b *AppConfig) updateDefaultBaseUrls(m *BackstageModel, backstage bsv1.Back
 	}
 }
 
-func getAppConfigContentWithBaseUrlUpdated(content string, baseUrl string) (string, error) {
+func getAppConfigContentWithBaseUrlsUpdated(content string, baseUrl string) (string, error) {
 	var appConfigData map[string]any
 	err := yaml.Unmarshal([]byte(content), &appConfigData)
 	if err != nil {

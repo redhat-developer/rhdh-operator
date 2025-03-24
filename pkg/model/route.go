@@ -3,8 +3,6 @@ package model
 import (
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
@@ -163,7 +161,6 @@ func buildOpenShiftBaseUrl(model *BackstageModel, backstage bsv1.Backstage) stri
 	if appendIngressDomain {
 		d := model.ExternalConfig.OpenShiftIngressDomain
 		if d == "" {
-			klog.V(1).Info("no cluster ingress domain found, skipping setting the default baseUrls")
 			return ""
 		}
 		host = fmt.Sprintf("%s.%s", host, d)

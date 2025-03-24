@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	openshift "github.com/openshift/api/route/v1"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/model"
-
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
@@ -38,18 +39,16 @@ var _ = When("create default backstage", func() {
 	})
 
 	for _, tt := range []struct {
-		name              string
-		desiredRoute      bsv1.Route
-		expectedBaseUrlFn func(ingressDomain string) string
+		name                   string
+		desiredRoute           bsv1.Route
+		expectedBaseUrlPattern string
 	}{
 		{
 			name: "route disabled",
 			desiredRoute: bsv1.Route{
 				Enabled: ptr.To(false),
 			},
-			expectedBaseUrlFn: func(ingressDomain string) string {
-				return "http://localhost:7007"
-			},
+			expectedBaseUrlPattern: "",
 		},
 		{
 			name: "route with subdomain",
@@ -58,18 +57,14 @@ var _ = When("create default backstage", func() {
 				//Enabled:   ptr.To(true),
 				Subdomain: "test",
 			},
-			expectedBaseUrlFn: func(ingressDomain string) string {
-				return fmt.Sprintf("https://test.%s", ingressDomain)
-			},
+			expectedBaseUrlPattern: fmt.Sprintf("https://test.+"),
 		},
 		{
 			name: "route with host",
 			desiredRoute: bsv1.Route{
 				Host: "host.example.com",
 			},
-			expectedBaseUrlFn: func(ingressDomain string) string {
-				return "https://host.example.com"
-			},
+			expectedBaseUrlPattern: "https://host.example.com",
 		},
 	} {
 		tt := tt
@@ -106,14 +101,11 @@ var _ = When("create default backstage", func() {
 					g.Expect(route.Status.Ingress[0].Host).To(Not(BeEmpty()))
 				}
 
-				//By("updating the baseUrls in the default app-config CM, per the desired route settings (RHIDP-6192)")
-				//var appConfigCm corev1.ConfigMap
-				//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
-				//g.Expect(err).ShouldNot(HaveOccurred())
-				//domain, err := utils.GetOCPIngressDomain()
-				//g.Expect(err).NotTo(HaveOccurred())
-				//g.Expect(appConfigCm).To(
-				//	HaveAppConfigBaseUrl(tt.expectedBaseUrlFn(domain)))
+				By("updating the baseUrls in the default app-config CM, per the desired route settings (RHIDP-6192)")
+				var appConfigCm corev1.ConfigMap
+				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(appConfigCm).To(HaveAppConfigBaseUrl(tt.expectedBaseUrlPattern))
 			}, 5*time.Minute, time.Second).Should(Succeed())
 
 		})
