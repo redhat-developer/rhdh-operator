@@ -1,9 +1,9 @@
 package integration_tests
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gcustom"
@@ -185,24 +185,31 @@ type AppConfigData struct {
 	} `yaml:"backend"`
 }
 
-func HaveAppConfigBaseUrl(expectedPattern string) types.GomegaMatcher {
+func HaveAppConfigBaseUrl(expected any) types.GomegaMatcher {
 	return gcustom.MakeMatcher(func(actual corev1.ConfigMap) (bool, error) {
-		y, ok := actual.Data["default.app-config.yaml"]
-		if !ok {
-			return false, errors.New("expected to find `default.app-config.yaml` in the default app-config ConfigMap")
+		fmt.Fprintf(ginkgo.GinkgoWriter, "actual: %v\n", actual)
+		for k, v := range actual.Data {
+			var appConfig AppConfigData
+			err := ReadYaml([]byte(v), &appConfig)
+			if err != nil {
+				return false, fmt.Errorf("could not parse key %q into an AppConfig struct: %w", k, err)
+			}
+
+			result, err := HaveEach(expected).Match(
+				[]string{
+					appConfig.App.BaseUrl,
+					appConfig.Backend.BaseUrl,
+					appConfig.Backend.Cors.Origin,
+				})
+			if err != nil {
+				return false, err
+			}
+			if !result {
+				return false, nil
+			}
 		}
-		var appConfig AppConfigData
-		err := ReadYaml([]byte(y), &appConfig)
-		if err != nil {
-			return false, fmt.Errorf("could not parse `default.app-config.yaml` into an AppConfig struct: %w", err)
-		}
-		return HaveEach(MatchRegexp(expectedPattern)).Match(
-			[]string{
-				appConfig.App.BaseUrl,
-				appConfig.Backend.BaseUrl,
-				appConfig.Backend.Cors.Origin,
-			})
+		return true, nil
 	}).WithTemplate(
-		"Expected the default app-config ConfigMap:\n{{.FormattedActual}}\n{{.To}} have the default baseUrls and CORS origin set to:\n{{format .Data 1}}",
-		expectedPattern)
+		"Expected the default app-config ConfigMap:\n{{.FormattedActual}}\n{{.To}} have the default baseUrls and CORS origin meet the expectations:\n{{format .Data 1}}",
+		expected)
 }

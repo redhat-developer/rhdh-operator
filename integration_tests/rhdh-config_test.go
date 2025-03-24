@@ -154,7 +154,7 @@ var _ = When("create default rhdh", func() {
 
 				By("updating the baseUrls in the default app-config CM (RHIDP-6192)", func() {
 					g.Expect(appConfigCm).To(
-						HaveAppConfigBaseUrl(fmt.Sprintf(`^https://%s-%s.+`, model.RouteName(backstageName), ns)))
+						HaveAppConfigBaseUrl(MatchRegexp(fmt.Sprintf(`^https://%s-%s.+`, model.RouteName(backstageName), ns))))
 				})
 			} else {
 				// k8s (patched)
@@ -165,7 +165,7 @@ var _ = When("create default rhdh", func() {
 				})
 
 				By("not updating the baseUrls in the default app-config CM", func() {
-					g.Expect(appConfigCm).To(HaveAppConfigBaseUrl("http://localhost:7007"))
+					g.Expect(appConfigCm).To(HaveAppConfigBaseUrl(BeEmpty()))
 				})
 			}
 

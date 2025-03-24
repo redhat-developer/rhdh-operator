@@ -2,7 +2,6 @@ package integration_tests
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -41,14 +40,16 @@ var _ = When("create default backstage", func() {
 	for _, tt := range []struct {
 		name                   string
 		desiredRoute           bsv1.Route
-		expectedBaseUrlPattern string
+		expectedBaseUrlMatcher func() any
 	}{
 		{
 			name: "route disabled",
 			desiredRoute: bsv1.Route{
 				Enabled: ptr.To(false),
 			},
-			expectedBaseUrlPattern: "",
+			expectedBaseUrlMatcher: func() any {
+				return BeEmpty()
+			},
 		},
 		{
 			name: "route with subdomain",
@@ -57,14 +58,19 @@ var _ = When("create default backstage", func() {
 				//Enabled:   ptr.To(true),
 				Subdomain: "test",
 			},
-			expectedBaseUrlPattern: fmt.Sprintf("https://test.+"),
+			expectedBaseUrlMatcher: func() any {
+				return MatchRegexp("^https://test.+")
+			},
 		},
 		{
 			name: "route with host",
 			desiredRoute: bsv1.Route{
-				Host: "host.example.com",
+				Host:      "host.example.com",
+				Subdomain: "test",
 			},
-			expectedBaseUrlPattern: "https://host.example.com",
+			expectedBaseUrlMatcher: func() any {
+				return "https://host.example.com"
+			},
 		},
 	} {
 		tt := tt
@@ -105,7 +111,7 @@ var _ = When("create default backstage", func() {
 				var appConfigCm corev1.ConfigMap
 				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(appConfigCm).To(HaveAppConfigBaseUrl(tt.expectedBaseUrlPattern))
+				g.Expect(appConfigCm).To(HaveAppConfigBaseUrl(tt.expectedBaseUrlMatcher()))
 			}, 5*time.Minute, time.Second).Should(Succeed())
 
 		})
