@@ -15,6 +15,12 @@ IS_OPENSHIFT=""
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
 NAMESPACE_OPERATOR="rhdh-operator"
 OLM_CHANNEL="fast"
+INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
+FILTERED_VERSIONS=(1.4 1.5)
+
+# assume mikefarah version of yq is already available on the path; if 1, then install the version shown
+INSTALL_YQ=0 
+YQ_VERSION=v4.45.1
 
 function logf() {
   set -euo pipefail
@@ -55,6 +61,7 @@ function check_tool() {
 }
 
 function usage() {
+  FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS[*]}"
   echo "
 This script streamlines the installation of the Red Hat Developer Hub Operator in a disconnected OpenShift or Kubernetes cluster.
 It supports partially disconnected as well as fully disconnected environments.
@@ -67,11 +74,11 @@ Usage:
   $0 [OPTIONS]
 
 Options:
-  --index-image <operator-index-image>   : Operator index image (default: registry.redhat.io/redhat/redhat-operator-index:v4.17)
+  --index-image <operator-index-image>   : Operator index image (default: $INDEX_IMAGE)
   --ci-index <true|false>                : Indicates that the index image is a CI build. Unsupported.
                                             Setting this to 'true' causes the script to replace all references to the internal RH registries
                                             with quay.io when mirroring images. Relevant only if '--use-oc-mirror' is 'false'. Default: false
-  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: 1.3,1.4).
+  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: $FILTERED_VERSIONS_CSV).
                                             Specify '*' to disable version filtering and include all channels and all versions.
                                             Useful for CI index images for example.
   --to-registry <registry_url>           : Mirror the images into the specified registry, assuming you are already logged into it.
@@ -98,6 +105,7 @@ Options:
                                             planes (like HyperShift or Red Hat OpenShift on IBM Cloud).
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
+  --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
 
 Examples:
 
@@ -127,7 +135,6 @@ Examples:
 "
 }
 
-INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.17"
 OPERATOR_NAME="rhdh-operator"
 IS_CI_INDEX_IMAGE="false"
 
@@ -135,7 +142,6 @@ TO_REGISTRY=""
 INSTALL_OPERATOR="true"
 TO_DIR=""
 FROM_DIR=""
-FILTERED_VERSIONS=(1.3 1.4)
 EXTRA_IMAGES=()
 USE_OC_MIRROR="false"
 OC_MIRROR_PATH="oc-mirror"
@@ -146,7 +152,7 @@ RELATED_IMAGES=()
 
 # example usage:
 # ./prepare-restricted-environment.sh \
-# [ --filter-versions "1.3,1.4" ]
+# [ --filter-versions "1.a,1.b" ]
 # --from-dir /path/to/dir (to support mirroring from a bastion host)
 # --to-dir /path/to/dir (to support exporting images to a dir, which can be transferred to the bastion host)
 # --to-registry "$MY_MIRROR_REGISTRY" (either this or to-dir needs to specified, both can be specified)
@@ -195,6 +201,7 @@ while [[ "$#" -gt 0 ]]; do
     '--use-oc-mirror') USE_OC_MIRROR="$2"; shift 1;;
     '--oc-mirror-path') OC_MIRROR_PATH="$2"; shift 1;;
     '--oc-mirror-flags') OC_MIRROR_FLAGS="$2"; shift 1;;
+    '--install-yq') INSTALL_YQ=1;;
     '-h'|'--help') usage; exit 0;;
     *) errorf "Unknown parameter is used: $1."; usage; exit 1;;
   esac
@@ -291,6 +298,15 @@ fi
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
+if [[ $INSTALL_YQ ]]; then
+  YQ=$HOME/.local/bin/yq_mf
+  YQ_BINARY=yq_linux_amd64
+  curl -sSLo- https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}.tar.gz | tar xz && mv -f ${YQ_BINARY} "${YQ}"
+  debugf "mikefarah yq $YQ_VERSION installed to $YQ"
+else
+  YQ=$(which yq)
+fi
+
 function merge_registry_auth() {
   set -euo pipefail
 
@@ -332,7 +348,7 @@ function merge_registry_auth() {
   sed -i '$ s/,$//' "$tmpFile"
   echo '}}' >> "$tmpFile"
   debugf "yq filter: $(cat "$tmpFile")"
-  yq -o=json "$(cat "$tmpFile")" "${currentRegistryAuthFile}" > "${REGISTRY_AUTH_FILE}"
+  "$YQ" -o=json "$(cat "$tmpFile")" "${currentRegistryAuthFile}" > "${REGISTRY_AUTH_FILE}"
 }
 
 function ocp_prepare_internal_registry() {
@@ -434,7 +450,7 @@ function render_index() {
     debugf "bundleFilterList=$bundleFilterList"
 
     opm render "${INDEX_IMAGE}" --output=yaml | \
-      yq 'select(
+      "$YQ" 'select(
           (.schema == "olm.package" and .name == "'${prod_operator_package_name}'")
           or
           (.schema == "olm.channel" and .package == "'${prod_operator_package_name}'" and .name == "fast")
@@ -442,7 +458,7 @@ function render_index() {
           '"$chanFilterList"'
           or
           '"$bundleFilterList"'
-        )' | yq '.entries |= map(select('"$chanEntriesFilterList"'))' \
+        )' | "$YQ" '.entries |= map(select('"$chanEntriesFilterList"'))' \
         > "${local_index_file}"
   fi
 
@@ -584,7 +600,7 @@ function process_bundles() {
       for file in "./bundles/${digest}/unpacked/rootfs/manifests"/*; do
         if [[ "$file" == *.clusterserviceversion.yaml || "$file" == *.csv.yaml ]]; then
           debugf "\t Adding imagePullSecrets to the CSV file so we can pull from private registries"
-          yq eval '
+          "$YQ" eval '
             (.spec.install.spec.deployments[] | select(.name == "rhdh-operator").spec.template.spec) +=
               {"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}
           ' -i "$file"
@@ -596,7 +612,7 @@ function process_bundles() {
             all_related_images+=($images)
           fi
           # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
-          related_images=$(yq '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
+          related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
           if [[ -n "$related_images" ]]; then
             all_related_images+=($related_images)
           fi
@@ -703,7 +719,7 @@ function process_bundles_from_dir() {
           all_related_images+=($images)
         fi
         # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
-        related_images=$(yq '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
+        related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
         if [[ -n "$related_images" ]]; then
           all_related_images+=($related_images)
         fi
@@ -952,9 +968,9 @@ EOF
     if [[ -n "${catalogSourceLocation}" ]]; then
       # Replace some metadata and add the default list of secrets
       debugf "catalogSource parent location: ${TMPDIR}/${catalogSourceLocation}"
-      yq -i '.metadata.name = "rhdh-catalog"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
-      yq -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
-      yq -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' \
+      "$YQ" -i '.metadata.name = "rhdh-catalog"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' \
         ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
       if [[ -n "${TO_REGISTRY}" ]]; then
         invoke_cluster_cli apply -f ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
