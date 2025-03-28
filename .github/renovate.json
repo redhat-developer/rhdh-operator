@@ -25,6 +25,12 @@
   ],
   "packageRules": [
     {
+      "matchBaseBranches": [
+        "release-1.3"
+      ],
+      "enabled": false
+    },
+    {
       "enabled": false,
       "groupName": "all minor dependencies",
       "groupSlug": "all-minor",
