@@ -61,7 +61,7 @@ function check_tool() {
 }
 
 function usage() {
-  FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS[*]}"
+  FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS[*]}"; FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS_CSV// /,}"
   echo "
 This script streamlines the installation of the Red Hat Developer Hub Operator in a disconnected OpenShift or Kubernetes cluster.
 It supports partially disconnected as well as fully disconnected environments.
