@@ -39,7 +39,7 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 		const managerPodLabel = "control-plane=controller-manager"
 		const crName = "my-backstage-app"
 
-		var defaultFromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "rhdh-operator-1.3.yaml")
+		var defaultFromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "rhdh-operator-1.4.yaml")
 		var fromDeploymentManifest string
 
 		BeforeEach(func() {
