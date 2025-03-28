@@ -18,6 +18,8 @@ type ExternalConfig struct {
 	ExtraEnvSecretKeys     map[string]DataObjectKeys
 	ExtraPvcKeys           []string
 
+	OpenShiftIngressDomain string
+
 	WatchingHash string
 }
 

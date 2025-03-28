@@ -176,3 +176,140 @@ func TestEnabledRoute(t *testing.T) {
 	assert.NotNil(t, model.route)
 
 }
+
+func Test_buildOpenShiftBaseUrl(t *testing.T) {
+	type args struct {
+		model     *BackstageModel
+		backstage bsv1.Backstage
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "should not return anything on a non-OpenShift platform",
+			args: args{
+				model: &BackstageModel{
+					isOpenshift: false,
+				},
+			},
+			want: "",
+		},
+		{
+			name: "should not return anything if route is disabled in the CR",
+			args: args{
+				model: &BackstageModel{
+					isOpenshift: true,
+				},
+				backstage: bsv1.Backstage{
+					Spec: bsv1.BackstageSpec{
+						Application: &bsv1.Application{
+							Route: &bsv1.Route{
+								Enabled: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "should not return anything if there is no cluster ingress domain set",
+			args: args{
+				model: &BackstageModel{
+					isOpenshift: true,
+				},
+				backstage: bsv1.Backstage{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-backstage",
+						Namespace: "my-ns",
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "should return the default route domain if no route spec",
+			args: args{
+				model: &BackstageModel{
+					isOpenshift: true,
+					ExternalConfig: ExternalConfig{
+						OpenShiftIngressDomain: "my-ocp-apps.example.com",
+					},
+				},
+				backstage: bsv1.Backstage{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-backstage",
+						Namespace: "my-ns",
+					},
+				},
+			},
+			want: "https://backstage-my-backstage-my-ns.my-ocp-apps.example.com",
+		},
+		{
+			name: "should return the route with the sub-domain if set in the route spec",
+			args: args{
+				model: &BackstageModel{
+					isOpenshift: true,
+					ExternalConfig: ExternalConfig{
+						OpenShiftIngressDomain: "my-ocp-apps.example.com",
+					},
+				},
+				backstage: bsv1.Backstage{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-backstage",
+						Namespace: "my-ns",
+					},
+					Spec: bsv1.BackstageSpec{
+						Application: &bsv1.Application{
+							Route: &bsv1.Route{
+								Enabled:   ptr.To(true),
+								Subdomain: "my-backstage.subdomain",
+							},
+						},
+					},
+				},
+			},
+			want: "https://my-backstage.subdomain.my-ocp-apps.example.com",
+		},
+		{
+			name: "should return the route host if set in the route spec even with a subdomain",
+			args: args{
+				model: &BackstageModel{
+					isOpenshift: true,
+					ExternalConfig: ExternalConfig{
+						OpenShiftIngressDomain: "my-ocp-apps.example.com",
+					},
+				},
+				backstage: bsv1.Backstage{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-backstage",
+						Namespace: "my-ns",
+					},
+					Spec: bsv1.BackstageSpec{
+						Application: &bsv1.Application{
+							Route: &bsv1.Route{
+								Enabled:   ptr.To(true),
+								Host:      "my-awesome-backstage.idp.example.com",
+								Subdomain: "my-backstage.subdomain",
+							},
+						},
+					},
+				},
+			},
+			want: "https://my-awesome-backstage.idp.example.com",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(
+				t,
+				tt.want,
+				buildOpenShiftBaseUrl(tt.args.model, tt.args.backstage),
+				"buildOpenShiftBaseUrl(%v, %v)",
+				tt.args.model, tt.args.backstage,
+			)
+		})
+	}
+}

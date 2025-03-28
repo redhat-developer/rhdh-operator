@@ -37,6 +37,13 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	ns := backstage.Namespace
 
 	result := model.NewExternalConfig()
+	if r.IsOpenShift {
+		domain, err := utils.GetOCPIngressDomain(r.Client)
+		if err != nil {
+			return result, err
+		}
+		result.OpenShiftIngressDomain = domain
+	}
 
 	hashingData := []byte{}
 	var err error

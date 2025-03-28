@@ -2,6 +2,7 @@ package integration_tests
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -44,9 +45,12 @@ var _ = When("create default rhdh", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.ServiceName(backstageName)}, serv)
 			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
 
-			//By("creating /opt/app-root/src/dynamic-plugins.xml ")
-			appConfig := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DynamicPluginsDefaultName(backstageName)}, appConfig)
+			dpCm := &corev1.ConfigMap{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DynamicPluginsDefaultName(backstageName)}, dpCm)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			var appConfigCm corev1.ConfigMap
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			g.Expect(deploy.Spec.Template.Spec.InitContainers).To(HaveLen(1))
@@ -140,17 +144,29 @@ var _ = When("create default rhdh", func() {
 				g.Expect(found).To(BeTrue())
 			}
 
-			// check the platform patch for security context
 			if isOpenshiftCluster() {
 				// no patch, so default
-				g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
-				g.Expect(ss.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
-				g.Expect(serv.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+				By("not applying any platform-specific patches", func() {
+					g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
+					g.Expect(ss.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
+					g.Expect(serv.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+				})
+
+				By("updating the baseUrls in the default app-config CM (RHIDP-6192)", func() {
+					g.Expect(appConfigCm).To(
+						HaveAppConfigBaseUrl(MatchRegexp(fmt.Sprintf(`^https://%s-%s.+`, model.RouteName(backstageName), ns))))
+				})
 			} else {
 				// k8s (patched)
-				g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(Not(BeNil()))
-				g.Expect(ss.Spec.Template.Spec.SecurityContext.FSGroup).To(Not(BeNil()))
-				g.Expect(serv.Spec.Type).To(Equal(corev1.ServiceTypeNodePort))
+				By("applying k8s-specific patches for security context", func() {
+					g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(Not(BeNil()))
+					g.Expect(ss.Spec.Template.Spec.SecurityContext.FSGroup).To(Not(BeNil()))
+					g.Expect(serv.Spec.Type).To(Equal(corev1.ServiceTypeNodePort))
+				})
+
+				By("not updating the baseUrls in the default app-config CM", func() {
+					g.Expect(appConfigCm).To(HaveAppConfigBaseUrl(BeEmpty()))
+				})
 			}
 
 		}, 10*time.Second, time.Second).Should(Succeed())
