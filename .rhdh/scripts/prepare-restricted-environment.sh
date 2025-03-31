@@ -11,6 +11,7 @@ SCRIPT_PATH=$(realpath "$0")
 NC='\033[0m'
 
 IS_OPENSHIFT=""
+IS_HOSTED_CONTROL_PLANE=""
 
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
 NAMESPACE_OPERATOR="rhdh-operator"
@@ -217,8 +218,22 @@ function is_openshift() {
 function detect_ocp_and_set_env_var() {
   set -euo pipefail
 
-  if [[ "${IS_OPENSHIFT}" = "" ]]; then
+  if [[ -z "${IS_OPENSHIFT}" ]]; then
     IS_OPENSHIFT=$(is_openshift && echo 'true' || echo 'false')
+    debugf "IS_OPENSHIFT: ${IS_OPENSHIFT}"
+  fi
+  if [[ "${IS_OPENSHIFT}" == "true" ]] && [[ -z "${IS_HOSTED_CONTROL_PLANE}" ]]; then
+    local cpTech
+    cpTech=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
+      (warnf 'Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
+    if [[ "${cpTech}" == "External" ]]; then
+      # 'External' indicates that the control plane is hosted externally to the cluster
+      # and that its components are not visible within the cluster.
+      IS_HOSTED_CONTROL_PLANE="true"
+    else
+      IS_HOSTED_CONTROL_PLANE="false"
+    fi
+    debugf "IS_HOSTED_CONTROL_PLANE: ${IS_HOSTED_CONTROL_PLANE}"
   fi
 }
 
