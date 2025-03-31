@@ -103,7 +103,7 @@ spec:
     url: https://access.redhat.com/node/7025299
   - name: Support Policies
     url: https://access.redhat.com/policy/developerhub-support-policy
-  - name: RHDH Operator (Upstream)
+  - name: Sources
     url: https://github.com/redhat-developer/rhdh-operator
   maintainers:
   - email: rhdh-notifications@redhat.com
