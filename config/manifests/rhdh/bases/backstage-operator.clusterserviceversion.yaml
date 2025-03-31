@@ -99,10 +99,12 @@ spec:
     url: https://developers.redhat.com/products/developer-hub/overview/
   - name: Documentation
     url: https://access.redhat.com/documentation/en-us/red_hat_developer_hub
-  - name: Backstage Operator (Upstream)
+  - name: Life Cycle
+    url: https://access.redhat.com/node/7025299
+  - name: Support Policies
+    url: https://access.redhat.com/policy/developerhub-support-policy
+  - name: Sources
     url: https://github.com/redhat-developer/rhdh-operator
-  - name: RHDH Operator (Downstream)
-    url: https://gitlab.cee.redhat.com/rhidp/rhdh/
   maintainers:
   - email: rhdh-notifications@redhat.com
     name: Red Hat Developer Hub Team
