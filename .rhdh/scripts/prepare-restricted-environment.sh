@@ -1123,9 +1123,12 @@ EOF
 EOF
     done
 
-    # Create the IDMS (OCP-specific) and CatalogSource
-    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-       invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+    # Create the IDMS (OCP-specific) and CatalogSource.
+    # IDMS resources never really worked on clusters with hosted control planes, and it looks like it is no longer
+    # possible to create them in ROSA/HyperShift 4.18. So skipping the IDMS creation for such clusters.
+    # More details in https://issues.redhat.com/browse/RHIDP-6684
+    if [[ "${IS_OPENSHIFT}" == "true" ]] && [[ "${IS_HOSTED_CONTROL_PLANE}" != "true" ]]; then
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     fi
     debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
     invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
