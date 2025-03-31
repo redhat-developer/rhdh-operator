@@ -1151,7 +1151,9 @@ EOF
   fi
 fi
 
-if [[ -n "${TO_REGISTRY}" && "${IS_OPENSHIFT}" = "true" ]]; then
+# No longer possible to patch the OperatorHub resource on clusters with hosted control planes (ROSA 4.18).
+# More details in https://issues.redhat.com/browse/OCPBUGS-43431?focusedId=26463911&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-26463911
+if [[ -n "${TO_REGISTRY}" ]] && [[ "${IS_OPENSHIFT}" == "true" ]] && [[ "${IS_HOSTED_CONTROL_PLANE}" != "true" ]]; then
   infof "Disabling the default Red Hat Ecosystem Catalog."
   invoke_cluster_cli patch OperatorHub cluster --type json \
       --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
