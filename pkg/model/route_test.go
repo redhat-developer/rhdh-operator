@@ -1,10 +1,13 @@
 package model
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
 	openshift "github.com/openshift/api/route/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"k8s.io/utils/ptr"
 
@@ -177,7 +180,7 @@ func TestEnabledRoute(t *testing.T) {
 
 }
 
-func Test_buildOpenShiftBaseUrl(t *testing.T) {
+func Test_buildBaseUrl(t *testing.T) {
 	type args struct {
 		model     *BackstageModel
 		backstage bsv1.Backstage
@@ -306,10 +309,146 @@ func Test_buildOpenShiftBaseUrl(t *testing.T) {
 			assert.Equalf(
 				t,
 				tt.want,
-				buildOpenShiftBaseUrl(tt.args.model, tt.args.backstage),
+				buildBaseUrl(tt.args.model, tt.args.backstage),
 				"buildOpenShiftBaseUrl(%v, %v)",
 				tt.args.model, tt.args.backstage,
 			)
+		})
+	}
+}
+
+func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
+	type args struct {
+		model     *BackstageModel
+		backstage bsv1.Backstage
+	}
+	tests := []struct {
+		name     string
+		args     args
+		assertFn func(t *testing.T, res map[string]map[string]any)
+	}{
+		{
+			name: "default app config ConfigMap not initialized",
+			args: args{
+				model: &BackstageModel{},
+			},
+			assertFn: func(t *testing.T, res map[string]map[string]any) {
+				assert.Empty(t, res)
+			},
+		},
+		{
+			name: "empty data in default app config ConfigMap",
+			args: args{
+				model: &BackstageModel{
+					ExternalConfig: ExternalConfig{
+						OpenShiftIngressDomain: "my-ocp-apps.example.com",
+					},
+					appConfig: &AppConfig{
+						ConfigMap: &corev1.ConfigMap{
+							Data: map[string]string{
+								"my-default-app-config.yaml": "",
+							},
+						},
+					},
+				},
+				backstage: bsv1.Backstage{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-backstage-app",
+						Namespace: "my-ns",
+					},
+				},
+			},
+			assertFn: func(t *testing.T, res map[string]map[string]any) {
+				const expected = "https://backstage-my-backstage-app-my-ns.my-ocp-apps.example.com"
+				assert.Len(t, res, 1)
+				v := res["my-default-app-config.yaml"]
+				assert.NotNil(t, v)
+				assert.Equal(t, expected, v["app"].(map[string]any)["baseUrl"].(string))
+				assert.Equal(t, expected, v["backend"].(map[string]any)["baseUrl"].(string))
+				assert.Equal(t, expected, v["backend"].(map[string]any)["cors"].(map[string]any)["origin"].(string))
+			},
+		},
+		{
+			name: "multi-file default app-config ConfigMap with other fields defined",
+			args: args{
+				model: &BackstageModel{
+					ExternalConfig: ExternalConfig{
+						OpenShiftIngressDomain: "my-ocp-apps.example.com",
+					},
+					appConfig: &AppConfig{
+						ConfigMap: &corev1.ConfigMap{
+							Data: map[string]string{
+								"my-default-app-config-1.yaml": `---
+app:
+  title: "My Awesome App"
+plugin1:
+  config1: [val1, val2]
+---
+`,
+								"my-default-app-config-2.yaml": `backend:
+  baseUrl: https://app.example.com
+  auth:
+    # TODO: once plugins have been migrated we can remove this, but right now it
+    # is require for the backend-next to work in this repo
+    dangerouslyDisableDefaultAuthPolicy: true
+  cors:
+    origin: http://localhost:3000
+    credentials: true
+
+organization:
+  name: My Company
+    
+`,
+							},
+						},
+					},
+				},
+				backstage: bsv1.Backstage{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-backstage-app",
+						Namespace: "my-ns",
+					},
+				},
+			},
+			assertFn: func(t *testing.T, res map[string]map[string]any) {
+				const expected = "https://backstage-my-backstage-app-my-ns.my-ocp-apps.example.com"
+				assert.Len(t, res, 2)
+				for _, v := range res {
+					assert.NotNil(t, v)
+					assert.Equal(t, expected, v["app"].(map[string]any)["baseUrl"].(string))
+					assert.Equal(t, expected, v["backend"].(map[string]any)["baseUrl"].(string))
+					assert.Equal(t, expected, v["backend"].(map[string]any)["cors"].(map[string]any)["origin"].(string))
+				}
+
+				//The other fields defined in the default app-config should still be present
+				assert.Equal(t, "My Awesome App",
+					res["my-default-app-config-1.yaml"]["app"].(map[string]any)["title"].(string))
+				assert.NotNil(t, res["my-default-app-config-1.yaml"]["plugin1"].(map[string]any))
+
+				assert.Equal(t, "My Company",
+					res["my-default-app-config-2.yaml"]["organization"].(map[string]any)["name"].(string))
+				assert.True(t,
+					res["my-default-app-config-2.yaml"]["backend"].(map[string]any)["auth"].(map[string]any)["dangerouslyDisableDefaultAuthPolicy"].(bool))
+				assert.True(t,
+					res["my-default-app-config-2.yaml"]["backend"].(map[string]any)["cors"].(map[string]any)["credentials"].(bool))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := &BackstageRoute{}
+			b.updateAppConfigWithBaseUrls(tt.args.model, tt.args.backstage)
+			updatedAppConfigMaps := make(map[string]map[string]any)
+			if tt.args.model.appConfig != nil && tt.args.model.appConfig.ConfigMap != nil {
+				for k, v := range tt.args.model.appConfig.ConfigMap.Data {
+					var appConfig map[string]any
+					err := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(v)), 1000).Decode(&appConfig)
+					assert.NoError(t, err)
+					updatedAppConfigMaps[k] = appConfig
+				}
+			}
+			tt.assertFn(t, updatedAppConfigMaps)
 		})
 	}
 }
