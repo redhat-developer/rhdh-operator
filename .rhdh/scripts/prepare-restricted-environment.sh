@@ -11,6 +11,7 @@ SCRIPT_PATH=$(realpath "$0")
 NC='\033[0m'
 
 IS_OPENSHIFT=""
+IS_HOSTED_CONTROL_PLANE=""
 
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
 NAMESPACE_OPERATOR="rhdh-operator"
@@ -217,8 +218,22 @@ function is_openshift() {
 function detect_ocp_and_set_env_var() {
   set -euo pipefail
 
-  if [[ "${IS_OPENSHIFT}" = "" ]]; then
+  if [[ -z "${IS_OPENSHIFT}" ]]; then
     IS_OPENSHIFT=$(is_openshift && echo 'true' || echo 'false')
+    debugf "IS_OPENSHIFT: ${IS_OPENSHIFT}"
+  fi
+  if [[ "${IS_OPENSHIFT}" == "true" ]] && [[ -z "${IS_HOSTED_CONTROL_PLANE}" ]]; then
+    local cpTech
+    cpTech=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
+      (warnf 'Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
+    if [[ "${cpTech}" == "External" ]]; then
+      # 'External' indicates that the control plane is hosted externally to the cluster
+      # and that its components are not visible within the cluster.
+      IS_HOSTED_CONTROL_PLANE="true"
+    else
+      IS_HOSTED_CONTROL_PLANE="false"
+    fi
+    debugf "IS_HOSTED_CONTROL_PLANE: ${IS_HOSTED_CONTROL_PLANE}"
   fi
 }
 
@@ -1124,16 +1139,21 @@ EOF
 EOF
     done
 
-    # Create the IDMS (OCP-specific) and CatalogSource
-    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-       invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+    # Create the IDMS (OCP-specific) and CatalogSource.
+    # IDMS resources never really worked on clusters with hosted control planes, and it looks like it is no longer
+    # possible to create them in ROSA/HyperShift 4.18. So skipping the IDMS creation for such clusters.
+    # More details in https://issues.redhat.com/browse/RHIDP-6684
+    if [[ "${IS_OPENSHIFT}" == "true" ]] && [[ "${IS_HOSTED_CONTROL_PLANE}" != "true" ]]; then
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     fi
     debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
     invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
   fi
 fi
 
-if [[ -n "${TO_REGISTRY}" && "${IS_OPENSHIFT}" = "true" ]]; then
+# No longer possible to patch the OperatorHub resource on clusters with hosted control planes (ROSA 4.18).
+# More details in https://issues.redhat.com/browse/OCPBUGS-43431?focusedId=26463911&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-26463911
+if [[ -n "${TO_REGISTRY}" ]] && [[ "${IS_OPENSHIFT}" == "true" ]] && [[ "${IS_HOSTED_CONTROL_PLANE}" != "true" ]]; then
   infof "Disabling the default Red Hat Ecosystem Catalog."
   invoke_cluster_cli patch OperatorHub cluster --type json \
       --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
