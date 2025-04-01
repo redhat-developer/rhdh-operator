@@ -2009,7 +2009,7 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh/rhdh-hub-rhel9:next
-        image: quay.io/rhdh/rhdh-rhel9-operator:1.6
+        image: quay.io/rhdh/rhdh-rhel9-operator:1.7
         livenessProbe:
           httpGet:
             path: /healthz
