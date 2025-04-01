@@ -8,6 +8,12 @@ import (
 	"sort"
 	"strconv"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"golang.org/x/exp/maps"
@@ -38,7 +44,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 
 	result := model.NewExternalConfig()
 	if r.IsOpenShift {
-		domain, err := utils.GetOCPIngressDomain(r.Client)
+		domain, err := r.getOCPIngressDomain()
 		if err != nil {
 			return result, err
 		}
@@ -264,4 +270,36 @@ func concatData(original []byte, obj client.Object) []byte {
 	}
 
 	return data
+}
+
+// getOCPIngressDomain returns the OpenShift Ingress domain
+func (r *BackstageReconciler) getOCPIngressDomain() (string, error) {
+	var u unstructured.Unstructured
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "config.openshift.io",
+		Kind:    "Ingress",
+		Version: "v1",
+	})
+
+	err := r.Client.Get(context.Background(), client.ObjectKey{
+		Name:      "cluster",
+		Namespace: "",
+	}, &u)
+	if err != nil {
+		if k8serrors.IsNotFound(err) || meta.IsNoMatchError(err) {
+			klog.V(1).Info("no cluster ingress config found")
+			return "", nil
+		}
+		return "", err
+	}
+
+	d, ok, err := unstructured.NestedString(u.Object, "spec", "domain")
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		klog.V(1).Info("spec.domain in Ingress cluster config not found")
+		return "", nil
+	}
+	return d, nil
 }
