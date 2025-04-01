@@ -4,10 +4,8 @@ import (
 	"path/filepath"
 
 	"golang.org/x/exp/maps"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -71,6 +69,7 @@ func (b *AppConfig) EmptyObject() client.Object {
 // implementation of RuntimeObject interface
 func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	if b.ConfigMap != nil {
+		model.appConfig = b
 		model.setRuntimeObject(b)
 		return true, nil
 	}
@@ -78,7 +77,7 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
 	updatePodWithAppConfig(m.backstageDeployment, m.backstageDeployment.container(), b.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
 	return nil
 }
@@ -88,7 +87,7 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 	setMetaInfo(b.ConfigMap, backstage, scheme)
 }
 
-// updatePodWithAppConfig contrubutes to Volumes, container.VolumeMounts and contaiter.Args
+// updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args
 func updatePodWithAppConfig(bsd *BackstageDeployment, container *corev1.Container, cmName, mountPath, key string, withSubPath bool, cmData []string) {
 	bsd.mountFilesFrom([]string{container.Name}, ConfigMapObjectKind,
 		cmName, mountPath, key, withSubPath, cmData)
