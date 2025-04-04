@@ -503,8 +503,15 @@ define go-install-tool
 set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
-GOBIN=$(LOCALBIN) go install $${package} ;\
-mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
+GOBIN=$(LOCALBIN)/tmp go install $${package} ;\
+files=$$(ls $(LOCALBIN)/tmp | wc -l); \
+if [ "$$files" -ne 1 ]; then \
+	echo "Expected exactly one file in $(LOCALBIN)/tmp, found $$files"; \
+	ls -a "$(LOCALBIN)"/tmp ;\
+	exit 1; \
+fi; \
+echo "Moving $(LOCALBIN)/tmp/*" => $(1) ;\
+mv -f "$(LOCALBIN)"/tmp/* $(1) ;\
 }
 endef
 
