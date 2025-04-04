@@ -61,7 +61,12 @@ jobs:
       - name: Run Controller
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
-        run: make install run &
+        run: |
+          # Need to 'make install' first, so that the necessary tool binaries (like controller-gen) can be downloaded locally.
+          # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
+          # but the `make test` command tries to use it.
+          make manifests generate fmt vet install
+          make run &
 
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
