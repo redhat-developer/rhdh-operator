@@ -15,8 +15,10 @@ jobs:
         from_version:
           - 1.4
           - 1.5
+          - 1.6
         to_branch:
           - main
+          - release-1.6
           - release-1.5
           - release-1.4
         exclude:
@@ -27,6 +29,13 @@ jobs:
             to_branch: release-1.4
           - from_version: 1.5
             to_branch: release-1.5
+
+          - from_version: 1.6
+            to_branch: release-1.4
+          - from_version: 1.6
+            to_branch: release-1.5
+          - from_version: 1.6
+            to_branch: release-1.6
 
     name: 'E2E Upgrade: ${{ matrix.from_version }} => ${{ matrix.to_branch }}'
     concurrency:
@@ -66,11 +75,22 @@ jobs:
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
 
+      - name: Determine if the starting operator can be installed from the repo
+        run: |
+          FROM_VERSION=${{ matrix.from_version }}
+          MAJOR=$(echo $FROM_VERSION | cut -d. -f1)
+          MINOR=$(echo $FROM_VERSION | cut -d. -f2)
+          START_VERSION_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${FROM_VERSION}.yaml"
+          if [[ $MAJOR -ge 1 && $MINOR -ge 6 ]]; then
+            START_VERSION_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/release-${FROM_VERSION}/dist/rhdh/install.yaml"
+          fi
+          echo "START_VERSION_MANIFEST=${START_VERSION_MANIFEST}" >> $GITHUB_ENV
+
       - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_version }} => ${{ matrix.to_branch }})'
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
           PROFILE: 'rhdh'
-          START_VERSION_MANIFEST: '${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${{ matrix.from_version }}.yaml'
+          START_VERSION_MANIFEST: ${{ env.START_VERSION_MANIFEST }}
           IMG: ${{ env.OPERATOR_IMAGE }}
         run: make test-e2e-upgrade

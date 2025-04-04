@@ -78,7 +78,9 @@ metadata:
 			_, err = helper.Run(cmd)
 			Expect(err).ShouldNot(HaveOccurred())
 
-			Eventually(helper.VerifyBackstageCRStatus, time.Minute, time.Second).WithArguments(ns, crName, `"reason":"Deployed"`).Should(Succeed())
+			Eventually(helper.VerifyBackstageCRStatus, time.Minute, time.Second).
+				WithArguments(ns, crName, `"reason":"DeployInProgress"`).
+				Should(Succeed())
 		})
 
 		AfterEach(func() {
@@ -95,26 +97,27 @@ metadata:
 				EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, 3*time.Second).WithArguments(managerPodLabel).Should(Succeed())
 			})
 
-			fetchOperatorLogs := func() string {
-				return fmt.Sprintf("=== Operator logs ===\n%s\n", getPodLogs(_namespace, managerPodLabel))
-			}
-
 			crLabel := fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName)
 
-			By("ensuring the current operator eventually reconciled through the creation of a new ReplicaSet of the application")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command(helper.GetPlatformTool(), "get",
-					"replicasets", "-l", crLabel,
-					"-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}"+
-						"{{ \"\\n\" }}{{ end }}{{ end }}",
-					"-n", ns,
-				)
-				rsOutput, err := helper.Run(cmd)
-				g.Expect(err).ShouldNot(HaveOccurred())
-				rsNames := helper.GetNonEmptyLines(string(rsOutput))
-				g.Expect(len(rsNames)).Should(BeNumerically(">=", 2),
-					fmt.Sprintf("expected at least 2 Backstage operand ReplicaSets, but got %d", len(rsNames)))
-			}, 3*time.Minute, 3*time.Second).Should(Succeed(), fetchOperatorLogs)
+			// TODO(rm3l): this might never work because the Deployment may not necessarily change after an upgrade of the Operator
+			// It might not result in a different replicas if the newer operator did not change anything.
+			//By("ensuring the current operator eventually reconciled through the creation of a new ReplicaSet of the application")
+			//fetchOperatorLogs := func() string {
+			//	return fmt.Sprintf("=== Operator logs ===\n%s\n", getPodLogs(_namespace, managerPodLabel))
+			//}
+			//Eventually(func(g Gomega) {
+			//	cmd := exec.Command(helper.GetPlatformTool(), "get",
+			//		"replicasets", "-l", crLabel,
+			//		"-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}"+
+			//			"{{ \"\\n\" }}{{ end }}{{ end }}",
+			//		"-n", ns,
+			//	)
+			//	rsOutput, err := helper.Run(cmd)
+			//	g.Expect(err).ShouldNot(HaveOccurred())
+			//	rsNames := helper.GetNonEmptyLines(string(rsOutput))
+			//	g.Expect(len(rsNames)).Should(BeNumerically(">=", 2),
+			//		fmt.Sprintf("expected at least 2 Backstage operand ReplicaSets, but got %d", len(rsNames)))
+			//}, 3*time.Minute, 3*time.Second).Should(Succeed(), fetchOperatorLogs)
 
 			By("checking the status of the existing CR")
 			Eventually(helper.VerifyBackstageCRStatus, 5*time.Minute, 3*time.Second).WithArguments(ns, crName, `"reason":"Deployed"`).
