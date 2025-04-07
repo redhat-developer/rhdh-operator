@@ -302,4 +302,4 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 0.4.3
+  version: 0.4.4
