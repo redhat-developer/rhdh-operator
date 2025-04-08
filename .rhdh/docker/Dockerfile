@@ -16,19 +16,15 @@ ENV GOPATH=/go/
 
 ENV EXTERNAL_SOURCE=.
 ENV CONTAINER_SOURCE=/opt/app-root/src
-WORKDIR /workspace
+WORKDIR $CONTAINER_SOURCE
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-COPY $EXTERNAL_SOURCE/go.mod ./go.mod
-COPY $EXTERNAL_SOURCE/go.sum ./go.sum
+COPY $EXTERNAL_SOURCE/go.mod $CONTAINER_SOURCE/go.mod
+COPY $EXTERNAL_SOURCE/go.sum $CONTAINER_SOURCE/go.sum
 RUN go mod download
 
-COPY $EXTERNAL_SOURCE/api/ ./api/
-COPY $EXTERNAL_SOURCE/cmd/ ./cmd/
-COPY $EXTERNAL_SOURCE/config/ ./config/
-COPY $EXTERNAL_SOURCE/internal/ ./internal/
-COPY $EXTERNAL_SOURCE/pkg/ ./pkg/
+COPY $EXTERNAL_SOURCE $CONTAINER_SOURCE
 
 # Build
 # hadolint ignore=SC3010
@@ -58,7 +54,7 @@ RUN microdnf install -y openssl; microdnf clean -y all
 # RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
 COPY $EXTERNAL_SOURCE/LICENSE /licenses/
 
-ENV CONTAINER_SOURCE=/workspace
+ENV CONTAINER_SOURCE=/opt/app-root/src
 
 ENV HOME=/ \
     USER_NAME=backstage \
@@ -74,4 +70,3 @@ USER ${USER_UID}
 WORKDIR ${HOME}
 
 ENTRYPOINT ["/manager"]
-
