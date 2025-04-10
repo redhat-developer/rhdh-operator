@@ -3,8 +3,15 @@ kind: Backstage
 metadata:
   name: my-rhdh
 spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: backstage-backend
+                image: quay.io/rhdh/rhdh-hub-rhel9:latest
   application:
-    image: quay.io/rhdh/rhdh-hub-rhel9:latest
     appConfig:
       configMaps:
         - name: app-config-rhdh
