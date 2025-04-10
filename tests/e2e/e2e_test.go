@@ -264,6 +264,16 @@ subjects:
 				crFilePath: filepath.Join("examples", "bs-existing-secret.yaml"),
 				crName:     "bs-existing-secret",
 			},
+			{
+				name:       "extra file mounts",
+				crFilePath: filepath.Join("examples", "filemounts.yaml"),
+				crName:     "my-rhdh-file-mounts",
+			},
+			{
+				name:       "raw-runtime-config",
+				crFilePath: filepath.Join("examples", "raw-runtime-config.yaml"),
+				crName:     "bs-raw-runtime-config",
+			},
 		} {
 			tt := tt
 			When(fmt.Sprintf("applying %s (%s)", tt.name, tt.crFilePath), func() {
