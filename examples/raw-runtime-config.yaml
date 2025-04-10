@@ -1,0 +1,66 @@
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: bs-raw-runtime-config
+spec:
+  rawRuntimeConfig:
+    backstageConfig: raw-runtime-config
+  database:
+    enableLocalDb: false
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: raw-runtime-config
+data:
+  app-config.yaml: |-
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: my-backstage-config-cm1 # placeholder for <bs>-default-appconfig
+    data:
+      my.app-config.yaml: |
+        backend:
+          database:
+            client: better-sqlite3
+            connection: ':memory:'
+          auth:
+            externalAccess:
+              - type: legacy
+                options:
+                  subject: legacy-default-config
+                  # This is a default value, which you should change by providing your own app-config
+                  secret: "pl4s3Ch4ng3M3"
+        auth:
+          providers: {}
+  service.yaml: |-
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: backstage # placeholder for 'backstage-<cr-name>'
+      annotations:
+        my.custom-ann1: val1
+    spec:
+      type: ClusterIP
+      selector:
+        rhdh.redhat.com/app:  # placeholder for 'backstage-<cr-name>'
+      ports:
+        - name: http-backend
+          port: 80
+          targetPort: backend
+        #- name: http-metrics
+        #  protocol: TCP
+        #  port: 9464
+        #  targetPort: 9464
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: some-secrets
+type: Opaque
+stringData:
+  MY_SUPER_SECRET_1: "some value" # notsecret
+
+---
