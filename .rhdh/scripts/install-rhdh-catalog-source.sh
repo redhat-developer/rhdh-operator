@@ -838,6 +838,13 @@ metadata:
   namespace: ${NAMESPACE_SUBSCRIPTION}
 "
 
+# RHIDP-6408: The `spec.name` field in the Subscription has to be `rhdh`, which is the name of the package in the Catalog Source.
+# If a CatalogSource is specified ($UPSTREAM_IIB_OVERRIDE), we may want to install a different operator.
+# See https://issues.redhat.com/browse/RHIDP-6408
+OPERATOR_NAME_IN_CS="rhdh"
+if [ -n "$UPSTREAM_IIB_OVERRIDE" ]; then
+  OPERATOR_NAME_IN_CS="${OPERATOR_NAME_TO_INSTALL}"
+fi
 SUBSCRIPTION_MANIFEST="
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -847,7 +854,7 @@ metadata:
 spec:
   channel: $OLM_CHANNEL
   installPlanApproval: ${INSTALL_PLAN_APPROVAL}
-  name: ${OPERATOR_NAME_TO_INSTALL}
+  name: ${OPERATOR_NAME_IN_CS}
   source: ${CATALOGSOURCE_NAME}
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 "
