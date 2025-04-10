@@ -12,34 +12,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        from_version:
-          - 1.4
-          - 1.5
-          - 1.6
+        from_branch:
+          - release-1.4
+          - release-1.5
+          - release-1.6
         to_branch:
           - main
           - release-1.6
           - release-1.5
           - release-1.4
         exclude:
-          - from_version: 1.4
+          - from_branch: release-1.4
             to_branch: release-1.4
 
-          - from_version: 1.5
+          - from_branch: release-1.5
             to_branch: release-1.4
-          - from_version: 1.5
+          - from_branch: release-1.5
             to_branch: release-1.5
 
-          - from_version: 1.6
+          - from_branch: release-1.6
             to_branch: release-1.4
-          - from_version: 1.6
+          - from_branch: release-1.6
             to_branch: release-1.5
-          - from_version: 1.6
+          - from_branch: release-1.6
             to_branch: release-1.6
 
-    name: 'E2E Upgrade: ${{ matrix.from_version }} => ${{ matrix.to_branch }}'
+    name: 'E2E Upgrade: ${{ matrix.from_branch }} => ${{ matrix.to_branch }}'
     concurrency:
-      group: '${{ github.workflow }}-${{ matrix.to_branch }}-${{ matrix.from_version }}'
+      group: '${{ github.workflow }}-${{ matrix.from_branch }}-${{ matrix.to_branch }}'
       cancel-in-progress: true
     env:
       CONTAINER_ENGINE: podman
@@ -48,49 +48,73 @@ jobs:
         with:
           fetch-depth: 0
 
-      - if: ${{ matrix.to_branch != 'main' }}
-        name: Checkout ${{ matrix.to_branch }} branch
-        run: git switch ${{ matrix.to_branch }}
-
       - name: Setup Go
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
           go-version-file: 'go.mod'
 
-      - name: Determine built operator image
+      - name: Set env vars
         run: |
-          echo "OPERATOR_IMAGE=$(make show-img)" >> $GITHUB_ENV
+          distLocation="dist/rhdh/install.yaml"
 
-      - name: Check if image exists in remote registry
+          from_branch=${{ matrix.from_branch }}
+          FROM_OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
+          proto="file://"
+          if [[ "${from_branch}" != "main" ]]; then
+            version="${from_branch#release-}"
+            major=$(echo $version | cut -d. -f1)
+            minor=$(echo $version | cut -d. -f2)
+            FROM_OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
+            # TODO(rm3l): remove this once 1.6 is the minimal supported version
+            if [[ $major -ge 1 && $minor -ge 6 ]]; then
+              FROM_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${from_branch}/${distLocation}"
+              proto=""
+            fi
+          fi
+          echo "FROM_OPERATOR_MANIFEST=${FROM_OPERATOR_MANIFEST}" >> $GITHUB_ENV
+          FROM_OPERATOR_IMAGE=$(curl -s "${proto}${FROM_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          echo "FROM_OPERATOR_IMAGE=${FROM_OPERATOR_IMAGE}" >> $GITHUB_ENV
+
+          to_branch=${{ matrix.to_branch }}
+          TO_OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
+          proto="file://"
+          if [[ "${to_branch}" != "main" ]]; then
+            version="${to_branch#release-}"
+            major=$(echo $version | cut -d. -f1)
+            minor=$(echo $version | cut -d. -f2)
+            TO_OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
+            # TODO(rm3l): remove this once 1.6 is the minimal supported version
+            if [[ $major -ge 1 && $minor -ge 6 ]]; then
+              TO_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${to_branch}/${distLocation}"
+              proto=""
+            fi
+          fi
+          echo "TO_OPERATOR_MANIFEST=${TO_OPERATOR_MANIFEST}" >> $GITHUB_ENV
+          TO_OPERATOR_IMAGE=$(curl -s "${proto}${TO_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          echo "TO_OPERATOR_IMAGE=${TO_OPERATOR_IMAGE}" >> $GITHUB_ENV
+
+      - name: Check if operator images exist in remote registry
         id: operator-image-existence-checker
         run: |
-          echo "OPERATOR_IMAGE_EXISTS=$(if skopeo inspect "docker://${{ env.OPERATOR_IMAGE }}" > /dev/null; then echo "true"; else echo "false"; fi)" >> $GITHUB_OUTPUT
+          echo "FROM_OPERATOR_IMAGE_EXISTS=$(skopeo inspect "docker://${{ env.FROM_OPERATOR_IMAGE }}" > /dev/null && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "TO_OPERATOR_IMAGE_EXISTS=$(skopeo inspect "docker://${{ env.TO_OPERATOR_IMAGE }}" > /dev/null && echo "true" || echo "false")" >> $GITHUB_OUTPUT
 
-      - name: Display warning if image was not found
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'false' }}
+      - name: Display warning if any of the operator images were not found
+        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'false' || steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'false' }}
         run: |
-          echo "::warning ::Target image ${{ env.OPERATOR_IMAGE }} not found for testing the ${{ matrix.to_branch }} branch. It might have expired. E2E tests will be skipped for ${{ matrix.to_branch }}."
+          echo "::warning ::One of the operator images (${{ env.FROM_OPERATOR_IMAGE }} or ${{ env.TO_OPERATOR_IMAGE }}) could not be found for testing the ${{ matrix.from_branch }} => ${{ matrix.to_branch }} upgrade path. They might have expired. Skipping."
 
       - name: Start Minikube
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
 
-      - name: Determine if the starting operator can be installed from the repo
-        run: |
-          FROM_VERSION=${{ matrix.from_version }}
-          MAJOR=$(echo $FROM_VERSION | cut -d. -f1)
-          MINOR=$(echo $FROM_VERSION | cut -d. -f2)
-          START_VERSION_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${FROM_VERSION}.yaml"
-          if [[ $MAJOR -ge 1 && $MINOR -ge 6 ]]; then
-            START_VERSION_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/release-${FROM_VERSION}/dist/rhdh/install.yaml"
-          fi
-          echo "START_VERSION_MANIFEST=${START_VERSION_MANIFEST}" >> $GITHUB_ENV
-
-      - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_version }} => ${{ matrix.to_branch }})'
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+      - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_branch }} => ${{ matrix.to_branch }})'
+        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
           PROFILE: 'rhdh'
-          START_VERSION_MANIFEST: ${{ env.START_VERSION_MANIFEST }}
-          IMG: ${{ env.OPERATOR_IMAGE }}
+          FROM_OPERATOR_MANIFEST: ${{ env.FROM_OPERATOR_MANIFEST }}
+          TO_OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
+          OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
+          IMG: ${{ env.TO_OPERATOR_IMAGE }}
         run: make test-e2e-upgrade
