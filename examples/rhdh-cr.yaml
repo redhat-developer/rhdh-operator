@@ -27,13 +27,22 @@ metadata:
   name: app-config-rhdh
 data:
   "app-config-rhdh.yaml": |
+    app:
+      title: My Awesome RHDH
+      # As of 0.6 (RHDH 1.6), this is not needed on OCP by default, but needed on other platforms
+    #  baseUrl: https://my-rhdh-example.com
     backend:
+      # As of 0.6 (RHDH 1.6), this is not needed on OCP by default, but needed on other platforms
+      #  baseUrl: https://my-rhdh-example.com
       auth:
         externalAccess:
             - type: legacy
               options:
                 subject: legacy-default-config
                 secret: "${BACKEND_SECRET}"
+      #cors:
+      #  # As of 0.6 (RHDH 1.6), this is not needed on OCP by default, but needed on other platforms
+      #  origin: https://my-rhdh-example.com
     auth:
       # see https://backstage.io/docs/auth/ to learn about auth providers
       environment: development
@@ -80,3 +89,5 @@ data:
                     # supports ISO duration, "human duration (used below)
                     timeout: { minutes: 3}
                     initialDelay: { seconds: 15}
+
+---
