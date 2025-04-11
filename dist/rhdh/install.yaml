@@ -1362,6 +1362,12 @@ rules:
   - update
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+- apiGroups:
   - rhdh.redhat.com
   resources:
   - backstages
@@ -1782,6 +1788,7 @@ data:
                   type: RuntimeDefault
                 runAsNonRoot: true
                 allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
               startupProbe:
                 # This gives enough time upon container startup before the liveness and readiness probes are triggered.
                 # Giving (120s = initialDelaySeconds + failureThreshold * periodSeconds) to account for the worst case scenario.
@@ -2002,7 +2009,7 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh/rhdh-hub-rhel9:next
-        image: quay.io/rhdh/rhdh-rhel9-operator:1.6
+        image: quay.io/rhdh/rhdh-rhel9-operator:1.7
         livenessProbe:
           httpGet:
             path: /healthz

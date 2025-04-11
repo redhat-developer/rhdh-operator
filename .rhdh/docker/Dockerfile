@@ -2,7 +2,7 @@
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.5-1742197705@sha256:564c50dbad93a50dfe1439b295f021dae0bdc8c2aef3ad8be7b2a4dde52f0e2f AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:9.5-1744294473@sha256:8a9e1465ae487fa2b4a94d2baa249a8d59fb3d7e6884a7b22c783f494f4cfb01 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # hadolint ignore=DL3002
@@ -16,19 +16,15 @@ ENV GOPATH=/go/
 
 ENV EXTERNAL_SOURCE=.
 ENV CONTAINER_SOURCE=/opt/app-root/src
-WORKDIR /workspace
+WORKDIR $CONTAINER_SOURCE
 
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-COPY $EXTERNAL_SOURCE/go.mod ./go.mod
-COPY $EXTERNAL_SOURCE/go.sum ./go.sum
+COPY $EXTERNAL_SOURCE/go.mod $CONTAINER_SOURCE/go.mod
+COPY $EXTERNAL_SOURCE/go.sum $CONTAINER_SOURCE/go.sum
 RUN go mod download
 
-COPY $EXTERNAL_SOURCE/api/ ./api/
-COPY $EXTERNAL_SOURCE/cmd/ ./cmd/
-COPY $EXTERNAL_SOURCE/config/ ./config/
-COPY $EXTERNAL_SOURCE/internal/ ./internal/
-COPY $EXTERNAL_SOURCE/pkg/ ./pkg/
+COPY $EXTERNAL_SOURCE $CONTAINER_SOURCE
 
 # Build
 # hadolint ignore=SC3010
@@ -42,7 +38,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Install openssl for FIPS support
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
 # https://registry.access.redhat.com/ubi9/ubi-minimal
-FROM registry.access.redhat.com/ubi9-minimal:9.5-1741850109@sha256:bafd57451de2daa71ed301b277d49bd120b474ed438367f087eac0b885a668dc AS runtime
+FROM registry.access.redhat.com/ubi9-minimal:9.5-1742914212@sha256:ac61c96b93894b9169221e87718733354dd3765dd4a62b275893c7ff0d876869 AS runtime
 
 # Downstream uncomment
 RUN cat /cachi2/cachi2.env
@@ -58,7 +54,7 @@ RUN microdnf install -y openssl; microdnf clean -y all
 # RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
 COPY $EXTERNAL_SOURCE/LICENSE /licenses/
 
-ENV CONTAINER_SOURCE=/workspace
+ENV CONTAINER_SOURCE=/opt/app-root/src
 
 ENV HOME=/ \
     USER_NAME=backstage \
@@ -74,4 +70,3 @@ USER ${USER_UID}
 WORKDIR ${HOME}
 
 ENTRYPOINT ["/manager"]
-

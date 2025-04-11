@@ -98,13 +98,12 @@ func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus
 		fmt.Sprintf("backstage pod in %s status", status))
 }
 
-func VerifyBackstageCRStatus(g Gomega, ns string, crName string, expectedStatus string) {
+func VerifyBackstageCRStatus(g Gomega, ns string, crName string, statusMatcher types.GomegaMatcher) {
 	cmd := exec.Command(GetPlatformTool(), "get", "backstage", crName, "-o", "jsonpath={.status.conditions}", "-n", ns) // #nosec G204
 	status, err := Run(cmd)
 	fmt.Fprintln(GinkgoWriter, string(status))
 	g.Expect(err).ShouldNot(HaveOccurred())
-	g.Expect(string(status)).Should(ContainSubstring(expectedStatus),
-		fmt.Sprintf("status condition with type %s should be set", expectedStatus))
+	g.Expect(string(status)).Should(statusMatcher)
 }
 
 func PatchBackstageCR(ns string, crName string, jsonPatch string, patchType string) error {

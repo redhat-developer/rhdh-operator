@@ -21,7 +21,7 @@ jobs:
       # check changes in this commit for regex include and exclude matches
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@2f7c5bfce28377bc069a65ba478de0a74aa0ca32 # v46.0.1
+        uses: tj-actions/changed-files@ed68ef82c095e0d48ec87eccea555d944a631a4c # v46.0.5
         with:
           files: |
             .github/workflows/pr.yaml
@@ -61,7 +61,12 @@ jobs:
       - name: Run Controller
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
-        run: make install run &
+        run: |
+          # Need to 'make install' first, so that the necessary tool binaries (like controller-gen) can be downloaded locally.
+          # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
+          # but the `make test` command tries to use it.
+          make manifests generate fmt vet install
+          make run &
 
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
@@ -83,7 +88,7 @@ jobs:
         run: make gosec
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@5f8171a638ada777af81d42b55959a643bb29017 # v3
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: gosec.sarif

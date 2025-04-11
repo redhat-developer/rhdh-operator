@@ -52,7 +52,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 			By("not creating a kube-rbac-proxy sidecar", func() {
 				Eventually(func(g Gomega) {
 					cmd := exec.Command(helper.GetPlatformTool(), "get",
-						"pods", "-l", "control-plane=controller-manager",
+						"pods", "-l", "app=rhdh-operator",
 						"-o", "jsonpath={.items[*].spec.containers[*].name}",
 						"-n", _namespace,
 					)
@@ -68,7 +68,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 			var metricsServiceName string
 			Eventually(func(g Gomega) {
 				cmd := exec.Command(helper.GetPlatformTool(), "get", "services",
-					"-l", "control-plane=controller-manager",
+					"-l", "app=rhdh-operator",
 					"-l", "app.kubernetes.io/component=metrics",
 					"-o", "jsonpath={.items[*].metadata.name}",
 					"-n", _namespace,
@@ -264,28 +264,41 @@ subjects:
 				crFilePath: filepath.Join("examples", "bs-existing-secret.yaml"),
 				crName:     "bs-existing-secret",
 			},
+			{
+				name:       "extra file mounts",
+				crFilePath: filepath.Join("examples", "filemounts.yaml"),
+				crName:     "my-rhdh-file-mounts",
+			},
+			{
+				name:       "raw-runtime-config",
+				crFilePath: filepath.Join("examples", "raw-runtime-config.yaml"),
+				crName:     "bs-raw-runtime-config",
+			},
 		} {
 			tt := tt
 			When(fmt.Sprintf("applying %s (%s)", tt.name, tt.crFilePath), func() {
 				var crPath string
+				var crLabel string
 				BeforeEach(func() {
 					crPath = filepath.Join(projectDir, tt.crFilePath)
 					cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", crPath, "-n", ns)
 					_, err := helper.Run(cmd)
 					Expect(err).ShouldNot(HaveOccurred())
+					crLabel = fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", tt.crName)
 				})
 
 				It("should handle CR as expected", func() {
 					By("validating that the status of the custom resource created is updated or not", func() {
-						Eventually(helper.VerifyBackstageCRStatus, time.Minute, time.Second).
-							WithArguments(ns, tt.crName, "Deployed").
-							Should(Succeed())
+						// [{"lastTransitionTime":"2025-04-09T09:02:06Z","message":"","reason":"Deployed","status":"True","type":"Deployed"}]
+						Eventually(helper.VerifyBackstageCRStatus, time.Minute, 10*time.Second).
+							WithArguments(ns, tt.crName, ContainSubstring(`"type":"Deployed"`)).
+							Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
 					})
 
 					By("validating that pod(s) status.phase=Running", func() {
-						Eventually(helper.VerifyBackstagePodStatus, 7*time.Minute, time.Second).
+						Eventually(helper.VerifyBackstagePodStatus, 10*time.Minute, 10*time.Second).
 							WithArguments(ns, tt.crName, "Running").
-							Should(Succeed())
+							Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
 					})
 
 					if helper.IsOpenShift() {
@@ -295,11 +308,13 @@ subjects:
 									exists, err := helper.DoesBackstageRouteExist(ns, tt.crName)
 									g.Expect(err).ShouldNot(HaveOccurred())
 									g.Expect(exists).Should(BeTrue())
-								}, 15*time.Second, time.Second).WithArguments(tt.crName).ShouldNot(Succeed())
+								}, 15*time.Second, time.Second).
+									WithArguments(tt.crName).
+									ShouldNot(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
 							})
 						} else {
 							By("ensuring the route is reachable", func() {
-								ensureRouteIsReachable(ns, tt.crName, tt.additionalApiEndpointTests)
+								ensureRouteIsReachable(ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
 							})
 						}
 					} else {
@@ -346,7 +361,7 @@ spec:
 							By("ensuring the application is fully reachable", func() {
 								Eventually(helper.VerifyBackstageAppAccess, 8*time.Minute, time.Second).
 									WithArguments(fmt.Sprintf("http://%s", ingressHost), tt.additionalApiEndpointTests).
-									Should(Succeed())
+									Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
 							})
 						}
 					}
@@ -371,7 +386,7 @@ spec:
 					if helper.IsOpenShift() {
 						if isRouteEnabledNow {
 							By("ensuring the route is reachable", func() {
-								ensureRouteIsReachable(ns, tt.crName, tt.additionalApiEndpointTests)
+								ensureRouteIsReachable(ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
 							})
 						} else {
 							By("ensuring route no longer exists eventually", func() {
@@ -405,8 +420,8 @@ spec:
 	})
 })
 
-func ensureRouteIsReachable(ns string, crName string, additionalApiEndpointTests []helper.ApiEndpointTest) {
+func ensureRouteIsReachable(ns string, crName string, crLabel string, additionalApiEndpointTests []helper.ApiEndpointTest) {
 	Eventually(helper.VerifyBackstageRoute, 5*time.Minute, time.Second).
 		WithArguments(ns, crName, additionalApiEndpointTests).
-		Should(Succeed())
+		Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
 }

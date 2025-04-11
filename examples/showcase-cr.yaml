@@ -1,7 +1,0 @@
-apiVersion: rhdh.redhat.com/v1alpha3
-kind: Backstage
-metadata:
-  name: bs-showcase
-spec:
-  rawRuntimeConfig:
-    backstageConfig: showcase-config
