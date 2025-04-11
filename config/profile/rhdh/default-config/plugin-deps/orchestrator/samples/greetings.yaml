@@ -1,0 +1,130 @@
+apiVersion: v1
+data:
+  greeting.sw.input-schema.json: |
+    {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "language": {
+          "title": "Language",
+          "description": "Language to greet",
+          "type": "string",
+          "enum": ["English", "Spanish"],
+          "default": "English"
+        }
+      }
+    }
+  workflow-output-schema.json: |-
+    {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "WorkflowResult",
+      "description": "Schema of workflow output",
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "../shared/schemas/workflow-result-schema.json",
+          "type": "object"
+        }
+      }
+    }
+kind: ConfigMap
+metadata:
+  name: 01-greeting-resources-schemas
+---
+apiVersion: sonataflow.org/v1alpha08
+kind: SonataFlow
+metadata:
+  annotations:
+    sonataflow.org/description: YAML based greeting workflow
+    sonataflow.org/expressionLang: jq
+    sonataflow.org/profile: gitops
+    sonataflow.org/version: "1.0"
+  labels:
+    app: greeting
+    sonataflow.org/workflow-app: greeting
+  name: greeting
+spec:
+  flow:
+    annotations:
+      - workflow-type/infrastructure
+    dataInputSchema:
+      failOnValidationErrors: true
+      schema: schemas/greeting.sw.input-schema.json
+    functions:
+      - name: greetFunction
+        operation: sysout
+        type: custom
+      - name: successResult
+        operation: '{ "result": { "message": "Greeting workflow completed successfully", "outputs":[ { "key":"Selected language", "value": .language }, { "key":"Greeting message", "value": .greeting } ] } }'
+        type: expression
+    start:
+      stateName: ChooseOnLanguage
+    states:
+      - dataConditions:
+          - condition: .language  == "English"
+            transition:
+              nextState: GreetInEnglish
+          - condition: .language  == "Spanish"
+            transition:
+              nextState: GreetInSpanish
+        defaultCondition:
+          transition:
+            nextState: GreetInEnglish
+        name: ChooseOnLanguage
+        type: switch
+      - data:
+          greeting: Hello from YAML Workflow
+        name: GreetInEnglish
+        transition:
+          nextState: GreetPerson
+        type: inject
+      - data:
+          greeting: Saludos desde YAML Workflow
+        name: GreetInSpanish
+        transition:
+          nextState: GreetPerson
+        type: inject
+      - actionMode: sequential
+        actions:
+          - actionDataFilter:
+              useResults: true
+            functionRef:
+              arguments:
+                message: .greeting
+              invoke: sync
+              refName: greetFunction
+            name: greetAction
+          - actionDataFilter:
+              useResults: true
+            functionRef:
+              invoke: sync
+              refName: successResult
+            name: setOutput
+        end:
+          terminate: true
+        name: GreetPerson
+        type: operation
+  podTemplate:
+    container:
+      resources: {}
+      image: quay.io/orchestrator/serverless-workflow-greeting:96d772297d3ee964ab9775d7aae7dbbd4f070dd7
+  resources:
+    configMaps:
+      - configMap:
+          name: 01-greeting-resources-schemas
+        workflowPath: schemas
+  persistence:
+    postgresql:
+      secretRef:
+        name: backstage-psql-secret-bs1 # hardcoded backstage-psql-secret-{{cr-name}}
+        userKey: POSTGRES_USER #hardcoded
+        passwordKey: POSTGRES_PASSWORD #hardcoded
+      serviceRef:
+        name: backstage-psql-bs1 # hardcoded backstage-psql-{{cr-name}}
+        namespace: backstage # hardcoded {{cr-namespace}}
+        databaseName: backstage_plugin_orchestrator #hardcoded
+        port: 5432
+        databaseSchema: greeting
+status:
+  address: {}
+
