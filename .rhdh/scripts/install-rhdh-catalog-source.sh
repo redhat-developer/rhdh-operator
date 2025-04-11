@@ -759,6 +759,25 @@ else
   DISPLAY_NAME_SUFFIX="${IIB_NAME}"
 fi
 
+OPERATOR_GROUP_NAME="${OPERATOR_NAME_TO_INSTALL}-operator-group"
+
+if [ -n "$TO_INSTALL" ]; then
+  # OLM allows a single OperatorGroup per namespace.
+  # Err out early if there are existing OperatorGroups in the Operator namespace.
+  existing_ogs=$(invoke_cluster_cli get operatorgroup -n "${NAMESPACE_SUBSCRIPTION}" --no-headers -o custom-columns=":metadata.name" || true)
+  filtered=$(echo "$existing_ogs" | grep -v "^${OPERATOR_GROUP_NAME}$" || true)
+  debugf "filtered=$filtered"
+  if [[ -n "$filtered" ]]; then
+    errorf "
+Only one OperatorGroup is allowed per namespace. The following were found in '${NAMESPACE_SUBSCRIPTION}':
+---
+${filtered}
+---
+Please remove them so that I can create/update the one I am expecting: '${OPERATOR_GROUP_NAME}'"
+    exit 1
+  fi
+fi
+
 # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
 # might be restricted in CI environments.
 export REGISTRY_AUTH_FILE="${TMPDIR}/.auth.json"
@@ -834,7 +853,7 @@ OPERATOR_GROUP_MANIFEST="
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: ${OPERATOR_NAME_TO_INSTALL}-operator-group
+  name: ${OPERATOR_GROUP_NAME}
   namespace: ${NAMESPACE_SUBSCRIPTION}
 "
 
