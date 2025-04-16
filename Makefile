@@ -162,13 +162,13 @@ fmt: goimports ## Format the code using goimports
 .PHONY: test
 test: manifests generate fmt vet envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/operator/default-config/* $(LOCALBIN)/default-config
-	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps
+	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps 2>/dev/null || :
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/operator/default-config/* $(LOCALBIN)/default-config
-	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps
+	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps 2>/dev/null || :
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.

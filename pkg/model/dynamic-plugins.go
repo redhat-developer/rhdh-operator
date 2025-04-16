@@ -143,6 +143,9 @@ func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 }
 
 func (p *DynamicPlugins) Dependencies() []string {
+	if p.ConfigMap == nil {
+		return []string{}
+	}
 	data := p.ConfigMap.Data[EnabledPluginsDepsFile]
 	if data != "" {
 		return strings.Split(data, "\n")

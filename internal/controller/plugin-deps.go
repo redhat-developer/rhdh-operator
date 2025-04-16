@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/redhat-developer/rhdh-operator/pkg/model"
-	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
+	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
