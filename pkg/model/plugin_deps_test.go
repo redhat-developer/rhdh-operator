@@ -13,6 +13,13 @@ func TestReadPluginDeps(t *testing.T) {
 	dir := t.TempDir()
 
 	// Create subdirectories and files
+	// subdir1/
+	//  file0.yaml
+	//  file1.yaml
+	//  subdir11/  - second dir level to always ignore
+	//   file11.yaml
+	// subdir2/
+	//  file2.yaml
 	subdir1 := filepath.Join(dir, "subdir1")
 	subdir11 := filepath.Join(subdir1, "subdir11")
 	subdir2 := filepath.Join(dir, "subdir2")
@@ -23,29 +30,29 @@ func TestReadPluginDeps(t *testing.T) {
 	err = os.MkdirAll(subdir11, 0755)
 	assert.NoError(t, err)
 
-	file0 := filepath.Join(dir, "file0.yaml")
+	file0 := filepath.Join(subdir1, "file0.yaml")
 	file1 := filepath.Join(subdir1, "file1.yaml")
+	file11 := filepath.Join(subdir11, "file11.yaml")
 	file2 := filepath.Join(subdir2, "file2.yaml")
-	file11 := filepath.Join(subdir11, "file2.yaml")
 	err = os.WriteFile(file1, []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test1"), 0644)
 	assert.NoError(t, err)
 	err = os.WriteFile(file2, []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test2"), 0644)
 	assert.NoError(t, err)
 	err = os.WriteFile(file11, []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test11"), 0644)
 	assert.NoError(t, err)
-	err = os.WriteFile(file0, []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test11"), 0644)
+	err = os.WriteFile(file0, []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test0"), 0644)
 	assert.NoError(t, err)
 
-	// Call ReadPluginDeps
+	// Call ReadPluginDeps for subdir1
 	objects, err := ReadPluginDeps(dir, "", "", []string{"subdir1"})
 	assert.NoError(t, err)
 	assert.Len(t, objects, 2)
-	assert.Equal(t, "test1", objects[0].GetName())
-	assert.Equal(t, "test11", objects[1].GetName())
+	assert.Equal(t, "test0", objects[0].GetName())
+	assert.Equal(t, "test1", objects[1].GetName())
 
 	objects, err = ReadPluginDeps(dir, "", "", []string{""})
 	assert.NoError(t, err)
-	assert.Len(t, objects, 4)
+	assert.Len(t, objects, 0)
 }
 
 func TestReadPluginDepsSubstitutions(t *testing.T) {

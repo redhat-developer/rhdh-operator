@@ -30,6 +30,7 @@ import (
 
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
+const EnabledPluginsDepsFile = "plugin-dependencies"
 
 type DynamicPluginsFactory struct{}
 
