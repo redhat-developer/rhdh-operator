@@ -221,7 +221,7 @@ build: manifests generate fmt vet ## Build manager binary.
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	mkdir -p $(LOCALBIN)/default-config/ &&	rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/operator/default-config/* $(LOCALBIN)/default-config/
-	mkdir -p $(LOCALBIN)/plugin-deps/ &&	rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps/
+	mkdir -p $(LOCALBIN)/plugin-deps/ &&	rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps/ 2>/dev/null || :
 	go run -C $(LOCALBIN) ../cmd/main.go
 
 # by default images expire from quay registry after 14 days
