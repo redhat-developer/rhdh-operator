@@ -60,7 +60,8 @@ func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "expects exactly one Data key named 'dynamic-plugins.yaml'")
+	//assert.Contains(t, err.Error(), "expects exactly one Data key named 'dynamic-plugins.yaml'")
+	assert.Contains(t, err.Error(), "dynamic plugin configMap expects 'dynamic-plugins.yaml' and|or 'plugin-dependencies' Data keys")
 
 }
 
@@ -91,6 +92,8 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	//vol-default-dynamic-plugins
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 
+	assert.Equal(t, 0, len(model.DynamicPlugins.Dependencies()))
+
 }
 
 func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
@@ -120,6 +123,8 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 	//vol-dplugin
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("dplugin"), ic.VolumeMounts[3].Name)
+
+	assert.Equal(t, 0, len(model.DynamicPlugins.Dependencies()))
 }
 
 func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
@@ -150,6 +155,29 @@ func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
 			assert.Fail(t, "Model contains DynamicPlugins object")
 		}
 	}
+}
+
+func TestWithDynamicPluginsDeps(t *testing.T) {
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+
+	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
+		Data: map[string]string{DynamicPluginsFile: "tt", EnabledPluginsDepsFile: `dep1
+dep2`},
+	}
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+	assert.Equal(t, 2, len(model.DynamicPlugins.Dependencies()))
+
 }
 
 func initContainer(model *BackstageModel) *corev1.Container {

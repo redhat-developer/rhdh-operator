@@ -1,0 +1,124 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-knative-to-sonataflow-and-workflows # hardcoded
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              # Allow knative events to be delivered to workflows.
+              kubernetes.io/metadata.name: knative-eventing
+        - namespaceSelector:
+            matchLabels:
+              # Allow auxiliary knative function for workflow (such as m2k-save-transformation)
+              kubernetes.io/metadata.name: knative-serving
+---
+# NetworkPolicy to unblock incoming traffic to the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-communication # hardcoded
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              # Allow knative events to be delivered to workflows.
+              kubernetes.io/metadata.name: openshift-ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-network # hardcoded
+spec:
+  # Apply this policy to all pods in the namespace
+  podSelector: {}
+  # Specify policy type as 'Ingress' to control incoming traffic rules
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Allow ingress from any pod within the same namespace
+        - podSelector: {}
+---
+# NetworkPolicy to allow openshift-user-workload-monitoring pods to access all pods within the workflow's namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-to-sonataflow-and-workflows # hardcoded
+spec:
+  # Apply this policy to all pods in the namespace
+  podSelector: {}
+  # Specify policy type as 'Ingress' to control incoming traffic rules
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              # Allow openshift-user-workload-monitoring pods to access the workflow.
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring
+---
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeEventing
+metadata:
+  name: knative-eventing
+  namespace: knative-eventing
+spec:
+  Registry: {}
+---
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeServing
+metadata:
+  name: knative-serving
+  namespace: knative-serving
+spec:
+  controller-custom-certs:
+    name: ""
+    type: ""
+  registry: {}
+---
+apiVersion: sonataflow.org/v1alpha08
+kind: SonataFlowPlatform
+metadata:
+  name: sonataflow-platform  # hardcoded
+spec:
+  monitoring:
+    enabled: true
+  build:
+    template:
+      resources:
+        requests:
+          memory: 64Mi
+          cpu: 250m
+        limits:
+          memory: 1Gi
+          cpu: 500m
+  services:
+    dataIndex:
+      enabled: true
+      persistence:
+        postgresql:
+          secretRef:
+            name: backstage-psql-secret-{{backstage-name}} # hardcoded backstage-psql-secret-{{cr-name}}
+            userKey: POSTGRES_USER
+            passwordKey: POSTGRES_PASSWORD
+          serviceRef:
+            name: backstage-psql-{{backstage-name}} # hardcoded backstage-psql-{{cr-name}}
+            namespace: {{backstage-ns}} # hardcoded {{cr-namespace}}
+            databaseName: backstage_plugin_orchestrator #hardcoded
+    jobService:
+      enabled: true
+      persistence:
+        postgresql:
+          secretRef:
+            name: backstage-psql-secret-{{backstage-name}} # hardcoded backstage-psql-secret-{{cr-name}}
+            userKey: POSTGRES_USER
+            passwordKey: POSTGRES_PASSWORD
+          serviceRef:
+            name: backstage-psql-{{backstage-name}} # hardcoded backstage-psql-{{cr-name}}
+            namespace: {{backstage-ns}} # hardcoded {{cr-namespace}}
+            databaseName: backstage_plugin_orchestrator # hardcoded name of DB created by orchestrator plugin
