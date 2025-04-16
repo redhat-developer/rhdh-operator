@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rhdh-operator
+
+namePrefix: rhdh-
+
+resources:
+- ../../../crd
+- ../../../rbac
+- ../../../manager
+- namespace.yaml
+
+
+images:
+- name: controller
+  newName: quay.io/gazarenk/backstage-operator
+
+patches:
+- path: patches/deployment-patch.yaml
+  target:
+    kind: Deployment
+    name: operator
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - files:
+      - default-config/app-config.yaml
+      - default-config/db-secret.yaml
+      - default-config/db-service.yaml
+      - default-config/db-statefulset.yaml
+      - default-config/deployment.yaml
+      - default-config/dynamic-plugins.yaml
+      - default-config/route.yaml
+      - default-config/secret-envs.yaml
+      - default-config/service.yaml
+      - default-config/deployment.yaml.k8s
+      - default-config/db-statefulset.yaml.k8s
+      - default-config/service.yaml.k8s
+    name: default-config
+  - files:
+      - plugin-deps/orchestrator/sonataflow.yaml
+      - plugin-deps/orchestrator/sample-greetings.yaml
+    name: plugin-deps

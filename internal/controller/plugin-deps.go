@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
+	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -16,15 +16,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, bsNamespace string) error {
+func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, nsName types.NamespacedName, plugins model.DynamicPlugins) error {
 
 	lg := log.FromContext(ctx)
-	dir := filepath.Join(os.Getenv("LOCALBIN"), "default-config", "plugin-deps")
+	dir := filepath.Join(os.Getenv("LOCALBIN"), "plugin-deps")
 
-	// Read all YAML files from the directory
-	//objects, err := utils.ReadYamlFilesFromDir(dir)
-	objects, err := utils.ReadPluginDeps(dir)
-
+	objects, err := model.ReadPluginDeps(dir, nsName.Name, nsName.Namespace, plugins.Dependencies())
 	if err != nil {
 		return fmt.Errorf("failed to read YAML files: %w", err)
 	}
@@ -37,7 +34,7 @@ func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, bsNamespace s
 
 		// Set the namespace if not set
 		if obj.GetNamespace() == "" {
-			obj.SetNamespace(bsNamespace)
+			obj.SetNamespace(nsName.Namespace)
 		}
 
 		if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {

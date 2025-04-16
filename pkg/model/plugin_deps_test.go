@@ -1,4 +1,4 @@
-package utils
+package model
 
 import (
 	"os"
@@ -9,19 +9,14 @@ import (
 )
 
 func TestReadPluginDeps(t *testing.T) {
-	// Create a temporary directory
-	dir := t.TempDir()
 
-	// Create a mock "enabled" file
-	enabledContent := filepath.Clean("subdir1")
-	err := os.WriteFile(filepath.Join(dir, "enabled"), []byte(enabledContent), 0644)
-	assert.NoError(t, err)
+	dir := t.TempDir()
 
 	// Create subdirectories and files
 	subdir1 := filepath.Join(dir, "subdir1")
 	subdir11 := filepath.Join(subdir1, "subdir11")
 	subdir2 := filepath.Join(dir, "subdir2")
-	err = os.MkdirAll(subdir1, 0755)
+	err := os.MkdirAll(subdir1, 0755)
 	assert.NoError(t, err)
 	err = os.MkdirAll(subdir2, 0755)
 	assert.NoError(t, err)
@@ -42,35 +37,45 @@ func TestReadPluginDeps(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Call ReadPluginDeps
-	objects, err := ReadPluginDeps(dir)
+	objects, err := ReadPluginDeps(dir, "", "", []string{"subdir1"})
 	assert.NoError(t, err)
 	assert.Len(t, objects, 2)
 	assert.Equal(t, "test1", objects[0].GetName())
 	assert.Equal(t, "test11", objects[1].GetName())
 
-	enabledContent = filepath.Clean("")
-	err = os.WriteFile(filepath.Join(dir, "enabled"), []byte(enabledContent), 0644)
-	objects, err = ReadPluginDeps(dir)
+	objects, err = ReadPluginDeps(dir, "", "", []string{""})
 	assert.NoError(t, err)
 	assert.Len(t, objects, 4)
-
 }
 
-func TestReadEnabledDirs(t *testing.T) {
-	// Create a temporary file
+func TestReadPluginDepsSubstitutions(t *testing.T) {
+
 	dir := t.TempDir()
-	enabledFile := filepath.Join(dir, "enabled")
 
-	// Write content to the file
-	content := "subdir1\nsubdir2\n"
-	err := os.WriteFile(enabledFile, []byte(content), 0644)
+	// Create subdirectory and a YAML file with placeholders
+	subdir1 := filepath.Join(dir, "subdir1")
+	err := os.MkdirAll(subdir1, 0755)
 	assert.NoError(t, err)
 
-	// Call readEnabledDirs
-	enabledDirs, err := readEnabledDirs(enabledFile)
-	root := filepath.Dir(enabledFile)
+	file1 := filepath.Join(subdir1, "file1.yaml")
+	yamlContent := `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{backstage-name}}
+  namespace: {{backstage-ns}}
+`
+	err = os.WriteFile(file1, []byte(yamlContent), 0644)
 	assert.NoError(t, err)
-	assert.Len(t, enabledDirs, 2)
-	assert.Contains(t, enabledDirs, filepath.Join(root, "subdir1"))
-	assert.Contains(t, enabledDirs, filepath.Join(root, "subdir2"))
+
+	// Call ReadPluginDeps with substitution values
+	bsName := "test-name"
+	bsNamespace := "test-namespace"
+	objects, err := ReadPluginDeps(dir, bsName, bsNamespace, []string{"subdir1"})
+	assert.NoError(t, err)
+	assert.Len(t, objects, 1)
+
+	// Verify the substitutions
+	assert.Equal(t, "test-name", objects[0].GetName())
+	assert.Equal(t, "test-namespace", objects[0].GetNamespace())
 }

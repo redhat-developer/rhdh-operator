@@ -11,7 +11,7 @@ PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
-# To re-generate a bundle for another specific version without changing the standard setup, you can:
+# To re-generate a bundle for another specific version without changing the st:andard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 # Set a default VERSION if it is not defined
@@ -161,12 +161,14 @@ fmt: goimports ## Format the code using goimports
 
 .PHONY: test
 test: manifests generate fmt vet envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
+	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/operator/default-config/* $(LOCALBIN)/default-config
+	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
+	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/operator/default-config/* $(LOCALBIN)/default-config
+	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
@@ -218,9 +220,8 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
-	mkdir -p $(LOCALBIN)/default-config/
-	rm -fr $(LOCALBIN)/default-config/*
-	cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config/
+	mkdir -p $(LOCALBIN)/default-config/ &&	rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/operator/default-config/* $(LOCALBIN)/default-config/
+	mkdir -p $(LOCALBIN)/plugin-deps/ &&	rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/operator/plugin-deps/* $(LOCALBIN)/plugin-deps/
 	go run -C $(LOCALBIN) ../cmd/main.go
 
 # by default images expire from quay registry after 14 days

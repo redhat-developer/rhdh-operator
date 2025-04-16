@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"golang.org/x/exp/maps"
 
@@ -60,15 +61,19 @@ func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) e
 	}
 
 	dp := model.ExternalConfig.DynamicPlugins
-	if dp.Data == nil || len(dp.Data) != 1 || dp.Data[DynamicPluginsFile] == "" {
-		return fmt.Errorf("dynamic plugin configMap expects exactly one Data key named '%s' ", DynamicPluginsFile)
+
+	if dp.Data == nil || (dp.Data[DynamicPluginsFile] == "" && dp.Data[EnabledPluginsDepsFile] == "") {
+		return fmt.Errorf("dynamic plugin configMap expects '%s' and|or '%s' Data keys", DynamicPluginsFile, EnabledPluginsDepsFile)
 	}
 
-	model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
-		dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
+	if dp.Data[DynamicPluginsFile] != "" {
+		model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+			dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
+	}
+
+	model.DynamicPlugins.ConfigMap = &dp
 
 	return nil
-
 }
 
 // implementation of RuntimeObject interface
@@ -92,16 +97,25 @@ func (p *DynamicPlugins) EmptyObject() client.Object {
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 
-	if p.ConfigMap == nil || (backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "") {
-		return false, nil
+	if p.ConfigMap == nil {
+		if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+			p.ConfigMap = &corev1.ConfigMap{}
+		} else {
+			return false, nil
+		}
 	}
 	model.setRuntimeObject(p)
+	model.DynamicPlugins = p
 	return true, nil
 }
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backstage) error {
+func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
+
+	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+		return nil
+	}
 
 	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
@@ -126,6 +140,14 @@ func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backsta
 func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	p.ConfigMap.SetName(DynamicPluginsDefaultName(backstage.Name))
 	setMetaInfo(p.ConfigMap, backstage, scheme)
+}
+
+func (p *DynamicPlugins) Dependencies() []string {
+	data := p.ConfigMap.Data[EnabledPluginsDepsFile]
+	if data != "" {
+		return strings.Split(data, "\n")
+	}
+	return []string{}
 }
 
 // returns initContainer supposed to initialize DynamicPlugins

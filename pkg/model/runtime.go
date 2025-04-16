@@ -43,8 +43,9 @@ type BackstageModel struct {
 	LocalDbService     *DbService
 	LocalDbSecret      *DbSecret
 
-	route     *BackstageRoute
-	appConfig *AppConfig
+	route          *BackstageRoute
+	appConfig      *AppConfig
+	DynamicPlugins *DynamicPlugins
 
 	RuntimeObjects []RuntimeObject
 

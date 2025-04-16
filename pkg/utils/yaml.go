@@ -23,7 +23,7 @@ func ReadYamlFilesFromDir(dir string) ([]*unstructured.Unstructured, error) {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() || !isYamlFile(d.Name()) {
+		if d.IsDir() || !IsYamlFile(d.Name()) {
 			return nil
 		}
 
@@ -69,7 +69,28 @@ func ReadYamlFile(path string) ([]*unstructured.Unstructured, error) {
 	return objects, nil
 }
 
-func isYamlFile(filename string) bool {
+func ReadYamlContent(content string) ([]*unstructured.Unstructured, error) {
+	// Create a YAML decoder from the content
+	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(content)), 1000)
+	var objects []*unstructured.Unstructured
+
+	// Decode the content into unstructured objects
+	for {
+		obj := &unstructured.Unstructured{}
+		err := dec.Decode(obj)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("failed to decode YAML content: %w", err)
+		}
+		objects = append(objects, obj)
+	}
+
+	return objects, nil
+}
+
+func IsYamlFile(filename string) bool {
 	ext := filepath.Ext(filename)
 	return ext == ".yaml" || ext == ".yml"
 }

@@ -116,12 +116,12 @@ spec:
   persistence:
     postgresql:
       secretRef:
-        name: backstage-psql-secret-bs1 # hardcoded backstage-psql-secret-{{cr-name}}
+        name: backstage-psql-secret-{{backstage-name}}
         userKey: POSTGRES_USER #hardcoded
         passwordKey: POSTGRES_PASSWORD #hardcoded
       serviceRef:
-        name: backstage-psql-bs1 # hardcoded backstage-psql-{{cr-name}}
-        namespace: backstage # hardcoded {{cr-namespace}}
+        name: backstage-psql-{{backstage-name}} # hardcoded backstage-psql-{{cr-name}}
+        namespace: {{backstage-ns}} # hardcoded {{cr-namespace}}
         databaseName: backstage_plugin_orchestrator #hardcoded
         port: 5432
         databaseSchema: greeting

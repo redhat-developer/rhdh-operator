@@ -1,28 +1,27 @@
-package utils
+package model
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func ReadPluginDeps(rootDir string) ([]*unstructured.Unstructured, error) {
+const EnabledPluginsDepsFile = "plugin-dependencies"
 
-	if !DirectoryExists(rootDir) {
+// ReadPluginDeps reads the plugin dependencies from the specified directory
+// and returns a slice of unstructured.Unstructured objects.
+func ReadPluginDeps(rootDir, bsName, bsNamespace string, enabledDirs []string) ([]*unstructured.Unstructured, error) {
+
+	if !utils.DirectoryExists(rootDir) {
 		return []*unstructured.Unstructured{}, nil
 	}
 
 	var objects []*unstructured.Unstructured
-
-	// Read allowed directories from the "enabled" file
-	enabledDirs, err := readEnabledDirs(filepath.Join(rootDir, "enabled"))
-	if err != nil {
-		return nil, err
-	}
 
 	// Read the directory tree
 	files, err := processDepsTree(rootDir, enabledDirs)
@@ -32,10 +31,23 @@ func ReadPluginDeps(rootDir string) ([]*unstructured.Unstructured, error) {
 	}
 
 	for _, file := range files {
-		if !isYamlFile(file) {
+		if !utils.IsYamlFile(file) {
 			continue
 		}
-		objs, err := ReadYamlFile(file)
+
+		// Read file content
+		content, err := os.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read file %s: %w", file, err)
+		}
+
+		// Perform substitutions
+		modifiedContent := strings.ReplaceAll(string(content), "{{backstage-name}}", bsName)
+		modifiedContent = strings.ReplaceAll(modifiedContent, "{{backstage-ns}}", bsNamespace)
+
+		// Parse the modified content
+		objs, err := utils.ReadYamlContent(modifiedContent)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to read YAML file %s: %w", file, err)
 		}
@@ -49,7 +61,7 @@ func processDepsTree(root string, enabledDirs []string) ([]string, error) {
 	// Normalize and store allowed directories
 	enabledMap := make(map[string]bool)
 	for _, dir := range enabledDirs {
-		enabledMap[filepath.Clean(dir)] = true
+		enabledMap[filepath.Join(root, dir)] = true
 	}
 	files := []string{}
 
@@ -95,40 +107,4 @@ func isEnabled(path string, enabledMap map[string]bool) bool {
 		path = parent
 	}
 	return false
-}
-
-func readEnabledDirs(filePath string) ([]string, error) {
-	var enabledDirs []string
-
-	root := filepath.Dir(filePath)
-	// Open the file
-	file, err := os.Open(filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Ignore file not found error and return an empty list
-			return enabledDirs, nil
-		}
-		return nil, err
-	}
-	defer file.Close()
-
-	// Read the file line by line
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line != "" {
-			//fmt.Println("Adding enabled line:", line)
-			//fmt.Println("Adding enabled parent:", parent)
-			path := filepath.Join(root, line)
-			fmt.Println("Adding enabled directory:", path)
-			enabledDirs = append(enabledDirs, path)
-		}
-	}
-
-	// Check for scanner errors
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return enabledDirs, nil
 }
