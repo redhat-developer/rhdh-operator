@@ -26,33 +26,40 @@ metadata:
   name: default-dynamic-plugins
 data:
   plugin-dependencies: |
-  #  orchestrator
+#    orchestrator
   dynamic-plugins.yaml: |
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - disabled: true #false
-        integrity: sha512-2aOHDLFrGMAtyHFiyGZwVBZ9Op+TmKYUwfZxwoaGJ1s6JSy/0qgqineEEE0K3dn/f17XBUj+H1dwa5Al598Ugw==
-        package: https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/1.4.0/backstage-plugin-orchestrator-backend-dynamic-1.4.0.tgz
+      - disabled: false
+        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-1.5.1.tgz"
+        integrity: sha512-7VOe+XGTUzrdO/av0DNHbydOjB3Lo+XdCs6fj3JVODLP7Ypd3GXHf/nssYxG5ZYC9F1t9MNeguE2bZOB6ckqTA==  
+        pluginConfig:
+          dynamicPlugins:
+              frontend:
+                red-hat-developer-hub.backstage-plugin-orchestrator:
+                  appIcons:
+                    - importName: OrchestratorIcon
+                      module: OrchestratorPlugin
+                      name: orchestratorIcon
+                  dynamicRoutes:
+                    - importName: OrchestratorPage
+                      menuItem:
+                        icon: orchestratorIcon
+                        text: Orchestrator
+                      module: OrchestratorPlugin
+                      path: /orchestrator
+      - disabled: false
+        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-backend-dynamic-1.5.1.tgz"
+        integrity: sha512-VIenFStdq9QvvmgmEMG8O7b2wqIebvEcqNeJ9SWZ8jen9t+efTK6D3Rde74LQ1no1QaHLx8RoxNCOuTUEF8O/g==
         pluginConfig:
           orchestrator:
             dataIndexService:
               url: http://sonataflow-platform-data-index-service
-      - disabled: true #false
-        integrity: sha512-2yasbfBZ3iKntArIfK+hk9tvv4b/dy9+WKXOcWIotqkI1gv+Nhvy+m55KAUWi2vmfM0rj3EoG6YP+3Zajn1KyA==
-        package: https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/1.4.0/backstage-plugin-orchestrator-1.4.0.tgz
+      - disabled: false
+        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic-1.5.1.tgz"
+        integrity: sha512-bnVQjVsUZ470Vgm2kd5Lo/bVa2fF0q4GufBDc/8oTQsnP3zZJQqKFvFElBTCjY76RqkECydlvZ1UFybSzvockQ==
         pluginConfig:
-          dynamicPlugins:
-            frontend:
-              red-hat-developer-hub.backstage-plugin-orchestrator:
-                appIcons:
-                  - importName: OrchestratorIcon
-                    module: OrchestratorPlugin
-                    name: orchestratorIcon
-                dynamicRoutes:
-                  - importName: OrchestratorPage
-                    menuItem:
-                      icon: orchestratorIcon
-                      text: Orchestrator
-                    module: OrchestratorPlugin
-                    path: /orchestrator
+          orchestrator:
+            dataIndexService:
+              url: http://sonataflow-platform-data-index-service

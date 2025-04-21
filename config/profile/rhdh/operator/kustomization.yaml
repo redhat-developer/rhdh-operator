@@ -43,4 +43,4 @@ configMapGenerator:
   - files:
       - plugin-deps/orchestrator/sonataflow.yaml
       - plugin-deps/orchestrator/sample-greetings.yaml
-    name: plugin-deps
+    name: plugin-deps-orchestrator

@@ -84,7 +84,7 @@ spec:
 apiVersion: sonataflow.org/v1alpha08
 kind: SonataFlowPlatform
 metadata:
-  name: sonataflow-platform  # hardcoded
+  name: sonataflow-platform
 spec:
   monitoring:
     enabled: true
@@ -103,22 +103,22 @@ spec:
       persistence:
         postgresql:
           secretRef:
-            name: backstage-psql-secret-{{backstage-name}} # hardcoded backstage-psql-secret-{{cr-name}}
+            name: backstage-psql-secret-{{backstage-name}}
             userKey: POSTGRES_USER
             passwordKey: POSTGRES_PASSWORD
           serviceRef:
-            name: backstage-psql-{{backstage-name}} # hardcoded backstage-psql-{{cr-name}}
-            namespace: {{backstage-ns}} # hardcoded {{cr-namespace}}
-            databaseName: backstage_plugin_orchestrator #hardcoded
+            name: backstage-psql-{{backstage-name}}
+            namespace: {{backstage-ns}}
+            databaseName: backstage_plugin_orchestrator
     jobService:
       enabled: true
       persistence:
         postgresql:
           secretRef:
-            name: backstage-psql-secret-{{backstage-name}} # hardcoded backstage-psql-secret-{{cr-name}}
+            name: backstage-psql-secret-{{backstage-name}}
             userKey: POSTGRES_USER
             passwordKey: POSTGRES_PASSWORD
           serviceRef:
-            name: backstage-psql-{{backstage-name}} # hardcoded backstage-psql-{{cr-name}}
-            namespace: {{backstage-ns}} # hardcoded {{cr-namespace}}
-            databaseName: backstage_plugin_orchestrator # hardcoded name of DB created by orchestrator plugin
+            name: backstage-psql-{{backstage-name}}
+            namespace: {{backstage-ns}}
+            databaseName: backstage_plugin_orchestrator
