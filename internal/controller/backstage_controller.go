@@ -51,9 +51,7 @@ const (
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	// indicates if current cluster is Openshift
-	//IsOpenShift bool
+	Scheme   *runtime.Scheme
 	Platform platform.Platform
 }
 
