@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: operator
+  labels:
+    app: rhdh-operator
+spec:
+  selector:
+    matchLabels:
+      app: rhdh-operator
+  template:
+    metadata:
+      labels:
+        app: rhdh-operator
+        app.kubernetes.io/component: rhdh-operator
+    spec:
+      containers:
+        - name: manager
+          env:
+            - name: OPERATOR_NAME
+              value: rhdh-operator
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: RELATED_IMAGE_postgresql
+              value: quay.io/fedora/postgresql-15:latest
+            - name: RELATED_IMAGE_backstage
+              value: quay.io/rhdh/rhdh-hub-rhel9:next
+          volumeMounts:
+            - name: plugin-deps-orchestrator
+              mountPath: plugin-deps/orchestrator
+      volumes:
+        - name: plugin-deps-orchestrator
+          configMap:
+            name: rhdh-plugin-deps-orchestrator
