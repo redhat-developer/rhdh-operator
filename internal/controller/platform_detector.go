@@ -3,20 +3,18 @@ package controller
 import (
 	"context"
 
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 func DetectPlatform() (platform.Platform, error) {
 
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return platform.Default, err
-	}
-
+	//config, err := rest.InClusterConfig()
+	config := ctrl.GetConfigOrDie()
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return platform.Default, err
