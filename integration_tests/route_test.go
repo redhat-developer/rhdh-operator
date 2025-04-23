@@ -76,7 +76,7 @@ var _ = When("create default backstage", func() {
 		tt := tt
 		It("creates Backstage object (on Openshift) - "+tt.name, func() {
 
-			if !isOpenshiftCluster() {
+			if !currentPlatform.IsOpenshift() {
 				Skip("Skipped for non-Openshift cluster")
 			}
 

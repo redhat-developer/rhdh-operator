@@ -5,8 +5,6 @@ import (
 	"flag"
 	"os"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -124,16 +122,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	isOpenShift, err := utils.IsOpenshift()
+	plf, err := controller.DetectPlatform()
 	if err != nil {
-		setupLog.Error(err, "unable to detect if a cluster is OpenShift. Make sure your cluster is running and accessible")
+		setupLog.Error(err, "unable to detect platform. Make sure your cluster is running and accessible")
 		os.Exit(1)
 	}
 
 	if err = (&controller.BackstageReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		IsOpenShift: isOpenShift,
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Platform: plf,
+		//IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backstage")
 		os.Exit(1)
@@ -151,7 +150,7 @@ func main() {
 
 	setupLog.Info("starting manager with parameters: ",
 		"env.LOCALBIN", os.Getenv("LOCALBIN"),
-		"isOpenShift", isOpenShift,
+		"platform", plf.Name,
 	)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")

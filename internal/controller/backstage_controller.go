@@ -3,6 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+
 	"reflect"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
@@ -50,7 +53,8 @@ type BackstageReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	// indicates if current cluster is Openshift
-	IsOpenShift bool
+	//IsOpenShift bool
+	Platform platform.Platform
 }
 
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
@@ -101,7 +105,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// This creates array of model objects to be reconsiled
-	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.IsOpenShift, r.Scheme)
+	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
 	}
@@ -192,7 +196,7 @@ func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Bac
 	}
 
 	//// check if route disabled, respective objects have to deleted/unowned
-	if r.IsOpenShift && !backstage.Spec.IsRouteEnabled() {
+	if r.Platform.IsOpenshift() && !backstage.Spec.IsRouteEnabled() {
 		if err := r.tryToDelete(ctx, &openshift.Route{}, model.RouteName(backstage.Name), backstage.Namespace); err != nil {
 			return fmt.Errorf("%s %w", failedToCleanup, err)
 		}
