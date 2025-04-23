@@ -176,28 +176,6 @@ spec:
   - mirrors:
     - ${ICSP_URL}rhdh-hub-rhel9
     source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9
-
-  ## 2. general repo mappings
-  - mirrors:
-    - ${ICSP_URL_PRE}
-    source: registry.redhat.io
-  - mirrors:
-    - ${ICSP_URL_PRE}
-    source: registry.stage.redhat.io
-  - mirrors:
-    - ${ICSP_URL_PRE}
-    source: registry-proxy.engineering.redhat.com
-
-  ### now add mappings to resolve internal references
-  - mirrors:
-    - registry.redhat.io
-    source: registry.stage.redhat.io
-  - mirrors:
-    - registry.stage.redhat.io
-    source: registry-proxy.engineering.redhat.com
-  - mirrors:
-    - registry.redhat.io
-    source: registry-proxy.engineering.redhat.com
   " > "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" >&2
   fi
 
