@@ -28,15 +28,6 @@ import (
 const maxK8sResourceNameLength = 63
 
 const (
-	// Optional environment variable to force the platform
-	// If not set, the operator will try to detect the platform
-	// In general, it is not recommended to set this variable, if only it is really not possible to detect the platform or for the testing purposes
-	//PlatformEnvVar = "PLATFORM_backstage"
-	// OpenShift platform
-	//PlatformOCP = "ocp"
-	// Vanilla Kubernetes platform
-	//PlatformK8s = "k8s"
-
 	BackstageAppLabel      = "app.kubernetes.io/name"
 	BackstageAppName       = "backstage"
 	BackstageInstanceLabel = "app.kubernetes.io/instance"
@@ -204,29 +195,6 @@ func GeneratePassword(length int) (string, error) {
 	return base64.StdEncoding.EncodeToString(buff), nil
 }
 
-// Automatically detects if the cluster the operator running on is OpenShift
-//func IsOpenshift() (bool, error) {
-//	restConfig := ctrl.GetConfigOrDie()
-//	dcl, err := discovery.NewDiscoveryClientForConfig(restConfig)
-//	if err != nil {
-//		return false, err
-//	}
-//
-//	apiList, err := dcl.ServerGroups()
-//	if err != nil {
-//		return false, err
-//	}
-//
-//	apiGroups := apiList.Groups
-//	for i := 0; i < len(apiGroups); i++ {
-//		if apiGroups[i].Name == "route.openshift.io" {
-//			return true, nil
-//		}
-//	}
-//
-//	return false, nil
-//}
-
 // ToRFC1123Label converts the given string into a valid Kubernetes label name (RFC 1123-compliant).
 // See https://kubernetes.io/docs/concepts/overview/working-with-objects/names/ for more details about the requirements.
 // It will replace any invalid characters with a dash and drop any leading or trailing dashes.
@@ -282,13 +250,3 @@ func FilterContainers(allContainers []string, filter string) []string {
 	}
 	return filtered
 }
-
-//func getPlatform() string {
-//	if p := os.Getenv(PlatformEnvVar); p != "" {
-//		return p
-//	}
-//	if ocp, _ := IsOpenshift(); ocp {
-//		return PlatformOCP
-//	}
-//	return PlatformK8s
-//}

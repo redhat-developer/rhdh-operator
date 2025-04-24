@@ -13,7 +13,6 @@ import (
 
 func DetectPlatform() (platform.Platform, error) {
 
-	//config, err := rest.InClusterConfig()
 	config := ctrl.GetConfigOrDie()
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
