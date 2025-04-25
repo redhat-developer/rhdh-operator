@@ -364,6 +364,9 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/profile/$(PROFILE) | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+.PHONY: plugin-infra
+plugin-infra:
+	$(KUSTOMIZE) build config/profile/$(PROFILE)/plugin-infra | $(KUBECTL) apply -f -
 ##@ OLM Deployment
 
 # It has to be the same namespace as ./config/default/kustomization.yaml -> namespace

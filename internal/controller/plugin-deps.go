@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
@@ -20,9 +18,8 @@ import (
 func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, nsName types.NamespacedName, plugins model.DynamicPlugins) error {
 
 	lg := log.FromContext(ctx)
-	dir := filepath.Join(os.Getenv("LOCALBIN"), "plugin-deps")
 
-	objects, err := model.ReadPluginDeps(dir, nsName.Name, nsName.Namespace, plugins.Dependencies())
+	objects, err := model.GetPluginDeps(nsName.Name, nsName.Namespace, plugins)
 	if err != nil {
 		return fmt.Errorf("failed to read YAML files: %w", err)
 	}

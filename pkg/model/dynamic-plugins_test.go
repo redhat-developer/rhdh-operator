@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"k8s.io/utils/ptr"
@@ -61,7 +63,7 @@ func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 
 	assert.Error(t, err)
 	//assert.Contains(t, err.Error(), "expects exactly one Data key named 'dynamic-plugins.yaml'")
-	assert.Contains(t, err.Error(), "dynamic plugin configMap expects 'dynamic-plugins.yaml' and|or 'plugin-dependencies' Data keys")
+	assert.Contains(t, err.Error(), "dynamic plugin configMap expects 'dynamic-plugins.yaml' Data key")
 
 }
 
@@ -92,7 +94,9 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	//vol-default-dynamic-plugins
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 
-	assert.Equal(t, 0, len(model.DynamicPlugins.Dependencies()))
+	deps, err := model.DynamicPlugins.Dependencies()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(deps))
 
 }
 
@@ -107,7 +111,7 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
-		Data:       map[string]string{DynamicPluginsFile: "tt"},
+		Data:       map[string]string{DynamicPluginsFile: "dynamic-plugins.yaml: | \n plugins: []"},
 	}
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
@@ -124,7 +128,9 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("dplugin"), ic.VolumeMounts[3].Name)
 
-	assert.Equal(t, 0, len(model.DynamicPlugins.Dependencies()))
+	deps, err := model.DynamicPlugins.Dependencies()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(deps))
 }
 
 func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
@@ -166,17 +172,27 @@ func TestWithDynamicPluginsDeps(t *testing.T) {
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
+	yamlData := `"dynamic-plugins.yaml": |
+plugins:
+  - package: "plugin-a"
+    disabled: false
+    dependencies:
+      - ref: "dependency-1"
+      - ref: "dependency-2"
+`
+
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
-		Data: map[string]string{DynamicPluginsFile: "tt", EnabledPluginsDepsFile: `dep1
-dep2`},
+		Data:       map[string]string{DynamicPluginsFile: yamlData},
 	}
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
-	assert.Equal(t, 2, len(model.DynamicPlugins.Dependencies()))
+	deps, err := model.DynamicPlugins.Dependencies()
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(deps))
 
 }
 
@@ -187,4 +203,51 @@ func initContainer(model *BackstageModel) *corev1.Container {
 		}
 	}
 	return nil
+}
+
+func TestUnmarshalDynaPluginsConfig(t *testing.T) {
+	yamlData := `
+plugins:
+  - package: "plugin-a"
+    integrity: "sha256-abc123"
+    disabled: false
+    pluginConfig:
+      key1: "value1"
+      key2: "value2"
+    dependencies:
+      - ref: "dependency-1"
+      - ref: "dependency-2"
+  - package: "plugin-b"
+    integrity: "sha256-def456"
+    disabled: true
+    pluginConfig:
+      key3: "value3"
+    dependencies: []
+`
+
+	var config DynaPluginsConfig
+	err := yaml.Unmarshal([]byte(yamlData), &config)
+	assert.NoError(t, err)
+
+	// Validate plugins
+	assert.Equal(t, 2, len(config.Plugins))
+
+	// Validate first plugin
+	pluginA := config.Plugins[0]
+	assert.Equal(t, "plugin-a", pluginA.Package)
+	assert.Equal(t, "sha256-abc123", pluginA.Integrity)
+	assert.False(t, pluginA.Disabled)
+	assert.Equal(t, "value1", pluginA.PluginConfig["key1"])
+	assert.Equal(t, "value2", pluginA.PluginConfig["key2"])
+	assert.Equal(t, 2, len(pluginA.Dependencies))
+	assert.Equal(t, "dependency-1", pluginA.Dependencies[0].Ref)
+	assert.Equal(t, "dependency-2", pluginA.Dependencies[1].Ref)
+
+	// Validate second plugin
+	pluginB := config.Plugins[1]
+	assert.Equal(t, "plugin-b", pluginB.Package)
+	assert.Equal(t, "sha256-def456", pluginB.Integrity)
+	assert.True(t, pluginB.Disabled)
+	assert.Equal(t, "value3", pluginB.PluginConfig["key3"])
+	assert.Empty(t, pluginB.Dependencies)
 }

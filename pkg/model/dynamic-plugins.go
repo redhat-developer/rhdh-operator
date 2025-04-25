@@ -2,8 +2,8 @@ package model
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"os"
-	"strings"
 
 	"golang.org/x/exp/maps"
 
@@ -30,7 +30,6 @@ import (
 
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
-const EnabledPluginsDepsFile = "plugin-dependencies"
 
 type DynamicPluginsFactory struct{}
 
@@ -40,6 +39,23 @@ func (f DynamicPluginsFactory) newBackstageObject() RuntimeObject {
 
 type DynamicPlugins struct {
 	ConfigMap *corev1.ConfigMap
+}
+
+type DynaPluginsConfig struct {
+	Includes []string     `yaml:"includes"`
+	Plugins  []DynaPlugin `yaml:"plugins"`
+}
+
+type DynaPlugin struct {
+	Package      string                 `yaml:"package"`
+	Integrity    string                 `yaml:"integrity"`
+	Disabled     bool                   `yaml:"disabled"`
+	PluginConfig map[string]interface{} `yaml:"pluginConfig"`
+	Dependencies []PluginDependency     `yaml:"dependencies"`
+}
+
+type PluginDependency struct {
+	Ref string `yaml:"ref"`
 }
 
 func init() {
@@ -63,8 +79,8 @@ func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) e
 
 	dp := model.ExternalConfig.DynamicPlugins
 
-	if dp.Data == nil || (dp.Data[DynamicPluginsFile] == "" && dp.Data[EnabledPluginsDepsFile] == "") {
-		return fmt.Errorf("dynamic plugin configMap expects '%s' and|or '%s' Data keys", DynamicPluginsFile, EnabledPluginsDepsFile)
+	if dp.Data == nil || dp.Data[DynamicPluginsFile] == "" {
+		return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
 	}
 
 	if dp.Data[DynamicPluginsFile] != "" {
@@ -143,15 +159,55 @@ func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
-func (p *DynamicPlugins) Dependencies() []string {
+func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
+	ps, err := p.pluginsFromConfigMap()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]PluginDependency, 0)
+
+	for _, pp := range ps {
+		if pp.Disabled {
+			continue
+		}
+
+		result = append(result, pp.Dependencies...)
+	}
+
+	return result, nil
+
+	//if p.ConfigMap == nil {
+	//	return []string{}
+	//}
+	//
+	//data := p.ConfigMap.Data[EnabledPluginsDepsFile]
+	//if data != "" {
+	//	return strings.Split(data, "\n")
+	//}
+	//
+	//return []string{}
+}
+
+func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
 	if p.ConfigMap == nil {
-		return []string{}
+		return nil, fmt.Errorf("dynamic plugins configMap is not set")
 	}
-	data := p.ConfigMap.Data[EnabledPluginsDepsFile]
-	if data != "" {
-		return strings.Split(data, "\n")
+
+	data := p.ConfigMap.Data[DynamicPluginsFile]
+	if data == "" {
+		return nil, fmt.Errorf("dynamic plugins configMap does not contain %s key", DynamicPluginsFile)
 	}
-	return []string{}
+
+	//var plugins []DynaPlugin
+	var pluginsConfig DynaPluginsConfig
+	err := yaml.Unmarshal([]byte(data), &pluginsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal dynamic plugins data: %w", err)
+	}
+
+	return pluginsConfig.Plugins, nil
+
 }
 
 // returns initContainer supposed to initialize DynamicPlugins

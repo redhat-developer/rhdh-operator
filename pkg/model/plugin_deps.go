@@ -11,6 +11,25 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+func GetPluginDeps(bsName, bsNamespace string, plugins DynamicPlugins) ([]*unstructured.Unstructured, error) {
+	dir := filepath.Join(os.Getenv("LOCALBIN"), "plugin-deps")
+	pdeps, err := plugins.Dependencies()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get plugin dependencies: %w", err)
+	}
+
+	//get refs from enabledDirs
+	var refs []string
+	for _, dep := range pdeps {
+		if dep.Ref != "" {
+			refs = append(refs, dep.Ref)
+		}
+	}
+
+	return ReadPluginDeps(dir, bsName, bsNamespace, refs)
+
+}
+
 // ReadPluginDeps reads the plugin dependencies from the specified directory
 // and returns a slice of unstructured.Unstructured objects.
 func ReadPluginDeps(rootDir, bsName, bsNamespace string, enabledDirs []string) ([]*unstructured.Unstructured, error) {
