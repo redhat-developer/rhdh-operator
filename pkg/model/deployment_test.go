@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"k8s.io/utils/ptr"
@@ -37,7 +39,7 @@ func TestSpecs(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.container().Image)
@@ -53,7 +55,7 @@ func TestWorkingDirMount(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("deployment.yaml", "working-dir-mount.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "/my/home", model.backstageDeployment.defaultMountPath())
@@ -77,7 +79,7 @@ func TestOverrideBackstageImage(t *testing.T) {
 
 	t.Setenv(BackstageImageEnvVar, "dummy")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Containers))
@@ -93,7 +95,7 @@ func TestSpecImagePullSecrets(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("deployment.yaml", "ips-deployment.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
 	// if imagepullsecrets not defined - default used
@@ -105,7 +107,7 @@ func TestSpecImagePullSecrets(t *testing.T) {
 	testObj = createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("deployment.yaml", "ips-deployment.yaml")
 
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
 	// if explicitly set empty slice - they are empty
@@ -149,7 +151,7 @@ spec:
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
 	// label added
@@ -193,12 +195,12 @@ spec:
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	model, err := InitObjects(context.TODO(), bsv1.Backstage{}, testObj.externalConfig, true, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bsv1.Backstage{}, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	// make sure env var works
 	assert.Equal(t, "envvar-image", model.backstageDeployment.container().Image)
 
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	// make sure image defined in CR overrides
 	assert.Equal(t, "cr-image", model.backstageDeployment.container().Image)
@@ -225,7 +227,7 @@ spec:
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "backstage-backend", model.backstageDeployment.container().Name)

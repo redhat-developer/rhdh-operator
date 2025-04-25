@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+
 	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
@@ -29,7 +31,7 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-envs.yaml", "raw-cm-envs.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -66,7 +68,7 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvConfigMapKeys["mapName"] = NewDataObjectKeys(map[string]string{"mapName": "ENV1"}, nil)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)

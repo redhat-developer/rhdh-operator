@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -90,7 +92,7 @@ func registerConfig(key string, factory ObjectFactory, multiple bool) {
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
-func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, isOpenshift bool, scheme *runtime.Scheme) (*BackstageModel, error) {
+func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, platform platform.Platform, scheme *runtime.Scheme) (*BackstageModel, error) {
 
 	// 3 phases of Backstage configuration:
 	// 1- load from Operator defaults, modify metadata (labels, selectors..) and namespace as needed
@@ -101,7 +103,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 	lg := log.FromContext(ctx)
 	lg.V(1)
 
-	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: isOpenshift}
+	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: platform.IsOpenshift()}
 
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
@@ -110,7 +112,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
 		var templ = backstageObject.EmptyObject()
-		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), templ, *scheme); err != nil {
+		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), templ, *scheme, platform.Extension); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}

@@ -22,24 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"k8s.io/client-go/discovery"
-	ctrl "sigs.k8s.io/controller-runtime"
-
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 const maxK8sResourceNameLength = 63
 
 const (
-	// Optional environment variable to force the platform
-	// If not set, the operator will try to detect the platform
-	// In general, it is not recommended to set this variable, if only it is really not possible to detect the platform or for the testing purposes
-	PlatformEnvVar = "PLATFORM_backstage"
-	// OpenShift platform
-	PlatformOCP = "ocp"
-	// Vanilla Kubernetes platform
-	PlatformK8s = "k8s"
-
 	BackstageAppLabel      = "app.kubernetes.io/name"
 	BackstageAppName       = "backstage"
 	BackstageInstanceLabel = "app.kubernetes.io/instance"
@@ -140,7 +128,7 @@ func ReadYamls(manifest []byte, platformPatch []byte, templ runtime.Object, sche
 	return objects, nil
 }
 
-func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
+func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
 	fpath := filepath.Clean(path)
 	if _, err := os.Stat(fpath); err != nil {
 		return nil, err
@@ -151,15 +139,15 @@ func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme) ([]
 	}
 
 	// Read platform patch if exists
-	pp, err := readPlatformPatch(fpath)
+	pp, err := readPlatformPatch(fpath, platformExt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read platform patch: %w", err)
 	}
 	return ReadYamls(conf, pp, templ, scheme)
 }
 
-func readPlatformPatch(path string) ([]byte, error) {
-	fpath := filepath.Clean(path + "." + getPlatform())
+func readPlatformPatch(path string, platformExt string) ([]byte, error) {
+	fpath := filepath.Clean(path + "." + platformExt)
 	b, err := os.ReadFile(fpath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -205,29 +193,6 @@ func GeneratePassword(length int) (string, error) {
 	}
 	// Encode the password to prevent special characters
 	return base64.StdEncoding.EncodeToString(buff), nil
-}
-
-// Automatically detects if the cluster the operator running on is OpenShift
-func IsOpenshift() (bool, error) {
-	restConfig := ctrl.GetConfigOrDie()
-	dcl, err := discovery.NewDiscoveryClientForConfig(restConfig)
-	if err != nil {
-		return false, err
-	}
-
-	apiList, err := dcl.ServerGroups()
-	if err != nil {
-		return false, err
-	}
-
-	apiGroups := apiList.Groups
-	for i := 0; i < len(apiGroups); i++ {
-		if apiGroups[i].Name == "route.openshift.io" {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 // ToRFC1123Label converts the given string into a valid Kubernetes label name (RFC 1123-compliant).
@@ -284,14 +249,4 @@ func FilterContainers(allContainers []string, filter string) []string {
 		}
 	}
 	return filtered
-}
-
-func getPlatform() string {
-	if p := os.Getenv(PlatformEnvVar); p != "" {
-		return p
-	}
-	if ocp, _ := IsOpenshift(); ocp {
-		return PlatformOCP
-	}
-	return PlatformK8s
 }
