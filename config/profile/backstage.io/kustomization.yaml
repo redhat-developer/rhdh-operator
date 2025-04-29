@@ -3,4 +3,7 @@ kind: Kustomization
 
 resources:
 - operator
-
+images:
+- name: controller
+  newName: quay.io/rhdh-community/operator
+  newTag: 0.7.0

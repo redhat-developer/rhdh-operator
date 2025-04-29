@@ -1749,6 +1749,8 @@ data:
               env:
                 - name: NPM_CONFIG_USERCONFIG
                   value: /opt/app-root/src/.npmrc.dynamic-plugins
+                - name: MAX_ENTRY_SIZE
+                  value: "30000000"
               volumeMounts:
                 - mountPath: /dynamic-plugins-root
                   name: dynamic-plugins-root
@@ -1859,28 +1861,37 @@ data:
           securityContext:
             # any group id
             fsGroup: 1001
-  dynamic-plugins.yaml: |-
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: default-dynamic-plugins #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name
-    data:
-      "dynamic-plugins.yaml": |
-        ###########################################################################################################
-        # /!\ WARNING
-        #
-        # This is the default dynamic plugins configuration file created and managed by the Operator for your CR.
-        # Do NOT edit this manually in the Cluster, as your changes will be overridden by the Operator upon the
-        # next reconciliation.
-        # If you want to customize the dynamic plugins, you should create your own dynamic-plugins ConfigMap
-        # and reference it in your CR.
-        # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/installing_and_viewing_plugins_in_red_hat_developer_hub/rhdh-installing-rhdh-plugins_title-plugins-rhdh-about#proc-config-dynamic-plugins-rhdh-operator_rhdh-installing-rhdh-plugins
-        # for more details or https://github.com/redhat-developer/rhdh-operator/blob/main/examples/rhdh-cr.yaml
-        # for an example.
-        ###########################################################################################################
-        includes:
-          - dynamic-plugins.default.yaml
-        plugins: []
+  dynamic-plugins.yaml: "#apiVersion: v1\n#kind: ConfigMap\n#metadata:\n#  name: default-dynamic-plugins
+    #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name\n#data:\n#
+    \ \"dynamic-plugins.yaml\": |\n#    ###########################################################################################################\n#
+    \   # /!\\ WARNING\n#    #\n#    # This is the default dynamic plugins configuration
+    file created and managed by the Operator for your CR.\n#    # Do NOT edit this
+    manually in the Cluster, as your changes will be overridden by the Operator upon
+    the\n#    # next reconciliation.\n#    # If you want to customize the dynamic
+    plugins, you should create your own dynamic-plugins ConfigMap\n#    # and reference
+    it in your CR.\n#    # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/installing_and_viewing_plugins_in_red_hat_developer_hub/rhdh-installing-rhdh-plugins_title-plugins-rhdh-about#proc-config-dynamic-plugins-rhdh-operator_rhdh-installing-rhdh-plugins\n#
+    \   # for more details or https://github.com/redhat-developer/rhdh-operator/blob/main/examples/rhdh-cr.yaml\n#
+    \   # for an example.\n#    ###########################################################################################################\n#
+    \   includes:\n#      - dynamic-plugins.default.yaml\n#    plugins: []\n#---\napiVersion:
+    v1\nkind: ConfigMap\nmetadata:\n  name: default-dynamic-plugins\ndata:\n  plugin-dependencies:
+    |\n#    orchestrator\n  dynamic-plugins.yaml: |\n    includes:\n      - dynamic-plugins.default.yaml\n
+    \   plugins:\n      - disabled: false\n        package: \"https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-1.5.1.tgz\"\n
+    \       integrity: sha512-7VOe+XGTUzrdO/av0DNHbydOjB3Lo+XdCs6fj3JVODLP7Ypd3GXHf/nssYxG5ZYC9F1t9MNeguE2bZOB6ckqTA==
+    \ \n        pluginConfig:\n          dynamicPlugins:\n              frontend:\n
+    \               red-hat-developer-hub.backstage-plugin-orchestrator:\n                  appIcons:\n
+    \                   - importName: OrchestratorIcon\n                      module:
+    OrchestratorPlugin\n                      name: orchestratorIcon\n                  dynamicRoutes:\n
+    \                   - importName: OrchestratorPage\n                      menuItem:\n
+    \                       icon: orchestratorIcon\n                        text:
+    Orchestrator\n                      module: OrchestratorPlugin\n                      path:
+    /orchestrator\n      - disabled: false\n        package: \"https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-backend-dynamic-1.5.1.tgz\"\n
+    \       integrity: sha512-VIenFStdq9QvvmgmEMG8O7b2wqIebvEcqNeJ9SWZ8jen9t+efTK6D3Rde74LQ1no1QaHLx8RoxNCOuTUEF8O/g==\n
+    \       pluginConfig:\n          orchestrator:\n            dataIndexService:\n
+    \             url: http://sonataflow-platform-data-index-service\n      - disabled:
+    false\n        package: \"https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic-1.5.1.tgz\"\n
+    \       integrity: sha512-bnVQjVsUZ470Vgm2kd5Lo/bVa2fF0q4GufBDc/8oTQsnP3zZJQqKFvFElBTCjY76RqkECydlvZ1UFybSzvockQ==\n
+    \       pluginConfig:\n          orchestrator:\n            dataIndexService:\n
+    \             url: http://sonataflow-platform-data-index-service\n"
   route.yaml: |-
     apiVersion: route.openshift.io/v1
     kind: Route
@@ -1928,6 +1939,269 @@ data:
 kind: ConfigMap
 metadata:
   name: rhdh-default-config
+  namespace: rhdh-operator
+---
+apiVersion: v1
+data:
+  sample-greetings.yaml: |+
+    apiVersion: v1
+    data:
+      greeting.sw.input-schema.json: |
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "language": {
+              "title": "Language",
+              "description": "Language to greet",
+              "type": "string",
+              "enum": ["English", "Spanish"],
+              "default": "English"
+            }
+          }
+        }
+      workflow-output-schema.json: |-
+        {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "WorkflowResult",
+          "description": "Schema of workflow output",
+          "type": "object",
+          "properties": {
+            "result": {
+              "$ref": "../shared/schemas/workflow-result-schema.json",
+              "type": "object"
+            }
+          }
+        }
+    kind: ConfigMap
+    metadata:
+      name: 01-greeting-resources-schemas
+    ---
+    apiVersion: sonataflow.org/v1alpha08
+    kind: SonataFlow
+    metadata:
+      annotations:
+        sonataflow.org/description: YAML based greeting workflow
+        sonataflow.org/expressionLang: jq
+        sonataflow.org/profile: gitops
+        sonataflow.org/version: "1.0"
+      labels:
+        app: greeting
+        sonataflow.org/workflow-app: greeting
+      name: greeting
+    spec:
+      flow:
+        annotations:
+          - workflow-type/infrastructure
+        dataInputSchema:
+          failOnValidationErrors: true
+          schema: schemas/greeting.sw.input-schema.json
+        functions:
+          - name: greetFunction
+            operation: sysout
+            type: custom
+          - name: successResult
+            operation: '{ "result": { "message": "Greeting workflow completed successfully", "outputs":[ { "key":"Selected language", "value": .language }, { "key":"Greeting message", "value": .greeting } ] } }'
+            type: expression
+        start:
+          stateName: ChooseOnLanguage
+        states:
+          - dataConditions:
+              - condition: .language  == "English"
+                transition:
+                  nextState: GreetInEnglish
+              - condition: .language  == "Spanish"
+                transition:
+                  nextState: GreetInSpanish
+            defaultCondition:
+              transition:
+                nextState: GreetInEnglish
+            name: ChooseOnLanguage
+            type: switch
+          - data:
+              greeting: Hello from YAML Workflow
+            name: GreetInEnglish
+            transition:
+              nextState: GreetPerson
+            type: inject
+          - data:
+              greeting: Saludos desde YAML Workflow
+            name: GreetInSpanish
+            transition:
+              nextState: GreetPerson
+            type: inject
+          - actionMode: sequential
+            actions:
+              - actionDataFilter:
+                  useResults: true
+                functionRef:
+                  arguments:
+                    message: .greeting
+                  invoke: sync
+                  refName: greetFunction
+                name: greetAction
+              - actionDataFilter:
+                  useResults: true
+                functionRef:
+                  invoke: sync
+                  refName: successResult
+                name: setOutput
+            end:
+              terminate: true
+            name: GreetPerson
+            type: operation
+      podTemplate:
+        container:
+          resources: {}
+          image: quay.io/orchestrator/serverless-workflow-greeting:96d772297d3ee964ab9775d7aae7dbbd4f070dd7
+      resources:
+        configMaps:
+          - configMap:
+              name: 01-greeting-resources-schemas
+            workflowPath: schemas
+      persistence:
+        postgresql:
+          secretRef:
+            name: backstage-psql-secret-{{backstage-name}}
+            userKey: POSTGRES_USER #hardcoded
+            passwordKey: POSTGRES_PASSWORD #hardcoded
+          serviceRef:
+            name: backstage-psql-{{backstage-name}} # hardcoded backstage-psql-{{cr-name}}
+            namespace: {{backstage-ns}} # hardcoded {{cr-namespace}}
+            databaseName: backstage_plugin_orchestrator #hardcoded
+            port: 5432
+            databaseSchema: greeting
+    status:
+      address: {}
+
+  sonataflow.yaml: |
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-knative-to-sonataflow-and-workflows # hardcoded
+    spec:
+      podSelector: {}
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  # Allow knative events to be delivered to workflows.
+                  kubernetes.io/metadata.name: knative-eventing
+            - namespaceSelector:
+                matchLabels:
+                  # Allow auxiliary knative function for workflow (such as m2k-save-transformation)
+                  kubernetes.io/metadata.name: knative-serving
+    ---
+    # NetworkPolicy to unblock incoming traffic to the namespace
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-external-communication # hardcoded
+    spec:
+      podSelector: {}
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  # Allow knative events to be delivered to workflows.
+                  kubernetes.io/metadata.name: openshift-ingress
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-intra-network # hardcoded
+    spec:
+      # Apply this policy to all pods in the namespace
+      podSelector: {}
+      # Specify policy type as 'Ingress' to control incoming traffic rules
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            # Allow ingress from any pod within the same namespace
+            - podSelector: {}
+    ---
+    # NetworkPolicy to allow openshift-user-workload-monitoring pods to access all pods within the workflow's namespace
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-monitoring-to-sonataflow-and-workflows # hardcoded
+    spec:
+      # Apply this policy to all pods in the namespace
+      podSelector: {}
+      # Specify policy type as 'Ingress' to control incoming traffic rules
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  # Allow openshift-user-workload-monitoring pods to access the workflow.
+                  kubernetes.io/metadata.name: openshift-user-workload-monitoring
+    ---
+    apiVersion: operator.knative.dev/v1beta1
+    kind: KnativeEventing
+    metadata:
+      name: knative-eventing
+      namespace: knative-eventing
+    spec:
+      Registry: {}
+    ---
+    apiVersion: operator.knative.dev/v1beta1
+    kind: KnativeServing
+    metadata:
+      name: knative-serving
+      namespace: knative-serving
+    spec:
+      controller-custom-certs:
+        name: ""
+        type: ""
+      registry: {}
+    ---
+    apiVersion: sonataflow.org/v1alpha08
+    kind: SonataFlowPlatform
+    metadata:
+      name: sonataflow-platform
+    spec:
+      monitoring:
+        enabled: true
+      build:
+        template:
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 250m
+            limits:
+              memory: 1Gi
+              cpu: 500m
+      services:
+        dataIndex:
+          enabled: true
+          persistence:
+            postgresql:
+              secretRef:
+                name: backstage-psql-secret-{{backstage-name}}
+                userKey: POSTGRES_USER
+                passwordKey: POSTGRES_PASSWORD
+              serviceRef:
+                name: backstage-psql-{{backstage-name}}
+                namespace: {{backstage-ns}}
+                databaseName: backstage_plugin_orchestrator
+        jobService:
+          enabled: true
+          persistence:
+            postgresql:
+              secretRef:
+                name: backstage-psql-secret-{{backstage-name}}
+                userKey: POSTGRES_USER
+                passwordKey: POSTGRES_PASSWORD
+              serviceRef:
+                name: backstage-psql-{{backstage-name}}
+                namespace: {{backstage-ns}}
+                databaseName: backstage_plugin_orchestrator
+kind: ConfigMap
+metadata:
+  name: rhdh-plugin-deps-orchestrator
   namespace: rhdh-operator
 ---
 apiVersion: v1
@@ -2009,7 +2283,7 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh/rhdh-hub-rhel9:next
-        image: quay.io/rhdh/rhdh-rhel9-operator:1.7
+        image: quay.io/gazarenk/backstage-operator:latest
         livenessProbe:
           httpGet:
             path: /healthz
@@ -2043,6 +2317,8 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         volumeMounts:
+        - mountPath: plugin-deps/orchestrator
+          name: plugin-deps-orchestrator
         - mountPath: /default-config
           name: default-config
       securityContext:
@@ -2050,6 +2326,9 @@ spec:
       serviceAccountName: rhdh-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
+      - configMap:
+          name: rhdh-plugin-deps-orchestrator
+        name: plugin-deps-orchestrator
       - configMap:
           name: rhdh-default-config
         name: default-config
