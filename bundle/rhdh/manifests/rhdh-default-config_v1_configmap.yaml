@@ -378,8 +378,6 @@ data:
     metadata:
       name: default-dynamic-plugins
     data:
-    #  plugin-dependencies: |
-    #    orchestrator
       dynamic-plugins.yaml: |
         includes:
           - dynamic-plugins.default.yaml
