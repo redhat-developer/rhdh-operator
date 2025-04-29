@@ -42,5 +42,3 @@ configMapGenerator:
     name: default-config
   - files:
       - plugin-deps/orchestrator/sonataflow.yaml
-      - plugin-deps/orchestrator/sample-greetings.yaml
-    name: plugin-deps-orchestrator
