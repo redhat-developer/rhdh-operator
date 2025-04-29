@@ -2,8 +2,9 @@ package model
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"os"
+
+	"gopkg.in/yaml.v2"
 
 	"golang.org/x/exp/maps"
 
