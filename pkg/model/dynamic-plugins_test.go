@@ -190,9 +190,18 @@ plugins:
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
+
+	// dependencies from external config
+	//  - ref: "dependency-1"
+	//  - ref: "dependency-2"
 	deps, err := model.DynamicPlugins.Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(deps))
+
+	// dependencies from default config = []
+	depends, err := (model.getRuntimeObjectByType(&DynamicPlugins{})).(*DynamicPlugins).Dependencies()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(depends))
 
 }
 

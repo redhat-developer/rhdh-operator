@@ -107,7 +107,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Apply the plugin dependencies
-	if err := r.applyPluginDeps(ctx, req.NamespacedName, *bsModel.DynamicPlugins); err != nil {
+	if err := r.applyPluginDeps(ctx, req.NamespacedName, bsModel.DynamicPlugins); err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply plugin dependencies", err)
 	}
 

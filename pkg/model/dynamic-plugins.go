@@ -91,6 +91,7 @@ func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) e
 			dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
 	}
 
+	// if default dynamic-plugins set, the value from model.DynamicPlugins will differ from the one in model.RuntimeObjects
 	model.DynamicPlugins.ConfigMap = &dp
 
 	return nil
@@ -125,7 +126,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 		}
 	}
 	model.setRuntimeObject(p)
-	model.DynamicPlugins = p
+	model.DynamicPlugins = *p
 	return true, nil
 }
 

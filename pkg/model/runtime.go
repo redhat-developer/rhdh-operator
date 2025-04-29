@@ -45,7 +45,7 @@ type BackstageModel struct {
 
 	route          *BackstageRoute
 	appConfig      *AppConfig
-	DynamicPlugins *DynamicPlugins
+	DynamicPlugins DynamicPlugins
 
 	RuntimeObjects []RuntimeObject
 
@@ -102,7 +102,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 	lg := log.FromContext(ctx)
 	lg.V(1)
 
-	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: isOpenshift, DynamicPlugins: &DynamicPlugins{}}
+	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: isOpenshift, DynamicPlugins: DynamicPlugins{}}
 
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
