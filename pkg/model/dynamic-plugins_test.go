@@ -251,3 +251,60 @@ plugins:
 	assert.Equal(t, "value3", pluginB.PluginConfig["key3"])
 	assert.Empty(t, pluginB.Dependencies)
 }
+
+func TestDynamicPluginsDependencies(t *testing.T) {
+	// Case 1: Plugins with dependencies
+	yamlDataWithDeps := `
+plugins:
+  - package: "plugin-a"
+    disabled: false
+    dependencies:
+      - ref: "dependency-1"
+      - ref: "dependency-2"
+  - package: "plugin-b"
+    disabled: false
+    dependencies:
+      - ref: "dependency-3"
+  - package: "plugin-disabled"
+    disabled: true
+    dependencies:
+      - ref: "dependency-4"
+`
+
+	dpWithDeps := &DynamicPlugins{
+		ConfigMap: &corev1.ConfigMap{
+			Data: map[string]string{
+				DynamicPluginsFile: yamlDataWithDeps,
+			},
+		},
+	}
+
+	deps, err := dpWithDeps.Dependencies()
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(deps))
+	assert.Equal(t, "dependency-1", deps[0].Ref)
+	assert.Equal(t, "dependency-2", deps[1].Ref)
+	assert.Equal(t, "dependency-3", deps[2].Ref)
+
+	// Case 2: Plugins without dependencies
+	yamlDataWithoutDeps := `
+plugins:
+  - package: "plugin-c"
+    disabled: false
+  - package: "plugin-d"
+    disabled: false
+`
+
+	dpWithoutDeps := &DynamicPlugins{
+		ConfigMap: &corev1.ConfigMap{
+			Data: map[string]string{
+				DynamicPluginsFile: yamlDataWithoutDeps,
+			},
+		},
+	}
+
+	deps, err = dpWithoutDeps.Dependencies()
+	assert.NoError(t, err)
+	assert.NotNil(t, deps)
+	assert.Equal(t, 0, len(deps)) // Ensure it returns an empty slice, not nil
+}

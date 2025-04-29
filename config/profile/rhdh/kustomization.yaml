@@ -3,4 +3,6 @@ kind: Kustomization
 
 resources:
 - operator
-#- plugin-infra
+images:
+- name: controller
+  newName: quay.io/gazarenk/backstage-operator

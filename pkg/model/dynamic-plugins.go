@@ -42,6 +42,8 @@ type DynamicPlugins struct {
 }
 
 type DynaPluginsConfig struct {
+	// we do not really support Includes here, that's what is processed by the installation script
+	// in the dynamic-plugins container. Keeping it here for the sake of completeness
 	Includes []string     `yaml:"includes"`
 	Plugins  []DynaPlugin `yaml:"plugins"`
 }
@@ -159,6 +161,7 @@ func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
+// Dependencies returns a list of plugin dependencies
 func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
 	ps, err := p.pluginsFromConfigMap()
 	if err != nil {
@@ -176,19 +179,9 @@ func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
 	}
 
 	return result, nil
-
-	//if p.ConfigMap == nil {
-	//	return []string{}
-	//}
-	//
-	//data := p.ConfigMap.Data[EnabledPluginsDepsFile]
-	//if data != "" {
-	//	return strings.Split(data, "\n")
-	//}
-	//
-	//return []string{}
 }
 
+// returns a list of plugins from the configMap
 func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
 	if p.ConfigMap == nil {
 		return nil, fmt.Errorf("dynamic plugins configMap is not set")
@@ -199,7 +192,6 @@ func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
 		return nil, fmt.Errorf("dynamic plugins configMap does not contain %s key", DynamicPluginsFile)
 	}
 
-	//var plugins []DynaPlugin
 	var pluginsConfig DynaPluginsConfig
 	err := yaml.Unmarshal([]byte(data), &pluginsConfig)
 	if err != nil {
@@ -207,7 +199,6 @@ func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
 	}
 
 	return pluginsConfig.Plugins, nil
-
 }
 
 // returns initContainer supposed to initialize DynamicPlugins
