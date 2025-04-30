@@ -68,6 +68,40 @@ jobs:
           make manifests generate fmt vet install
           make run &
 
+      - name: Download SeaLights Go agent and CLI tool
+        run: |
+          echo "[Sealights] Downloading Sealights Golang & CLI Agents..."
+          case $(lscpu | awk '/Architecture:/{print $2}') in
+            x86_64) SL_ARCH="linux-amd64";;
+            arm) SL_ARCH="linux-arm64";;
+          esac
+          wget -nv -O sealights-go-agent.tar.gz https://agents.sealights.co/slgoagent/latest/slgoagent-$SL_ARCH.tar.gz
+          wget -nv -O sealights-slcli.tar.gz https://agents.sealights.co/slcli/latest/slcli-$SL_ARCH.tar.gz
+          tar -xzf ./sealights-go-agent.tar.gz && tar -xzf ./sealights-slcli.tar.gz
+          rm -f ./sealights-go-agent.tar.gz ./sealights-slcli.tar.gz
+          ./slgoagent -v 2> /dev/null | grep version && ./slcli -v 2> /dev/null | grep version
+      
+      - name: Write SeaLights token into file
+        run: echo "${SEALIGHTS_AGENT_TOKEN}" > sltoken.txt
+        env:
+          SEALIGHTS_AGENT_TOKEN: '${{secrets.SEALIGHTS_AGENT_TOKEN}}'
+
+      - name: Initiating the SeaLights agent
+        run: |
+          echo "[Sealights] Initiating the SeaLights agent to Golang and handing it the token"
+          ./slcli config init --lang go --token ./sltoken.txt
+
+      - name: Configuring SeaLights - on pull_request event
+        if: env.on-event == 'pull_request'
+        run: |
+          echo "[Sealights] Configuring SeaLights to scan the pull request branch"
+          echo "Latest commit sha: ${LATEST_COMMIT_SHA}"
+          echo "PR Number: ${PULL_REQUEST_NUMBER}"
+          ./slcli config create-pr-bsid --app rhdh-operator --target-branch "main" --pull-request-number ${PULL_REQUEST_NUMBER} --latest-commit ${LATEST_COMMIT_SHA} --repository-url https://github.com/npotluri-rh/rhdh-operator.git
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          LATEST_COMMIT_SHA: ${{github.event.pull_request.head.sha}}
+
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -84,6 +118,18 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
+      - name: Run the SeaLights scan
+        id: sealights-scan
+        run: |
+          echo "[Sealights] Running the SeaLights scan"
+          ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent --workspacepath ./ --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
+          echo bsid=$(< buildSessionId.txt) | tee -a "$GITHUB_OUTPUT"
+
+      - name: clean all SeaLights secret stuff
+        run: |
+          echo "[Sealights] Cleaning up after SeaLights run"
+          rm sltoken.txt
+          
       - name: Run Gosec Security Scanner
         run: make gosec
 
