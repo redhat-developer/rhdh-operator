@@ -1,12 +1,12 @@
 name: PR Test operator
 
 on:
-  pull_request: {}
-    # branches: 
-    # - main
-    # - rhdh-1.[0-9]+
-    # - 1.[0-9]+.x
-    # - release-1.[0-9]+
+  pull_request:
+    branches: 
+    - main
+    - rhdh-1.[0-9]+
+    - 1.[0-9]+.x
+    - release-1.[0-9]+
 
 jobs:
   pr-validate:
@@ -97,16 +97,16 @@ jobs:
           echo "[Sealights] Configuring SeaLights to scan the pull request branch"
           echo "Latest commit sha: ${LATEST_COMMIT_SHA}"
           echo "PR Number: ${PULL_REQUEST_NUMBER}"
-          ./slcli config create-pr-bsid --app rhdh-operator --target-branch "rhidp-6915" --pull-request-number ${PULL_REQUEST_NUMBER} --latest-commit ${LATEST_COMMIT_SHA} --repository-url https://github.com/npotluri-rh/rhdh-operator.git
+          ./slcli config create-pr-bsid --app rhdh-operator --target-branch "main" --pull-request-number ${PULL_REQUEST_NUMBER} --latest-commit ${LATEST_COMMIT_SHA} --repository-url https://github.com/npotluri-rh/rhdh-operator.git
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           LATEST_COMMIT_SHA: ${{github.event.pull_request.head.sha}}
 
       - name: Configuring SeaLights - on push event
-        #if: env.on-event == 'push'
+        if: env.on-event == 'push'
         run: |
           echo "[Sealights] Configuring SeaLights to scan the main branch after pull request was closed"
-          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build ${LATEST_COMMIT_SHA}
+          ./slcli config create-bsid --app rhdh-operator --branch "main" --build ${LATEST_COMMIT_SHA}
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
@@ -119,13 +119,13 @@ jobs:
 
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
-        #if: steps.changed-files.outputs.any_changed == 'true'
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make test
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
         # perform it on backstage.io for speed
-        #if: steps.changed-files.outputs.any_changed == 'true'
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: RHDH specific Integration test
@@ -133,11 +133,6 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
-      - name: end test session
-        if: success() || failure()
-        run: |
-          ./slcli test end-stage --bsid buildSessionId.txt --executionId "Tests"
-          
       - name: clean all SeaLights secret stuff
         run: |
           echo "[Sealights] Cleaning up after SeaLights run"
