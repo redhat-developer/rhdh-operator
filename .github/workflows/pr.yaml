@@ -137,11 +137,11 @@ jobs:
       - name: Run the SeaLights scan for integration_tests
         run: |
           echo "[Sealights] Running the SeaLights integration tests scan"
-          ./slcli scan --bsid buildSessionId.txt  --tests-runner --enable-ginkgo --path-to-scanner ./slgoagent --workspacepath "./" --packages-included "./integration_tests/*.go" \ 
+          ./slcli scan --bsid buildSessionId.txt  --tests-runner --path-to-scanner ./slgoagent --workspacepath "./" --packages-included "./integration_tests/*.go" \ 
            --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
         env:
           SEALIGHTS_TEST_STAGE: "Integration Tests"
-          SEALIGHTS_IGNORE_GO_TESTS: true
+          #SEALIGHTS_IGNORE_GO_TESTS: false
 
       - name: Create start test session
         run: ./slcli test start-stage --bsid buildSessionId.txt --labid "Integration Tests" --testGroupId "Integration Tests" --testStage "Integration Tests"
