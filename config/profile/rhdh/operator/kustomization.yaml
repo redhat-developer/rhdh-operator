@@ -42,3 +42,4 @@ configMapGenerator:
     name: default-config
   - files:
       - plugin-deps/orchestrator/sonataflow.yaml
+    name: plugin-deps-orchestrator
