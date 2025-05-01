@@ -120,13 +120,20 @@ jobs:
 
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
+        #if: steps.changed-files.outputs.any_changed == 'true'
         run: make test
+
+      - name: Run the SeaLights scan for integration_tests
+        id: sealights-scan-integration_tests
+        run: |
+          echo "[Sealights] Running the SeaLights scan"
+          ./slcli scan --bsid buildSessionId.txt  --tests-runner --enable-ginkgo --workspacepath "$(pwd)/integration_tests" --path-to-scanner ./slgoagent  --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
+          echo bsid=$(< buildSessionId.txt) | tee -a "$GITHUB_OUTPUT"
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
         # perform it on backstage.io for speed
-        if: steps.changed-files.outputs.any_changed == 'true'
+        #if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: RHDH specific Integration test
