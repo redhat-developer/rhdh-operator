@@ -107,7 +107,7 @@ jobs:
         #if: env.on-event == 'push'
         run: |
           echo "[Sealights] Configuring SeaLights to scan the main branch after pull request was closed"
-          ./slcli config create-bsid --app rhdh-operator --branch "main" --build ${LATEST_COMMIT_SHA}
+          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build ${LATEST_COMMIT_SHA}
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
