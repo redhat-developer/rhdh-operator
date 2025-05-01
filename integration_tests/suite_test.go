@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -54,6 +56,7 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 var useExistingController = false
+var currentPlatform platform.Platform
 
 type TestBackstageReconciler struct {
 	rec       controller.BackstageReconciler
@@ -104,6 +107,14 @@ var _ = BeforeSuite(func() {
 	}
 
 	var err error
+
+	if *testEnv.UseExistingCluster {
+		currentPlatform, err = controller.DetectPlatform()
+		Expect(err).To(Not(HaveOccurred()))
+	} else {
+		currentPlatform = platform.Default
+	}
+
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -215,25 +226,14 @@ func deleteNamespace(ctx context.Context, ns string) {
 func NewTestBackstageReconciler(namespace string) *TestBackstageReconciler {
 
 	sch := k8sClient.Scheme()
-	var (
-		isOpenshift bool
-		err         error
-	)
-	isOpenshift = isOpenshiftCluster()
-	if *testEnv.UseExistingCluster {
-		Expect(err).To(Not(HaveOccurred()))
-		if isOpenshift {
-			utilruntime.Must(openshift.Install(sch))
-		}
-	} else {
-		isOpenshift = false
+	if currentPlatform.IsOpenshift() {
+		utilruntime.Must(openshift.Install(sch))
 	}
 
 	return &TestBackstageReconciler{rec: controller.BackstageReconciler{
-		Client: k8sClient,
-		Scheme: sch,
-		// let's set it explicitly to avoid misunderstanding
-		IsOpenShift: isOpenshift,
+		Client:   k8sClient,
+		Scheme:   sch,
+		Platform: currentPlatform,
 	}, namespace: namespace}
 }
 
@@ -246,17 +246,6 @@ func (t *TestBackstageReconciler) ReconcileAny(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 	return t.rec.Reconcile(ctx, req)
-}
-
-func isOpenshiftCluster() bool {
-
-	if *testEnv.UseExistingCluster {
-		isOs, err := utils.IsOpenshift()
-		Expect(err).To(Not(HaveOccurred()))
-		return isOs
-	} else {
-		return false
-	}
 }
 
 func isProfile(profile string) bool {

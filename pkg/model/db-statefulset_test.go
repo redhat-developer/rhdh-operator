@@ -5,6 +5,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/utils/ptr"
@@ -32,7 +34,7 @@ func TestDefault(t *testing.T) {
 	bs := *dbStatefulSetBackstage.DeepCopy()
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
 	assert.Equal(t, model.LocalDbService.service.Name, model.localDbStatefulSet.statefulSet.Spec.ServiceName)
@@ -50,7 +52,7 @@ func TestOverrideDbImage(t *testing.T) {
 
 	_ = os.Setenv(LocalDbImageEnvVar, "dummy")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "dummy", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.Containers[0].Image)
@@ -62,7 +64,7 @@ func TestImagePullSecretSpec(t *testing.T) {
 	bs.Spec.Application.ImagePullSecrets = []string{"my-secret1", "my-secret2"}
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
@@ -74,7 +76,7 @@ func TestImagePullSecretSpec(t *testing.T) {
 	testObj = createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("db-statefulset.yaml", "ips-db-statefulset.yaml")
 
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	if assert.NoError(t, err) {
 		// if imagepullsecrets not defined - default used
 		assert.Equal(t, 2, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
@@ -89,7 +91,7 @@ func TestImagePullSecretSpec(t *testing.T) {
 	testObj = createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("db-statefulset.yaml", "ips-db-statefulset.yaml")
 
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, true, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	if assert.NoError(t, err) {
 		assert.Equal(t, 0, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"k8s.io/utils/ptr"
 
@@ -39,7 +41,7 @@ func TestDefaultSecretFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretFilesObjectKey, "raw-secret-files.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 
@@ -67,7 +69,7 @@ func TestDefaultMultiSecretFiles(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
 		addToDefaultConfig(SecretFilesObjectKey, "raw-multi-secret.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -100,7 +102,7 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	testObj.externalConfig.ExtraFileSecretKeys["secret2"] = NewDataObjectKeys(map[string]string{"conf.yaml": "data"}, nil)
 	testObj.externalConfig.ExtraFileSecretKeys["secret.dot"] = NewDataObjectKeys(nil, map[string][]byte{"conf3.yaml": []byte("data")})
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -134,7 +136,7 @@ func TestFailedValidation(t *testing.T) {
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
-	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.EqualError(t, err, "key is required if defaultMountPath is not specified for secret secret1")
 
 }
@@ -148,7 +150,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 
 	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(map[string]string{"conf.yaml": ""}, nil)}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -172,7 +174,7 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 
 	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(nil, map[string][]byte{"conf.yaml": []byte("")})}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)

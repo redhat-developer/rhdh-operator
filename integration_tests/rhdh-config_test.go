@@ -144,7 +144,7 @@ var _ = When("create default rhdh", func() {
 				g.Expect(found).To(BeTrue())
 			}
 
-			if isOpenshiftCluster() {
+			if currentPlatform.IsOpenshift() {
 				// no patch, so default
 				By("not applying any platform-specific patches", func() {
 					g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
