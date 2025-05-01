@@ -97,7 +97,7 @@ jobs:
           echo "[Sealights] Configuring SeaLights to scan the pull request branch"
           echo "Latest commit sha: ${LATEST_COMMIT_SHA}"
           echo "PR Number: ${PULL_REQUEST_NUMBER}"
-          ./slcli config create-pr-bsid --app rhdh-operator --target-branch "main" --pull-request-number ${PULL_REQUEST_NUMBER} --latest-commit ${LATEST_COMMIT_SHA} --repository-url https://github.com/npotluri-rh/rhdh-operator.git
+          ./slcli config create-pr-bsid --app rhdh-operator --target-branch "rhidp-6915" --pull-request-number ${PULL_REQUEST_NUMBER} --latest-commit ${LATEST_COMMIT_SHA} --repository-url https://github.com/npotluri-rh/rhdh-operator.git
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           LATEST_COMMIT_SHA: ${{github.event.pull_request.head.sha}}
