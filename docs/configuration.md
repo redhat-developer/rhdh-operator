@@ -507,6 +507,9 @@ spec:
   application:
     dynamicPluginsConfigMapName: "dynamic-plugins-config"
 ```
+Starting from version **0.7.0**, the Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
+
+```yaml
 
 #### Deployment Parameters
 

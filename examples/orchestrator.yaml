@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orchestrator-plugin
+data:
+  dynamic-plugins.yaml: |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins:
+      - disabled: false
+        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-1.5.1.tgz"
+        integrity: sha512-7VOe+XGTUzrdO/av0DNHbydOjB3Lo+XdCs6fj3JVODLP7Ypd3GXHf/nssYxG5ZYC9F1t9MNeguE2bZOB6ckqTA==
+        pluginConfig:
+          dynamicPlugins:
+            frontend:
+              red-hat-developer-hub.backstage-plugin-orchestrator:
+                appIcons:
+                  - importName: OrchestratorIcon
+                    module: OrchestratorPlugin
+                    name: orchestratorIcon
+                dynamicRoutes:
+                  - importName: OrchestratorPage
+                    menuItem:
+                      icon: orchestratorIcon
+                      text: Orchestrator
+                    module: OrchestratorPlugin
+                    path: /orchestrator
+      - disabled: false
+        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-backend-dynamic-1.5.1.tgz"
+        integrity: sha512-VIenFStdq9QvvmgmEMG8O7b2wqIebvEcqNeJ9SWZ8jen9t+efTK6D3Rde74LQ1no1QaHLx8RoxNCOuTUEF8O/g==
+        pluginConfig:
+          orchestrator:
+            dataIndexService:
+              url: http://sonataflow-platform-data-index-service
+        dependencies:
+          - ref: orchestrator
+      - disabled: false
+        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic-1.5.1.tgz"
+        integrity: sha512-bnVQjVsUZ470Vgm2kd5Lo/bVa2fF0q4GufBDc/8oTQsnP3zZJQqKFvFElBTCjY76RqkECydlvZ1UFybSzvockQ==
+        pluginConfig:
+          orchestrator:
+            dataIndexService:
+              url: http://sonataflow-platform-data-index-service
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config-rhdh
+data:
+  app-config-rhdh.yaml: |-
+    app:
+      title: Red Hat Developer Hub
+    backend:
+      cors:
+        credentials: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+      csp:
+        script-src: ["'self'", "'unsafe-inline'", "'unsafe-eval'"]
+        script-src-elem: ["'self'", "'unsafe-inline'", "'unsafe-eval'"]
+        connect-src: ["'self'", 'http:', 'https:', 'data:']
+      auth:
+        externalAccess:
+          - type: legacy
+            options:
+              subject: legacy-default-config
+              secret: "${BACKEND_SECRET}"
+    auth:
+      environment: development
+      providers:
+        guest:
+          # using the guest user to query the '/api/dynamic-plugins-info/loaded-plugins' endpoint.
+          dangerouslyAllowOutsideDevelopment: true
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rhdh-secrets
+type: Opaque
+stringData:
+  #ROUTE_URL: "https://backstage-bs1-backstage.apps.rosa.pvmvb-xo4tu-ri7.1py9.p3.openshiftapps.com"
+  BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK"
+---
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: orchestrator
+spec:
+  application:
+    appConfig:
+      configMaps:
+        - name: app-config-rhdh
+    extraEnvs:
+      secrets:
+        - name: rhdh-secrets
+    dynamicPluginsConfigMapName: orchestrator-plugin
