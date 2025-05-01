@@ -110,6 +110,13 @@ jobs:
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
+      - name: Run the SeaLights scan
+        id: sealights-scan
+        run: |
+          echo "[Sealights] Running the SeaLights scan"
+          ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent --workspacepath ./ --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
+          echo bsid=$(< buildSessionId.txt) | tee -a "$GITHUB_OUTPUT"
+
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
         #if: steps.changed-files.outputs.any_changed == 'true'
@@ -125,13 +132,6 @@ jobs:
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
-
-      - name: Run the SeaLights scan
-        id: sealights-scan
-        run: |
-          echo "[Sealights] Running the SeaLights scan"
-          ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent --workspacepath ./ --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
-          echo bsid=$(< buildSessionId.txt) | tee -a "$GITHUB_OUTPUT"
 
       - name: end test session
         if: success() || failure()
