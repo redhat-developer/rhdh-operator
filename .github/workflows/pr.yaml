@@ -7,6 +7,7 @@ on:
     - rhdh-1.[0-9]+
     - 1.[0-9]+.x
     - release-1.[0-9]+
+    - rhidp-6915
 
 jobs:
   pr-validate:
