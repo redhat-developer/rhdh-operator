@@ -127,7 +127,7 @@ jobs:
         run: make test
 
       - name: Create a end test session
-        run: ./slcli test end-stage --bsid buildSessionId.txt --testStage "Unit Tests"
+        run: ./slcli test end-stage --bsid buildSessionId.txt --executionId "Unit Tests"
 
       - name: Run the SeaLights scan for integration_tests
         id: sealights-scan-integration_tests
@@ -145,7 +145,7 @@ jobs:
         run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: Create a end test session
-        run: ./slcli test end-stage --bsid buildSessionId.txt --testStage "Integration Tests"
+        run: ./slcli test end-stage --bsid buildSessionId.txt --executionId "Integration Tests"
 
       - name: RHDH specific Integration test
         # run this stage only if there are changes that match the includes and not the excludes
