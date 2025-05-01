@@ -186,12 +186,12 @@ func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
 // returns a list of plugins from the configMap
 func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
 	if p.ConfigMap == nil {
-		return nil, fmt.Errorf("dynamic plugins configMap is not set")
+		return []DynaPlugin{}, nil
 	}
 
 	data := p.ConfigMap.Data[DynamicPluginsFile]
 	if data == "" {
-		return nil, fmt.Errorf("dynamic plugins configMap does not contain %s key", DynamicPluginsFile)
+		return []DynaPlugin{}, nil
 	}
 
 	var pluginsConfig DynaPluginsConfig
