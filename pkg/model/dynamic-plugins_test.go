@@ -188,7 +188,7 @@ plugins:
 		Data:       map[string]string{DynamicPluginsFile: yamlData},
 	}
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, false, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)

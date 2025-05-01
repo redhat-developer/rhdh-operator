@@ -92,12 +92,6 @@ var _ = BeforeSuite(func() {
 			testEnv.UseExistingCluster = ptr.To(boolValue)
 		}
 	}
-	if !*testEnv.UseExistingCluster {
-		// force k8s platform if not use existing cluster
-		// this is needed for instance for the case when we run tests
-		// on test env but OCP cluster is configured as current
-		os.Setenv(utils.PlatformEnvVar, "k8s")
-	}
 
 	if val, ok := os.LookupEnv("USE_EXISTING_CONTROLLER"); ok {
 		boolValue, err := strconv.ParseBool(val)
