@@ -92,7 +92,7 @@ jobs:
           ./slcli config init --lang go --token ./sltoken.txt
 
       - name: Configuring SeaLights - on pull_request event
-        #if: env.on-event == 'pull_request'
+        if: env.on-event == 'pull_request'
         run: |
           echo "[Sealights] Configuring SeaLights to scan the pull request branch"
           echo "Latest commit sha: ${LATEST_COMMIT_SHA}"
@@ -101,6 +101,14 @@ jobs:
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           LATEST_COMMIT_SHA: ${{github.event.pull_request.head.sha}}
+
+      - name: Configuring SeaLights - on push event
+        if: env.on-event == 'push'
+        run: |
+          echo "[Sealights] Configuring SeaLights to scan the main branch after pull request was closed"
+          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build ${LATEST_COMMIT_SHA}
+        env:
+          LATEST_COMMIT_SHA: ${{ github.sha }}
 
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
