@@ -50,6 +50,10 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: build
         run: make lint
@@ -107,19 +111,20 @@ jobs:
         #if: env.on-event == 'push'
         run: |
           echo "[Sealights] Configuring SeaLights to scan the main branch after pull request was closed"
-          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build ${LATEST_COMMIT_SHA}
+          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build ${LATEST_COMMIT_SHA}-${{ steps.date.outputs.date }}
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
       - name: Run the SeaLights scan
-        id: sealights-scan
         run: |
           echo "[Sealights] Running the SeaLights scan"
-          ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent --workspacepath ./ --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
-          echo bsid=$(< buildSessionId.txt) | tee -a "$GITHUB_OUTPUT"
+          ./slcli scan --bsid buildSessionId.txt --tests-runner --path-to-scanner ./slgoagent --workspacepath ./ \
+          --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
+        env:
+          SEALIGHTS_TEST_STAGE: "Unit Tests"
 
-      - name: Create a test session
-        run: ./slcli test start-stage --bsid buildSessionId.txt --testStage "Unit Tests"
+      - name: Create start test session
+        run: ./slcli test start-stage --bsid buildSessionId.txt --labid "Unit Tests --testGroupId "Unit Tests"
 
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
@@ -127,16 +132,19 @@ jobs:
         run: make test
 
       - name: Create a end test session
-        run: ./slcli test end-stage --bsid buildSessionId.txt --executionId "Unit Tests"
+        run: ./slcli test end-stage --bsid buildSessionId.txt --labid "Unit Tests" --testGroupId "Unit Tests"
 
       - name: Run the SeaLights scan for integration_tests
-        id: sealights-scan-integration_tests
         run: |
-          echo "[Sealights] Running the SeaLights scan"
-          ./slcli scan --bsid buildSessionId.txt  --tests-runner --enable-ginkgo --workspacepath "$(pwd)/integration_tests" --path-to-scanner ./slgoagent  --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
+          echo "[Sealights] Running the SeaLights integration tests scan"
+          ./slcli scan --bsid buildSessionId.txt  --tests-runner --enable-ginkgo --workspacepath "$(pwd)/integration_tests" \ 
+          --path-to-scanner ./slgoagent  --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
+        env:
+          SEALIGHTS_TEST_STAGE: "Integration Tests"
+          SEALIGHTS_IGNORE_GO_TESTS: true
 
-      - name: Create a test session
-        run: ./slcli test start-stage --bsid buildSessionId.txt --testStage "Integration Tests"
+      - name: Create start test session
+        run: ./slcli test start-stage --bsid buildSessionId.txt --labid "Integration Tests" --testGroupId "Integration Tests"
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
@@ -145,7 +153,7 @@ jobs:
         run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: Create a end test session
-        run: ./slcli test end-stage --bsid buildSessionId.txt --executionId "Integration Tests"
+        run: ./slcli test end-stage --bsid buildSessionId.txt --labid "Integration Tests" --testGroupId "Integration Tests"
 
       - name: RHDH specific Integration test
         # run this stage only if there are changes that match the includes and not the excludes
