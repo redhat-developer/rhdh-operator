@@ -50,9 +50,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Get current date
-        id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+      - name: Store build timestamp
+        run: echo "BUILD_TIME=$(date +'%T')" >> $GITHUB_ENV
 
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: build
@@ -111,7 +110,7 @@ jobs:
         #if: env.on-event == 'push'
         run: |
           echo "[Sealights] Configuring SeaLights to scan the main branch after pull request was closed"
-          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build ${{ steps.date.outputs.date }}-${LATEST_COMMIT_SHA}
+          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build "$BUILD_TIME :$LATEST_COMMIT_SHA"
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
@@ -137,27 +136,17 @@ jobs:
       - name: Run the SeaLights scan for integration_tests
         run: |
           echo "[Sealights] Running the SeaLights integration tests scan"
-          ./slcli scan --bsid buildSessionId.txt  --tests-runner --path-to-scanner ./slgoagent --workspacepath "./" --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
+          ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent --workspacepath "./" --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmProvider github
         env:
           SEALIGHTS_TEST_STAGE: "Integration Tests"
           #SEALIGHTS_IGNORE_GO_TESTS: false
-
-      - name: Create start test session
-        run: ./slcli test start-stage --bsid buildSessionId.txt --labid "github-runner" --testGroupId "Integration Tests" --testStage "Integration Tests"
+          SEALIGHTS_TEST_SELECTION: false
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
         # perform it on backstage.io for speed
         #if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
-
-      - name: Create a end test session
-        run: ./slcli test end-stage --bsid buildSessionId.txt --labid "Integration Tests" --testGroupId "Integration Tests"
-
-      - name: RHDH specific Integration test
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
-        run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: clean all SeaLights secret stuff
         run: |
