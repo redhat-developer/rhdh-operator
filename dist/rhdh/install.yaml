@@ -1919,7 +1919,7 @@ data:
                 dataIndexService:
                   url: http://sonataflow-platform-data-index-service
             dependencies:
-              - ref: orchestrator
+              - ref: sonataflow
           - disabled: true
             package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic-1.5.1.tgz"
             integrity: sha512-bnVQjVsUZ470Vgm2kd5Lo/bVa2fF0q4GufBDc/8oTQsnP3zZJQqKFvFElBTCjY76RqkECydlvZ1UFybSzvockQ==
@@ -2105,7 +2105,7 @@ data:
                 databaseName: backstage_plugin_orchestrator
 kind: ConfigMap
 metadata:
-  name: rhdh-plugin-deps-orchestrator
+  name: rhdh-plugin-deps
   namespace: rhdh-operator
 ---
 apiVersion: v1
@@ -2187,7 +2187,7 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh/rhdh-hub-rhel9:next
-        image: quay.io/gazarenk/backstage-operator:latest
+        image: quay.io/rhdh/rhdh-rhel9-operator:1.7
         livenessProbe:
           httpGet:
             path: /healthz
@@ -2221,18 +2221,19 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         volumeMounts:
-        - mountPath: plugin-deps/orchestrator
-          name: plugin-deps-orchestrator
         - mountPath: /default-config
           name: default-config
+        - mountPath: /plugin-deps
+          name: plugin-deps
       securityContext:
         runAsNonRoot: true
       serviceAccountName: rhdh-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
       - configMap:
-          name: rhdh-plugin-deps-orchestrator
-        name: plugin-deps-orchestrator
-      - configMap:
           name: rhdh-default-config
         name: default-config
+      - configMap:
+          name: rhdh-plugin-deps
+          optional: true
+        name: plugin-deps

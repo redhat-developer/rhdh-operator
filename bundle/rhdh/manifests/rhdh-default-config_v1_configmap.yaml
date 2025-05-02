@@ -408,7 +408,7 @@ data:
                 dataIndexService:
                   url: http://sonataflow-platform-data-index-service
             dependencies:
-              - ref: orchestrator
+              - ref: sonataflow
           - disabled: true
             package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic-1.5.1.tgz"
             integrity: sha512-bnVQjVsUZ470Vgm2kd5Lo/bVa2fF0q4GufBDc/8oTQsnP3zZJQqKFvFElBTCjY76RqkECydlvZ1UFybSzvockQ==
