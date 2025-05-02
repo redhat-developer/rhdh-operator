@@ -3,15 +3,14 @@ package model
 import (
 	"fmt"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"k8s.io/klog/v2"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
-
-	"k8s.io/apimachinery/pkg/runtime"
 
 	openshift "github.com/openshift/api/route/v1"
 )
@@ -19,6 +18,7 @@ import (
 type BackstageRouteFactory struct{}
 
 func (f BackstageRouteFactory) newBackstageObject() RuntimeObject {
+	__sealights__.TraceFunc("2298dcdf3247ffb23a")
 	return &BackstageRoute{}
 }
 
@@ -27,10 +27,12 @@ type BackstageRoute struct {
 }
 
 func RouteName(backstageName string) string {
+	__sealights__.TraceFunc("e4ed69a16d4cb45c99")
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage")
 }
 
 func (b *BackstageRoute) setRoute(specified *bsv1.Route) {
+	__sealights__.TraceFunc("c4d2cffca72e99c13a")
 
 	if len(specified.Host) > 0 {
 		b.route.Spec.Host = specified.Host
@@ -74,15 +76,18 @@ func (b *BackstageRoute) setRoute(specified *bsv1.Route) {
 }
 
 func init() {
+	__sealights__.TraceFunc("bb162f36239c3c04b6")
 	registerConfig("route.yaml", BackstageRouteFactory{}, false)
 }
 
 // implementation of RuntimeObject interface
 func (b *BackstageRoute) Object() runtime.Object {
+	__sealights__.TraceFunc("2cb0a99ceab68d3e94")
 	return b.route
 }
 
 func (b *BackstageRoute) setObject(obj runtime.Object) {
+	__sealights__.TraceFunc("b37b75025e50c807f2")
 	b.route = nil
 	if obj != nil {
 		b.route = obj.(*openshift.Route)
@@ -91,11 +96,13 @@ func (b *BackstageRoute) setObject(obj runtime.Object) {
 
 // implementation of RuntimeObject interface
 func (b *BackstageRoute) EmptyObject() client.Object {
+	__sealights__.TraceFunc("8b2860189fadc1381a")
 	return &openshift.Route{}
 }
 
 // implementation of RuntimeObject interface
 func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+	__sealights__.TraceFunc("03fcc7fda857a89e3c")
 
 	// not Openshift
 	if !model.isOpenshift {
@@ -132,12 +139,14 @@ func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backst
 
 // implementation of RuntimeObject interface
 func (b *BackstageRoute) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
+	__sealights__.TraceFunc("c026d73b0d942c33f5")
 	b.route.Spec.To.Name = model.backstageService.service.Name
 	b.updateAppConfigWithBaseUrls(model, backstage)
 	return nil
 }
 
 func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	__sealights__.TraceFunc("66f5c5c63d689ee6fc")
 	b.route.SetName(RouteName(backstage.Name))
 	setMetaInfo(b.route, backstage, scheme)
 }
@@ -146,6 +155,7 @@ func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 // Note that this is purposely done on a best effort basis. So it is not considered an issue if the cluster ingress domain
 // could not be determined, since the user can always set it explicitly in their custom app-config.
 func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstage bsv1.Backstage) {
+	__sealights__.TraceFunc("a74dd93c7d0c75f49a")
 	if m.appConfig == nil || m.appConfig.ConfigMap == nil {
 		klog.V(1).Infof(
 			"Default app-config ConfigMap not initialized yet - skipping automatic population of base URLS in the default app-config for Backstage %s",
@@ -155,6 +165,7 @@ func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstag
 
 	baseUrl := buildBaseUrl(m, backstage)
 	updateFn := func(content string) (string, error) {
+		__sealights__.TraceFunc("48c87f0b15bb843964")
 		var appConfigData map[string]any
 		err := yaml.Unmarshal([]byte(content), &appConfigData)
 		if err != nil {
@@ -205,6 +216,7 @@ func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstag
 // buildBaseUrl returns the base URL that should be considered as default on OpenShift,
 // per the cluster ingress domain and the Route spec.
 func buildBaseUrl(model *BackstageModel, backstage bsv1.Backstage) string {
+	__sealights__.TraceFunc("794ee57bc2553ee978")
 	host := fmt.Sprintf("%s-%s", RouteName(backstage.Name), backstage.Namespace)
 	appendIngressDomain := true
 	if backstage.Spec.Application != nil && backstage.Spec.Application.Route != nil {

@@ -5,17 +5,22 @@ import (
 	"flag"
 	"os"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -23,8 +28,9 @@ import (
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
 
 	openshift "github.com/openshift/api/route/v1"
-	//+kubebuilder:scaffold:imports
 )
+
+//+kubebuilder:scaffold:imports
 
 var (
 	scheme   = runtime.NewScheme()
@@ -32,6 +38,7 @@ var (
 )
 
 func init() {
+	__sealights__.TraceFunc("4afd726916cf198fda")
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(bsv1.AddToScheme(scheme))
@@ -41,6 +48,8 @@ func init() {
 }
 
 func main() {
+	__sealights__.StartMainFunc("c531b2fc09654ae68c")
+	defer func() { __sealights__.EndMainFunc("c531b2fc09654ae68c") }()
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -72,6 +81,7 @@ func main() {
 	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	disableHTTP2 := func(c *tls.Config) {
+		__sealights__.TraceFunc("ac5db439bee4dc31ae")
 		setupLog.Info("disabling http/2")
 		c.NextProtos = []string{"http/1.1"}
 	}

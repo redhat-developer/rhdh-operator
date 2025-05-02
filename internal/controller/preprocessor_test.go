@@ -3,19 +3,22 @@ package controller
 import (
 	"context"
 	"os"
-
 	"testing"
+
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
-
 	"github.com/stretchr/testify/assert"
+
 	corev1 "k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 func updateConfigMap(t *testing.T) BackstageReconciler {
+	__sealights__.TraceFunc("6b29044ef1de4cbd7f")
 	ctx := context.TODO()
 
 	bs := bsv1.Backstage{
@@ -64,6 +67,8 @@ func updateConfigMap(t *testing.T) BackstageReconciler {
 }
 
 func TestExtConfigChanged(t *testing.T) {
+	__sealights__.StartTestFunc("66d8286513146391fd", t)
+	defer func() { __sealights__.EndTestFunc("66d8286513146391fd", t) }()
 
 	ctx := context.TODO()
 	cm := corev1.ConfigMap{}
@@ -87,6 +92,8 @@ func TestExtConfigChanged(t *testing.T) {
 
 // TestExtConfigChanged tests if concatData returns the same data when the order of the keys is different
 func TestExtConcatData(t *testing.T) {
+	__sealights__.StartTestFunc("d65b2743a298f85c5a", t)
+	defer func() { __sealights__.EndTestFunc("d65b2743a298f85c5a", t) }()
 	cm := corev1.ConfigMap{}
 
 	cm.Data = map[string]string{"key1": "value1", "key2": "value2", "key3": "value3", "key4": "value4"}

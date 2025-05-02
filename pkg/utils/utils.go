@@ -14,15 +14,14 @@ import (
 	"strconv"
 	"strings"
 
-	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
-	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
+	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
 )
 
 const maxK8sResourceNameLength = 63
@@ -34,6 +33,7 @@ const (
 )
 
 func SetKubeLabels(labels map[string]string, backstageName string) map[string]string {
+	__sealights__.TraceFunc("ed879344e6c73e433d")
 	if labels == nil {
 		labels = map[string]string{}
 	}
@@ -45,6 +45,7 @@ func SetKubeLabels(labels map[string]string, backstageName string) map[string]st
 
 // GenerateLabel generates backstage-{Id} for labels or selectors
 func GenerateLabel(labels *map[string]string, name string, value string) {
+	__sealights__.TraceFunc("e06f091629a819f81e")
 	if *labels == nil {
 		*labels = map[string]string{}
 	}
@@ -52,6 +53,7 @@ func GenerateLabel(labels *map[string]string, name string, value string) {
 }
 
 func AddAnnotation(object client.Object, name string, value string) {
+	__sealights__.TraceFunc("856e988bbf1ce200c2")
 	if object.GetAnnotations() == nil {
 		object.SetAnnotations(map[string]string{})
 	}
@@ -60,6 +62,7 @@ func AddAnnotation(object client.Object, name string, value string) {
 
 // GenerateRuntimeObjectName generates name using BackstageCR name and objectType which is ConfigObject Key without '.yaml' (like 'deployment')
 func GenerateRuntimeObjectName(backstageCRName string, objectType string) string {
+	__sealights__.TraceFunc("acf18e425e43186484")
 	return fmt.Sprintf("%s-%s", objectType, backstageCRName)
 }
 
@@ -70,14 +73,17 @@ func GenerateRuntimeObjectName(backstageCRName string, objectType string) string
 //
 // See https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 func GenerateVolumeNameFromCmOrSecret(cmOrSecretName string) string {
+	__sealights__.TraceFunc("a4d09dcc9d55608c5d")
 	return ToRFC1123Label(cmOrSecretName)
 }
 
 func BackstageAppLabelValue(backstageName string) string {
+	__sealights__.TraceFunc("1ddd0154f1f4fdfa7e")
 	return fmt.Sprintf("backstage-%s", backstageName)
 }
 
 func BackstageDbAppLabelValue(backstageName string) string {
+	__sealights__.TraceFunc("f7ee1cded4c1178ad6")
 	return fmt.Sprintf("backstage-psql-%s", backstageName)
 }
 
@@ -87,6 +93,7 @@ func BackstageDbAppLabelValue(backstageName string) string {
 // templ - template object to create new objects
 // scheme - runtime.Scheme
 func ReadYamls(manifest []byte, platformPatch []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
+	__sealights__.TraceFunc("b44f24017a1771a05f")
 
 	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
 
@@ -129,6 +136,7 @@ func ReadYamls(manifest []byte, platformPatch []byte, templ runtime.Object, sche
 }
 
 func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+	__sealights__.TraceFunc("48371ecc3a3c215d9e")
 	fpath := filepath.Clean(path)
 	if _, err := os.Stat(fpath); err != nil {
 		return nil, err
@@ -147,6 +155,7 @@ func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme, pla
 }
 
 func readPlatformPatch(path string, platformExt string) ([]byte, error) {
+	__sealights__.TraceFunc("e99b97f9ade6c54275")
 	fpath := filepath.Clean(path + "." + platformExt)
 	b, err := os.ReadFile(fpath)
 	if err != nil {
@@ -159,6 +168,7 @@ func readPlatformPatch(path string, platformExt string) ([]byte, error) {
 }
 
 func checkObjectKind(object client.Object, scheme *runtime.Scheme) error {
+	__sealights__.TraceFunc("434906e18e8712374c")
 	gvks, _, err := scheme.ObjectKinds(object)
 	if err != nil {
 		return fmt.Errorf("failed to obtain object Kind: %w", err)
@@ -175,6 +185,7 @@ func checkObjectKind(object client.Object, scheme *runtime.Scheme) error {
 }
 
 func GetObjectKind(object client.Object, scheme *runtime.Scheme) *schema.GroupVersionKind {
+	__sealights__.TraceFunc("9c07bcdd11e3ace063")
 	gvks, _, err := scheme.ObjectKinds(object)
 	if err != nil {
 		return nil
@@ -183,10 +194,12 @@ func GetObjectKind(object client.Object, scheme *runtime.Scheme) *schema.GroupVe
 }
 
 func DefFile(key string) string {
+	__sealights__.TraceFunc("f3f116bbba2f78bad6")
 	return filepath.Join(os.Getenv("LOCALBIN"), "default-config", key)
 }
 
 func GeneratePassword(length int) (string, error) {
+	__sealights__.TraceFunc("2be46e56a6fdfa8d9e")
 	buff := make([]byte, length)
 	if _, err := rand.Read(buff); err != nil {
 		return "", err
@@ -199,6 +212,7 @@ func GeneratePassword(length int) (string, error) {
 // See https://kubernetes.io/docs/concepts/overview/working-with-objects/names/ for more details about the requirements.
 // It will replace any invalid characters with a dash and drop any leading or trailing dashes.
 func ToRFC1123Label(str string) string {
+	__sealights__.TraceFunc("6af5ab9738af645a75")
 	const dash = "-"
 
 	name := strings.ToLower(str)
@@ -225,6 +239,7 @@ func ToRFC1123Label(str string) string {
 }
 
 func BoolEnvVar(envvar string, def bool) bool {
+	__sealights__.TraceFunc("c5eaa2b251ee1a4dd6")
 	if envValue, ok := os.LookupEnv(envvar); ok {
 		if ret, err := strconv.ParseBool(envValue); err == nil {
 			return ret
@@ -234,6 +249,7 @@ func BoolEnvVar(envvar string, def bool) bool {
 }
 
 func FilterContainers(allContainers []string, filter string) []string {
+	__sealights__.TraceFunc("051c061b337c872336")
 	if filter == "*" {
 		return allContainers
 	} else if filter == "" {

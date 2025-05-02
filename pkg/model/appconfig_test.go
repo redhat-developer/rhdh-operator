@@ -4,17 +4,16 @@ import (
 	"context"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
-	"golang.org/x/exp/maps"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	"golang.org/x/exp/maps"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -60,6 +59,8 @@ var (
 )
 
 func TestDefaultAppConfig(t *testing.T) {
+	__sealights__.StartTestFunc("e5c18eda0dcce016a7", t)
+	defer func() { __sealights__.EndTestFunc("e5c18eda0dcce016a7", t) }()
 
 	bs := *appConfigTestBackstage.DeepCopy()
 
@@ -82,6 +83,8 @@ func TestDefaultAppConfig(t *testing.T) {
 }
 
 func TestSpecifiedAppConfig(t *testing.T) {
+	__sealights__.StartTestFunc("298af7a53fb8e32ef9", t)
+	defer func() { __sealights__.EndTestFunc("298af7a53fb8e32ef9", t) }()
 
 	bs := *appConfigTestBackstage.DeepCopy()
 	bs.Spec.Application.AppConfig.MountPath = "/app/src"
@@ -122,6 +125,8 @@ func TestSpecifiedAppConfig(t *testing.T) {
 }
 
 func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
+	__sealights__.StartTestFunc("4ff331030d99058960", t)
+	defer func() { __sealights__.EndTestFunc("4ff331030d99058960", t) }()
 
 	bs := *appConfigTestBackstage.DeepCopy()
 	cms := &bs.Spec.Application.AppConfig.ConfigMaps

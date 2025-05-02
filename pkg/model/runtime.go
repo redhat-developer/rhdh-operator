@@ -8,19 +8,15 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
@@ -54,6 +50,7 @@ type BackstageModel struct {
 }
 
 func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
+	__sealights__.TraceFunc("f2064c2e8a23ea1ea8")
 	for i, obj := range m.RuntimeObjects {
 		if reflect.TypeOf(obj) == reflect.TypeOf(object) {
 			m.RuntimeObjects[i] = object
@@ -64,6 +61,7 @@ func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
 }
 
 func (m *BackstageModel) getRuntimeObjectByType(object RuntimeObject) RuntimeObject {
+	__sealights__.TraceFunc("5dd18a6235ac63b792")
 	for _, obj := range m.RuntimeObjects {
 		if reflect.TypeOf(obj) == reflect.TypeOf(object) {
 			return obj
@@ -74,9 +72,11 @@ func (m *BackstageModel) getRuntimeObjectByType(object RuntimeObject) RuntimeObj
 
 // sort objects so DbStatefulSet and BackstageDeployment become the last in the list
 func (m *BackstageModel) sortRuntimeObjects() {
+	__sealights__.TraceFunc("dc24c33fb378f0a82f")
 
 	slices.SortFunc(m.RuntimeObjects,
 		func(a, b RuntimeObject) int {
+			__sealights__.TraceFunc("8fe409301c738134a1")
 			_, ok1 := b.(*DbStatefulSet)
 			_, ok2 := b.(*BackstageDeployment)
 			if ok1 || ok2 {
@@ -88,11 +88,13 @@ func (m *BackstageModel) sortRuntimeObjects() {
 
 // Registers config object
 func registerConfig(key string, factory ObjectFactory, multiple bool) {
+	__sealights__.TraceFunc("87e70c3bedb19e87ab")
 	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory, Multiple: multiple})
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
 func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, platform platform.Platform, scheme *runtime.Scheme) (*BackstageModel, error) {
+	__sealights__.TraceFunc("5b679d4ee1ff18b1d6")
 
 	// 3 phases of Backstage configuration:
 	// 1- load from Operator defaults, modify metadata (labels, selectors..) and namespace as needed
@@ -171,6 +173,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 }
 
 func addFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
+	__sealights__.TraceFunc("bb1ee8bb05a3069aed")
 
 	if err := addAppConfigsFromSpec(spec, model); err != nil {
 		return err
@@ -196,6 +199,7 @@ func addFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
 
 // Every RuntimeObject.setMetaInfo should as minimum call this
 func setMetaInfo(clientObj client.Object, backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	__sealights__.TraceFunc("2e11bee2f154dea76a")
 
 	clientObj.SetNamespace(backstage.Namespace)
 	clientObj.SetLabels(utils.SetKubeLabels(clientObj.GetLabels(), backstage.Name))
@@ -209,6 +213,7 @@ func setMetaInfo(clientObj client.Object, backstage bsv1.Backstage, scheme *runt
 }
 
 func adjustObject(objectConfig ObjectConfig, objects []client.Object) (runtime.Object, error) {
+	__sealights__.TraceFunc("0167efc3388da53710")
 	if len(objects) == 0 {
 		return nil, nil
 	}

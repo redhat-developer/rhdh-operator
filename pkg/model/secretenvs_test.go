@@ -4,20 +4,20 @@ import (
 	"context"
 	"testing"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestDefaultSecretEnvFrom(t *testing.T) {
+	__sealights__.StartTestFunc("7622e49b1be15a074b", t)
+	defer func() { __sealights__.EndTestFunc("7622e49b1be15a074b", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -46,6 +46,8 @@ func TestDefaultSecretEnvFrom(t *testing.T) {
 }
 
 func TestDefaultMultiSecretEnv(t *testing.T) {
+	__sealights__.StartTestFunc("b11a02dc4a925f6ce7", t)
+	defer func() { __sealights__.EndTestFunc("b11a02dc4a925f6ce7", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -75,6 +77,8 @@ func TestDefaultMultiSecretEnv(t *testing.T) {
 }
 
 func TestSpecifiedSecretEnvs(t *testing.T) {
+	__sealights__.StartTestFunc("6b67f185f36ba82719", t)
+	defer func() { __sealights__.EndTestFunc("6b67f185f36ba82719", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{

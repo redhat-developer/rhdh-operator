@@ -3,15 +3,18 @@ package controller
 import (
 	"context"
 
-	ctrl "sigs.k8s.io/controller-runtime"
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 )
 
 func DetectPlatform() (platform.Platform, error) {
+	__sealights__.TraceFunc("64b761c0d0a7338d8b")
 
 	config := ctrl.GetConfigOrDie()
 	clientset, err := kubernetes.NewForConfig(config)

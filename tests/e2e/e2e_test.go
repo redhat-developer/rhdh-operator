@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/onsi/gomega/gcustom"
-
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/tests/helper"
 
 	. "github.com/onsi/ginkgo/v2"
+
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 	"github.com/tidwall/gjson"
@@ -421,6 +422,7 @@ spec:
 })
 
 func ensureRouteIsReachable(ns string, crName string, crLabel string, additionalApiEndpointTests []helper.ApiEndpointTest) {
+	__sealights__.TraceFunc("a0bfbd16a22e01829a")
 	Eventually(helper.VerifyBackstageRoute, 5*time.Minute, time.Second).
 		WithArguments(ns, crName, additionalApiEndpointTests).
 		Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))

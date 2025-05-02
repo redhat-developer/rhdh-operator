@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
+	__sealights__.StartTestFunc("5854adab2dc8611b76", t)
+	defer func() { __sealights__.EndTestFunc("5854adab2dc8611b76", t) }()
 	for _, cfg := range runtimeConfig {
 		obj := cfg.ObjectFactory.newBackstageObject()
 		assert.NotNil(t, obj.EmptyObject())
@@ -29,6 +29,8 @@ func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
 
 // NOTE: to make it work locally env var LOCALBIN should point to the directory where default-config folder located
 func TestInitDefaultDeploy(t *testing.T) {
+	__sealights__.StartTestFunc("4df1e55c20f1954216", t)
+	defer func() { __sealights__.EndTestFunc("4df1e55c20f1954216", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -66,6 +68,8 @@ func TestInitDefaultDeploy(t *testing.T) {
 }
 
 func TestIfEmptyObjectIsValid(t *testing.T) {
+	__sealights__.StartTestFunc("fe64f8c0f31bd68f68", t)
+	defer func() { __sealights__.EndTestFunc("fe64f8c0f31bd68f68", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -91,6 +95,8 @@ func TestIfEmptyObjectIsValid(t *testing.T) {
 }
 
 func TestAddToModel(t *testing.T) {
+	__sealights__.StartTestFunc("23140e06264edd60de", t)
+	defer func() { __sealights__.EndTestFunc("23140e06264edd60de", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -135,6 +141,8 @@ func TestAddToModel(t *testing.T) {
 }
 
 func TestRawConfig(t *testing.T) {
+	__sealights__.StartTestFunc("b10bfc9e74bae7b8bc", t)
+	defer func() { __sealights__.EndTestFunc("b10bfc9e74bae7b8bc", t) }()
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
@@ -173,6 +181,8 @@ spec:
 }
 
 func TestMultiobject(t *testing.T) {
+	__sealights__.StartTestFunc("37a280d34e29cca12e", t)
+	defer func() { __sealights__.EndTestFunc("37a280d34e29cca12e", t) }()
 	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -190,6 +200,8 @@ func TestMultiobject(t *testing.T) {
 }
 
 func TestSingleMultiobject(t *testing.T) {
+	__sealights__.StartTestFunc("fdc4dfbe806179e4a7", t)
+	defer func() { __sealights__.EndTestFunc("fdc4dfbe806179e4a7", t) }()
 	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "single-pvc.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -207,6 +219,8 @@ func TestSingleMultiobject(t *testing.T) {
 }
 
 func TestSingleFailedWithMultiDefinition(t *testing.T) {
+	__sealights__.StartTestFunc("703c0859cbb393ff5c", t)
+	defer func() { __sealights__.EndTestFunc("703c0859cbb393ff5c", t) }()
 	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "multi-service-err.yaml")
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -214,6 +228,8 @@ func TestSingleFailedWithMultiDefinition(t *testing.T) {
 }
 
 func TestInvalidObjectKind(t *testing.T) {
+	__sealights__.StartTestFunc("64720af4ecda3bcb30", t)
+	defer func() { __sealights__.EndTestFunc("64720af4ecda3bcb30", t) }()
 	bs := bsv1.Backstage{}
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "invalid-service-type.yaml")
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)

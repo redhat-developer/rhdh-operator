@@ -4,18 +4,17 @@ import (
 	"context"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var testDynamicPluginsBackstage = bsv1.Backstage{
@@ -32,6 +31,8 @@ var testDynamicPluginsBackstage = bsv1.Backstage{
 }
 
 func TestDynamicPluginsValidationFailed(t *testing.T) {
+	__sealights__.StartTestFunc("ed63ee0e52e7946f1b", t)
+	defer func() { __sealights__.EndTestFunc("ed63ee0e52e7946f1b", t) }()
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
@@ -46,6 +47,8 @@ func TestDynamicPluginsValidationFailed(t *testing.T) {
 }
 
 func TestDynamicPluginsInvalidKeyName(t *testing.T) {
+	__sealights__.StartTestFunc("bc6da83df4d586834e", t)
+	defer func() { __sealights__.EndTestFunc("bc6da83df4d586834e", t) }()
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
 	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
@@ -68,6 +71,8 @@ func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 
 // Janus specific test
 func TestDefaultDynamicPlugins(t *testing.T) {
+	__sealights__.StartTestFunc("9663d0e5731a25cf31", t)
+	defer func() { __sealights__.EndTestFunc("9663d0e5731a25cf31", t) }()
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
@@ -96,6 +101,8 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 }
 
 func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
+	__sealights__.StartTestFunc("06b35adce691538bff", t)
+	defer func() { __sealights__.EndTestFunc("06b35adce691538bff", t) }()
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
@@ -125,6 +132,8 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 }
 
 func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
+	__sealights__.StartTestFunc("08b411fac1c20ceec8", t)
+	defer func() { __sealights__.EndTestFunc("08b411fac1c20ceec8", t) }()
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 	//bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
@@ -138,6 +147,8 @@ func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
 }
 
 func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
+	__sealights__.StartTestFunc("3e956c5e1c938ed3db", t)
+	defer func() { __sealights__.EndTestFunc("3e956c5e1c938ed3db", t) }()
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 	assert.Empty(t, bs.Spec.Application.DynamicPluginsConfigMapName)
@@ -155,6 +166,7 @@ func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
 }
 
 func initContainer(model *BackstageModel) *corev1.Container {
+	__sealights__.TraceFunc("3a6993157e326939fd")
 	for _, v := range model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers {
 		if v.Name == dynamicPluginInitContainerName {
 			return &v

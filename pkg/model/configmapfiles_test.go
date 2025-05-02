@@ -5,13 +5,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -32,6 +33,8 @@ var (
 )
 
 func TestDefaultConfigMapFiles(t *testing.T) {
+	__sealights__.StartTestFunc("fe94afad5610e259c6", t)
+	defer func() { __sealights__.EndTestFunc("fe94afad5610e259c6", t) }()
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 
@@ -50,6 +53,8 @@ func TestDefaultConfigMapFiles(t *testing.T) {
 }
 
 func TestSpecifiedConfigMapFiles(t *testing.T) {
+	__sealights__.StartTestFunc("7e3ba05229612bd72a", t)
+	defer func() { __sealights__.EndTestFunc("7e3ba05229612bd72a", t) }()
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
@@ -90,6 +95,8 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 }
 
 func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
+	__sealights__.StartTestFunc("c0eccc2059c51230ff", t)
+	defer func() { __sealights__.EndTestFunc("c0eccc2059c51230ff", t) }()
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
@@ -115,6 +122,8 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 }
 
 func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
+	__sealights__.StartTestFunc("4d43356b1a91d2ba8a", t)
+	defer func() { __sealights__.EndTestFunc("4d43356b1a91d2ba8a", t) }()
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps

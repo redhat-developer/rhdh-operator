@@ -1,6 +1,8 @@
 package v1alpha1
 
 import (
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -263,11 +265,13 @@ type TLS struct {
 }
 
 func init() {
+	__sealights__.TraceFunc("c5505f2dc70de850af")
 	SchemeBuilder.Register(&Backstage{}, &BackstageList{})
 }
 
 // IsLocalDbEnabled returns true if Local database is configured and enabled
 func (s *BackstageSpec) IsLocalDbEnabled() bool {
+	__sealights__.TraceFunc("87c65ae0a13714f054")
 	if s.Database == nil {
 		return true
 	}
@@ -276,6 +280,7 @@ func (s *BackstageSpec) IsLocalDbEnabled() bool {
 
 // IsRouteEnabled returns value of Application.Route.Enabled if defined or true by default
 func (s *BackstageSpec) IsRouteEnabled() bool {
+	__sealights__.TraceFunc("395511c82c76f7bf45")
 	if s.Application != nil && s.Application.Route != nil {
 		return ptr.Deref(s.Application.Route.Enabled, true)
 	}
@@ -283,5 +288,6 @@ func (s *BackstageSpec) IsRouteEnabled() bool {
 }
 
 func (s *BackstageSpec) IsAuthSecretSpecified() bool {
+	__sealights__.TraceFunc("e1ba134b5f1616035f")
 	return s.Database != nil && s.Database.AuthSecretName != ""
 }

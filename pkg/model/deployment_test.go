@@ -4,17 +4,16 @@ import (
 	"context"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
 	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var deploymentTestBackstage = bsv1.Backstage{
@@ -31,6 +30,8 @@ var deploymentTestBackstage = bsv1.Backstage{
 }
 
 func TestSpecs(t *testing.T) {
+	__sealights__.StartTestFunc("66188af1b8749fdc97", t)
+	defer func() { __sealights__.EndTestFunc("66188af1b8749fdc97", t) }()
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Application.Image = ptr.To("my-image:1.0.0")
 	bs.Spec.Application.Replicas = ptr.To(int32(3))
@@ -50,6 +51,8 @@ func TestSpecs(t *testing.T) {
 }
 
 func TestWorkingDirMount(t *testing.T) {
+	__sealights__.StartTestFunc("60d40c575d8b50462a", t)
+	defer func() { __sealights__.EndTestFunc("60d40c575d8b50462a", t) }()
 	bs := *deploymentTestBackstage.DeepCopy()
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
@@ -71,6 +74,8 @@ func TestWorkingDirMount(t *testing.T) {
 
 // It tests the overriding image feature
 func TestOverrideBackstageImage(t *testing.T) {
+	__sealights__.StartTestFunc("7ca18b7d47042e2d3f", t)
+	defer func() { __sealights__.EndTestFunc("7ca18b7d47042e2d3f", t) }()
 
 	bs := *deploymentTestBackstage.DeepCopy()
 
@@ -90,6 +95,8 @@ func TestOverrideBackstageImage(t *testing.T) {
 }
 
 func TestSpecImagePullSecrets(t *testing.T) {
+	__sealights__.StartTestFunc("5e2662e2d9f657d33f", t)
+	defer func() { __sealights__.EndTestFunc("5e2662e2d9f657d33f", t) }()
 	bs := *deploymentTestBackstage.DeepCopy()
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
@@ -116,6 +123,8 @@ func TestSpecImagePullSecrets(t *testing.T) {
 }
 
 func TestMergeFromSpecDeployment(t *testing.T) {
+	__sealights__.StartTestFunc("1c5f2e70ecb372f42e", t)
+	defer func() { __sealights__.EndTestFunc("1c5f2e70ecb372f42e", t) }()
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
@@ -178,6 +187,8 @@ spec:
 }
 
 func TestImageInCRPrevailsOnEnvVar(t *testing.T) {
+	__sealights__.StartTestFunc("9d061a0f22e76cc5db", t)
+	defer func() { __sealights__.EndTestFunc("9d061a0f22e76cc5db", t) }()
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
@@ -208,6 +219,8 @@ spec:
 
 // to remove when stop supporting v1alpha1
 func TestDeploymentFieldPrevailsOnDeprecated(t *testing.T) {
+	__sealights__.StartTestFunc("9dd75c90d532256f9e", t)
+	defer func() { __sealights__.EndTestFunc("9dd75c90d532256f9e", t) }()
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Application.Image = ptr.To("app-image")
 	bs.Spec.Application.Replicas = ptr.To(int32(2))

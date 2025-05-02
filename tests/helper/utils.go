@@ -9,10 +9,14 @@ import (
 	"strconv"
 	"strings"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
+
 	. "github.com/onsi/ginkgo/v2"
+
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/discovery"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -23,7 +27,9 @@ var (
 )
 
 func init() {
+	__sealights__.TraceFunc("85f88f6f59e4ff844d")
 	_isOpenShift = func() bool {
+		__sealights__.TraceFunc("81ba048ad09d0d679f")
 		restConfig := ctrl.GetConfigOrDie()
 		dcl, err := discovery.NewDiscoveryClientForConfig(restConfig)
 		if err != nil {
@@ -47,6 +53,7 @@ func init() {
 }
 
 func GetPlatformTool() string {
+	__sealights__.TraceFunc("ee04a3d5c8f28d6378")
 	if IsOpenShift() {
 		return "oc"
 	}
@@ -54,6 +61,7 @@ func GetPlatformTool() string {
 }
 
 func saveImageArchive(name string) (string, error) {
+	__sealights__.TraceFunc("ff0f8e23c2ec476643")
 	cEng, err := Run(exec.Command("make", "--no-print-directory", "show-container-tool"))
 	if err != nil {
 		return "", err
@@ -81,8 +89,10 @@ func saveImageArchive(name string) (string, error) {
 
 // LoadImageToKindClusterWithName loads a local container image to the kind cluster
 func LoadImageToKindClusterWithName(name string) error {
+	__sealights__.TraceFunc("a189210f75bf324bcc")
 	archive, err := saveImageArchive(name)
 	defer func() {
+		__sealights__.TraceFunc("d1e94b7b144aba91d4")
 		if archive != "" {
 			_ = os.Remove(archive)
 		}
@@ -102,8 +112,10 @@ func LoadImageToKindClusterWithName(name string) error {
 
 // LoadImageToK3dClusterWithName loads a local container image to the k3d cluster
 func LoadImageToK3dClusterWithName(name string) error {
+	__sealights__.TraceFunc("9cae356d51c541be57")
 	archive, err := saveImageArchive(name)
 	defer func() {
+		__sealights__.TraceFunc("15b0a0b02077659981")
 		if archive != "" {
 			_ = os.Remove(archive)
 		}
@@ -123,8 +135,10 @@ func LoadImageToK3dClusterWithName(name string) error {
 
 // LoadImageToMinikubeClusterWithName loads a local container image to the Minikube cluster
 func LoadImageToMinikubeClusterWithName(name string) error {
+	__sealights__.TraceFunc("bae24eaaadbdace5c5")
 	archive, err := saveImageArchive(name)
 	defer func() {
+		__sealights__.TraceFunc("7fa826037da61b9857")
 		if archive != "" {
 			_ = os.Remove(archive)
 		}
@@ -140,6 +154,7 @@ func LoadImageToMinikubeClusterWithName(name string) error {
 // GetNonEmptyLines converts given command output string into individual objects
 // according to line breakers, and ignores the empty elements in it.
 func GetNonEmptyLines(output string) []string {
+	__sealights__.TraceFunc("312c640f04b1c017d7")
 	var res []string
 	elements := strings.Split(output, "\n")
 	for _, element := range elements {
@@ -153,6 +168,7 @@ func GetNonEmptyLines(output string) []string {
 
 // Run executes the provided command within this context
 func Run(cmd *exec.Cmd) ([]byte, error) {
+	__sealights__.TraceFunc("d64ad50eff74ff846d")
 	dir, _ := GetProjectDir()
 	cmd.Dir = dir
 	fmt.Fprintf(GinkgoWriter, "running dir: %s\n", cmd.Dir)
@@ -182,6 +198,7 @@ func Run(cmd *exec.Cmd) ([]byte, error) {
 
 // GetProjectDir will return the directory where the project is
 func GetProjectDir() (string, error) {
+	__sealights__.TraceFunc("33f8f91cc1c68b8012")
 	wd, err := os.Getwd()
 	if err != nil {
 		return wd, err
@@ -191,6 +208,7 @@ func GetProjectDir() (string, error) {
 }
 
 func CreateNamespace(ns string) {
+	__sealights__.TraceFunc("fb110571fa23571549")
 	cmd := exec.Command(GetPlatformTool(), "create", "namespace", ns) // #nosec G204
 	out, err := Run(cmd)
 	if err != nil && strings.Contains(string(out), fmt.Sprintf("%q already exists", ns)) {
@@ -200,6 +218,7 @@ func CreateNamespace(ns string) {
 }
 
 func DeleteNamespace(ns string, wait bool) {
+	__sealights__.TraceFunc("b6cff2c267f10a7a4b")
 	cmd := exec.Command(GetPlatformTool(),
 		"delete",
 		"namespace",
@@ -212,6 +231,7 @@ func DeleteNamespace(ns string, wait bool) {
 }
 
 func RandString(n int) string {
+	__sealights__.TraceFunc("8645424f0b8014f4ed")
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
@@ -220,5 +240,6 @@ func RandString(n int) string {
 }
 
 func IsOpenShift() bool {
+	__sealights__.TraceFunc("92efff527f33a590bc")
 	return _isOpenShift
 }

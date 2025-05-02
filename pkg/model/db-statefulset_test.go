@@ -5,17 +5,16 @@ import (
 	"os"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var dbStatefulSetBackstage = &bsv1.Backstage{
@@ -31,6 +30,8 @@ var dbStatefulSetBackstage = &bsv1.Backstage{
 
 // test default StatefulSet
 func TestDefault(t *testing.T) {
+	__sealights__.StartTestFunc("c2c813de91a7d22de9", t)
+	defer func() { __sealights__.EndTestFunc("c2c813de91a7d22de9", t) }()
 	bs := *dbStatefulSetBackstage.DeepCopy()
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -43,6 +44,8 @@ func TestDefault(t *testing.T) {
 
 // It tests the overriding image feature
 func TestOverrideDbImage(t *testing.T) {
+	__sealights__.StartTestFunc("70203dba4faaebbc12", t)
+	defer func() { __sealights__.EndTestFunc("70203dba4faaebbc12", t) }()
 	bs := *dbStatefulSetBackstage.DeepCopy()
 
 	bs.Spec.Database.EnableLocalDb = ptr.To(false)
@@ -60,6 +63,8 @@ func TestOverrideDbImage(t *testing.T) {
 
 // test bs.Spec.Application.ImagePullSecrets shared with StatefulSet
 func TestImagePullSecretSpec(t *testing.T) {
+	__sealights__.StartTestFunc("9ea8092d3d05454567", t)
+	defer func() { __sealights__.EndTestFunc("9ea8092d3d05454567", t) }()
 	bs := *dbStatefulSetBackstage.DeepCopy()
 	bs.Spec.Application.ImagePullSecrets = []string{"my-secret1", "my-secret2"}
 

@@ -10,9 +10,11 @@ import (
 	"testing"
 	"time"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/tests/helper"
 
 	. "github.com/onsi/ginkgo/v2"
+
 	. "github.com/onsi/gomega"
 )
 
@@ -30,12 +32,15 @@ var managerPodLabel = "app=rhdh-operator"
 
 // Run E2E tests using the Ginkgo runner.
 func TestE2E(t *testing.T) {
+	__sealights__.StartTestFunc("717e00618f19d7b4e6", t)
+	defer func() { __sealights__.EndTestFunc("717e00618f19d7b4e6", t) }()
 	RegisterFailHandler(Fail)
 	fmt.Fprintln(GinkgoWriter, "Starting Backstage Operator suite")
 	RunSpecs(t, "Backstage E2E suite")
 }
 
 func installRhdhOperator(flavor string) (podLabel string) {
+	__sealights__.TraceFunc("3ee20c8701f3b7d6d3")
 	Expect(helper.IsOpenShift()).Should(BeTrue(), "install RHDH script works only on OpenShift clusters!")
 	cmd := exec.Command(filepath.Join(".rhdh", "scripts", "install-rhdh-catalog-source.sh"), "--"+flavor, "--install-operator", "rhdh")
 	_, err := helper.Run(cmd)
@@ -45,6 +50,7 @@ func installRhdhOperator(flavor string) (podLabel string) {
 }
 
 func installRhdhOperatorAirgapped() (podLabel string) {
+	__sealights__.TraceFunc("f16c21a910e09b2c26")
 	Expect(helper.IsOpenShift()).Should(BeTrue(), "airgap preparation script for RHDH works only on OpenShift clusters!")
 	indexImg, ok := os.LookupEnv("BACKSTAGE_OPERATOR_TESTS_AIRGAP_INDEX_IMAGE")
 	if !ok {
@@ -75,6 +81,7 @@ func installRhdhOperatorAirgapped() (podLabel string) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	go func() {
+		__sealights__.TraceFunc("79c1c1871494c2b4d1")
 		defer stdin.Close()
 		_, _ = io.WriteString(stdin, fmt.Sprintf(`
 apiVersion: operators.coreos.com/v1alpha1
@@ -98,6 +105,7 @@ spec:
 }
 
 func installOperatorWithMakeDeploy(withOlm bool) {
+	__sealights__.TraceFunc("94882be33297602685")
 	img, err := helper.Run(exec.Command("make", "--no-print-directory", "show-img"))
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	operatorImage := strings.TrimSpace(string(img))
@@ -188,6 +196,7 @@ var _ = SynchronizedAfterSuite(func() {
 )
 
 func verifyControllerUp(g Gomega, managerPodLabel string) {
+	__sealights__.TraceFunc("522dd9d04fd5ce1523")
 	// Get pod name
 	cmd := exec.Command(helper.GetPlatformTool(), "get",
 		"pods", "-l", managerPodLabel,
@@ -213,6 +222,7 @@ func verifyControllerUp(g Gomega, managerPodLabel string) {
 }
 
 func getPodLogs(ns string, label string) string {
+	__sealights__.TraceFunc("3c1b831669851d24c1")
 	cmd := exec.Command(helper.GetPlatformTool(), "logs",
 		"-l", label,
 		"-n", ns,
@@ -222,7 +232,9 @@ func getPodLogs(ns string, label string) string {
 }
 
 func fetchOperatorLogs(managerPodLabel string, raw bool) func() string {
+	__sealights__.TraceFunc("52a1110a564a5ab0f5")
 	return func() string {
+		__sealights__.TraceFunc("db439ba2776d378807")
 		logs := getPodLogs(_namespace, managerPodLabel)
 		if raw {
 			return logs
@@ -232,7 +244,9 @@ func fetchOperatorLogs(managerPodLabel string, raw bool) func() string {
 }
 
 func fetchOperandLogs(ns string, crLabel string, raw bool) func() string {
+	__sealights__.TraceFunc("44fd6bffd4b9011850")
 	return func() string {
+		__sealights__.TraceFunc("31f55974e28b360606")
 		logs := getPodLogs(ns, crLabel)
 		if raw {
 			return logs
@@ -242,12 +256,15 @@ func fetchOperandLogs(ns string, crLabel string, raw bool) func() string {
 }
 
 func fetchOperatorAndOperandLogs(managerPodLabel string, ns string, crLabel string) func() string {
+	__sealights__.TraceFunc("f09192d2f7e72c8407")
 	return func() string {
+		__sealights__.TraceFunc("c494842fea8bcf63a4")
 		return fmt.Sprintf("%s\n\n%s\n", fetchOperatorLogs(managerPodLabel, false)(), fetchOperandLogs(ns, crLabel, false)())
 	}
 }
 
 func uninstallOperator() {
+	__sealights__.TraceFunc("69e1de0bdc04604da3")
 	if operatorManifest := os.Getenv("OPERATOR_MANIFEST"); operatorManifest != "" {
 		cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", operatorManifest)
 		_, _ = helper.Run(cmd)
@@ -263,6 +280,7 @@ func uninstallOperator() {
 }
 
 func uninstallRhdhOperator(withAirgap bool) {
+	__sealights__.TraceFunc("ec1d1fb9b8b411e5d3")
 	cmd := exec.Command(helper.GetPlatformTool(), "delete", "subscription", "rhdh", "-n", _namespace, "--ignore-not-found=true")
 	_, err := helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
@@ -281,6 +299,7 @@ func uninstallRhdhOperator(withAirgap bool) {
 }
 
 func uninstallOperatorWithMakeUndeploy(withOlm bool) {
+	__sealights__.TraceFunc("670b475a24b2f2011d")
 	By("undeploying the controller-manager")
 	undeployCmd := "undeploy"
 	if withOlm {

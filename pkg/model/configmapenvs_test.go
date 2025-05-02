@@ -4,18 +4,19 @@ import (
 	"context"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
 	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestDefaultConfigMapEnvFrom(t *testing.T) {
+	__sealights__.StartTestFunc("e3f14a75745957ae3f", t)
+	defer func() { __sealights__.EndTestFunc("e3f14a75745957ae3f", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -45,6 +46,8 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 }
 
 func TestSpecifiedConfigMapEnvs(t *testing.T) {
+	__sealights__.StartTestFunc("674ce10ad8c399df19", t)
+	defer func() { __sealights__.EndTestFunc("674ce10ad8c399df19", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{

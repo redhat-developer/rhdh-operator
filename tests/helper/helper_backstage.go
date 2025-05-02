@@ -9,9 +9,11 @@ import (
 	"os/exec"
 	"strings"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	. "github.com/onsi/ginkgo/v2"
+
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 )
@@ -53,6 +55,7 @@ type BackstageIdentity struct {
 // It requires guest login to be enabled in the loaded app-config.
 // See https://backstage.io/docs/auth/guest/provider/ for more details.
 func GuestAuth(baseUrl string) (string, error) {
+	__sealights__.TraceFunc("f6d981566cc7bb7146")
 	url := fmt.Sprintf("%s/api/auth/guest/refresh", baseUrl)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -86,6 +89,7 @@ func GuestAuth(baseUrl string) (string, error) {
 }
 
 func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus string) {
+	__sealights__.TraceFunc("1c848b1f6fc7349996")
 	cmd := exec.Command("kubectl", "get", "pods",
 		"-l", "rhdh.redhat.com/app=backstage-"+crName,
 		"-o", "jsonpath={.items[*].status}",
@@ -99,6 +103,7 @@ func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus
 }
 
 func VerifyBackstageCRStatus(g Gomega, ns string, crName string, statusMatcher types.GomegaMatcher) {
+	__sealights__.TraceFunc("ba50db12df1cf97a23")
 	cmd := exec.Command(GetPlatformTool(), "get", "backstage", crName, "-o", "jsonpath={.status.conditions}", "-n", ns) // #nosec G204
 	status, err := Run(cmd)
 	fmt.Fprintln(GinkgoWriter, string(status))
@@ -107,6 +112,7 @@ func VerifyBackstageCRStatus(g Gomega, ns string, crName string, statusMatcher t
 }
 
 func PatchBackstageCR(ns string, crName string, jsonPatch string, patchType string) error {
+	__sealights__.TraceFunc("aea6132dbbb33d400f")
 	p := patchType
 	if p == "" {
 		p = "strategic"
@@ -116,6 +122,7 @@ func PatchBackstageCR(ns string, crName string, jsonPatch string, patchType stri
 }
 
 func DoesBackstageRouteExist(ns string, crName string) (bool, error) {
+	__sealights__.TraceFunc("1da41b652268bb9bc9")
 	routeName := model.RouteName(crName)
 	out, err := Run(exec.Command(GetPlatformTool(), "get", "route", routeName, "-n", ns)) // #nosec G204
 	if err != nil {
@@ -128,6 +135,7 @@ func DoesBackstageRouteExist(ns string, crName string) (bool, error) {
 }
 
 func GetBackstageRouteHost(ns string, crName string) (string, error) {
+	__sealights__.TraceFunc("9851925db931ef3cd0")
 	routeName := model.RouteName(crName)
 
 	hostBytes, err := Run(exec.Command(
@@ -171,6 +179,7 @@ var defaultApiEndpointTests = []ApiEndpointTest{
 }
 
 func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpointTest) {
+	__sealights__.TraceFunc("2c71846683a5ca1ede")
 	host, err := GetBackstageRouteHost(ns, crName)
 	fmt.Fprintln(GinkgoWriter, host)
 	g.Expect(err).ShouldNot(HaveOccurred())
@@ -180,6 +189,7 @@ func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpoin
 }
 
 func VerifyBackstageAppAccess(g Gomega, baseUrl string, tests []ApiEndpointTest) {
+	__sealights__.TraceFunc("433c9ed24e3101f821")
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true, // #nosec G402 -- test code only, not used in production
@@ -188,6 +198,7 @@ func VerifyBackstageAppAccess(g Gomega, baseUrl string, tests []ApiEndpointTest)
 	httpClient := &http.Client{Transport: tr}
 
 	performTest := func(tt ApiEndpointTest) {
+		__sealights__.TraceFunc("ac468224a41455541f")
 		url := fmt.Sprintf("%s/%s", baseUrl, strings.TrimPrefix(tt.Endpoint, "/"))
 
 		req, reqErr := http.NewRequest("GET", url, nil)

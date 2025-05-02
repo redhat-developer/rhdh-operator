@@ -4,11 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
+
 	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -22,6 +26,7 @@ import (
 )
 
 func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
+	__sealights__.TraceFunc("2af1da0daabc1d4c0b")
 	// Watch in all the cases but WatchExtConfig == false
 	if utils.BoolEnvVar(WatchExtConfig, true) {
 
@@ -55,22 +60,24 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 		b.WatchesMetadata(
 			secretMeta,
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+				__sealights__.TraceFunc("8e21af7a202b290471")
 				return r.requestByExtConfigLabel(ctx, o)
 			}),
 			builder.WithPredicates(pred, predicate.Funcs{
-				DeleteFunc: func(e event.DeleteEvent) bool { return true },
-				UpdateFunc: func(e event.UpdateEvent) bool { return true },
+				DeleteFunc: func(e event.DeleteEvent) bool { __sealights__.TraceFunc("3f9d76b696da496da0"); return true },
+				UpdateFunc: func(e event.UpdateEvent) bool { __sealights__.TraceFunc("2c4b129a83e70e5e00"); return true },
 				//CreateFunc: func(e event.CreateEvent) bool { return true },
 			}),
 		).
 			WatchesMetadata(
 				configMapMeta,
 				handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+					__sealights__.TraceFunc("791c312e101c107544")
 					return r.requestByExtConfigLabel(ctx, o)
 				}),
 				builder.WithPredicates(pred, predicate.Funcs{
-					DeleteFunc: func(e event.DeleteEvent) bool { return true },
-					UpdateFunc: func(e event.UpdateEvent) bool { return true },
+					DeleteFunc: func(e event.DeleteEvent) bool { __sealights__.TraceFunc("c84561070ca2dfe7cc"); return true },
+					UpdateFunc: func(e event.UpdateEvent) bool { __sealights__.TraceFunc("24b3d002195d20a496"); return true },
 					//CreateFunc: func(e event.CreateEvent) bool { return true },
 				}))
 	}
@@ -97,13 +104,14 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 			},
 		},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+			__sealights__.TraceFunc("ecaed3c8eb127ffdf5")
 			return r.requestByAppLabels(ctx, o)
 		}),
 		builder.WithPredicates(labelPred,
 			predicate.Funcs{
-				DeleteFunc: func(e event.DeleteEvent) bool { return true },
-				UpdateFunc: func(e event.UpdateEvent) bool { return true },
-				CreateFunc: func(e event.CreateEvent) bool { return true },
+				DeleteFunc: func(e event.DeleteEvent) bool { __sealights__.TraceFunc("7d6e6e08b4e62574c5"); return true },
+				UpdateFunc: func(e event.UpdateEvent) bool { __sealights__.TraceFunc("d99d19f84a02bd5d74"); return true },
+				CreateFunc: func(e event.CreateEvent) bool { __sealights__.TraceFunc("1f0fc7087f3fdf72aa"); return true },
 			}),
 	)
 	return nil
@@ -112,6 +120,7 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 // requestByExtConfigLabel returns a request with current Namespace and Backstage Object name taken from label
 // or empty request object if label not found
 func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, object client.Object) []reconcile.Request {
+	__sealights__.TraceFunc("42a20f31b0d9496d07")
 
 	lg := log.FromContext(ctx)
 
@@ -164,6 +173,7 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 
 // requestByAppLabels returns a request with current Namespace and Backstage Object name taken from label
 func (r *BackstageReconciler) requestByAppLabels(ctx context.Context, object client.Object) []reconcile.Request {
+	__sealights__.TraceFunc("f11d1ab3da0bf25a51")
 	lg := log.FromContext(ctx)
 
 	backstageName := object.GetLabels()[utils.BackstageInstanceLabel]

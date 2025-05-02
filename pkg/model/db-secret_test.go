@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
 	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var dbSecretBackstage = &bsv1.Backstage{
@@ -29,6 +28,8 @@ var dbSecretBackstage = &bsv1.Backstage{
 }
 
 func TestEmptyDbSecret(t *testing.T) {
+	__sealights__.StartTestFunc("4e3e842b2bd7031b07", t)
+	defer func() { __sealights__.EndTestFunc("4e3e842b2bd7031b07", t) }()
 
 	bs := *dbSecretBackstage.DeepCopy()
 
@@ -49,6 +50,8 @@ func TestEmptyDbSecret(t *testing.T) {
 }
 
 func TestDefaultWithGeneratedSecrets(t *testing.T) {
+	__sealights__.StartTestFunc("64b5fc1f71cd9287bc", t)
+	defer func() { __sealights__.EndTestFunc("64b5fc1f71cd9287bc", t) }()
 	bs := *dbSecretBackstage.DeepCopy()
 
 	// expected generatePassword = true (no db-secret defined) will come from preprocess
@@ -69,6 +72,8 @@ func TestDefaultWithGeneratedSecrets(t *testing.T) {
 }
 
 func TestSpecifiedSecret(t *testing.T) {
+	__sealights__.StartTestFunc("06315ca8ac8f34e552", t)
+	defer func() { __sealights__.EndTestFunc("06315ca8ac8f34e552", t) }()
 	bs := *dbSecretBackstage.DeepCopy()
 	bs.Spec.Database.AuthSecretName = "custom-db-secret"
 

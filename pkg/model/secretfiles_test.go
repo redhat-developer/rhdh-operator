@@ -4,18 +4,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-	"k8s.io/utils/ptr"
-
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	"k8s.io/utils/ptr"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -36,6 +34,8 @@ var (
 )
 
 func TestDefaultSecretFiles(t *testing.T) {
+	__sealights__.StartTestFunc("39d5aebf7144122a90", t)
+	defer func() { __sealights__.EndTestFunc("39d5aebf7144122a90", t) }()
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 
@@ -54,6 +54,8 @@ func TestDefaultSecretFiles(t *testing.T) {
 }
 
 func TestDefaultMultiSecretFiles(t *testing.T) {
+	__sealights__.StartTestFunc("6c660541625d899207", t)
+	defer func() { __sealights__.EndTestFunc("6c660541625d899207", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -86,6 +88,8 @@ func TestDefaultMultiSecretFiles(t *testing.T) {
 }
 
 func TestSpecifiedSecretFiles(t *testing.T) {
+	__sealights__.StartTestFunc("8aed78e0287483d524", t)
+	defer func() { __sealights__.EndTestFunc("8aed78e0287483d524", t) }()
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
@@ -131,6 +135,8 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 }
 
 func TestFailedValidation(t *testing.T) {
+	__sealights__.StartTestFunc("9210ff046a48235ed4", t)
+	defer func() { __sealights__.EndTestFunc("9210ff046a48235ed4", t) }()
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1"})
@@ -142,6 +148,8 @@ func TestFailedValidation(t *testing.T) {
 }
 
 func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
+	__sealights__.StartTestFunc("49dffeebd06d30a775", t)
+	defer func() { __sealights__.EndTestFunc("49dffeebd06d30a775", t) }()
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
@@ -166,6 +174,8 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 }
 
 func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
+	__sealights__.StartTestFunc("b68472b477319560f9", t)
+	defer func() { __sealights__.EndTestFunc("b68472b477319560f9", t) }()
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets

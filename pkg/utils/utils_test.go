@@ -3,24 +3,31 @@ package utils
 import (
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
+
 	appsv1 "k8s.io/api/apps/v1"
 
 	openshift "github.com/openshift/api/route/v1"
-
 	"github.com/stretchr/testify/assert"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 var util_test_scheme = runtime.NewScheme()
 
 func init() {
+	__sealights__.TraceFunc("d22f6e82c2ad7c4668")
 	utilruntime.Must(clientgoscheme.AddToScheme(util_test_scheme))
 }
 
 func TestToRFC1123Label(t *testing.T) {
+	__sealights__.StartTestFunc("f1a9801d16d3b21cb5", t)
+	defer func() { __sealights__.EndTestFunc("f1a9801d16d3b21cb5", t) }()
 	tests := []struct {
 		name string
 		in   string
@@ -46,6 +53,8 @@ func TestToRFC1123Label(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			__sealights__.StartTestFunc("dd42357d4828b883c9", t)
+			defer func() { __sealights__.EndTestFunc("dd42357d4828b883c9", t) }()
 			if got := ToRFC1123Label(tt.in); got != tt.want {
 				t.Errorf("ToRFC1123Label() = %v, want %v", got, tt.want)
 			}
@@ -54,6 +63,8 @@ func TestToRFC1123Label(t *testing.T) {
 }
 
 func TestReadMultiObject(t *testing.T) {
+	__sealights__.StartTestFunc("a713286c25fa6e2041", t)
+	defer func() { __sealights__.EndTestFunc("a713286c25fa6e2041", t) }()
 
 	y := `
 apiVersion: v1
@@ -90,6 +101,8 @@ spec:
 }
 
 func TestReadMultiInvalidObject(t *testing.T) {
+	__sealights__.StartTestFunc("5d1e12180bee98ad93", t)
+	defer func() { __sealights__.EndTestFunc("5d1e12180bee98ad93", t) }()
 
 	y := `
 apiVersion: v1
@@ -118,6 +131,8 @@ data:`
 }
 
 func TestPlatformPatchMerge(t *testing.T) {
+	__sealights__.StartTestFunc("ffe3c81a03db62af3e", t)
+	defer func() { __sealights__.EndTestFunc("ffe3c81a03db62af3e", t) }()
 
 	// ocp (no patch, so default)
 	//t.Setenv(PlatformEnvVar, "ocp")
@@ -144,6 +159,8 @@ func TestPlatformPatchMerge(t *testing.T) {
 }
 
 func TestGetObjectKind(t *testing.T) {
+	__sealights__.StartTestFunc("c8ce9704db0f2beb20", t)
+	defer func() { __sealights__.EndTestFunc("c8ce9704db0f2beb20", t) }()
 
 	objk := GetObjectKind(&corev1.PersistentVolumeClaim{}, util_test_scheme)
 	assert.NotNil(t, objk)
@@ -157,6 +174,8 @@ func TestGetObjectKind(t *testing.T) {
 }
 
 func TestBoolEnvVar(t *testing.T) {
+	__sealights__.StartTestFunc("ced7fd0735dc290d1b", t)
+	defer func() { __sealights__.EndTestFunc("ced7fd0735dc290d1b", t) }()
 
 	// not defined - true
 	assert.True(t, BoolEnvVar("MyVar", true))
@@ -169,6 +188,8 @@ func TestBoolEnvVar(t *testing.T) {
 }
 
 func TestFilterContainers(t *testing.T) {
+	__sealights__.StartTestFunc("3d9751cb451c5b9a92", t)
+	defer func() { __sealights__.EndTestFunc("3d9751cb451c5b9a92", t) }()
 
 	containers := []string{"c1", "c2", "c3"}
 

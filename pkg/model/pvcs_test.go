@@ -19,18 +19,22 @@ import (
 	"path/filepath"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	"github.com/stretchr/testify/assert"
+
 	corev1 "k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestDefaultPvcs(t *testing.T) {
+	__sealights__.StartTestFunc("639cbfa5923235fd8a", t)
+	defer func() { __sealights__.EndTestFunc("639cbfa5923235fd8a", t) }()
 
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -65,6 +69,8 @@ func TestDefaultPvcs(t *testing.T) {
 }
 
 func TestMultiContainersPvc(t *testing.T) {
+	__sealights__.StartTestFunc("c68d229fe92146b397", t)
+	defer func() { __sealights__.EndTestFunc("c68d229fe92146b397", t) }()
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pvc",
@@ -90,6 +96,8 @@ func TestMultiContainersPvc(t *testing.T) {
 }
 
 func TestSpecifiedPvcs(t *testing.T) {
+	__sealights__.StartTestFunc("755940cdf353f225ae", t)
+	defer func() { __sealights__.EndTestFunc("755940cdf353f225ae", t) }()
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pvc",

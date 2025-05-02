@@ -5,22 +5,24 @@ import (
 	"context"
 	"testing"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	openshift "github.com/openshift/api/route/v1"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
-
 	"k8s.io/utils/ptr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultRoute(t *testing.T) {
+	__sealights__.StartTestFunc("2546a1250eaa68f8ca", t)
+	defer func() { __sealights__.EndTestFunc("2546a1250eaa68f8ca", t) }()
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
@@ -54,6 +56,8 @@ func TestDefaultRoute(t *testing.T) {
 }
 
 func TestSpecifiedRoute(t *testing.T) {
+	__sealights__.StartTestFunc("0b51aca82a950b3838", t)
+	defer func() { __sealights__.EndTestFunc("0b51aca82a950b3838", t) }()
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
@@ -98,6 +102,8 @@ func TestSpecifiedRoute(t *testing.T) {
 }
 
 func TestDisabledRoute(t *testing.T) {
+	__sealights__.StartTestFunc("e322a1599220e2d88e", t)
+	defer func() { __sealights__.EndTestFunc("e322a1599220e2d88e", t) }()
 
 	// Route.Enabled = false
 	bs := bsv1.Backstage{
@@ -131,6 +137,8 @@ func TestDisabledRoute(t *testing.T) {
 }
 
 func TestExcludedRoute(t *testing.T) {
+	__sealights__.StartTestFunc("712adbc062d58226bf", t)
+	defer func() { __sealights__.EndTestFunc("712adbc062d58226bf", t) }()
 	// No route configured
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -155,6 +163,8 @@ func TestExcludedRoute(t *testing.T) {
 }
 
 func TestEnabledRoute(t *testing.T) {
+	__sealights__.StartTestFunc("d930dca61d02008280", t)
+	defer func() { __sealights__.EndTestFunc("d930dca61d02008280", t) }()
 	// Route is enabled by default if configured
 	bs := bsv1.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
@@ -183,6 +193,8 @@ func TestEnabledRoute(t *testing.T) {
 }
 
 func Test_buildBaseUrl(t *testing.T) {
+	__sealights__.StartTestFunc("15855945f1662e7dec", t)
+	defer func() { __sealights__.EndTestFunc("15855945f1662e7dec", t) }()
 	type args struct {
 		model     *BackstageModel
 		backstage bsv1.Backstage
@@ -308,6 +320,8 @@ func Test_buildBaseUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			__sealights__.StartTestFunc("24450952a292dc7300", t)
+			defer func() { __sealights__.EndTestFunc("24450952a292dc7300", t) }()
 			assert.Equalf(
 				t,
 				tt.want,
@@ -320,6 +334,8 @@ func Test_buildBaseUrl(t *testing.T) {
 }
 
 func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
+	__sealights__.StartTestFunc("1f879c4b12f43e80e3", t)
+	defer func() { __sealights__.EndTestFunc("1f879c4b12f43e80e3", t) }()
 	type args struct {
 		model     *BackstageModel
 		backstage bsv1.Backstage
@@ -335,6 +351,8 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 				model: &BackstageModel{},
 			},
 			assertFn: func(t *testing.T, res map[string]map[string]any) {
+				__sealights__.StartTestFunc("10f650b35932966c50", t)
+				defer func() { __sealights__.EndTestFunc("10f650b35932966c50", t) }()
 				assert.Empty(t, res)
 			},
 		},
@@ -361,6 +379,8 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 				},
 			},
 			assertFn: func(t *testing.T, res map[string]map[string]any) {
+				__sealights__.StartTestFunc("9048d42f722bc4713e", t)
+				defer func() { __sealights__.EndTestFunc("9048d42f722bc4713e", t) }()
 				const expected = "https://backstage-my-backstage-app-my-ns.my-ocp-apps.example.com"
 				assert.Len(t, res, 1)
 				v := res["my-default-app-config.yaml"]
@@ -413,6 +433,8 @@ organization:
 				},
 			},
 			assertFn: func(t *testing.T, res map[string]map[string]any) {
+				__sealights__.StartTestFunc("d2c4260a1da669cfc0", t)
+				defer func() { __sealights__.EndTestFunc("d2c4260a1da669cfc0", t) }()
 				const expected = "https://backstage-my-backstage-app-my-ns.my-ocp-apps.example.com"
 				assert.Len(t, res, 2)
 				for _, v := range res {
@@ -439,6 +461,8 @@ organization:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			__sealights__.StartTestFunc("88ec9d0840c1c36f83", t)
+			defer func() { __sealights__.EndTestFunc("88ec9d0840c1c36f83", t) }()
 			b := &BackstageRoute{}
 			b.updateAppConfigWithBaseUrls(tt.args.model, tt.args.backstage)
 			updatedAppConfigMaps := make(map[string]map[string]any)

@@ -1,5 +1,7 @@
 package platform
 
+import __sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
+
 // Platform represents the Kubernetes platform type
 type Platform struct {
 	Name      string
@@ -16,5 +18,6 @@ var (
 )
 
 func (p Platform) IsOpenshift() bool {
+	__sealights__.TraceFunc("90fab59d993a708829")
 	return p == OpenShift
 }

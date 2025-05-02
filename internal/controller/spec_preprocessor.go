@@ -8,26 +8,21 @@ import (
 	"sort"
 	"strconv"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
+
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	"golang.org/x/exp/maps"
+	"k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
-
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
-	"golang.org/x/exp/maps"
-
 	"k8s.io/client-go/util/retry"
-
-	"k8s.io/apimachinery/pkg/api/errors"
-
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +32,7 @@ import (
 // Add additional details to the Backstage Spec helping in making Backstage RuntimeObjects Model
 // Validates Backstage Spec and fails fast if something not correct
 func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1.Backstage) (model.ExternalConfig, error) {
+	__sealights__.TraceFunc("ed58226a5acff9aa62")
 	//lg := log.FromContext(ctx)
 
 	bsSpec := backstage.Spec
@@ -168,6 +164,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 // and adding its content (marshalled object) to make it watchable by Operator and able to refresh the Pod if needed
 // (Pod refresh will be called if external configuration hash changed)
 func (r *BackstageReconciler) addExtConfig(ctx context.Context, obj client.Object, backstageName, objectName, ns string, addToWatch bool, hashingData []byte) ([]byte, error) {
+	__sealights__.TraceFunc("f681f9c5369dd75364")
 
 	lg := log.FromContext(ctx)
 
@@ -178,6 +175,7 @@ func (r *BackstageReconciler) addExtConfig(ctx context.Context, obj client.Objec
 	// use RetryOnConflict to avoid possible Conflict error which may be caused mostly by other call of this function
 	// https://pkg.go.dev/k8s.io/client-go/util/retry#RetryOnConflict.
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		__sealights__.TraceFunc("df82c5b2fa97b64642")
 
 		if err := r.checkExternalObject(ctx, obj, objectName, ns); err != nil {
 			return err
@@ -215,6 +213,7 @@ func (r *BackstageReconciler) addExtConfig(ctx context.Context, obj client.Objec
 }
 
 func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj client.Object, objectName, ns string) error {
+	__sealights__.TraceFunc("ed1fec5355edc03d87")
 	if err := r.Get(ctx, types.NamespacedName{Name: objectName, Namespace: ns}, obj); err != nil {
 		if _, ok := obj.(*corev1.Secret); ok && errors.IsForbidden(err) {
 			return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
@@ -225,6 +224,7 @@ func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj clien
 }
 
 func addToWatch(fileObjectRef bsv1.FileObjectRef) bool {
+	__sealights__.TraceFunc("6cd2bbfd66c07da89d")
 	// it will contain subPath either as specified key or as a list of all keys if only mountPath specified
 	if (fileObjectRef.MountPath == "" || fileObjectRef.Key != "") && utils.BoolEnvVar(WatchExtConfig, true) {
 		return true
@@ -233,6 +233,7 @@ func addToWatch(fileObjectRef bsv1.FileObjectRef) bool {
 }
 
 func concatData(original []byte, obj client.Object) []byte {
+	__sealights__.TraceFunc("6f2b3277fc33c2e13b")
 	data := original
 	stringData := map[string]string{}
 	binaryData := map[string][]byte{}
@@ -274,6 +275,7 @@ func concatData(original []byte, obj client.Object) []byte {
 
 // getOCPIngressDomain returns the OpenShift Ingress domain
 func (r *BackstageReconciler) getOCPIngressDomain() (string, error) {
+	__sealights__.TraceFunc("afd3d2ff0a6f8faeb9")
 	var u unstructured.Unstructured
 	u.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   "config.openshift.io",

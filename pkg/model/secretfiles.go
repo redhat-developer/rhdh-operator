@@ -3,13 +3,11 @@ package model
 import (
 	"fmt"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-
 	"golang.org/x/exp/maps"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -22,6 +20,7 @@ const SecretFilesObjectKey = "secret-files.yaml"
 type SecretFilesFactory struct{}
 
 func (f SecretFilesFactory) newBackstageObject() RuntimeObject {
+	__sealights__.TraceFunc("5496281aa482563e0a")
 	return &SecretFiles{}
 }
 
@@ -30,10 +29,12 @@ type SecretFiles struct {
 }
 
 func init() {
+	__sealights__.TraceFunc("377cd75399a19c297c")
 	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true)
 }
 
 func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
+	__sealights__.TraceFunc("8b1315499b22fecb8c")
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
 		return nil
@@ -54,11 +55,13 @@ func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) erro
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) Object() runtime.Object {
+	__sealights__.TraceFunc("d8db7c5210fa52a88f")
 	return p.secrets
 }
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) setObject(obj runtime.Object) {
+	__sealights__.TraceFunc("42565414c756957da4")
 	p.secrets = nil
 	if obj != nil {
 		p.secrets = obj.(*multiobject.MultiObject)
@@ -67,11 +70,13 @@ func (p *SecretFiles) setObject(obj runtime.Object) {
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) EmptyObject() client.Object {
+	__sealights__.TraceFunc("2c30baa37a08a78148")
 	return &corev1.Secret{}
 }
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	__sealights__.TraceFunc("ade8415ca12876fc05")
 	if p.secrets != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -81,6 +86,7 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool,
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+	__sealights__.TraceFunc("8f57c32240af493015")
 
 	for _, item := range p.secrets.Items {
 		secret, ok := item.(*corev1.Secret)
@@ -98,6 +104,7 @@ func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) err
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	__sealights__.TraceFunc("fda420ec94fe5dae9d")
 
 	for _, item := range p.secrets.Items {
 		secret := item.(*corev1.Secret)

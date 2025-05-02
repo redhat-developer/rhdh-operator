@@ -3,34 +3,29 @@ package controller
 import (
 	"context"
 	"fmt"
-
-	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
 	"reflect"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	openshift "github.com/openshift/api/route/v1"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	appsv1 "k8s.io/api/apps/v1"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/model"
-
 	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -69,6 +64,7 @@ type BackstageReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	__sealights__.TraceFunc("3ede3dcc586a86b9ad")
 	lg := log.FromContext(ctx)
 
 	backstage := bs.Backstage{}
@@ -82,6 +78,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// This update will make sure the status is always updated in case of any errors or successful result
 	defer func(bs *bs.Backstage) {
+		__sealights__.TraceFunc("1f14bc99e2e60fb0ba")
 		if err := r.Client.Status().Update(ctx, bs); err != nil {
 			if errors.IsConflict(err) {
 				lg.V(1).Info("Backstage object modified, retry syncing status", "Backstage Object", bs)
@@ -122,11 +119,13 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 func errorAndStatus(backstage *bs.Backstage, msg string, err error) error {
+	__sealights__.TraceFunc("7fcb3b6f54425eaf98")
 	setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, fmt.Sprintf("%s %s", msg, err))
 	return fmt.Errorf("%s %w", msg, err)
 }
 
 func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.RuntimeObject) error {
+	__sealights__.TraceFunc("4bcc76a0fecf07f20a")
 
 	for _, obj := range objects {
 		switch v := obj.Object().(type) {
@@ -150,6 +149,7 @@ func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.
 }
 
 func objDispKind(obj client.Object, scheme *runtime.Scheme) string {
+	__sealights__.TraceFunc("38fe29ce752dc97b20")
 	gvk := utils.GetObjectKind(obj, scheme)
 	if gvk == nil {
 		return fmt.Sprintf("Unknown kind for: %s", reflect.TypeOf(obj).String())
@@ -158,6 +158,7 @@ func objDispKind(obj client.Object, scheme *runtime.Scheme) string {
 }
 
 func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Object, immutable bool) error {
+	__sealights__.TraceFunc("8dc3cd195119574ad6")
 	lg := log.FromContext(ctx)
 	if immutable {
 		if err := r.Create(ctx, obj, &client.CreateOptions{FieldManager: BackstageFieldManager}); err != nil {
@@ -178,6 +179,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 }
 
 func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Backstage) error {
+	__sealights__.TraceFunc("f7ca87426daff93a9f")
 
 	const failedToCleanup = "failed to cleanup runtime"
 	// check if local database disabled, respective objects have to deleted/unowned
@@ -205,6 +207,7 @@ func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Bac
 
 // tryToDelete tries to delete the object by name and namespace, does not throw error if object not found
 func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object, name string, ns string) error {
+	__sealights__.TraceFunc("35eb241b9a4e72ffb9")
 	obj.SetName(name)
 	obj.SetNamespace(ns)
 	if err := r.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {
@@ -214,6 +217,7 @@ func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object
 }
 
 func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *bs.Backstage) {
+	__sealights__.TraceFunc("ab68f3fca781182333")
 	deploy := &appsv1.Deployment{}
 	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: backstage.GetNamespace()}, deploy); err != nil {
 		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, err.Error())
@@ -236,6 +240,7 @@ func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage
 }
 
 func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionType, status metav1.ConditionStatus, reason bs.BackstageConditionReason, msg string) {
+	__sealights__.TraceFunc("0a3b163a2becc7d352")
 	meta.SetStatusCondition(&backstage.Status.Conditions, metav1.Condition{
 		Type:               string(condType),
 		Status:             status,
@@ -247,6 +252,7 @@ func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionT
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	__sealights__.TraceFunc("b5350ba86af0802792")
 
 	b := ctrl.NewControllerManagedBy(mgr).
 		For(&bs.Backstage{})
@@ -259,6 +265,7 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *BackstageReconciler) tryToFixUpgradeGlitch(ctx context.Context, obj client.Object, inError error) error {
+	__sealights__.TraceFunc("79890a5d94282e9cc7")
 
 	lg := log.FromContext(ctx)
 

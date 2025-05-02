@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	__sealights__ "github.com/redhat-developer/rhdh-operator/__sealights__"
 	"golang.org/x/exp/maps"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -33,6 +32,7 @@ const DynamicPluginsFile = "dynamic-plugins.yaml"
 type DynamicPluginsFactory struct{}
 
 func (f DynamicPluginsFactory) newBackstageObject() RuntimeObject {
+	__sealights__.TraceFunc("54c88faa43ba8c5ded")
 	return &DynamicPlugins{}
 }
 
@@ -41,14 +41,17 @@ type DynamicPlugins struct {
 }
 
 func init() {
+	__sealights__.TraceFunc("b092b1470f5c435ab1")
 	registerConfig("dynamic-plugins.yaml", DynamicPluginsFactory{}, false)
 }
 
 func DynamicPluginsDefaultName(backstageName string) string {
+	__sealights__.TraceFunc("769d34ae79574715b7")
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
 }
 
 func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
+	__sealights__.TraceFunc("69c9548fb3f3a33186")
 
 	if spec.Application == nil || spec.Application.DynamicPluginsConfigMapName == "" {
 		return nil
@@ -73,10 +76,12 @@ func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) e
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) Object() runtime.Object {
+	__sealights__.TraceFunc("7cd7466d7b5bc8cbf2")
 	return p.ConfigMap
 }
 
 func (p *DynamicPlugins) setObject(obj runtime.Object) {
+	__sealights__.TraceFunc("4fb709f65a2e99d504")
 	p.ConfigMap = nil
 	if obj != nil {
 		p.ConfigMap = obj.(*corev1.ConfigMap)
@@ -86,11 +91,13 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) EmptyObject() client.Object {
+	__sealights__.TraceFunc("fdfc0367f0dfc73a9d")
 	return &corev1.ConfigMap{}
 }
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+	__sealights__.TraceFunc("fa518985307dd2d259")
 
 	if p.ConfigMap == nil || (backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "") {
 		return false, nil
@@ -102,6 +109,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
 func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backstage) error {
+	__sealights__.TraceFunc("85995d4ae0bf3e5b20")
 
 	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
@@ -124,6 +132,7 @@ func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backsta
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+	__sealights__.TraceFunc("70f235114d4b030098")
 	p.ConfigMap.SetName(DynamicPluginsDefaultName(backstage.Name))
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
@@ -131,6 +140,7 @@ func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 // returns initContainer supposed to initialize DynamicPlugins
 // TODO consider to use a label to identify instead
 func DynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev1.Container) {
+	__sealights__.TraceFunc("c51c63a727e4caa6c5")
 	for i, ic := range initContainers {
 		if ic.Name == dynamicPluginInitContainerName {
 			return i, &ic
