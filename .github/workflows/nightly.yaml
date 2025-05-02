@@ -4,7 +4,8 @@ on:
   # workflow_dispatch so that it can be triggered manually if needed
   workflow_dispatch:
   schedule:
-    - cron: "34 23 * * *"
+    #- cron: "34 23 * * *"
+    - cron: "15 * * * *"
 
 jobs:
   e2e-tests:
@@ -53,6 +54,7 @@ jobs:
           echo "OPERATOR_MANIFEST=${OPERATOR_MANIFEST}" >> $GITHUB_ENV
           OPERATOR_IMAGE=$(curl -s "${proto}${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
 
       - name: Check if operator image exists in remote registry
         id: operator-image-existence-checker
@@ -75,6 +77,45 @@ jobs:
         run: |
           echo "K8S_INGRESS_DOMAIN=$(minikube ip).sslip.io" >> $GITHUB_ENV
 
+      - name: Download SeaLights Go agent and CLI tool
+        run: |
+          echo "[Sealights] Downloading Sealights Golang & CLI Agents..."
+          case $(lscpu | awk '/Architecture:/{print $2}') in
+            x86_64) SL_ARCH="linux-amd64";;
+            arm) SL_ARCH="linux-arm64";;
+          esac
+          wget -nv -O sealights-go-agent.tar.gz https://agents.sealights.co/slgoagent/latest/slgoagent-$SL_ARCH.tar.gz
+          wget -nv -O sealights-slcli.tar.gz https://agents.sealights.co/slcli/latest/slcli-$SL_ARCH.tar.gz
+          tar -xzf ./sealights-go-agent.tar.gz && tar -xzf ./sealights-slcli.tar.gz
+          rm -f ./sealights-go-agent.tar.gz ./sealights-slcli.tar.gz
+          ./slgoagent -v 2> /dev/null | grep version && ./slcli -v 2> /dev/null | grep version
+      
+      - name: Write SeaLights token into file
+        run: echo "${SEALIGHTS_AGENT_TOKEN}" > sltoken.txt
+        env:
+          SEALIGHTS_AGENT_TOKEN: '${{secrets.SEALIGHTS_AGENT_TOKEN}}' ## Make sure to add token to repo secrets
+
+      - name: Initiating the SeaLights agent
+        run: |
+          echo "[Sealights] Initiating the SeaLights agent to Golang and handing it the token"
+          ./slcli config init --lang go --token ./sltoken.txt
+
+      - name: Configuring SeaLights
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          echo "[Sealights] Configuring SeaLights to scan the main branch for nightly"
+          ./slcli config create-bsid --app rhdh-operator --branch "main" --build "$BUILD_TIME :$LATEST_COMMIT_SHA"
+        env:
+          LATEST_COMMIT_SHA: ${{ github.sha }}
+
+      - name: Run the SeaLights scan for integration_tests
+        run: |
+          echo "[Sealights] Running the SeaLights integration tests scan"
+          ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent --workspacepath "./" --scm git --scmBaseUrl https://github.com/redhat-developer/rhdh-operator --scmProvider github
+        env:
+          SEALIGHTS_TEST_STAGE: "E2E Tests Nightly"
+          SEALIGHTS_TEST_SELECTION: false
+
       - name: Run E2E tests
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
@@ -84,3 +125,8 @@ jobs:
           OPERATOR_MANIFEST: ${{ env.OPERATOR_MANIFEST }}
           IMG: ${{ env.OPERATOR_IMAGE }}
         run: make test-e2e
+
+      - name: clean all SeaLights secret stuff
+        run: |
+          echo "[Sealights] Cleaning up after SeaLights run"
+          rm sltoken.txt
