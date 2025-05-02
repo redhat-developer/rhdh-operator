@@ -13,6 +13,15 @@ jobs:
     name: PR Validate
     runs-on: ubuntu-latest
     steps:
+      - name: Determine workflow run event context
+        run: echo "on-event=${{ github.event_name }}" >> $GITHUB_ENV
+
+      - name: Handle invalid context for pull requests
+        if: ${{ env.on-event == 'pull_request' && (!github.event.pull_request.head.sha || !github.event.pull_request.number) }}
+        run: |
+          echo "Invalid context for this workflow run. Exiting."
+          exit 1
+          
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
@@ -49,6 +58,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Store build timestamp
+        run: echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
+
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: build
         run: make lint
@@ -68,15 +80,65 @@ jobs:
           make manifests generate fmt vet install
           make run &
 
+      - name: Download SeaLights Go agent and CLI tool
+        run: |
+          echo "[Sealights] Downloading Sealights Golang & CLI Agents..."
+          case $(lscpu | awk '/Architecture:/{print $2}') in
+            x86_64) SL_ARCH="linux-amd64";;
+            arm) SL_ARCH="linux-arm64";;
+          esac
+          wget -nv -O sealights-go-agent.tar.gz https://agents.sealights.co/slgoagent/latest/slgoagent-$SL_ARCH.tar.gz
+          wget -nv -O sealights-slcli.tar.gz https://agents.sealights.co/slcli/latest/slcli-$SL_ARCH.tar.gz
+          tar -xzf ./sealights-go-agent.tar.gz && tar -xzf ./sealights-slcli.tar.gz
+          rm -f ./sealights-go-agent.tar.gz ./sealights-slcli.tar.gz
+          ./slgoagent -v 2> /dev/null | grep version && ./slcli -v 2> /dev/null | grep version
+      
+      - name: Write SeaLights token into file
+        run: echo "${SEALIGHTS_AGENT_TOKEN}" > sltoken.txt
+        env:
+          SEALIGHTS_AGENT_TOKEN: '${{secrets.SEALIGHTS_AGENT_TOKEN}}' ## Make sure to add token to repo secrets
+
+      - name: Initiating the SeaLights agent
+        run: |
+          echo "[Sealights] Initiating the SeaLights agent to Golang and handing it the token"
+          ./slcli config init --lang go --token ./sltoken.txt
+
+      - name: Configuring SeaLights - on pull_request event
+        if: env.on-event == 'pull_request'
+        run: |
+          echo "[Sealights] Configuring SeaLights to scan the pull request branch"
+          echo "Latest commit sha: ${LATEST_COMMIT_SHA}"
+          echo "PR Number: ${PULL_REQUEST_NUMBER}"
+          ./slcli config create-pr-bsid --app rhdh-operator --target-branch "main" --pull-request-number ${PULL_REQUEST_NUMBER} --latest-commit ${LATEST_COMMIT_SHA} --repository-url https://github.com/redhat-developer/rhdh-operator.git
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          LATEST_COMMIT_SHA: ${{github.event.pull_request.head.sha}}
+
+      - name: Configuring SeaLights - on push event
+        if: env.on-event == 'push'
+        run: |
+          echo "[Sealights] Configuring SeaLights to scan the main branch after pull request was closed"
+          ./slcli config create-bsid --app rhdh-operator --branch "main" --build "$BUILD_TIME :$LATEST_COMMIT_SHA"
+        env:
+          LATEST_COMMIT_SHA: ${{ github.sha }}
+
+      - name: Run the SeaLights scan for integration_tests
+        run: |
+          echo "[Sealights] Running the SeaLights integration tests scan"
+          ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent --workspacepath "./" --scm git --scmBaseUrl https://github.com/redhat-developer/rhdh-operator --scmProvider github
+        env:
+          SEALIGHTS_TEST_STAGE: "ALL Tests"
+          SEALIGHTS_TEST_SELECTION: false
+
       - name: Test
         # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
+        #if: steps.changed-files.outputs.any_changed == 'true' ## enable after initial scan results captured
         run: make test
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
         # perform it on backstage.io for speed
-        if: steps.changed-files.outputs.any_changed == 'true'
+        #if: steps.changed-files.outputs.any_changed == 'true' ## enable after initial scan results captured
         run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: RHDH specific Integration test
@@ -84,6 +146,11 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
+      - name: clean all SeaLights secret stuff
+        run: |
+          echo "[Sealights] Cleaning up after SeaLights run"
+          rm sltoken.txt
+          
       - name: Run Gosec Security Scanner
         run: make gosec
 
