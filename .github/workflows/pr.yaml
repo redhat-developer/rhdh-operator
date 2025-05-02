@@ -109,7 +109,7 @@ jobs:
         if: env.on-event == 'push'
         run: |
           echo "[Sealights] Configuring SeaLights to scan the main branch after pull request was closed"
-          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build "$BUILD_TIME :$LATEST_COMMIT_SHA"
+          ./slcli config create-bsid --app rhdh-operator --branch "main" --build "$BUILD_TIME :$LATEST_COMMIT_SHA"
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
@@ -136,7 +136,7 @@ jobs:
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
-        
+
       - name: clean all SeaLights secret stuff
         run: |
           echo "[Sealights] Cleaning up after SeaLights run"
