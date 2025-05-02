@@ -115,13 +115,13 @@ jobs:
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
-      - name: Run the SeaLights scan
-        run: |
-          echo "[Sealights] Running the SeaLights scan"
-          ./slcli scan --bsid buildSessionId.txt --tests-runner --path-to-scanner ./slgoagent --workspacepath ./ \
-          --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github --packages-excluded "./integration_tests/*.go"
-        env:
-          SEALIGHTS_TEST_STAGE: "Unit Tests"
+      # - name: Run the SeaLights scan
+      #   run: |
+      #     echo "[Sealights] Running the SeaLights scan"
+      #     ./slcli scan --bsid buildSessionId.txt --tests-runner --path-to-scanner ./slgoagent --workspacepath ./ \
+      #     --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
+      #   env:
+      #     SEALIGHTS_TEST_STAGE: "Unit Tests"
 
       # - name: Create start test session
       #   run: ./slcli test start-stage --bsid buildSessionId.txt --labid "github-actions-runner" --testGroupId "Unit Tests" --testStage "Unit Tests"
@@ -137,7 +137,7 @@ jobs:
       - name: Run the SeaLights scan for integration_tests
         run: |
           echo "[Sealights] Running the SeaLights integration tests scan"
-          ./slcli scan --bsid buildSessionId.txt  --tests-runner --path-to-scanner ./slgoagent --workspacepath "./" --packages-included "./integration_tests/*.go" \ 
+          ./slcli scan --bsid buildSessionId.txt  --tests-runner --path-to-scanner ./slgoagent --workspacepath "./" 
            --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
         env:
           SEALIGHTS_TEST_STAGE: "Integration Tests"
