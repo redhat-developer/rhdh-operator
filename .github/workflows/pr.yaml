@@ -51,7 +51,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Store build timestamp
-        run: echo "BUILD_TIME=$(date +'%T')" >> $GITHUB_ENV
+        run: echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
 
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: build
@@ -138,9 +138,14 @@ jobs:
           echo "[Sealights] Running the SeaLights integration tests scan"
           ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent --workspacepath "./" --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmProvider github
         env:
-          SEALIGHTS_TEST_STAGE: "Integration Tests"
+          SEALIGHTS_TEST_STAGE: "ALL Tests"
           #SEALIGHTS_IGNORE_GO_TESTS: false
           SEALIGHTS_TEST_SELECTION: false
+
+      - name: Test
+        # run this stage only if there are changes that match the includes and not the excludes
+        #if: steps.changed-files.outputs.any_changed == 'true'
+        run: make test
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
