@@ -18,7 +18,7 @@ func GetPluginDeps(bsName, bsNamespace string, plugins DynamicPlugins) ([]*unstr
 		return nil, fmt.Errorf("failed to get plugin dependencies: %w", err)
 	}
 
-	//get refs from enabledDirs
+	//get refs from enabled
 	var refs []string
 	for _, dep := range pdeps {
 		if dep.Ref != "" {
@@ -32,7 +32,7 @@ func GetPluginDeps(bsName, bsNamespace string, plugins DynamicPlugins) ([]*unstr
 
 // ReadPluginDeps reads the plugin dependencies from the specified directory
 // and returns a slice of unstructured.Unstructured objects.
-func ReadPluginDeps(rootDir, bsName, bsNamespace string, enabledDirs []string) ([]*unstructured.Unstructured, error) {
+func ReadPluginDeps(rootDir, bsName, bsNamespace string, enabled []string) ([]*unstructured.Unstructured, error) {
 
 	if !utils.DirectoryExists(rootDir) {
 		return []*unstructured.Unstructured{}, nil
@@ -41,7 +41,7 @@ func ReadPluginDeps(rootDir, bsName, bsNamespace string, enabledDirs []string) (
 	var objects []*unstructured.Unstructured
 
 	// Read the directory tree
-	files, err := getDepsFiles(rootDir, enabledDirs)
+	files, err := getDepsFiles(rootDir, enabled)
 
 	if err != nil {
 		return nil, err
@@ -74,23 +74,26 @@ func ReadPluginDeps(rootDir, bsName, bsNamespace string, enabledDirs []string) (
 	return objects, nil
 }
 
-func getDepsFiles(root string, enabledDirs []string) ([]string, error) {
+func getDepsFiles(root string, enabledPrefixes []string) ([]string, error) {
 	var files []string
 
-	// Iterate over the specified directories
-	for _, dir := range enabledDirs {
-		dirPath := filepath.Join(root, dir)
+	// Read the directory contents
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory %s: %w", root, err)
+	}
 
-		// Read the directory contents
-		entries, err := os.ReadDir(dirPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
+	// Iterate over the entries and filter by prefixes
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue // Skip directories
 		}
 
-		// Collect only files from the first level
-		for _, entry := range entries {
-			if !entry.IsDir() { // Skip subdirectories
-				files = append(files, filepath.Join(dirPath, entry.Name()))
+		// Check if the file name starts with any of the enabled prefixes
+		for _, prefix := range enabledPrefixes {
+			if strings.HasPrefix(entry.Name(), prefix) {
+				files = append(files, filepath.Join(root, entry.Name()))
+				break
 			}
 		}
 	}
