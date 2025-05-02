@@ -114,25 +114,6 @@ jobs:
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
-      # - name: Run the SeaLights scan
-      #   run: |
-      #     echo "[Sealights] Running the SeaLights scan"
-      #     ./slcli scan --bsid buildSessionId.txt --tests-runner --path-to-scanner ./slgoagent --workspacepath ./ \
-      #     --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github
-      #   env:
-      #     SEALIGHTS_TEST_STAGE: "Unit Tests"
-
-      # - name: Create start test session
-      #   run: ./slcli test start-stage --bsid buildSessionId.txt --labid "github-actions-runner" --testGroupId "Unit Tests" --testStage "Unit Tests"
-
-      # - name: Test
-      #   # run this stage only if there are changes that match the includes and not the excludes
-      #   #if: steps.changed-files.outputs.any_changed == 'true'
-      #   run: make test
-
-      # - name: Create a end test session
-      #   run: ./slcli test end-stage --bsid buildSessionId.txt --labid "Unit Tests" --testGroupId "Unit Tests"
-
       - name: Run the SeaLights scan for integration_tests
         run: |
           echo "[Sealights] Running the SeaLights integration tests scan"
@@ -147,11 +128,11 @@ jobs:
         #if: steps.changed-files.outputs.any_changed == 'true'
         run: make test
 
-      - name: Generic Integration test
-        # run this stage only if there are changes that match the includes and not the excludes
-        # perform it on backstage.io for speed
-        #if: steps.changed-files.outputs.any_changed == 'true'
-        run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
+      # - name: Generic Integration test
+      #   # run this stage only if there are changes that match the includes and not the excludes
+      #   # perform it on backstage.io for speed
+      #   #if: steps.changed-files.outputs.any_changed == 'true'
+      #   run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: clean all SeaLights secret stuff
         run: |
