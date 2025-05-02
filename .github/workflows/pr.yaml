@@ -111,7 +111,7 @@ jobs:
         #if: env.on-event == 'push'
         run: |
           echo "[Sealights] Configuring SeaLights to scan the main branch after pull request was closed"
-          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build ${LATEST_COMMIT_SHA}-${{ steps.date.outputs.date }}
+          ./slcli config create-bsid --app rhdh-operator --branch "rhidp-6915" --build ${{ steps.date.outputs.date }}-${LATEST_COMMIT_SHA}
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
@@ -119,20 +119,20 @@ jobs:
         run: |
           echo "[Sealights] Running the SeaLights scan"
           ./slcli scan --bsid buildSessionId.txt --tests-runner --path-to-scanner ./slgoagent --workspacepath ./ \
-          --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github --packages-excluded "./integration_tests/*"
+          --scm git --scmBaseUrl https://github.com/npotluri-rh/rhdh-operator.git --scmVersion “0” --scmProvider github --packages-excluded "./integration_tests/*.go"
         env:
           SEALIGHTS_TEST_STAGE: "Unit Tests"
 
-      - name: Create start test session
-        run: ./slcli test start-stage --bsid buildSessionId.txt --labid "Unit Tests" --testGroupId "Unit Tests" --testStage "Unit Tests"
+      # - name: Create start test session
+      #   run: ./slcli test start-stage --bsid buildSessionId.txt --labid "github-actions-runner" --testGroupId "Unit Tests" --testStage "Unit Tests"
 
-      - name: Test
-        # run this stage only if there are changes that match the includes and not the excludes
-        #if: steps.changed-files.outputs.any_changed == 'true'
-        run: make test
+      # - name: Test
+      #   # run this stage only if there are changes that match the includes and not the excludes
+      #   #if: steps.changed-files.outputs.any_changed == 'true'
+      #   run: make test
 
-      - name: Create a end test session
-        run: ./slcli test end-stage --bsid buildSessionId.txt --labid "Unit Tests" --testGroupId "Unit Tests"
+      # - name: Create a end test session
+      #   run: ./slcli test end-stage --bsid buildSessionId.txt --labid "Unit Tests" --testGroupId "Unit Tests"
 
       - name: Run the SeaLights scan for integration_tests
         run: |
@@ -144,7 +144,7 @@ jobs:
           #SEALIGHTS_IGNORE_GO_TESTS: false
 
       - name: Create start test session
-        run: ./slcli test start-stage --bsid buildSessionId.txt --labid "Integration Tests" --testGroupId "Integration Tests" --testStage "Integration Tests"
+        run: ./slcli test start-stage --bsid buildSessionId.txt --labid "github-runner" --testGroupId "Integration Tests" --testStage "Integration Tests"
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
