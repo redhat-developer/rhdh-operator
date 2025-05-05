@@ -17,7 +17,7 @@ metadata:
   namespace: openshift-serverless-logic
 spec:
   channel: alpha  #  channel of an operator package to subscribe to
-  installPlanApproval: Automatic # Manual  #  whether the update should be installed automatically
+  installPlanApproval: Automatic #  whether the update should be installed automatically
   name: logic-operator-rhel8  #  name of the operator package
   source: redhat-operators  #  name of the catalog source
   sourceNamespace: openshift-marketplace

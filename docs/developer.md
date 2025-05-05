@@ -90,6 +90,11 @@ To undeploy the controller from the cluster:
 make undeploy
 ```
 
+In a case if Profile contain plugin infrastructure manifests `/config/profile/<profile>/plugin-infra` it can be deployed by:
+```sh
+make plugin-infra [PROFILE=<configuration-profile>]
+```
+
 **UnDeploy the controller from the cluster:**
 
 ```sh

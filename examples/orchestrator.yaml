@@ -58,10 +58,6 @@ data:
           - POST
           - PUT
           - DELETE
-      csp:
-        script-src: ["'self'", "'unsafe-inline'", "'unsafe-eval'"]
-        script-src-elem: ["'self'", "'unsafe-inline'", "'unsafe-eval'"]
-        connect-src: ["'self'", 'http:', 'https:', 'data:']
       auth:
         externalAccess:
           - type: legacy

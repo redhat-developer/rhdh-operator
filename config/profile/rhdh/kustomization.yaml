@@ -14,7 +14,8 @@ resources:
 
 images:
 - name: controller
-  newName: quay.io/gazarenk/backstage-operator
+  newName: quay.io/rhdh/rhdh-rhel9-operator
+  newTag: "1.7"
 
 patches:
 - path: patches/deployment-patch.yaml
