@@ -1832,6 +1832,8 @@ spec:
         volumeMounts:
         - mountPath: /default-config
           name: default-config
+        - mountPath: /plugin-deps
+          name: plugin-deps
       securityContext:
         runAsNonRoot: true
       serviceAccountName: backstage-controller-manager
@@ -1840,3 +1842,7 @@ spec:
       - configMap:
           name: backstage-default-config
         name: default-config
+      - configMap:
+          name: plugin-deps
+          optional: true
+        name: plugin-deps

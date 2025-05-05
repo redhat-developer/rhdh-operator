@@ -35,7 +35,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-05-01T19:54:51Z"
+    createdAt: "2025-05-02T11:38:50Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -250,6 +250,8 @@ spec:
                 volumeMounts:
                 - mountPath: /default-config
                   name: default-config
+                - mountPath: /plugin-deps
+                  name: plugin-deps
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: backstage-controller-manager
@@ -258,6 +260,10 @@ spec:
               - configMap:
                   name: backstage-default-config
                 name: default-config
+              - configMap:
+                  name: plugin-deps
+                  optional: true
+                name: plugin-deps
       permissions:
       - rules:
         - apiGroups:
