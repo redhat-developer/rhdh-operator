@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: backstage-backend
-          image: ghcr.io/backstage/backstage:1.28.4
+          image: ghcr.io/backstage/backstage:1.38.1
           imagePullPolicy: IfNotPresent
           command:
             - "node"

@@ -95,9 +95,16 @@ spec:
           volumeMounts:
             - mountPath: /default-config
               name: default-config
+            - mountPath: /plugin-deps
+              name: plugin-deps
+
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
         - name: default-config
           configMap:
             name: default-config
+        - name: plugin-deps
+          configMap:
+            name: plugin-deps
+            optional: true
