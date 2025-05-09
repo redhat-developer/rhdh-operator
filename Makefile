@@ -366,7 +366,11 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 
 .PHONY: plugin-infra
 plugin-infra:
-	$(KUSTOMIZE) build config/profile/$(PROFILE)/plugin-infra | $(KUBECTL) apply -f -
+	@if [ -d "config/profile/$(PROFILE)/plugin-infra" ]; then \
+		$(KUSTOMIZE) build config/profile/$(PROFILE)/plugin-infra | $(KUBECTL) apply -f -; \
+	else \
+		echo "Directory config/profile/$(PROFILE)/plugin-infra does not exist."; \
+	fi
 ##@ OLM Deployment
 
 # It has to be the same namespace as ./config/default/kustomization.yaml -> namespace
