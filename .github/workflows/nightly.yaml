@@ -17,7 +17,6 @@ jobs:
           - release-1.6
           - release-1.5
           - release-1.4
-          
     name: 'E2E Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
@@ -80,7 +79,7 @@ jobs:
       - name: Download SeaLights Go agent and CLI tool
         if: ${{ matrix.branch == 'main' }}
         run: |
-            echo "[Sealights] Downloading Sealights Golang & CLI Agents..."
+            echo "[SeaLights] Downloading SeaLights Golang & CLI Agents..."
             case $(lscpu | awk '/Architecture:/{print $2}') in
               x86_64) SL_ARCH="linux-amd64";;
               arm) SL_ARCH="linux-arm64";;
@@ -106,7 +105,7 @@ jobs:
       - name: Configuring SeaLights
         if: ${{ matrix.branch == 'main' }} && ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
-          echo "[Sealights] Configuring SeaLights to scan for main branch nightly"
+          echo "[SeaLights] Configuring SeaLights to scan for main branch nightly"
           ./slcli config create-bsid --app rhdh-operator --branch main --build "$BUILD_TIME:$LATEST_COMMIT_SHA"
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
@@ -114,7 +113,7 @@ jobs:
       - name: Run SeaLights scan for e2e tests
         if: ${{ matrix.branch == 'main' }}
         run: |
-          echo "[Sealights] Running the SeaLights e2e tests scan"
+          echo "[SeaLights] Running the SeaLights e2e tests scan"
           ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent  --workspacepath "./" --scm git --scmBaseUrl https://github.com/redhat-developer/rhdh-operator --scmProvider github
         env:
           SEALIGHTS_TEST_STAGE: "E2E Tests Nightly"
@@ -132,5 +131,5 @@ jobs:
       - name: Remove SeaLights secrets
         if: ${{ matrix.branch == 'main' }}
         run: |
-          echo "[Sealights] Cleaning up after SeaLights run"
+          echo "[SeaLights] Cleaning up after SeaLights run"
           rm sltoken.txt
