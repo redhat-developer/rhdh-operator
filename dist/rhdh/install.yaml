@@ -2008,7 +2008,7 @@ data:
             - namespaceSelector:
                 matchLabels:
                   # Allow knative events to be delivered to workflows.
-                  kubernetes.io/metadata.name: openshift-ingress
+                  policy-group.network.openshift.io/ingress: ""
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
