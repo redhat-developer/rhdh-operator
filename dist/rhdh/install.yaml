@@ -2069,15 +2069,6 @@ data:
     spec:
       monitoring:
         enabled: true
-      build:
-        template:
-          resources:
-            requests:
-              memory: 64Mi
-              cpu: 250m
-            limits:
-              memory: 1Gi
-              cpu: 500m
       services:
         dataIndex:
           enabled: true
