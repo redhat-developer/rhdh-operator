@@ -48,37 +48,12 @@ metadata:
   name: app-config-rhdh
 data:
   app-config-rhdh.yaml: |-
-    app:
-      title: Red Hat Developer Hub
-    backend:
-      cors:
-        credentials: true
-        methods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-      auth:
-        externalAccess:
-          - type: legacy
-            options:
-              subject: legacy-default-config
-              secret: "${BACKEND_SECRET}"
     auth:
       environment: development
       providers:
         guest:
           # using the guest user to query the '/api/dynamic-plugins-info/loaded-plugins' endpoint.
           dangerouslyAllowOutsideDevelopment: true
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: rhdh-secrets
-type: Opaque
-stringData:
-  #ROUTE_URL: "https://backstage-bs1-backstage.apps.rosa.pvmvb-xo4tu-ri7.1py9.p3.openshiftapps.com"
-  BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK"
 ---
 apiVersion: rhdh.redhat.com/v1alpha3
 kind: Backstage
@@ -89,7 +64,4 @@ spec:
     appConfig:
       configMaps:
         - name: app-config-rhdh
-    extraEnvs:
-      secrets:
-        - name: rhdh-secrets
     dynamicPluginsConfigMapName: orchestrator-plugin
