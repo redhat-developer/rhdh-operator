@@ -1896,15 +1896,6 @@ data:
       to:
         kind: Service
         name:  # placeholder for 'backstage-<cr-name>'
-  secret-envs.yaml: |
-    apiVersion: v1
-    kind: Secret
-    metadata:
-      name: backend-auth-secret
-    stringData:
-      # generated with the command below (from https://janus-idp.io/docs/auth/service-to-service-auth/#setup):
-      # node -p 'require("crypto").randomBytes(24).toString("base64")'
-      BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK" # notsecret
   service.yaml: |-
     apiVersion: v1
     kind: Service
