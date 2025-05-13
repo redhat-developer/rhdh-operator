@@ -76,30 +76,32 @@ jobs:
         run: |
           echo "K8S_INGRESS_DOMAIN=$(minikube ip).sslip.io" >> $GITHUB_ENV
 
-      - name: Download SeaLights Go agent and CLI tool
-        if: ${{ matrix.branch == 'main' }}
-        run: |
-            echo "[SeaLights] Downloading SeaLights Golang & CLI Agents..."
-            case $(lscpu | awk '/Architecture:/{print $2}') in
-              x86_64) SL_ARCH="linux-amd64";;
-              arm) SL_ARCH="linux-arm64";;
-            esac
-            wget -nv -O sealights-go-agent.tar.gz https://agents.sealights.co/slgoagent/latest/slgoagent-$SL_ARCH.tar.gz
-            wget -nv -O sealights-slcli.tar.gz https://agents.sealights.co/slcli/latest/slcli-$SL_ARCH.tar.gz
-            tar -xzf ./sealights-go-agent.tar.gz && tar -xzf ./sealights-slcli.tar.gz
-            rm -f ./sealights-go-agent.tar.gz ./sealights-slcli.tar.gz
-            ./slgoagent -v 2> /dev/null | grep version && ./slcli -v 2> /dev/null | grep version
-
       - name: Write SeaLights token into file
         if: ${{ matrix.branch == 'main' }}
         run: echo "${SEALIGHTS_AGENT_TOKEN}" > sltoken.txt
         env:
           SEALIGHTS_AGENT_TOKEN: '${{secrets.SEALIGHTS_AGENT_TOKEN}}' ## Make sure to add token to repo secrets
 
+      - name: Download SeaLights Go agent and CLI tool
+        if: ${{ matrix.branch == 'main' }}
+        run: |
+            echo "[SeaLights] Downloading SeaLights Golang & CLI Agents..."
+            # Architectures available: darwin-amd64, darwin-arm64, linux-amd64, linux-arm64
+            SL_OS_ARCH=linux-amd64
+            SL_GO_AGENT_VERSION=v1.1.193
+            SL_CLI_AGENT_VERSION=v1.0.49
+
+            wget -nv -O sealights-go-agent.tar.gz https://agents.sealights.co/slgoagent/${SL_GO_AGENT_VERSION}/slgoagent-${SL_OS_ARCH}.tar.gz
+            wget -nv -O sealights-slcli.tar.gz https://agents.sealights.co/slcli/${SL_CLI_AGENT_VERSION}/slcli-${SL_OS_ARCH}.tar.gz
+
+            tar -xzf ./sealights-go-agent.tar.gz && tar -xzf ./sealights-slcli.tar.gz 
+            rm -f ./sealights-go-agent.tar.gz ./sealights-slcli.tar.gz 
+            ./slgoagent -v 2> /dev/null | grep version && ./slcli -v 2> /dev/null | grep version
+
       - name: Initiating the SeaLights agent
         if: ${{ matrix.branch == 'main' }}
         run: |
-          echo "[Sealights] Initiating the SeaLights agent to Golang and handing it the token"
+          echo "[SeaLights] Initiating the SeaLights agent to Golang and handing it the token"
           ./slcli config init --lang go --token ./sltoken.txt
 
       - name: Configuring SeaLights
