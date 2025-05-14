@@ -371,6 +371,15 @@ plugin-infra:
 	else \
 		echo "Directory config/profile/$(PROFILE)/plugin-infra does not exist."; \
 	fi
+
+.PHONY: plugin-infra-undeploy
+plugin-infra-undeploy:
+	@if [ -d "config/profile/$(PROFILE)/plugin-infra" ]; then \
+		$(KUSTOMIZE) build config/profile/$(PROFILE)/plugin-infra | $(KUBECTL) delete -f -; \
+	else \
+		echo "Directory config/profile/$(PROFILE)/plugin-infra does not exist."; \
+	fi
+
 ##@ OLM Deployment
 
 # It has to be the same namespace as ./config/default/kustomization.yaml -> namespace
