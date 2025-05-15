@@ -47,7 +47,6 @@ FROM registry.access.redhat.com/ubi9-minimal:9.5-1745855087@sha256:e1c4703364c5c
 # '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
 # Downstream comment
 RUN microdnf update --setopt=install_weak_deps=0 -y
-
 #/ Downstream comment
 
 RUN microdnf install -y openssl; microdnf clean -y all

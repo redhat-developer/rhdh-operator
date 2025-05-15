@@ -51,10 +51,11 @@ RUN cat /cachi2/cachi2.env
 
 RUN microdnf install -y openssl; microdnf clean -y all
 
+ENV EXTERNAL_SOURCE=.
+ENV CONTAINER_SOURCE=/opt/app-root/src
+
 # RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
 COPY $EXTERNAL_SOURCE/LICENSE /licenses/
-
-ENV CONTAINER_SOURCE=/opt/app-root/src
 
 ENV HOME=/ \
     USER_NAME=backstage \
