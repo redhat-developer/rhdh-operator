@@ -46,15 +46,16 @@ FROM registry.access.redhat.com/ubi9-minimal:9.5-1747111267@sha256:a50731d3397a4
 
 # '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
 # Downstream comment
-RUN microdnf update --setopt=install_weak_deps=0 -y 
+RUN microdnf update --setopt=install_weak_deps=0 -y
 #/ Downstream comment
 
 RUN microdnf install -y openssl; microdnf clean -y all
 
+ENV EXTERNAL_SOURCE=.
+ENV CONTAINER_SOURCE=/opt/app-root/src
+
 # RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
 COPY $EXTERNAL_SOURCE/LICENSE /licenses/
-
-ENV CONTAINER_SOURCE=/opt/app-root/src
 
 ENV HOME=/ \
     USER_NAME=backstage \
