@@ -105,7 +105,7 @@ jobs:
           ./slcli config init --lang go --token ./sltoken.txt
 
       - name: Configuring SeaLights
-        if: ${{ matrix.branch == 'main' }} && ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ matrix.branch == 'main' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           echo "[SeaLights] Configuring SeaLights to scan for main branch nightly"
           ./slcli config create-bsid --app rhdh-operator --branch main --build "$BUILD_TIME:$LATEST_COMMIT_SHA"
@@ -131,7 +131,7 @@ jobs:
         run: make test-e2e
 
       - name: Remove SeaLights secrets
-        if: ${{ matrix.branch == 'main' }}
+        if: always() && matrix.branch == 'main'
         run: |
           echo "[SeaLights] Cleaning up after SeaLights run"
           rm sltoken.txt
