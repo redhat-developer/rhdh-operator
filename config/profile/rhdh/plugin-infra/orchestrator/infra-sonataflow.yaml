@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-serverless-logic
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-serverless-logic
+  namespace: openshift-serverless-logic
+spec:
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: logic-operator-rhel8
+  namespace: openshift-serverless-logic
+spec:
+  channel: alpha  #  channel of an operator package to subscribe to
+  installPlanApproval: Automatic #  whether the update should be installed automatically
+  name: logic-operator-rhel8  #  name of the operator package
+  source: redhat-operators  #  name of the catalog source
+  sourceNamespace: openshift-marketplace
+  startingCSV: logic-operator-rhel8.v1.35.0  # The initial version of the operator
