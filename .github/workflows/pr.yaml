@@ -155,7 +155,7 @@ jobs:
         if: always() && steps.changed-files.outputs.any_changed == 'true'
         run: |
           echo "[SeaLights] Cleaning up after SeaLights run"
-          rm sltoken.txt
+          rm -f sltoken.txt
           
       - name: Run Gosec Security Scanner
         run: make gosec
