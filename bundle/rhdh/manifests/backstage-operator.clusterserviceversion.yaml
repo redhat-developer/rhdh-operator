@@ -39,7 +39,7 @@ metadata:
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.7
-    createdAt: "2025-04-25T07:39:52Z"
+    createdAt: "2025-05-12T12:54:40Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -302,6 +302,8 @@ spec:
                 volumeMounts:
                 - mountPath: /default-config
                   name: default-config
+                - mountPath: /plugin-deps
+                  name: plugin-deps
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: rhdh-controller-manager
@@ -310,6 +312,10 @@ spec:
               - configMap:
                   name: rhdh-default-config
                 name: default-config
+              - configMap:
+                  name: rhdh-plugin-deps
+                  optional: true
+                name: plugin-deps
       permissions:
       - rules:
         - apiGroups:

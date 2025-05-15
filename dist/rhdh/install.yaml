@@ -1749,6 +1749,8 @@ data:
               env:
                 - name: NPM_CONFIG_USERCONFIG
                   value: /opt/app-root/src/.npmrc.dynamic-plugins
+                - name: MAX_ENTRY_SIZE
+                  value: "30000000"
               volumeMounts:
                 - mountPath: /dynamic-plugins-root
                   name: dynamic-plugins-root
@@ -1859,28 +1861,72 @@ data:
           securityContext:
             # any group id
             fsGroup: 1001
-  dynamic-plugins.yaml: |-
+  dynamic-plugins.yaml: |
+    #apiVersion: v1
+    #kind: ConfigMap
+    #metadata:
+    #  name: default-dynamic-plugins #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name
+    #data:
+    #  "dynamic-plugins.yaml": |
+    #    ###########################################################################################################
+    #    # /!\ WARNING
+    #    #
+    #    # This is the default dynamic plugins configuration file created and managed by the Operator for your CR.
+    #    # Do NOT edit this manually in the Cluster, as your changes will be overridden by the Operator upon the
+    #    # next reconciliation.
+    #    # If you want to customize the dynamic plugins, you should create your own dynamic-plugins ConfigMap
+    #    # and reference it in your CR.
+    #    # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/installing_and_viewing_plugins_in_red_hat_developer_hub/rhdh-installing-rhdh-plugins_title-plugins-rhdh-about#proc-config-dynamic-plugins-rhdh-operator_rhdh-installing-rhdh-plugins
+    #    # for more details or https://github.com/redhat-developer/rhdh-operator/blob/main/examples/rhdh-cr.yaml
+    #    # for an example.
+    #    ###########################################################################################################
+    #    includes:
+    #      - dynamic-plugins.default.yaml
+    #    plugins: []
+    #---
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: default-dynamic-plugins #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name
+      name: default-dynamic-plugins
     data:
-      "dynamic-plugins.yaml": |
-        ###########################################################################################################
-        # /!\ WARNING
-        #
-        # This is the default dynamic plugins configuration file created and managed by the Operator for your CR.
-        # Do NOT edit this manually in the Cluster, as your changes will be overridden by the Operator upon the
-        # next reconciliation.
-        # If you want to customize the dynamic plugins, you should create your own dynamic-plugins ConfigMap
-        # and reference it in your CR.
-        # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/installing_and_viewing_plugins_in_red_hat_developer_hub/rhdh-installing-rhdh-plugins_title-plugins-rhdh-about#proc-config-dynamic-plugins-rhdh-operator_rhdh-installing-rhdh-plugins
-        # for more details or https://github.com/redhat-developer/rhdh-operator/blob/main/examples/rhdh-cr.yaml
-        # for an example.
-        ###########################################################################################################
+      dynamic-plugins.yaml: |
         includes:
           - dynamic-plugins.default.yaml
-        plugins: []
+        plugins:
+          - disabled: true
+            package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-1.5.1.tgz"
+            integrity: sha512-7VOe+XGTUzrdO/av0DNHbydOjB3Lo+XdCs6fj3JVODLP7Ypd3GXHf/nssYxG5ZYC9F1t9MNeguE2bZOB6ckqTA==
+            pluginConfig:
+              dynamicPlugins:
+                  frontend:
+                    red-hat-developer-hub.backstage-plugin-orchestrator:
+                      appIcons:
+                        - importName: OrchestratorIcon
+                          module: OrchestratorPlugin
+                          name: orchestratorIcon
+                      dynamicRoutes:
+                        - importName: OrchestratorPage
+                          menuItem:
+                            icon: orchestratorIcon
+                            text: Orchestrator
+                          module: OrchestratorPlugin
+                          path: /orchestrator
+          - disabled: true
+            package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-backend-dynamic-1.5.1.tgz"
+            integrity: sha512-VIenFStdq9QvvmgmEMG8O7b2wqIebvEcqNeJ9SWZ8jen9t+efTK6D3Rde74LQ1no1QaHLx8RoxNCOuTUEF8O/g==
+            pluginConfig:
+              orchestrator:
+                dataIndexService:
+                  url: http://sonataflow-platform-data-index-service
+            dependencies:
+              - ref: sonataflow
+          - disabled: true
+            package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic-1.5.1.tgz"
+            integrity: sha512-bnVQjVsUZ470Vgm2kd5Lo/bVa2fF0q4GufBDc/8oTQsnP3zZJQqKFvFElBTCjY76RqkECydlvZ1UFybSzvockQ==
+            pluginConfig:
+              orchestrator:
+                dataIndexService:
+                  url: http://sonataflow-platform-data-index-service
   route.yaml: |-
     apiVersion: route.openshift.io/v1
     kind: Route
@@ -1928,6 +1974,129 @@ data:
 kind: ConfigMap
 metadata:
   name: rhdh-default-config
+  namespace: rhdh-operator
+---
+apiVersion: v1
+data:
+  sonataflow.yaml: |
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-knative-to-sonataflow-and-workflows # hardcoded
+    spec:
+      podSelector: {}
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  # Allow knative events to be delivered to workflows.
+                  kubernetes.io/metadata.name: knative-eventing
+            - namespaceSelector:
+                matchLabels:
+                  # Allow auxiliary knative function for workflow (such as m2k-save-transformation)
+                  kubernetes.io/metadata.name: knative-serving
+    ---
+    # NetworkPolicy to unblock incoming traffic to the namespace
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-external-communication # hardcoded
+    spec:
+      podSelector: {}
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  # Allow knative events to be delivered to workflows.
+                  policy-group.network.openshift.io/ingress: ""
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-intra-network # hardcoded
+    spec:
+      # Apply this policy to all pods in the namespace
+      podSelector: {}
+      # Specify policy type as 'Ingress' to control incoming traffic rules
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            # Allow ingress from any pod within the same namespace
+            - podSelector: {}
+    ---
+    # NetworkPolicy to allow openshift-user-workload-monitoring pods to access all pods within the workflow's namespace
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-monitoring-to-sonataflow-and-workflows # hardcoded
+    spec:
+      # Apply this policy to all pods in the namespace
+      podSelector: {}
+      # Specify policy type as 'Ingress' to control incoming traffic rules
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  # Allow openshift-user-workload-monitoring pods to access the workflow.
+                  kubernetes.io/metadata.name: openshift-user-workload-monitoring
+    ---
+    apiVersion: operator.knative.dev/v1beta1
+    kind: KnativeEventing
+    metadata:
+      name: knative-eventing
+      namespace: knative-eventing
+    spec:
+      Registry: {}
+    ---
+    apiVersion: operator.knative.dev/v1beta1
+    kind: KnativeServing
+    metadata:
+      name: knative-serving
+      namespace: knative-serving
+    spec:
+      controller-custom-certs:
+        name: ""
+        type: ""
+      registry: {}
+    ---
+    apiVersion: sonataflow.org/v1alpha08
+    kind: SonataFlowPlatform
+    metadata:
+      name: sonataflow-platform
+    spec:
+      monitoring:
+        enabled: true
+      services:
+        dataIndex:
+          enabled: true
+          persistence:
+            postgresql:
+              secretRef:
+                name: backstage-psql-secret-{{backstage-name}}
+                userKey: POSTGRES_USER
+                passwordKey: POSTGRES_PASSWORD
+              serviceRef:
+                name: backstage-psql-{{backstage-name}}
+                namespace: {{backstage-ns}}
+                databaseName: backstage_plugin_orchestrator
+        jobService:
+          enabled: true
+          persistence:
+            postgresql:
+              secretRef:
+                name: backstage-psql-secret-{{backstage-name}}
+                userKey: POSTGRES_USER
+                passwordKey: POSTGRES_PASSWORD
+              serviceRef:
+                name: backstage-psql-{{backstage-name}}
+                namespace: {{backstage-ns}}
+                databaseName: backstage_plugin_orchestrator
+kind: ConfigMap
+metadata:
+  name: rhdh-plugin-deps
   namespace: rhdh-operator
 ---
 apiVersion: v1
@@ -2045,6 +2214,8 @@ spec:
         volumeMounts:
         - mountPath: /default-config
           name: default-config
+        - mountPath: /plugin-deps
+          name: plugin-deps
       securityContext:
         runAsNonRoot: true
       serviceAccountName: rhdh-controller-manager
@@ -2053,3 +2224,7 @@ spec:
       - configMap:
           name: rhdh-default-config
         name: default-config
+      - configMap:
+          name: rhdh-plugin-deps
+          optional: true
+        name: plugin-deps

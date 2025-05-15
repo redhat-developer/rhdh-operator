@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"gopkg.in/yaml.v2"
+
 	"golang.org/x/exp/maps"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,6 +42,25 @@ type DynamicPlugins struct {
 	ConfigMap *corev1.ConfigMap
 }
 
+type DynaPluginsConfig struct {
+	// we do not really support Includes here, that's what is processed by the installation script
+	// in the dynamic-plugins container. Keeping it here for the sake of completeness
+	Includes []string     `yaml:"includes"`
+	Plugins  []DynaPlugin `yaml:"plugins"`
+}
+
+type DynaPlugin struct {
+	Package      string                 `yaml:"package"`
+	Integrity    string                 `yaml:"integrity"`
+	Disabled     bool                   `yaml:"disabled"`
+	PluginConfig map[string]interface{} `yaml:"pluginConfig"`
+	Dependencies []PluginDependency     `yaml:"dependencies"`
+}
+
+type PluginDependency struct {
+	Ref string `yaml:"ref"`
+}
+
 func init() {
 	registerConfig("dynamic-plugins.yaml", DynamicPluginsFactory{}, false)
 }
@@ -60,15 +81,20 @@ func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) e
 	}
 
 	dp := model.ExternalConfig.DynamicPlugins
-	if dp.Data == nil || len(dp.Data) != 1 || dp.Data[DynamicPluginsFile] == "" {
-		return fmt.Errorf("dynamic plugin configMap expects exactly one Data key named '%s' ", DynamicPluginsFile)
+
+	if dp.Data == nil || dp.Data[DynamicPluginsFile] == "" {
+		return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
 	}
 
-	model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
-		dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
+	if dp.Data[DynamicPluginsFile] != "" {
+		model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+			dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
+	}
+
+	// if default dynamic-plugins set, the value from model.DynamicPlugins will differ from the one in model.RuntimeObjects
+	model.DynamicPlugins.ConfigMap = &dp
 
 	return nil
-
 }
 
 // implementation of RuntimeObject interface
@@ -92,16 +118,25 @@ func (p *DynamicPlugins) EmptyObject() client.Object {
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 
-	if p.ConfigMap == nil || (backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "") {
-		return false, nil
+	if p.ConfigMap == nil {
+		if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+			p.ConfigMap = &corev1.ConfigMap{}
+		} else {
+			return false, nil
+		}
 	}
 	model.setRuntimeObject(p)
+	model.DynamicPlugins = *p
 	return true, nil
 }
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backstage) error {
+func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
+
+	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+		return nil
+	}
 
 	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
@@ -126,6 +161,46 @@ func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, _ bsv1.Backsta
 func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	p.ConfigMap.SetName(DynamicPluginsDefaultName(backstage.Name))
 	setMetaInfo(p.ConfigMap, backstage, scheme)
+}
+
+// Dependencies returns a list of plugin dependencies
+func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
+	ps, err := p.pluginsFromConfigMap()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]PluginDependency, 0)
+
+	for _, pp := range ps {
+		if pp.Disabled {
+			continue
+		}
+
+		result = append(result, pp.Dependencies...)
+	}
+
+	return result, nil
+}
+
+// returns a list of plugins from the configMap
+func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
+	if p.ConfigMap == nil {
+		return []DynaPlugin{}, nil
+	}
+
+	data := p.ConfigMap.Data[DynamicPluginsFile]
+	if data == "" {
+		return []DynaPlugin{}, nil
+	}
+
+	var pluginsConfig DynaPluginsConfig
+	err := yaml.Unmarshal([]byte(data), &pluginsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal dynamic plugins data: %w", err)
+	}
+
+	return pluginsConfig.Plugins, nil
 }
 
 // returns initContainer supposed to initialize DynamicPlugins
