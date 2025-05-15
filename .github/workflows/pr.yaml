@@ -118,10 +118,13 @@ jobs:
           echo "[SeaLights] Configuring SeaLights to scan the pull request branch"
           echo "Latest commit sha: ${LATEST_COMMIT_SHA}"
           echo "PR Number: ${PULL_REQUEST_NUMBER}"
-          ./slcli config create-pr-bsid --app rhdh-operator --target-branch "main" --pull-request-number ${PULL_REQUEST_NUMBER} --latest-commit ${LATEST_COMMIT_SHA} --repository-url https://github.com/redhat-developer/rhdh-operator.git
+          echo "Target Branch: ${TARGET_BRANCH}"
+          ./slcli config create-pr-bsid --app rhdh-operator --target-branch ${TARGET_BRANCH} --pull-request-number ${PULL_REQUEST_NUMBER} --latest-commit ${LATEST_COMMIT_SHA} --repository-url https://github.com/redhat-developer/rhdh-operator.git
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           LATEST_COMMIT_SHA: ${{github.event.pull_request.head.sha}}
+           ${{ github.ref_name }}
+          TARGET_BRANCH: ${{ github.base_ref }}
 
       - name: Run SeaLights scan for unit and integration tests
         if: steps.changed-files.outputs.any_changed == 'true'
