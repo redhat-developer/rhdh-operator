@@ -13,25 +13,15 @@ jobs:
       fail-fast: false
       matrix:
         from_branch:
-          - release-1.4
           - release-1.5
           - release-1.6
         to_branch:
           - main
           - release-1.6
           - release-1.5
-          - release-1.4
         exclude:
-          - from_branch: release-1.4
-            to_branch: release-1.4
-
-          - from_branch: release-1.5
-            to_branch: release-1.4
           - from_branch: release-1.5
             to_branch: release-1.5
-
-          - from_branch: release-1.6
-            to_branch: release-1.4
           - from_branch: release-1.6
             to_branch: release-1.5
           - from_branch: release-1.6
