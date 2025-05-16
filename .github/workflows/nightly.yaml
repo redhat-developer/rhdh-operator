@@ -106,8 +106,11 @@ jobs:
       - name: Configuring SeaLights
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
-          echo "[SeaLights] Configuring SeaLights to scan for main branch nightly"
-          ./slcli config create-bsid --app rhdh-operator --branch ${{ matrix.branch }} --build "$BUILD_TIME:$LATEST_COMMIT_SHA"
+          echo "[SeaLights] Configuring SeaLights to scan for ${{ matrix.branch }} branch nightly"
+          ./slcli config create-bsid \
+            --app rhdh-operator \
+            --branch ${{ matrix.branch }} \
+            --build "$BUILD_TIME:$LATEST_COMMIT_SHA"
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
@@ -115,8 +118,18 @@ jobs:
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           echo "[SeaLights] Running the SeaLights e2e tests scan"
-          ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent  --workspacepath "./" --scm git --scmBaseUrl https://github.com/redhat-developer/rhdh-operator --scmProvider github
+          ./slcli scan \
+            --tests-runner \
+            --enable-ginkgo \
+            --bsid buildSessionId.txt \
+            --path-to-scanner ./slgoagent \
+            --workspacepath "./" \
+            --scm git \
+            --scmBaseUrl https://github.com/redhat-developer/rhdh-operator \
+            --scmProvider github
         env:
+          # Required if using Ginkgo: https://sealights.atlassian.net/wiki/spaces/SUP/pages/4113891329/Using+Go+Agent+-+Running+your+Tests#Using-Ginkgo
+          SEALIGHTS_IGNORE_GO_TESTS: "true"
           SEALIGHTS_TEST_STAGE: "E2E Tests Nightly"
 
       - name: Run E2E tests
