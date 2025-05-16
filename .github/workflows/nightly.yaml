@@ -76,13 +76,13 @@ jobs:
           echo "K8S_INGRESS_DOMAIN=$(minikube ip).sslip.io" >> $GITHUB_ENV
 
       - name: Write SeaLights token into file
-        if: ${{ matrix.branch == 'main' }}
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: echo "${SEALIGHTS_AGENT_TOKEN}" > sltoken.txt
         env:
           SEALIGHTS_AGENT_TOKEN: '${{secrets.SEALIGHTS_AGENT_TOKEN}}' ## Make sure to add token to repo secrets
 
       - name: Download SeaLights Go agent and CLI tool
-        if: ${{ matrix.branch == 'main' }}
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
             echo "[SeaLights] Downloading SeaLights Golang & CLI Agents..."
             # Architectures available: darwin-amd64, darwin-arm64, linux-amd64, linux-arm64
@@ -98,21 +98,21 @@ jobs:
             ./slgoagent -v 2> /dev/null | grep version && ./slcli -v 2> /dev/null | grep version
 
       - name: Initiating the SeaLights agent
-        if: ${{ matrix.branch == 'main' }}
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           echo "[SeaLights] Initiating the SeaLights agent to Golang and handing it the token"
           ./slcli config init --lang go --token ./sltoken.txt
 
       - name: Configuring SeaLights
-        if: ${{ matrix.branch == 'main' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           echo "[SeaLights] Configuring SeaLights to scan for main branch nightly"
-          ./slcli config create-bsid --app rhdh-operator --branch main --build "$BUILD_TIME:$LATEST_COMMIT_SHA"
+          ./slcli config create-bsid --app rhdh-operator --branch ${{ matrix.branch }} --build "$BUILD_TIME:$LATEST_COMMIT_SHA"
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
       - name: Run SeaLights scan for e2e tests
-        if: ${{ matrix.branch == 'main' }}
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           echo "[SeaLights] Running the SeaLights e2e tests scan"
           ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent  --workspacepath "./" --scm git --scmBaseUrl https://github.com/redhat-developer/rhdh-operator --scmProvider github
@@ -130,7 +130,7 @@ jobs:
         run: make test-e2e
 
       - name: Remove SeaLights secrets
-        if: always() && matrix.branch == 'main'
+        if: always() && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true'
         run: |
           echo "[SeaLights] Cleaning up after SeaLights run"
-          rm sltoken.txt
+          rm -f sltoken.txt
