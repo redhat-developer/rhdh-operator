@@ -131,7 +131,7 @@ jobs:
         run: make test-e2e
 
       - name: Remove SeaLights secrets
-        if: always()
+        if: always() && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true'
         run: |
           echo "[SeaLights] Cleaning up after SeaLights run"
           rm -f sltoken.txt
