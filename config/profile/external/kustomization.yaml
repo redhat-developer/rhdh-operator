@@ -1,11 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Adds namespace to all resources.
-namespace: backstage-system
-
-namePrefix: backstage-
-
 resources:
 - ../../crd
 - ../../rbac
@@ -14,4 +9,4 @@ resources:
 images:
 - name: controller
   newName: quay.io/rhdh-community/operator
-  newTag: 0.5.0
+  newTag: 0.7.0
