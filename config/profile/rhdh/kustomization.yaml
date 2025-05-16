@@ -35,7 +35,6 @@ configMapGenerator:
   - default-config/deployment.yaml
   - default-config/dynamic-plugins.yaml
   - default-config/route.yaml
-  - default-config/secret-envs.yaml
   - default-config/service.yaml
   - default-config/deployment.yaml.k8s
   - default-config/db-statefulset.yaml.k8s

@@ -86,7 +86,7 @@ var _ = When("create default backstage", func() {
 
 		}, 5*time.Minute, time.Second).Should(Succeed())
 
-		if *testEnv.UseExistingCluster {
+		if *testEnv.UseExistingCluster && useExistingController {
 			By("setting Backstage status (real cluster only)")
 			Eventually(func(g Gomega) {
 
@@ -106,6 +106,7 @@ var _ = When("create default backstage", func() {
 						g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
 					}
 				}
+
 			}, 5*time.Minute, time.Second).Should(Succeed())
 		}
 	})
@@ -218,6 +219,9 @@ var _ = When("create default backstage", func() {
 	It("creates backstage and checks the status", func() {
 		if !*testEnv.UseExistingCluster {
 			Skip("Real cluster required")
+		}
+		if !useExistingController {
+			Skip("Real controller required")
 		}
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
