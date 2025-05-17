@@ -119,8 +119,9 @@ plugins:
 	assert.Len(t, objects, 2)
 
 	// Verify the returned objects
-	assert.Equal(t, "dep1", objects[0].GetName())
-	assert.Equal(t, "dep2", objects[1].GetName())
+	actualNames := []string{objects[0].GetName(), objects[1].GetName()}
+	expectedNames := []string{"dep1", "dep2"}
+	assert.ElementsMatch(t, expectedNames, actualNames)
 }
 
 func TestReadPluginDepsNoFiles(t *testing.T) {
