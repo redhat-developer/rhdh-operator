@@ -123,7 +123,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Source packages outside of tests
-PKGS := $(shell go list ./... | grep -v /e2e)
+PKGS := $(shell go list ./... | grep -v /e2e | grep -v /v1alpha1 | grep -v /v1alpha2)
 
 .PHONY: all
 all: build
