@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,14 +53,83 @@ metadata:
 	err := os.WriteFile(file1, []byte(yamlContent), 0644)
 	assert.NoError(t, err)
 
-	// Call ReadPluginDeps with substitution values
 	bsName := "test-name"
 	bsNamespace := "test-namespace"
 	objects, err := ReadPluginDeps(dir, bsName, bsNamespace, []string{"file1"})
 	assert.NoError(t, err)
 	assert.Len(t, objects, 1)
 
-	// Verify the substitutions
-	assert.Equal(t, "test-name", objects[0].GetName())
-	assert.Equal(t, "test-namespace", objects[0].GetNamespace())
+	assert.Equal(t, bsName, objects[0].GetName())
+	assert.Equal(t, bsNamespace, objects[0].GetNamespace())
+}
+
+func TestGetPluginDeps(t *testing.T) {
+	// Setup temporary directory
+	tempDir := t.TempDir()
+	t.Setenv("LOCALBIN", tempDir)
+
+	pluginDepsDir := filepath.Join(tempDir, "plugin-deps")
+	err := os.Mkdir(pluginDepsDir, 0755)
+	assert.NoError(t, err)
+
+	// Create mock plugin dependency files
+	file1 := filepath.Join(pluginDepsDir, "dep1.yaml")
+	file2 := filepath.Join(pluginDepsDir, "dep2.yaml")
+
+	err = os.WriteFile(file1, []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dep1
+`), 0644)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(file2, []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dep2
+`), 0644)
+	assert.NoError(t, err)
+
+	dynaPlugins := DynamicPlugins{
+		ConfigMap: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-configmap",
+			},
+			Data: map[string]string{
+				"dynamic-plugins.yaml": `
+includes:
+  - dynamic-plugins.default.yaml
+plugins:
+  - package: './dynamic-plugins/dist/test'
+    disabled: false
+    dependencies:
+      - ref: dep1
+      - ref: dep2
+`,
+			},
+		},
+	}
+
+	// Call GetPluginDeps
+	bsName := "test-name"
+	bsNamespace := "test-namespace"
+	objects, err := GetPluginDeps(bsName, bsNamespace, dynaPlugins)
+	assert.NoError(t, err)
+	assert.Len(t, objects, 2)
+
+	// Verify the returned objects
+	actualNames := []string{objects[0].GetName(), objects[1].GetName()}
+	expectedNames := []string{"dep1", "dep2"}
+	assert.ElementsMatch(t, expectedNames, actualNames)
+}
+
+func TestReadPluginDepsNoFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// Call ReadPluginDeps with an empty directory
+	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"})
+	assert.NoError(t, err)
+	assert.Len(t, objects, 0)
 }
