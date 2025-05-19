@@ -48,10 +48,6 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Tidy
-        # run this step to ensure that the go.mod file is up to date, make lint will fail if it is not
-        run: go mod tidy
-
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: Build
         run: make lint
