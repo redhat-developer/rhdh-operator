@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: rhdh-manager-sonataflow-role
+  name: manager-sonataflow-role
 rules:
   - apiGroups:
       - "sonataflow.org"
@@ -51,11 +51,11 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: clusterrolebinding
     app.kubernetes.io/part-of: backstage-operator
-  name: rhdh-manager-sonataflow-rolebinding
+  name: manager-sonataflow-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: rhdh-manager-sonataflow-role
+  name: manager-sonataflow-role
 subjects:
   - kind: ServiceAccount
     name: rhdh-controller-manager

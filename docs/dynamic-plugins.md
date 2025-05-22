@@ -35,7 +35,7 @@ configMapGenerator:
 
 ### Plugin dependencies infrastructure
 
-If plugin dependencies require infrastructural resources (e.g., RoleBindings, CustomResources) and if the User (Administrator) wants it to be deployed (see Note below), they can be specified in the /config/profile/{PROFILE}/plugin-infra directory. To create these resources (along with the operator deployment), use the `make plugin-infra` command. 
+If plugin dependencies require infrastructural resources (e.g. other Operators to be installed) and if the User (Administrator) wants it to be deployed (see Note below), they can be specified in the /config/profile/{PROFILE}/plugin-infra directory. To create these resources (along with the operator deployment), use the `make plugin-infra` command. 
 
 **Note**: Be cautious when running this command on a production cluster, as it may reconfigure cluster-scoped resources.
 
@@ -108,8 +108,10 @@ The SonataFlowPlatform CR requires the SonataFlow operator to be installed. In a
 
 **Note:** Current Subscriptions configuration uses **Automatic** install plan (**spec.installPlanApproval: Automatic**), consider to change it to **Manual** if you want to control the installation of the operators (see [Operator Installation with OLM](https://olm.operatorframework.io/docs/tasks/install-operator-with-olm) for more details).
 
+**Note:** Using plugin infrastructure (plugin-infra) can be risky in production, as it modifies cluster-scoped resources.
+
+#### RBAC
+
 Additionally, to enable the Backstage operator to work with the SonataFlow platform, its ServiceAccount must be granted the appropriate permissions. 
 
-These manifests are defined as plugin infrastructure in the profile/rhdh/operator/plugin-infra/orchestrator directory.
-
-**Note:** Using plugin infrastructure (plugin-infra) can be risky in production, as it modifies cluster-scoped resources.
+These manifests are defined in the profile/rhdh/operator/plugin-rbac/rbac-sonataflow.yaml file which is applied along with the Backstage operator deployment.
