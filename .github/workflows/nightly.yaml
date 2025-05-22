@@ -7,7 +7,7 @@ on:
     - cron: "34 23 * * *"
 
 jobs:
-  e2e-tests:
+  nightly-tests:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -16,7 +16,7 @@ jobs:
           - main
           - release-1.6
           - release-1.5
-    name: 'E2E Tests on ${{ matrix.branch }}'
+    name: 'Nightly Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
       cancel-in-progress: true
@@ -111,13 +111,53 @@ jobs:
         env:
           LATEST_COMMIT_SHA: ${{ github.sha }}
 
-      - name: Run SeaLights scan for e2e tests
+      - name: Run SeaLights scan for tests
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
-          echo "[SeaLights] Running the SeaLights e2e tests scan"
+          echo "[SeaLights] Running the SeaLights scan"
           ./slcli scan --bsid buildSessionId.txt  --path-to-scanner ./slgoagent  --workspacepath "./" --scm git --scmBaseUrl https://github.com/redhat-developer/rhdh-operator --scmProvider github
-        env:
-          SEALIGHTS_TEST_STAGE: "E2E Tests Nightly"
+
+      # gosec needs a "build" stage so connect it to the lint step which we always do
+      - name: Build
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: make lint
+
+      - name: Run Controller
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        # run this stage only if there are changes that match the includes and not the excludes
+        run: |
+          # Need to 'make install' first, so that the necessary tool binaries (like controller-gen) can be downloaded locally.
+          # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
+          # but the `make test` command tries to use it.
+          make manifests generate fmt vet install
+          make run &
+
+      - name: Create a Unit Tests session
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: ./slcli test start-stage --bsid=buildSessionId.txt --testStage "Unit Tests"
+
+      - name: Test
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        # run this stage only if there are changes that match the includes and not the excludes
+        run: make test
+
+      - name: Create a Integration Tests session
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          ./slcli test end-stage --bsid=buildSessionId.txt --executionId "Unit Tests"
+          ./slcli test start-stage --bsid=buildSessionId.txt --testStage "Integration Tests"
+
+      - name: Generic Integration test
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        # run this stage only if there are changes that match the includes and not the excludes
+        # perform it on backstage.io for speed
+        run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
+
+      - name: Create a E2E Tests session
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          ./slcli test end-stage --bsid=buildSessionId.txt --executionId "Integration Tests"
+          ./slcli test start-stage --bsid=buildSessionId.txt --testStage "E2E Tests"
 
       - name: Run E2E tests
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
