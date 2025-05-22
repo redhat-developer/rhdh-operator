@@ -63,7 +63,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	if !secureMetrics {
+	if metricsAddr != "0" && !secureMetrics {
 		setupLog.Info("Metrics are served over plaintext HTTP. This is only intended for local development.")
 	}
 
