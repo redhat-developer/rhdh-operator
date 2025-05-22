@@ -21,7 +21,7 @@ func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, nsName types.
 
 	objects, err := model.GetPluginDeps(nsName.Name, nsName.Namespace, plugins)
 	if err != nil {
-		return fmt.Errorf("failed to read YAML files: %w", err)
+		return fmt.Errorf("failed to get plugin dependencies: %w", err)
 	}
 
 	// Process the objects as needed

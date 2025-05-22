@@ -96,6 +96,8 @@ func getDepsFiles(root string, enabledPrefixes []string) ([]string, error) {
 				break
 			}
 		}
+
+		// TODO add some warning if file is not in the enabled list
 	}
 
 	return files, nil

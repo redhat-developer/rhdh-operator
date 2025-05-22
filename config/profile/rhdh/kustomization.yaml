@@ -10,7 +10,7 @@ resources:
 - ../../rbac
 - ../../manager
 - namespace.yaml
-
+- plugin-rbac
 
 images:
 - name: controller
