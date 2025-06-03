@@ -32,3 +32,23 @@ kind: Namespace
 metadata:
   name: knative-eventing
 
+---
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeEventing
+metadata:
+  name: knative-eventing
+  namespace: knative-eventing
+spec:
+  Registry: {}
+---
+apiVersion: operator.knative.dev/v1beta1
+kind: KnativeServing
+metadata:
+  name: knative-serving
+  namespace: knative-serving
+spec:
+  controller-custom-certs:
+    name: ""
+    type: ""
+  registry: {}
+---
