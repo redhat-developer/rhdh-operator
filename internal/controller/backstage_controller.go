@@ -3,10 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
-	"reflect"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -123,6 +122,10 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to clean backstage objects ", err)
 	}
 
+	if false {
+		r.unusedFn()
+	}
+
 	r.setDeploymentStatus(ctx, &backstage)
 	return ctrl.Result{}, nil
 }
@@ -130,6 +133,11 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func errorAndStatus(backstage *bs.Backstage, msg string, err error) error {
 	setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, fmt.Sprintf("%s %s", msg, err))
 	return fmt.Errorf("%s: %w", msg, err)
+}
+
+func (r *BackstageReconciler) unusedFn() {
+	//FIXME(rm3l): remove this
+	fmt.Println("[REMOVE ME] This should not show up in the logs!!!")
 }
 
 func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.RuntimeObject) error {
