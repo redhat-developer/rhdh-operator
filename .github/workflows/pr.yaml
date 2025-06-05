@@ -10,12 +10,12 @@ on:
       - release-1.[0-9]+
 jobs:
   authorize:
-    # The 'external' environment is configured with the odo-maintainers team as required reviewers.
+    # The 'external' environment is configured with the repo maintainers team as required reviewers.
     # All the subsequent jobs in this workflow 'need' this job, which will require manual approval for PRs coming from external forks.
     # see list of approvers in OWNERS file
     environment:
       ${{ (github.event.pull_request.head.repo.full_name == github.repository ||
-        contains(fromJSON('["gazarenkov","nickboldt","rm3l","openshift-cherrypick-robot"]'), github.actor)) && 'internal' || 'external' }}
+        contains(fromJSON('["gazarenkov","nickboldt","rm3l","kim-tsao","kadel","Fortune-Ndlovu","subhashkhileri","zdrapela","openshift-cherrypick-robot"]'), github.actor)) && 'internal' || 'external' }}
     runs-on: ubuntu-latest
     steps:
       - name: approved
