@@ -20,7 +20,7 @@ resources:
 images:
 - name: controller
   newName: quay.io/rhdh-community/operator
-  newTag: 0.5.2
+  newTag: 0.5.3
 
 generatorOptions:
   disableNameSuffixHash: true
