@@ -315,4 +315,4 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 0.5.2
+  version: 0.5.3
