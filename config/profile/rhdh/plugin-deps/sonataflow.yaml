@@ -62,25 +62,6 @@ spec:
               # Allow openshift-user-workload-monitoring pods to access the workflow.
               kubernetes.io/metadata.name: openshift-user-workload-monitoring
 ---
-apiVersion: operator.knative.dev/v1beta1
-kind: KnativeEventing
-metadata:
-  name: knative-eventing
-  namespace: knative-eventing
-spec:
-  Registry: {}
----
-apiVersion: operator.knative.dev/v1beta1
-kind: KnativeServing
-metadata:
-  name: knative-serving
-  namespace: knative-serving
-spec:
-  controller-custom-certs:
-    name: ""
-    type: ""
-  registry: {}
----
 apiVersion: sonataflow.org/v1alpha08
 kind: SonataFlowPlatform
 metadata:
