@@ -61,11 +61,13 @@ jobs:
           done
 
       - name: Setup Go
+        if: steps.changed-files.outputs.any_changed == 'true'
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version-file: 'go.mod'
 
       - name: Store build timestamp
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
 
       - name: Write SeaLights token into file
@@ -119,6 +121,7 @@ jobs:
           
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: Build
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make lint
 
       - name: Start Minikube
@@ -159,9 +162,11 @@ jobs:
           rm sltoken.txt
 
       - name: Run Gosec Security Scanner
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make gosec
 
       - name: Upload SARIF file
+        if: steps.changed-files.outputs.any_changed == 'true'
         uses: github/codeql-action/upload-sarif@fca7ace96b7d713c7035871441bd52efbe39e27e # v3
         with:
           # Path to SARIF file relative to the root of the repository
