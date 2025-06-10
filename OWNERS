@@ -1,10 +1,12 @@
-# if adding/removing approvers, remember to update pr-container-build.yaml to add/remove them from the authorize job
+# if adding/removing approvers, remember to update the pr*.yaml files to add/remove them from the authorize job
 approvers:
- - coreydaley
  - gazarenkov
- - kadel
- - kim-tsao
- - nickboldt
  - rm3l
+ - nickboldt
+ - kim-tsao
+ - kadel
 
 reviewers:
+ - Fortune-Ndlovu
+ - subhashkhileri
+ - zdrapela
