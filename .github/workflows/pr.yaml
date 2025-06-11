@@ -124,10 +124,12 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make lint
 
-      - name: Start Minikube
-        # run this stage only if there are changes that match the includes and not the excludes
+      - name: Create Kind cluster
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: test-cluster
+          ignore_failed_clean: true
 
       - name: Run Controller
         # run this stage only if there are changes that match the includes and not the excludes

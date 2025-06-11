@@ -64,16 +64,44 @@ jobs:
         run: |
           echo "::warning ::Operator Image ${{ env.OPERATOR_IMAGE }} not found for testing the ${{ matrix.branch }} branch. It might have expired. E2E tests will be skipped for ${{ matrix.branch }}."
 
-      - name: Start Minikube
+      - name: Generate Kind Config
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
+        run: |
+          cat <<EOF > /tmp/kind-config.yaml
+          apiVersion: kind.x-k8s.io/v1alpha4
+          kind: Cluster
+          nodes:
+            - role: control-plane
+              extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+                - containerPort: 443
+                  hostPort: 443
+                  protocol: TCP
+          EOF
+
+      - name: Create Kind cluster
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
-          addons: ingress
+          cluster_name: test-cluster
+          config: /tmp/kind-config.yaml
+          ignore_failed_clean: true
+
+      - name: Install Ingress Controller
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=90s
 
       - name: Build Ingress Domain
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
-          echo "K8S_INGRESS_DOMAIN=$(minikube ip).sslip.io" >> $GITHUB_ENV
+          echo "K8S_INGRESS_DOMAIN=127.0.0.1.sslip.io" >> $GITHUB_ENV
 
       - name: Write SeaLights token into file
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
@@ -167,7 +195,7 @@ jobs:
       - name: Run E2E tests
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
-          BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
+          BACKSTAGE_OPERATOR_TESTS_PLATFORM: kind
           BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS: 'true'
           BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN: ${{ env.K8S_INGRESS_DOMAIN }}
           OPERATOR_MANIFEST: ${{ env.OPERATOR_MANIFEST }}
