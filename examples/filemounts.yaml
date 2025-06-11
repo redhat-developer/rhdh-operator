@@ -1,31 +1,3 @@
-apiVersion: rhdh.redhat.com/v1alpha3
-kind: Backstage
-metadata:
-  name: my-rhdh-file-mounts
-spec:
-  application:
-    extraFiles:
-      mountPath: /my/path
-      configMaps:
-        - name: cm1 # /my/path/file11.txt and /my/path/file12.txt expected, watched
-        - name: cm2 # /my/path/file21.txt expected, watched
-          key: file21.txt
-        - name: cm3  # /my/cm3/path/file31.txt and /my/cm3/path/file312.txt expected, not watched
-          mountPath: /my/cm3/path
-        - name: cm4  # /my/cm4/path/file41.txt expected, watched
-          mountPath: /my/cm4/path
-          key: file41.txt
-      secrets:
-        - name: secret1 # /my/path/secret11.txt expected, watched
-          key: secret11.txt
-        - name: secret2 # /my/secret2/path/secret21.txt and /my/secret2/path/secret22.txt expected, not watched
-          mountPath: /my/secret2/path
-        - name: secret3 # /my/secret3/path/secret31.txt expected, watched
-          mountPath: /my/secret3/path
-          key: secret31.txt
-#        - name: secret4  <-- this is forbidden
-
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -101,3 +73,29 @@ stringData:
     base64-encoded-content
 
 ---
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: my-rhdh-file-mounts
+spec:
+  application:
+    extraFiles:
+      mountPath: /my/path
+      configMaps:
+        - name: cm1 # /my/path/file11.txt and /my/path/file12.txt expected, watched
+        - name: cm2 # /my/path/file21.txt expected, watched
+          key: file21.txt
+        - name: cm3  # /my/cm3/path/file31.txt and /my/cm3/path/file312.txt expected, not watched
+          mountPath: /my/cm3/path
+        - name: cm4  # /my/cm4/path/file41.txt expected, watched
+          mountPath: /my/cm4/path
+          key: file41.txt
+      secrets:
+        - name: secret1 # /my/path/secret11.txt expected, watched
+          key: secret11.txt
+        - name: secret2 # /my/secret2/path/secret21.txt and /my/secret2/path/secret22.txt expected, not watched
+          mountPath: /my/secret2/path
+        - name: secret3 # /my/secret3/path/secret31.txt expected, watched
+          mountPath: /my/secret3/path
+          key: secret31.txt
+#        - name: secret4  <-- this is forbidden
