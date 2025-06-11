@@ -172,7 +172,7 @@ integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run i
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
-POLL_PROGRESS_INTERVAL := 120s
+POLL_PROGRESS_INTERVAL := 600s
 TIMEOUT ?= 14400s
 GINKGO_FLAGS_ALL = $(GINKGO_TEST_ARGS) --randomize-all --poll-progress-after=$(POLL_PROGRESS_INTERVAL) --poll-progress-interval=$(POLL_PROGRESS_INTERVAL) -timeout $(TIMEOUT) --no-color
 # Flags for tests that may be run in parallel
