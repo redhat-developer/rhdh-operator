@@ -25,6 +25,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 		projectDir string
 		ns         string
 	)
+	appReachabilityTimeout := 5 * time.Minute
 
 	BeforeEach(func() {
 		var err error
@@ -33,6 +34,12 @@ var _ = Describe("Backstage Operator E2E", func() {
 
 		ns = fmt.Sprintf("e2e-test-%d-%s", GinkgoParallelProcess(), helper.RandString(5))
 		helper.CreateNamespace(ns)
+
+		r := os.Getenv("BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT")
+		if r != "" {
+			appReachabilityTimeout, err = time.ParseDuration(r)
+			Expect(err).ShouldNot(HaveOccurred())
+		}
 	})
 
 	AfterEach(func() {
@@ -130,7 +137,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 					})
 
 					By("validating that pod(s) status.phase=Running", func() {
-						Eventually(helper.VerifyBackstagePodStatus, 10*time.Minute, 10*time.Second).
+						Eventually(helper.VerifyBackstagePodStatus, appReachabilityTimeout, 10*time.Second).
 							WithArguments(ns, tt.crName, "Running").
 							Should(Succeed(), func() string {
 								return fmt.Sprintf("%s\n---\n%s",
@@ -158,7 +165,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 							})
 						} else {
 							By("ensuring the route is reachable", func() {
-								ensureRouteIsReachable(ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
+								ensureRouteIsReachable(appReachabilityTimeout, ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
 							})
 						}
 					} else {
@@ -216,7 +223,7 @@ spec:
 						}
 
 						By("ensuring the application is fully reachable", func() {
-							Eventually(helper.VerifyBackstageAppAccessWithUrlProvider, 10*time.Minute, 15*time.Second).
+							Eventually(helper.VerifyBackstageAppAccessWithUrlProvider, appReachabilityTimeout, 15*time.Second).
 								WithArguments(appUrlProvider, tt.additionalApiEndpointTests).
 								Should(Succeed(), func() string {
 									return fmt.Sprintf("%s\n---\n%s",
@@ -247,7 +254,7 @@ spec:
 						})
 						if isRouteEnabledNow {
 							By("ensuring the route is reachable", func() {
-								ensureRouteIsReachable(ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
+								ensureRouteIsReachable(appReachabilityTimeout, ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
 							})
 						} else {
 							By("ensuring route no longer exists eventually", func() {
@@ -281,8 +288,8 @@ spec:
 	})
 })
 
-func ensureRouteIsReachable(ns string, crName string, crLabel string, additionalApiEndpointTests []helper.ApiEndpointTest) {
-	Eventually(helper.VerifyBackstageRoute, 5*time.Minute, time.Second).
+func ensureRouteIsReachable(reachabilityTimeoutMinutes time.Duration, ns string, crName string, crLabel string, additionalApiEndpointTests []helper.ApiEndpointTest) {
+	Eventually(helper.VerifyBackstageRoute, reachabilityTimeoutMinutes, 10*time.Second).
 		WithArguments(ns, crName, additionalApiEndpointTests).
 		Should(Succeed(), func() string {
 			return fmt.Sprintf("%s\n---\n%s",
