@@ -120,13 +120,23 @@ var _ = Describe("Backstage Operator E2E", func() {
 						// [{"lastTransitionTime":"2025-04-09T09:02:06Z","message":"","reason":"Deployed","status":"True","type":"Deployed"}]
 						Eventually(helper.VerifyBackstageCRStatus, time.Minute, 10*time.Second).
 							WithArguments(ns, tt.crName, ContainSubstring(`"type":"Deployed"`)).
-							Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+							Should(Succeed(), func() string {
+								return fmt.Sprintf("%s\n---\n%s",
+									fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+									describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+								)
+							})
 					})
 
 					By("validating that pod(s) status.phase=Running", func() {
 						Eventually(helper.VerifyBackstagePodStatus, 10*time.Minute, 10*time.Second).
 							WithArguments(ns, tt.crName, "Running").
-							Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+							Should(Succeed(), func() string {
+								return fmt.Sprintf("%s\n---\n%s",
+									fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+									describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+								)
+							})
 					})
 
 					if helper.IsOpenShift() {
@@ -138,7 +148,12 @@ var _ = Describe("Backstage Operator E2E", func() {
 									g.Expect(exists).Should(BeTrue())
 								}, 15*time.Second, time.Second).
 									WithArguments(tt.crName).
-									ShouldNot(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+									ShouldNot(Succeed(), func() string {
+										return fmt.Sprintf("%s\n---\n%s",
+											fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+											describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+										)
+									})
 							})
 						} else {
 							By("ensuring the route is reachable", func() {
@@ -251,5 +266,10 @@ spec:
 func ensureRouteIsReachable(ns string, crName string, crLabel string, additionalApiEndpointTests []helper.ApiEndpointTest) {
 	Eventually(helper.VerifyBackstageRoute, 5*time.Minute, time.Second).
 		WithArguments(ns, crName, additionalApiEndpointTests).
-		Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+		Should(Succeed(), func() string {
+			return fmt.Sprintf("%s\n---\n%s",
+				fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+				describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+			)
+		})
 }
