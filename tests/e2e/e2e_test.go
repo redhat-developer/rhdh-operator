@@ -175,7 +175,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 							}
 							appUrl := fmt.Sprintf("%s.%s", tt.crName, ingressDomain)
 							By("manually creating a K8s Ingress", func() {
-								cmd := exec.Command(helper.GetPlatformTool(), "-n", ns, "create", "-f", "-")
+								cmd := exec.Command(helper.GetPlatformTool(), "-n", ns, "apply", "-f", "-")
 								stdin, err := cmd.StdinPipe()
 								ExpectWithOffset(1, err).NotTo(HaveOccurred())
 								go func() {
