@@ -196,7 +196,7 @@ jobs:
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: kind
-          BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS: 'true'
+          BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS: 'false'
           BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN: ${{ env.K8S_INGRESS_DOMAIN }}
           OPERATOR_MANIFEST: ${{ env.OPERATOR_MANIFEST }}
           IMG: ${{ env.OPERATOR_IMAGE }}
