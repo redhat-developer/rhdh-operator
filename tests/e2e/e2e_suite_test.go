@@ -213,10 +213,13 @@ func verifyControllerUp(g Gomega, managerPodLabel string) {
 }
 
 func getPodLogs(ns string, label string) string {
-	cmd := exec.Command(helper.GetPlatformTool(), "logs",
-		"-l", label,
-		"-n", ns,
-	)
+	cmd := exec.Command(helper.GetPlatformTool(), "logs", "--all-containers", "-l", label, "-n", ns)
+	output, _ := helper.Run(cmd)
+	return string(output)
+}
+
+func describePod(ns string, label string) string {
+	cmd := exec.Command(helper.GetPlatformTool(), "describe", "pods", "-l", label, "-n", ns)
 	output, _ := helper.Run(cmd)
 	return string(output)
 }
@@ -241,10 +244,16 @@ func fetchOperandLogs(ns string, crLabel string, raw bool) func() string {
 	}
 }
 
-func fetchOperatorAndOperandLogs(managerPodLabel string, ns string, crLabel string) func() string {
-	return func() string {
-		return fmt.Sprintf("%s\n\n%s\n", fetchOperatorLogs(managerPodLabel, false)(), fetchOperandLogs(ns, crLabel, false)())
-	}
+func fetchOperatorAndOperandLogs(managerPodLabel string, ns string, crLabel string) string {
+	return fmt.Sprintf("%s\n\n%s\n",
+		fetchOperatorLogs(managerPodLabel, false)(),
+		fetchOperandLogs(ns, crLabel, false)())
+}
+
+func describeOperatorAndOperatorPods(managerPodLabel string, ns string, crLabel string) string {
+	return fmt.Sprintf("%s\n\n%s\n",
+		describePod(_namespace, managerPodLabel),
+		describePod(ns, crLabel))
 }
 
 func uninstallOperator() {

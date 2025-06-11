@@ -1,14 +1,3 @@
-apiVersion: rhdh.redhat.com/v1alpha3
-kind: Backstage
-metadata:
-  name: bs-raw-runtime-config
-spec:
-  rawRuntimeConfig:
-    backstageConfig: raw-runtime-config
-  database:
-    enableLocalDb: false
-
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -64,3 +53,12 @@ stringData:
   MY_SUPER_SECRET_1: "some value" # notsecret
 
 ---
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: bs-raw-runtime-config
+spec:
+  rawRuntimeConfig:
+    backstageConfig: raw-runtime-config
+  database:
+    enableLocalDb: false

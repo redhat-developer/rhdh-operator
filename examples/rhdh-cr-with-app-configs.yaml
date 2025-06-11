@@ -1,46 +1,3 @@
-apiVersion: rhdh.redhat.com/v1alpha3
-kind: Backstage
-metadata:
-  name: bs-app-config
-spec:
-  database:
-    enableLocalDb: true
-  deployment:
-    patch:
-      spec:
-        replicas: 2
-  application:
-    appConfig:
-      configMaps:
-        - name: "my-backstage-config-backend-base-urls"
-        - name: "my-backstage-config-backend-auth"
-        - name: "my-backstage-config-cm1"
-        - name: "my-backstage-config-cm2"
-          key: "app-config1-cm2.gh.yaml"
-    dynamicPluginsConfigMapName: "my-dynamic-plugins-config-cm"
-    extraFiles:
-      mountPath: /tmp/my-extra-files
-      configMaps:
-        - name: "my-backstage-extra-files-cm1"
-      secrets:
-        - name: "my-backstage-extra-files-secret1"
-          key: secret_file1.txt
-    extraEnvs:
-      envs:
-        - name: GITHUB_ORG
-          value: 'my-gh-org'
-        - name: MY_ENV_VAR_2
-          value: my-value-2
-      configMaps:
-        - name: my-env-cm-1
-        - name: my-env-cm-11
-          key: CM_ENV11
-      secrets:
-        - name: "my-backstage-backend-auth-secret"
-          key: BACKEND_SECRET
-        - name: my-gh-auth-secret
-
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -239,3 +196,44 @@ stringData:
       SomeRsaPrivateKey
 
 ---
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: bs-app-config
+spec:
+  database:
+    enableLocalDb: true
+  deployment:
+    patch:
+      spec:
+        replicas: 1
+  application:
+    appConfig:
+      configMaps:
+        - name: "my-backstage-config-backend-base-urls"
+        - name: "my-backstage-config-backend-auth"
+        - name: "my-backstage-config-cm1"
+        - name: "my-backstage-config-cm2"
+          key: "app-config1-cm2.gh.yaml"
+    dynamicPluginsConfigMapName: "my-dynamic-plugins-config-cm"
+    extraFiles:
+      mountPath: /tmp/my-extra-files
+      configMaps:
+        - name: "my-backstage-extra-files-cm1"
+      secrets:
+        - name: "my-backstage-extra-files-secret1"
+          key: secret_file1.txt
+    extraEnvs:
+      envs:
+        - name: GITHUB_ORG
+          value: 'my-gh-org'
+        - name: MY_ENV_VAR_2
+          value: my-value-2
+      configMaps:
+        - name: my-env-cm-1
+        - name: my-env-cm-11
+          key: CM_ENV11
+      secrets:
+        - name: "my-backstage-backend-auth-secret"
+          key: BACKEND_SECRET
+        - name: my-gh-auth-secret
