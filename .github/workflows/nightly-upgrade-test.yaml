@@ -94,14 +94,44 @@ jobs:
         run: |
           echo "::warning ::One of the operator images (${{ env.FROM_OPERATOR_IMAGE }} or ${{ env.TO_OPERATOR_IMAGE }}) could not be found for testing the ${{ matrix.from_branch }} => ${{ matrix.to_branch }} upgrade path. They might have expired. Skipping."
 
-      - name: Start Minikube
+      - name: Generate Kind Config
         if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: medyagh/setup-minikube@cea33675329b799adccc9526aa5daccc26cd5052 # v0.0.19
+        run: |
+          cat <<EOF > /tmp/kind-config.yaml
+          apiVersion: kind.x-k8s.io/v1alpha4
+          kind: Cluster
+          nodes:
+            - role: control-plane
+              extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+                - containerPort: 443
+                  hostPort: 443
+                  protocol: TCP
+          EOF
+
+      - name: Create Kind cluster
+        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: test-cluster
+          config: /tmp/kind-config.yaml
+          ignore_failed_clean: true
+
+      - name: Install Ingress Controller
+        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=90s
 
       - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_branch }} => ${{ matrix.to_branch }})'
         if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
-          BACKSTAGE_OPERATOR_TESTS_PLATFORM: minikube
+          BACKSTAGE_OPERATOR_TESTS_PLATFORM: kind
           PROFILE: 'rhdh'
           FROM_OPERATOR_MANIFEST: ${{ env.FROM_OPERATOR_MANIFEST }}
           TO_OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}

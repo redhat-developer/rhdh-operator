@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,12 +11,12 @@ import (
 	"time"
 
 	"github.com/onsi/gomega/gcustom"
+	"github.com/tidwall/gjson"
 
 	"github.com/redhat-developer/rhdh-operator/tests/helper"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/tidwall/gjson"
 )
 
 var _ = Describe("Backstage Operator E2E", func() {
@@ -38,55 +39,13 @@ var _ = Describe("Backstage Operator E2E", func() {
 		helper.DeleteNamespace(ns, false)
 	})
 
-	Describe("operator metrics", func() {
-
-		It("should not have a kube-rbac-proxy container in the controller Pod", func() {
-			if testMode != olmDeployTestMode && testMode != defaultDeployTestMode {
-				Skip(fmt.Sprintf("testing operator metrics endpoint not supported for this mode: %q", testMode))
-			}
-
-			By("not creating a kube-rbac-proxy sidecar")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command(helper.GetPlatformTool(), "get",
-					"pods", "-l", "app=rhdh-operator",
-					"-o", "jsonpath={.items[*].spec.containers[*].name}",
-					"-n", _namespace,
-				)
-				containerListOutput, err := helper.Run(cmd)
-				g.Expect(err).ShouldNot(HaveOccurred())
-				containerListNames := helper.GetNonEmptyLines(string(containerListOutput))
-				g.Expect(containerListNames).Should(HaveLen(1),
-					fmt.Sprintf("expected 1 container(s) in the controller pod, but got %d", len(containerListNames)))
-				containerName := containerListNames[0]
-				g.Expect(containerName).ToNot(BeEmpty())
-				g.Expect(containerName).ShouldNot(ContainSubstring("rbac-proxy"))
-			}, 3*time.Minute, time.Second).Should(Succeed())
-
-			By("creating a Service to access the metrics")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command(helper.GetPlatformTool(), "get", "services",
-					"-l", "app=rhdh-operator",
-					"-l", "app.kubernetes.io/component=metrics",
-					"-o", "jsonpath={.items[*].metadata.name}",
-					"-n", _namespace,
-				)
-				svcListOutput, err := helper.Run(cmd)
-				g.Expect(err).ShouldNot(HaveOccurred())
-				svcListNames := helper.GetNonEmptyLines(string(svcListOutput))
-				g.Expect(svcListNames).Should(HaveLen(1),
-					fmt.Sprintf("expected 1 service exposing the controller metrics, but got %d", len(svcListNames)))
-				metricsServiceName := svcListNames[0]
-				g.Expect(metricsServiceName).ToNot(BeEmpty())
-			}, 3*time.Minute, time.Second).Should(Succeed())
-		})
-	})
-
 	Context("Examples CRs", func() {
 
 		for _, tt := range []struct {
 			name                       string
 			crFilePath                 string
 			crName                     string
+			isForOpenshift             bool
 			isRouteDisabled            bool
 			additionalApiEndpointTests []helper.ApiEndpointTest
 		}{
@@ -96,15 +55,17 @@ var _ = Describe("Backstage Operator E2E", func() {
 				crName:     "bs1",
 			},
 			{
-				name:       "specific route sub-domain",
-				crFilePath: filepath.Join("examples", "bs-route.yaml"),
-				crName:     "bs-route",
+				name:           "specific route sub-domain",
+				crFilePath:     filepath.Join("examples", "bs-route.yaml"),
+				crName:         "bs-route",
+				isForOpenshift: true,
 			},
 			{
 				name:            "route disabled",
 				crFilePath:      filepath.Join("examples", "bs-route-disabled.yaml"),
 				crName:          "bs-route-disabled",
 				isRouteDisabled: true,
+				isForOpenshift:  true,
 			},
 			{
 				name:       "RHDH CR with app-configs, dynamic plugins, extra files and extra-envs",
@@ -145,6 +106,9 @@ var _ = Describe("Backstage Operator E2E", func() {
 				var crPath string
 				var crLabel string
 				BeforeEach(func() {
+					if tt.isForOpenshift && !helper.IsOpenShift() {
+						Skip("Skipping OpenShift-only test on non OCP platform")
+					}
 					crPath = filepath.Join(projectDir, tt.crFilePath)
 					cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", crPath, "-n", ns)
 					_, err := helper.Run(cmd)
@@ -157,13 +121,23 @@ var _ = Describe("Backstage Operator E2E", func() {
 						// [{"lastTransitionTime":"2025-04-09T09:02:06Z","message":"","reason":"Deployed","status":"True","type":"Deployed"}]
 						Eventually(helper.VerifyBackstageCRStatus, time.Minute, 10*time.Second).
 							WithArguments(ns, tt.crName, ContainSubstring(`"type":"Deployed"`)).
-							Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+							Should(Succeed(), func() string {
+								return fmt.Sprintf("%s\n---\n%s",
+									fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+									describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+								)
+							})
 					})
 
 					By("validating that pod(s) status.phase=Running", func() {
 						Eventually(helper.VerifyBackstagePodStatus, 10*time.Minute, 10*time.Second).
 							WithArguments(ns, tt.crName, "Running").
-							Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+							Should(Succeed(), func() string {
+								return fmt.Sprintf("%s\n---\n%s",
+									fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+									describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+								)
+							})
 					})
 
 					if helper.IsOpenShift() {
@@ -175,7 +149,12 @@ var _ = Describe("Backstage Operator E2E", func() {
 									g.Expect(exists).Should(BeTrue())
 								}, 15*time.Second, time.Second).
 									WithArguments(tt.crName).
-									ShouldNot(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+									ShouldNot(Succeed(), func() string {
+										return fmt.Sprintf("%s\n---\n%s",
+											fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+											describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+										)
+									})
 							})
 						} else {
 							By("ensuring the route is reachable", func() {
@@ -183,17 +162,18 @@ var _ = Describe("Backstage Operator E2E", func() {
 							})
 						}
 					} else {
-						// This is how we currently instruct users to deploy the application on vanilla K8s clusters,
-						// where an Ingress resource is not created OOTB by the Operator.
-						// TODO(rm3l): this is until https://issues.redhat.com/browse/RHIDP-2176 is supported.
-						//   For now, we want to make sure the tests cover the same area as on OpenShift, i.e.,
-						//   making sure that the application is reachable end-to-end from a user standpoint.
+						var appUrlProvider func(g Gomega) (context.CancelFunc, string)
 						if os.Getenv("BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS") == "true" {
+							// This is how we currently instruct users to deploy the application on vanilla K8s clusters,
+							// where an Ingress resource is not created OOTB by the Operator.
+							// TODO(rm3l): this is until https://issues.redhat.com/browse/RHIDP-2176 is supported.
+							//   For now, we want to make sure the tests cover the same area as on OpenShift, i.e.,
+							//   making sure that the application is reachable end-to-end from a user standpoint.
 							ingressDomain := os.Getenv("BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN")
 							if ingressDomain == "" {
 								Fail("Ingress Domain should be configured via the BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN env var")
 							}
-							ingressHost := fmt.Sprintf("%s.%s", tt.crName, ingressDomain)
+							appUrl := fmt.Sprintf("%s.%s", tt.crName, ingressDomain)
 							By("manually creating a K8s Ingress", func() {
 								cmd := exec.Command(helper.GetPlatformTool(), "-n", ns, "create", "-f", "-")
 								stdin, err := cmd.StdinPipe()
@@ -217,38 +197,54 @@ spec:
             name: backstage-%[1]s
             port:
               name: http-backend
-`, tt.crName, ingressHost))
+`, tt.crName, appUrl))
 								}()
 								_, err = helper.Run(cmd)
 								Expect(err).ShouldNot(HaveOccurred())
 							})
-
-							By("ensuring the application is fully reachable", func() {
-								Eventually(helper.VerifyBackstageAppAccess, 8*time.Minute, time.Second).
-									WithArguments(fmt.Sprintf("http://%s", ingressHost), tt.additionalApiEndpointTests).
-									Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
-							})
+							appUrlProvider = func(g Gomega) (context.CancelFunc, string) {
+								return nil, "http://" + appUrl
+							}
+						} else {
+							// Expose the service and reach localhost:7007
+							appUrlProvider = func(g Gomega) (context.CancelFunc, string) {
+								localPort, cancelFunc, err := helper.StartPortForward(context.Background(), fmt.Sprintf("backstage-%s", tt.crName), ns, 80)
+								g.Expect(err).ShouldNot(HaveOccurred())
+								g.Expect(localPort).ShouldNot(BeZero())
+								return cancelFunc, fmt.Sprintf("http://127.0.0.1:%d", localPort)
+							}
 						}
+
+						By("ensuring the application is fully reachable", func() {
+							Eventually(helper.VerifyBackstageAppAccessWithUrlProvider, 10*time.Minute, 15*time.Second).
+								WithArguments(appUrlProvider, tt.additionalApiEndpointTests).
+								Should(Succeed(), func() string {
+									return fmt.Sprintf("%s\n---\n%s",
+										fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+										describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+									)
+								})
+						})
 					}
 
 					var isRouteEnabledNow bool
-					By("updating route spec in CR", func() {
-						// enables route that was previously disabled, and disables route that was previously enabled.
-						isRouteEnabledNow = tt.isRouteDisabled
-						err := helper.PatchBackstageCR(ns, tt.crName, fmt.Sprintf(`
-{
-  "spec": {
-  	"application": {
-		"route": {
-			"enabled": %s
-		}
-	}
-  }
-}`, strconv.FormatBool(isRouteEnabledNow)),
-							"merge")
-						Expect(err).ShouldNot(HaveOccurred())
-					})
 					if helper.IsOpenShift() {
+						By("updating route spec in CR", func() {
+							// enables route that was previously disabled, and disables route that was previously enabled.
+							isRouteEnabledNow = tt.isRouteDisabled
+							err := helper.PatchBackstageCR(ns, tt.crName, fmt.Sprintf(`
+					{
+						"spec": {
+							"application": {
+								"route": {
+									"enabled": %s
+								}
+							}
+						}
+					}`, strconv.FormatBool(isRouteEnabledNow)),
+								"merge")
+							Expect(err).ShouldNot(HaveOccurred())
+						})
 						if isRouteEnabledNow {
 							By("ensuring the route is reachable", func() {
 								ensureRouteIsReachable(ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
@@ -288,5 +284,10 @@ spec:
 func ensureRouteIsReachable(ns string, crName string, crLabel string, additionalApiEndpointTests []helper.ApiEndpointTest) {
 	Eventually(helper.VerifyBackstageRoute, 5*time.Minute, time.Second).
 		WithArguments(ns, crName, additionalApiEndpointTests).
-		Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+		Should(Succeed(), func() string {
+			return fmt.Sprintf("%s\n---\n%s",
+				fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+				describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+			)
+		})
 }

@@ -1,13 +1,17 @@
 package helper
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -221,4 +225,73 @@ func RandString(n int) string {
 
 func IsOpenShift() bool {
 	return _isOpenShift
+}
+
+func StartPortForward(ctx context.Context, svc string, ns string, svcPort int) (localPort int, cancelFunc context.CancelFunc, err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	cmd := exec.CommandContext(
+		ctx,
+		GetPlatformTool(),
+		"-n", ns,
+		"port-forward",
+		"svc/"+svc,
+		fmt.Sprintf(":%d", svcPort),
+		"--address", "127.0.0.1",
+	)
+
+	stdout, err := cmd.StdoutPipe()
+	Expect(err).ShouldNot(HaveOccurred())
+
+	stderr, err := cmd.StderrPipe()
+	Expect(err).ShouldNot(HaveOccurred())
+
+	fmt.Fprintf(GinkgoWriter, "starting port-forwarding on service %s/%s\n", ns, svc)
+	err = cmd.Start()
+	Expect(err).ShouldNot(HaveOccurred())
+
+	portChan := make(chan int)
+	errChan := make(chan error)
+
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		re := regexp.MustCompile(`Forwarding from 127\.0\.0\.1:(\d+)`)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			if matches := re.FindStringSubmatch(line); len(matches) == 2 {
+				port := matches[1]
+				fmt.Fprintf(GinkgoWriter, "Detected port-forward: %s\n", line)
+				var p int
+				_, _ = fmt.Sscanf(port, "%d", &p)
+				portChan <- p
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			errChan <- err
+		}
+	}()
+
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Fprintf(GinkgoWriter, "kubectl stderr: %s\n", line)
+			if strings.Contains(line, "error") {
+				errChan <- fmt.Errorf("stderr: %s", line)
+				return
+			}
+		}
+	}()
+
+	select {
+	case port := <-portChan:
+		return port, cancel, nil
+	case err := <-errChan:
+		cancel()
+		return 0, nil, err
+	case <-time.After(10 * time.Second):
+		cancel()
+		return 0, nil, fmt.Errorf("timeout waiting for port-forward")
+	}
 }
