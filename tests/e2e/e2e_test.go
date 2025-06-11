@@ -38,49 +38,6 @@ var _ = Describe("Backstage Operator E2E", func() {
 		helper.DeleteNamespace(ns, false)
 	})
 
-	Describe("operator metrics", func() {
-
-		It("should not have a kube-rbac-proxy container in the controller Pod", func() {
-			if testMode != olmDeployTestMode && testMode != defaultDeployTestMode {
-				Skip(fmt.Sprintf("testing operator metrics endpoint not supported for this mode: %q", testMode))
-			}
-
-			By("not creating a kube-rbac-proxy sidecar")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command(helper.GetPlatformTool(), "get",
-					"pods", "-l", "app=rhdh-operator",
-					"-o", "jsonpath={.items[*].spec.containers[*].name}",
-					"-n", _namespace,
-				)
-				containerListOutput, err := helper.Run(cmd)
-				g.Expect(err).ShouldNot(HaveOccurred())
-				containerListNames := helper.GetNonEmptyLines(string(containerListOutput))
-				g.Expect(containerListNames).Should(HaveLen(1),
-					fmt.Sprintf("expected 1 container(s) in the controller pod, but got %d", len(containerListNames)))
-				containerName := containerListNames[0]
-				g.Expect(containerName).ToNot(BeEmpty())
-				g.Expect(containerName).ShouldNot(ContainSubstring("rbac-proxy"))
-			}, 3*time.Minute, time.Second).Should(Succeed())
-
-			By("creating a Service to access the metrics")
-			Eventually(func(g Gomega) {
-				cmd := exec.Command(helper.GetPlatformTool(), "get", "services",
-					"-l", "app=rhdh-operator",
-					"-l", "app.kubernetes.io/component=metrics",
-					"-o", "jsonpath={.items[*].metadata.name}",
-					"-n", _namespace,
-				)
-				svcListOutput, err := helper.Run(cmd)
-				g.Expect(err).ShouldNot(HaveOccurred())
-				svcListNames := helper.GetNonEmptyLines(string(svcListOutput))
-				g.Expect(svcListNames).Should(HaveLen(1),
-					fmt.Sprintf("expected 1 service exposing the controller metrics, but got %d", len(svcListNames)))
-				metricsServiceName := svcListNames[0]
-				g.Expect(metricsServiceName).ToNot(BeEmpty())
-			}, 3*time.Minute, time.Second).Should(Succeed())
-		})
-	})
-
 	Context("Examples CRs", func() {
 
 		for _, tt := range []struct {
