@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -177,6 +178,14 @@ func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpoin
 	g.Expect(host).ShouldNot(BeEmpty())
 
 	VerifyBackstageAppAccess(g, fmt.Sprintf("https://%s", host), tests)
+}
+
+func VerifyBackstageAppAccessWithUrlProvider(g Gomega, baseUrlProvider func(g Gomega) (context.CancelFunc, string), tests []ApiEndpointTest) {
+	cancelFunc, appUrl := baseUrlProvider(g)
+	if cancelFunc != nil {
+		defer cancelFunc()
+	}
+	VerifyBackstageAppAccess(g, appUrl, tests)
 }
 
 func VerifyBackstageAppAccess(g Gomega, baseUrl string, tests []ApiEndpointTest) {

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -161,17 +162,18 @@ var _ = Describe("Backstage Operator E2E", func() {
 							})
 						}
 					} else {
-						// This is how we currently instruct users to deploy the application on vanilla K8s clusters,
-						// where an Ingress resource is not created OOTB by the Operator.
-						// TODO(rm3l): this is until https://issues.redhat.com/browse/RHIDP-2176 is supported.
-						//   For now, we want to make sure the tests cover the same area as on OpenShift, i.e.,
-						//   making sure that the application is reachable end-to-end from a user standpoint.
+						var appUrlProvider func(g Gomega) (context.CancelFunc, string)
 						if os.Getenv("BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS") == "true" {
+							// This is how we currently instruct users to deploy the application on vanilla K8s clusters,
+							// where an Ingress resource is not created OOTB by the Operator.
+							// TODO(rm3l): this is until https://issues.redhat.com/browse/RHIDP-2176 is supported.
+							//   For now, we want to make sure the tests cover the same area as on OpenShift, i.e.,
+							//   making sure that the application is reachable end-to-end from a user standpoint.
 							ingressDomain := os.Getenv("BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN")
 							if ingressDomain == "" {
 								Fail("Ingress Domain should be configured via the BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN env var")
 							}
-							ingressHost := fmt.Sprintf("%s.%s", tt.crName, ingressDomain)
+							appUrl := fmt.Sprintf("%s.%s", tt.crName, ingressDomain)
 							By("manually creating a K8s Ingress", func() {
 								cmd := exec.Command(helper.GetPlatformTool(), "-n", ns, "create", "-f", "-")
 								stdin, err := cmd.StdinPipe()
@@ -195,38 +197,54 @@ spec:
             name: backstage-%[1]s
             port:
               name: http-backend
-`, tt.crName, ingressHost))
+`, tt.crName, appUrl))
 								}()
 								_, err = helper.Run(cmd)
 								Expect(err).ShouldNot(HaveOccurred())
 							})
-
-							By("ensuring the application is fully reachable", func() {
-								Eventually(helper.VerifyBackstageAppAccess, 8*time.Minute, time.Second).
-									WithArguments(fmt.Sprintf("http://%s", ingressHost), tt.additionalApiEndpointTests).
-									Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
-							})
+							appUrlProvider = func(g Gomega) (context.CancelFunc, string) {
+								return nil, "http://" + appUrl
+							}
+						} else {
+							// Expose the service and reach localhost:7007
+							appUrlProvider = func(g Gomega) (context.CancelFunc, string) {
+								localPort, cancelFunc, err := helper.StartPortForward(context.Background(), fmt.Sprintf("backstage-%s", tt.crName), ns, 80)
+								g.Expect(err).ShouldNot(HaveOccurred())
+								g.Expect(localPort).ShouldNot(BeZero())
+								return cancelFunc, fmt.Sprintf("http://127.0.0.1:%d", localPort)
+							}
 						}
+
+						By("ensuring the application is fully reachable", func() {
+							Eventually(helper.VerifyBackstageAppAccessWithUrlProvider, 10*time.Minute, 15*time.Second).
+								WithArguments(appUrlProvider, tt.additionalApiEndpointTests).
+								Should(Succeed(), func() string {
+									return fmt.Sprintf("%s\n---\n%s",
+										fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+										describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+									)
+								})
+						})
 					}
 
 					var isRouteEnabledNow bool
-					By("updating route spec in CR", func() {
-						// enables route that was previously disabled, and disables route that was previously enabled.
-						isRouteEnabledNow = tt.isRouteDisabled
-						err := helper.PatchBackstageCR(ns, tt.crName, fmt.Sprintf(`
-{
-  "spec": {
-  	"application": {
-		"route": {
-			"enabled": %s
-		}
-	}
-  }
-}`, strconv.FormatBool(isRouteEnabledNow)),
-							"merge")
-						Expect(err).ShouldNot(HaveOccurred())
-					})
 					if helper.IsOpenShift() {
+						By("updating route spec in CR", func() {
+							// enables route that was previously disabled, and disables route that was previously enabled.
+							isRouteEnabledNow = tt.isRouteDisabled
+							err := helper.PatchBackstageCR(ns, tt.crName, fmt.Sprintf(`
+					{
+						"spec": {
+							"application": {
+								"route": {
+									"enabled": %s
+								}
+							}
+						}
+					}`, strconv.FormatBool(isRouteEnabledNow)),
+								"merge")
+							Expect(err).ShouldNot(HaveOccurred())
+						})
 						if isRouteEnabledNow {
 							By("ensuring the route is reachable", func() {
 								ensureRouteIsReachable(ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
