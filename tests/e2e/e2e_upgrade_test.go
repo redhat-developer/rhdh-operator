@@ -61,7 +61,7 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).WithArguments("app=rhdh-operator").Should(Succeed())
 
-			cmd = exec.Command(helper.GetPlatformTool(), "-n", ns, "create", "-f", "-")
+			cmd = exec.Command(helper.GetPlatformTool(), "-n", ns, "apply", "-f", "-")
 			stdin, err := cmd.StdinPipe()
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 			go func() {
