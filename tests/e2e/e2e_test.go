@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/onsi/gomega/gcustom"
+	"github.com/tidwall/gjson"
 
 	"github.com/redhat-developer/rhdh-operator/tests/helper"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/tidwall/gjson"
 )
 
 var _ = Describe("Backstage Operator E2E", func() {
@@ -44,6 +44,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 			name                       string
 			crFilePath                 string
 			crName                     string
+			isForOpenshift             bool
 			isRouteDisabled            bool
 			additionalApiEndpointTests []helper.ApiEndpointTest
 		}{
@@ -53,15 +54,17 @@ var _ = Describe("Backstage Operator E2E", func() {
 				crName:     "bs1",
 			},
 			{
-				name:       "specific route sub-domain",
-				crFilePath: filepath.Join("examples", "bs-route.yaml"),
-				crName:     "bs-route",
+				name:           "specific route sub-domain",
+				crFilePath:     filepath.Join("examples", "bs-route.yaml"),
+				crName:         "bs-route",
+				isForOpenshift: true,
 			},
 			{
 				name:            "route disabled",
 				crFilePath:      filepath.Join("examples", "bs-route-disabled.yaml"),
 				crName:          "bs-route-disabled",
 				isRouteDisabled: true,
+				isForOpenshift:  true,
 			},
 			{
 				name:       "RHDH CR with app-configs, dynamic plugins, extra files and extra-envs",
@@ -102,6 +105,9 @@ var _ = Describe("Backstage Operator E2E", func() {
 				var crPath string
 				var crLabel string
 				BeforeEach(func() {
+					if tt.isForOpenshift && !helper.IsOpenShift() {
+						Skip("Skipping OpenShift-only test on non OCP platform")
+					}
 					crPath = filepath.Join(projectDir, tt.crFilePath)
 					cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", crPath, "-n", ns)
 					_, err := helper.Run(cmd)
