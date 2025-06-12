@@ -64,45 +64,6 @@ jobs:
         run: |
           echo "::warning ::Operator Image ${{ env.OPERATOR_IMAGE }} not found for testing the ${{ matrix.branch }} branch. It might have expired. E2E tests will be skipped for ${{ matrix.branch }}."
 
-      - name: Generate Kind Config
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        run: |
-          cat <<EOF > /tmp/kind-config.yaml
-          apiVersion: kind.x-k8s.io/v1alpha4
-          kind: Cluster
-          nodes:
-            - role: control-plane
-              extraPortMappings:
-                - containerPort: 80
-                  hostPort: 80
-                  protocol: TCP
-                - containerPort: 443
-                  hostPort: 443
-                  protocol: TCP
-          EOF
-
-      - name: Create Kind cluster
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
-        with:
-          cluster_name: test-cluster
-          config: /tmp/kind-config.yaml
-          ignore_failed_clean: true
-
-      - name: Install Ingress Controller
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        run: |
-          kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
-          kubectl wait --namespace ingress-nginx \
-            --for=condition=ready pod \
-            --selector=app.kubernetes.io/component=controller \
-            --timeout=90s
-
-      - name: Build Ingress Domain
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        run: |
-          echo "K8S_INGRESS_DOMAIN=127.0.0.1.sslip.io" >> $GITHUB_ENV
-
       - name: Write SeaLights token into file
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: echo "${SEALIGHTS_AGENT_TOKEN}" > sltoken.txt
@@ -150,18 +111,6 @@ jobs:
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: make lint
 
-      - name: Run Controller
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        # run this stage only if there are changes that match the includes and not the excludes
-        run: |
-          # Need to 'make install' first, so that the necessary tool binaries (like controller-gen) can be downloaded locally.
-          # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
-          # but the `make test` command tries to use it.
-          make manifests generate fmt vet install
-          make run &
-          MAKE_RUN_BG_PID=$!
-          echo "MAKE_RUN_BG_PID=${MAKE_RUN_BG_PID}" | tee -a $GITHUB_ENV
-
       - name: Create a Unit Tests session
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: ./slcli test start-stage --bsid=buildSessionId.txt --testStage "Unit Tests"
@@ -177,6 +126,25 @@ jobs:
           ./slcli test end-stage --bsid=buildSessionId.txt --executionId "Unit Tests"
           ./slcli test start-stage --bsid=buildSessionId.txt --testStage "Integration Tests"
 
+      - name: Create Kind cluster (integration tests)
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: integration-test-cluster
+          ignore_failed_clean: true
+
+      - name: Run Controller
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        # run this stage only if there are changes that match the includes and not the excludes
+        run: |
+          # Need to 'make install' first, so that the necessary tool binaries (like controller-gen) can be downloaded locally.
+          # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
+          # but the `make test` command tries to use it.
+          make manifests generate fmt vet install
+          make run &
+          MAKE_RUN_BG_PID=$!
+          echo "MAKE_RUN_BG_PID=${MAKE_RUN_BG_PID}" | tee -a $GITHUB_ENV
+
       - name: Generic Integration test
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         # run this stage only if there are changes that match the includes and not the excludes
@@ -184,7 +152,12 @@ jobs:
         run: |
           make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
           kill "${{ env.MAKE_RUN_BG_PID }}" || true
-          make uninstall
+          make uninstall || true
+
+      - name: Delete integration test cluster
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          kind delete cluster --name integration-test-cluster || true
 
       - name: Create a E2E Tests session
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
@@ -192,12 +165,46 @@ jobs:
           ./slcli test end-stage --bsid=buildSessionId.txt --executionId "Integration Tests"
           ./slcli test start-stage --bsid=buildSessionId.txt --testStage "E2E Tests"
 
+      - name: Generate Kind Config
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          cat <<EOF > /tmp/kind-config.yaml
+          apiVersion: kind.x-k8s.io/v1alpha4
+          kind: Cluster
+          nodes:
+            - role: control-plane
+              extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+                - containerPort: 443
+                  hostPort: 443
+                  protocol: TCP
+          EOF
+
+      - name: Create Kind cluster (E2E)
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: e2e-test-cluster
+          config: /tmp/kind-config.yaml
+          ignore_failed_clean: true
+
+      - name: Install Ingress Controller
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=90s
+
       - name: Run E2E tests
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: kind
           BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS: 'true'
-          BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN: ${{ env.K8S_INGRESS_DOMAIN }}
+          BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN: '127.0.0.1.sslip.io'
           BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT: ${{ vars.BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT }}
           OPERATOR_MANIFEST: ${{ env.OPERATOR_MANIFEST }}
           IMG: ${{ env.OPERATOR_IMAGE }}
