@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   name: backstage # placeholder for 'backstage-<cr-name>'
 spec:
-  replicas: 1
   selector:
     matchLabels:
       rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
