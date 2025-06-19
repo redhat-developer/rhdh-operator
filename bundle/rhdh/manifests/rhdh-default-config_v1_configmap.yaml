@@ -58,7 +58,7 @@ data:
       name: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
     spec:
       podManagementPolicy: OrderedReady
-      replicas: 1
+      # replicas: 1 # Intentionally omitted to allow HPA or custom scaling control.
       selector:
         matchLabels:
           rhdh.redhat.com/app: backstage-psql-cr1 # placeholder for 'backstage-psql-<cr-name>'
@@ -179,6 +179,7 @@ data:
     metadata:
       name: backstage # placeholder for 'backstage-<cr-name>'
     spec:
+      # replicas: 1 # Intentionally omitted to allow HPA or custom scaling control.
       selector:
         matchLabels:
           rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
