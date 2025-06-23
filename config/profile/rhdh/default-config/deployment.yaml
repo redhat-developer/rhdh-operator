@@ -28,16 +28,6 @@ spec:
                   requests:
                     storage: 2Gi
           name: dynamic-plugins-root
-        - name: dynamic-plugins-npmrc
-          secret:
-            defaultMode: 420
-            optional: true
-            secretName: dynamic-plugins-npmrc
-        - name: dynamic-plugins-registry-auth
-          secret:
-            defaultMode: 416
-            optional: true
-            secretName: dynamic-plugins-registry-auth
         - emptyDir: {}
           name: npmcacache
         - name: temp
@@ -48,7 +38,7 @@ spec:
             - ./install-dynamic-plugins.sh
             - /dynamic-plugins-root
           # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-          image: quay.io/rhdh/rhdh-hub-rhel9:next
+          image: quay.io/rhdh-community/rhdh:pr-3016 #/rhdh/rhdh-hub-rhel9:next
           imagePullPolicy: IfNotPresent
           securityContext:
             readOnlyRootFilesystem: true
@@ -61,19 +51,12 @@ spec:
                 - ALL
           env:
             - name: NPM_CONFIG_USERCONFIG
-              value: /opt/app-root/src/.npmrc.dynamic-plugins
+              value: /opt/app-root/src/.npmrc.dynamic-plugins/.npmrc
             - name: MAX_ENTRY_SIZE
               value: "30000000"
           volumeMounts:
             - mountPath: /dynamic-plugins-root
               name: dynamic-plugins-root
-            - mountPath: /opt/app-root/src/.npmrc.dynamic-plugins
-              name: dynamic-plugins-npmrc
-              readOnly: true
-              subPath: .npmrc
-            - mountPath: /opt/app-root/src/.config/containers
-              name: dynamic-plugins-registry-auth
-              readOnly: true
             - mountPath: /opt/app-root/src/.npm/_cacache
               name: npmcacache
             - mountPath: /tmp
@@ -90,7 +73,7 @@ spec:
       containers:
         - name: backstage-backend
           # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-          image: quay.io/rhdh/rhdh-hub-rhel9:next
+          image: quay.io/rhdh-community/rhdh:pr-3016 #quay.io/rhdh/rhdh-hub-rhel9:next
           imagePullPolicy: IfNotPresent
           args:
             - "--config"
