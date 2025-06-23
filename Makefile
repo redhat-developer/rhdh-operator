@@ -363,17 +363,13 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 	$(KUSTOMIZE) build config/profile/$(PROFILE) | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: plugin-infra
-plugin-infra: install-crd
+plugin-infra:
 	@if [ -d "config/profile/$(PROFILE)/plugin-infra" ]; then \
-		$(KUSTOMIZE) build config/profile/$(PROFILE)/plugin-infra | $(KUBECTL) apply -f -; \
-	else \
-		echo "Directory config/profile/$(PROFILE)/plugin-infra does not exist."; \
-	fi
-
-install-crd:
-	@if [ -d "config/profile/$(PROFILE)/plugin-infra" ]; then \
-		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/crd/; \
+		$(KUSTOMIZE) build config/profile/$(PROFILE)/plugin-infra; \
+		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/orchestrator/infra-serverless.yaml; \
 		$(KUBECTL) wait --for=condition=Established crd --all --timeout=60s; \
+		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/orchestrator/infra-knative-cr.yaml; \
+		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/orchestrator/infra-sonataflow.yaml; \
 	else \
 		echo "Directory config/profile/$(PROFILE)/plugin-infra does not exist."; \
 	fi
