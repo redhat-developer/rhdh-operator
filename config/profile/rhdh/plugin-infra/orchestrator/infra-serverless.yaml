@@ -21,14 +21,3 @@ spec:
   name: serverless-operator  #  name of the operator package
   source: redhat-operators  #  name of the catalog source
   sourceNamespace: openshift-marketplace
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: knative-serving
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: knative-eventing
----
