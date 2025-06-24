@@ -365,7 +365,6 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 .PHONY: plugin-infra
 plugin-infra:
 	@if [ -d "config/profile/$(PROFILE)/plugin-infra" ]; then \
-		$(KUSTOMIZE) build config/profile/$(PROFILE)/plugin-infra; \
 		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/orchestrator/infra-serverless.yaml; \
 		$(KUBECTL) wait --for=condition=Established crd --all --timeout=60s; \
 		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/orchestrator/infra-knative-cr.yaml; \
@@ -377,7 +376,7 @@ plugin-infra:
 .PHONY: plugin-infra-undeploy
 plugin-infra-undeploy:
 	@if [ -d "config/profile/$(PROFILE)/plugin-infra" ]; then \
-		$(KUSTOMIZE) build config/profile/$(PROFILE)/plugin-infra | $(KUBECTL) delete -f -; \
+		$(KUBECTL) delete -f config/profile/$(PROFILE)/plugin-infra/orchestrator; \
 	else \
 		echo "Directory config/profile/$(PROFILE)/plugin-infra does not exist."; \
 	fi
