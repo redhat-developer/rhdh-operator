@@ -5,17 +5,16 @@ import (
 	"flag"
 	"os"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
+	_ "k8s.io/client-go/plugin/pkg/client/auth" // Load auth plugins for GCP, Azure, etc.
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -23,7 +22,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
 
 	openshift "github.com/openshift/api/route/v1"
-	//+kubebuilder:scaffold:imports
 )
 
 var (
@@ -33,68 +31,58 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(bsv1.AddToScheme(scheme))
-
 	utilruntime.Must(openshift.Install(scheme))
-	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var secureMetrics bool
-	var enableHTTP2 bool
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
-		"The address the metrics endpoint binds to. Use 0 to disable the metrics service.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", false,
-		"If set, the metrics endpoint is served securely over HTTPS and requires authentication and authorization.")
-	flag.BoolVar(&enableHTTP2, "enable-http2", false,
-		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	var (
+		metricsAddr         string
+		enableLeaderElection bool
+		probeAddr           string
+		secureMetrics       bool
+		enableHTTP2         bool
+	)
 
-	opts := zap.Options{
-		Development: true,
-	}
+	// CLI flags
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
+		"Address to bind metrics endpoint. Use 0 to disable metrics.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081",
+		"Address to bind liveness/readiness probes.")
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
+		"Enable leader election to ensure a single active controller manager.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", false,
+		"Serve metrics via HTTPS with authentication and authorization (recommended for production).")
+	flag.BoolVar(&enableHTTP2, "enable-http2", false,
+		"Enable HTTP/2 (defaults to off due to known vulnerabilities).")
+
+	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if metricsAddr != "0" && !secureMetrics {
-		setupLog.Info("Metrics are served over plaintext HTTP. This is only intended for local development.")
+		setupLog.Info("Serving metrics over plaintext HTTP (for development only).")
 	}
 
-	// if the enable-http2 flag is false (the default), http/2 should be disabled
-	// due to its vulnerabilities. More specifically, disabling http/2 will
-	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
-	// Rapid Reset CVEs. For more information see:
-	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
-	// - https://github.com/advisories/GHSA-4374-p667-p6c8
-	disableHTTP2 := func(c *tls.Config) {
-		setupLog.Info("disabling http/2")
-		c.NextProtos = []string{"http/1.1"}
-	}
-
+	// HTTP/2 mitigation
 	var tlsOpts []func(*tls.Config)
 	if !enableHTTP2 {
-		tlsOpts = append(tlsOpts, disableHTTP2)
+		tlsOpts = append(tlsOpts, func(c *tls.Config) {
+			setupLog.Info("Disabling HTTP/2 for security reasons")
+			c.NextProtos = []string{"http/1.1"}
+		})
 	}
 
+	// Configure metrics server
 	metricsServerOpts := metricsserver.Options{
 		BindAddress:   metricsAddr,
 		SecureServing: secureMetrics,
 		TLSOpts:       tlsOpts,
 	}
 	if secureMetrics {
-		// FilterProvider is used to protect the metrics endpoint with authn/authz.
-		// These configurations ensure that only authorized users and service accounts
-		// can access the metrics endpoint. The RBAC are configured in 'config/rbac/kustomization.yaml'. More info:
-		// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/metrics/filters#WithAuthenticationAndAuthorization
+		setupLog.Info("Metrics will be served securely with RBAC authorization.")
 		metricsServerOpts.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
@@ -102,6 +90,7 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
+	// Initialize manager
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOpts,
@@ -109,55 +98,50 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "06bdbdd5.rhdh.redhat.com",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "Unable to start controller manager")
 		os.Exit(1)
 	}
 
+	// Platform detection
 	plf, err := controller.DetectPlatform()
 	if err != nil {
-		setupLog.Error(err, "unable to detect platform. Make sure your cluster is running and accessible")
+		setupLog.Error(err, "Failed to detect platform. Is the cluster running and accessible?")
 		os.Exit(1)
 	}
 
-	if err = (&controller.BackstageReconciler{
+	// Setup controller
+	if err := (&controller.BackstageReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Platform: plf,
-		//IsOpenShift: isOpenShift,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Backstage")
+		setupLog.Error(err, "Unable to initialize Backstage controller")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
 
+	// Health & readiness
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+		setupLog.Error(err, "Failed to register health check")
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		setupLog.Error(err, "Failed to register readiness check")
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager with parameters: ",
+	// Success log
+	setupLog.Info("RHDH Operator Manager started",
 		"env.LOCALBIN", os.Getenv("LOCALBIN"),
 		"platform", plf.Name,
+		"leaderElection", enableLeaderElection,
+		"metricsSecure", secureMetrics,
 	)
+
+	// Start manager
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "Controller manager exited with error")
 		os.Exit(1)
 	}
 }
