@@ -181,7 +181,7 @@ while [[ "$#" -gt 0 ]]; do
       else
        FILTERED_VERSIONS=(${parts[*]})
       fi
-      debugf "FILTERED_VERSIONS=${FILTERED_VERSIONS[@]}"
+      debugf "${FILTERED_VERSIONS[@]}"
       shift 1;;
 
     # New options
@@ -500,7 +500,7 @@ function extract_last_two_elements() {
 }
 
 function mirror_extra_images() {
-  debugf "Extra images: ${EXTRA_IMAGES[@]}..."
+  debugf "Extra images: " "${EXTRA_IMAGES[@]}"
   for img in "${EXTRA_IMAGES[@]}"; do
     if [[ "$img" == *"@sha256:"* ]]; then
       imgDigest="${img##*@sha256:}"
@@ -1122,7 +1122,7 @@ EOF
       fi
     fi
     # Iterate from the --extra-images passed on the CLI
-    debugf "Extra images from CLI: ${EXTRA_IMAGES[@]}..."
+    debugf "Extra images from CLI: " "${EXTRA_IMAGES[@]}"
     for img in "${EXTRA_IMAGES[@]}"; do
       if [[ "$img" == *"@sha256:"* ]]; then
         targetImg="${img%@*}"
