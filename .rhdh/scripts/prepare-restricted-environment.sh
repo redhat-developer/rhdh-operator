@@ -177,9 +177,9 @@ while [[ "$#" -gt 0 ]]; do
       IFS='.' read -ra parts <<< "$input"
       length=${#parts[@]}
       if [ $length -ge 2 ]; then
-       FILTERED_VERSIONS=(${parts[0]}.${parts[1]})
+       FILTERED_VERSIONS=("${parts[0]}"."${parts[1]}")
       else
-       FILTERED_VERSIONS=(${parts[*]})
+       FILTERED_VERSIONS=("${parts[*]}")
       fi
       debugf "${FILTERED_VERSIONS[@]}"
       shift 1;;
@@ -308,7 +308,7 @@ if [[ -n "${TO_DIR}" ]]; then
 else
   TMPDIR=$(mktemp -d)
   ## shellcheck disable=SC2064
-  trap "rm -fr $TMPDIR || true" EXIT
+  trap 'rm -fr "$TMPDIR" || true' EXIT
 fi
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
@@ -624,12 +624,12 @@ function process_bundles() {
           debugf "\t finding related images in $file to mirror..."
           images=$(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
           if [[ -n "$images" ]]; then
-            all_related_images+=($images)
+            all_related_images+=("$images")
           fi
           # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
           related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
           if [[ -n "$related_images" ]]; then
-            all_related_images+=($related_images)
+            all_related_images+=("$related_images")
           fi
           for relatedImage in "${all_related_images[@]}"; do
             imgDir="./images/"
@@ -731,12 +731,12 @@ function process_bundles_from_dir() {
         debugf "\t finding related images in $file to mirror..."
         images=$(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
         if [[ -n "$images" ]]; then
-          all_related_images+=($images)
+          all_related_images+=("$images")
         fi
         # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
         related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
         if [[ -n "$related_images" ]]; then
-          all_related_images+=($related_images)
+          all_related_images+=("$related_images")
         fi
         for relatedImage in "${all_related_images[@]}"; do
           imgDir="${FROM_DIR}/images/"
