@@ -30,7 +30,7 @@ data:
       - dynamic-plugins.default.yaml
     plugins:
       - disabled: true
-        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-1.5.1.tgz"
+        package: "@redhat/backstage-plugin-orchestrator@1.5.1"
         integrity: sha512-7VOe+XGTUzrdO/av0DNHbydOjB3Lo+XdCs6fj3JVODLP7Ypd3GXHf/nssYxG5ZYC9F1t9MNeguE2bZOB6ckqTA==
         pluginConfig:
           dynamicPlugins:
@@ -48,7 +48,7 @@ data:
                       module: OrchestratorPlugin
                       path: /orchestrator
       - disabled: true
-        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-backend-dynamic-1.5.1.tgz"
+        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
         integrity: sha512-VIenFStdq9QvvmgmEMG8O7b2wqIebvEcqNeJ9SWZ8jen9t+efTK6D3Rde74LQ1no1QaHLx8RoxNCOuTUEF8O/g==
         pluginConfig:
           orchestrator:
@@ -57,7 +57,7 @@ data:
         dependencies:
           - ref: sonataflow
       - disabled: true
-        package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic-1.5.1.tgz"
+        package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.5.1"
         integrity: sha512-bnVQjVsUZ470Vgm2kd5Lo/bVa2fF0q4GufBDc/8oTQsnP3zZJQqKFvFElBTCjY76RqkECydlvZ1UFybSzvockQ==
         pluginConfig:
           orchestrator:
