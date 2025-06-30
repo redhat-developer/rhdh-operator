@@ -47,7 +47,7 @@ configMapGenerator:
 
 ### Plugin dependencies infrastructure
 
-If plugin dependencies require infrastructural resources (e.g. other Operators to be installed) and if the User (Administrator) wants it to be deployed (see Note below), they can be specified in the /config/profile/{PROFILE}/plugin-infra directory. To create these resources (along with the operator deployment), use the `make plugin-infra` command. 
+If plugin dependencies require infrastructural resources (e.g. other Operators and CRs to be installed) and if the User (Administrator) wants it to be deployed (see Note below), they can be specified in the /config/profile/{PROFILE}/plugin-infra directory. To create these resources (along with the operator deployment), use the `make plugin-infra` command. 
 
 **Note**: Be cautious when running this command on a production cluster, as it may reconfigure cluster-scoped resources.
 
@@ -86,7 +86,6 @@ See [example](/examples/orchestrator.yaml) for a configuration of the orchestrat
 
 The orchestrator plugin has the following dependencies:
 - A Sonataflowplatform custom resource - created in the namespace of the Backstage CR.
-- Knativeeventing and Knativeserving custom resources to be created in the knative-eventing and knative-serving namespaces respectively.
 - A set of NetworkPolicies to allow traffic between Knative resources created in the namespace of Backstage CR, traffic for monitoring, and intra-namespace traffic.
 See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps)
 
