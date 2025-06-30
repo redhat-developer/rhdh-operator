@@ -414,6 +414,30 @@ data:
       to:
         kind: Service
         name:  # placeholder for 'backstage-<cr-name>'
+  secret-files.yaml: |+
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: dynamic-plugins-npmrc
+      annotations:
+        rhdh.redhat.com/mount-path: /opt/app-root/src/.npmrc.dynamic-plugins
+        rhdh.redhat.com/containers: install-dynamic-plugins
+    type: Opaque
+    stringData:
+      .npmrc: |
+        @redhat:registry=https://npm.registry.redhat.com
+    #---
+    # Placeholder for image registry ayth configuration for OCI dynamic plugins
+    #apiVersion: v1
+    #kind: Secret
+    #metadata:
+    #  name: dynamic-plugins-registry-auth
+    #  annotations:
+    #    rhdh.redhat.com/mount-path: /opt/app-root/src/.config/containers
+    #    rhdh.redhat.com/containers: install-dynamic-plugins
+    #type: Opaque
+
+
   service.yaml: |-
     apiVersion: v1
     kind: Service
