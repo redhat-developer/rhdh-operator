@@ -69,7 +69,7 @@ The orchestrator plugin (as of v1.5.1) consists of three dynamic plugins:
 - orchestrator-frontend
 - scaffolder-backend-module
 
-These plugins are located in npm.registry.redhat.com NPM registry and included to the RHDH default.dynamic-plugins.yaml configuration file, so to enable Orchestrator a user should just enable them along with Sonataflow dependency.
+These plugins are located in npm.registry.redhat.com NPM registry and included in the RHDH default.dynamic-plugins.yaml configuration file, so to enable Orchestrator, a user should just enable them along with the Sonataflow dependency.
 See [example](/examples/orchestrator.yaml) for a configuration of the orchestrator plugin.
 
 The orchestrator plugin has the following dependencies:
