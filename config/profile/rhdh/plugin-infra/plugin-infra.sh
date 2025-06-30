@@ -5,7 +5,8 @@
 
 action="${1:-apply}" # Default action is 'apply'
 
-kubectl $action -f - <<EOF
+serverless() {
+  kubectl $action -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -29,7 +30,11 @@ spec:
   name: serverless-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
----
+EOF
+}
+
+knative() {
+  kubectl $action -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -41,12 +46,7 @@ metadata:
   name: knative-eventing
 EOF
 
-if [ "$action" == "apply" ]; then
-  echo "Waiting for CRDs to be established..."
-  kubectl wait --for=condition=Established crd --all --timeout=60s
-fi
-
-kubectl $action -f - <<EOF
+  kubectl $action -f - <<EOF
 apiVersion: operator.knative.dev/v1beta1
 kind: KnativeEventing
 metadata:
@@ -66,8 +66,10 @@ spec:
     type: ""
   registry: {}
 EOF
+}
 
-kubectl $action -f - <<EOF
+serverless_logic() {
+  kubectl $action -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -92,3 +94,21 @@ spec:
   source: redhat-operators  #  name of the catalog source
   sourceNamespace: openshift-marketplace
   startingCSV: logic-operator-rhel8.v1.35.0  # The initial version of the operator
+EOF
+}
+
+# execution
+
+if [ "$action" == "apply" ]; then
+  serverless
+  echo "Waiting for CRDs to be established..."
+  kubectl wait --for=condition=Established crd --all --timeout=60s
+  knative
+  serverless_logic
+elif [ "$action" == "delete" ]; then
+  serverless_logic
+  knative
+  serverless
+else
+  echo "Action '$action' is not supported. Use 'apply' (default) or 'delete'."
+fi
