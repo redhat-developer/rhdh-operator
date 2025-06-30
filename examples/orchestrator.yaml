@@ -14,7 +14,7 @@ data:
         dependencies:
           - ref: sonataflow
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
+        package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.5.1"
 ---
 apiVersion: v1
 kind: ConfigMap
