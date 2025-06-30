@@ -59,11 +59,11 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <1.6.2'
+    skipRange: '>=1.0.0 <1.6.3'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
-  name: rhdh-operator.v1.6.2
+  name: rhdh-operator.v1.6.3
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -265,7 +265,7 @@ spec:
                 - name: RELATED_IMAGE_postgresql
                   value: quay.io/fedora/postgresql-15:latest
                 - name: RELATED_IMAGE_backstage
-                  value: quay.io/rhdh/rhdh-hub-rhel9:next
+                  value: registry.redhat.io/rhdh/rhdh-hub-rhel9:1.6
                 image: quay.io/rhdh/rhdh-rhel9-operator:1.6
                 livenessProbe:
                   httpGet:
@@ -379,7 +379,7 @@ spec:
   relatedImages:
   - image: quay.io/fedora/postgresql-15:latest
     name: postgresql
-  - image: quay.io/rhdh/rhdh-hub-rhel9:next
+  - image: registry.redhat.io/rhdh/rhdh-hub-rhel9:1.6
     name: backstage
   replaces: rhdh-operator.v1.6.0
-  version: 1.6.2
+  version: 1.6.3
