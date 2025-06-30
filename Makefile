@@ -16,7 +16,7 @@ PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 # Set a default VERSION if it is not defined
 ifeq ($(origin VERSION), undefined)
-VERSION ?= 0.6.2
+VERSION ?= 0.6.3
 DEFAULT_VERSION := true
 else
 DEFAULT_VERSION := false
