@@ -39,6 +39,7 @@ configMapGenerator:
   - default-config/deployment.yaml.k8s
   - default-config/db-statefulset.yaml.k8s
   - default-config/service.yaml.k8s
+  - default-config/secret-files.yaml
   name: default-config
 - files:
   - plugin-deps/sonataflow.yaml

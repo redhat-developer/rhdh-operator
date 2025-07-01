@@ -1,3 +1,15 @@
+## Dynamic Plugins registry configuration
+
+Dynamic plugins can be configured to be loaded from different registries, such as NPM or container registries.
+
+### NPM registry
+
+TODO
+
+### Container registry
+
+TODO
+
 ## Dynamic plugins dependency management
 
 ### Overview
