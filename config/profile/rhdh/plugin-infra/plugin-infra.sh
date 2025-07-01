@@ -6,7 +6,7 @@
 action="${1:-apply}" # Default action is 'apply'
 
 serverless() {
-  kubectl $action -f - <<EOF
+  kubectl "$action" -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -34,7 +34,7 @@ EOF
 }
 
 knative() {
-  kubectl $action -f - <<EOF
+  kubectl "$action" -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -46,7 +46,7 @@ metadata:
   name: knative-eventing
 EOF
 
-  kubectl $action -f - <<EOF
+  kubectl "$action" -f - <<EOF
 apiVersion: operator.knative.dev/v1beta1
 kind: KnativeEventing
 metadata:
@@ -69,7 +69,7 @@ EOF
 }
 
 serverless_logic() {
-  kubectl $action -f - <<EOF
+  kubectl "$action" -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -111,4 +111,5 @@ elif [ "$action" == "delete" ]; then
   serverless
 else
   echo "Action '$action' is not supported. Use 'apply' (default) or 'delete'."
+  exit 1
 fi

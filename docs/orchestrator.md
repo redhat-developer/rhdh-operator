@@ -41,7 +41,7 @@ This script provides a quick way to install the OpenShift Serverless infrastruct
    ```bash
    curl -sSLO https://raw.githubusercontent.com/redhat-developer/rhdh-operator/refs/heads/release-1.7/config/profile/rhdh/plugin-infra/plugin-infra.sh
    ```  
-You can specify the RHDH version in the URL (`/release-X.Y/`, e.g., `1.7` in this example) or main .
+You can specify the RHDH version in the URL (`/release-X.Y/`, e.g., `1.7` in this example) or use main.
 2. Run the script:
    ```bash
    bash plugin-infra.sh
