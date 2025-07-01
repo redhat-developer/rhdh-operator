@@ -93,7 +93,7 @@ spec:
   name: logic-operator-rhel8  #  name of the operator package
   source: redhat-operators  #  name of the catalog source
   sourceNamespace: openshift-marketplace
-  startingCSV: logic-operator-rhel8.v1.35.0  # The initial version of the operator
+  startingCSV: logic-operator-rhel8.v1.36.0  # The initial version of the operator
 EOF
 }
 

@@ -9,11 +9,15 @@ To install the Orchestrator plugin on OpenShift, the following components are re
 - **Knative Eventing**
 - **OpenShift Serverless Logic Operator**
 
----
 
-### Methods to Install Required infrastructure
+### Methods to Install required infrastructure
 
-#### 1. **Manual Installation**
+There are 3 methods to install the required components for the Orchestrator plugin on OpenShift:
+- [Manual Installation](#manual-installation)
+- [RHDH helper script](#rhdh-helper-script)
+- [RHDH Orchestrator Infra Helm Chart](#rhdh-orchestrator-infra-helm-chart)
+
+#### Manual Installation
 This method is recommended for production environments, especially when specific versions of the required components are installed (e.g., when OpenShift Serverless is already in use by other applications).
 
 ##### Version Compatibility
@@ -28,8 +32,9 @@ This recommendation is based on OpenShift Serverless version `1.36`. Refer to th
 
 ---
 
-#### 2. **RHDH Helper script**
+#### RHDH helper script
 This script provides a quick way to install the OpenShift Serverless infrastructure for the Orchestrator plugin. It is safe to use in empty clusters but should be used with caution in production clusters.
+**Note:** Current Subscriptions configuration uses **Automatic** install plan (**spec.installPlanApproval: Automatic**), consider to change it to **Manual** if you want to control the installation of the operators (see [Operator Installation with OLM](https://olm.operatorframework.io/docs/tasks/install-operator-with-olm) for more details).
 
 ##### Steps
 1. Download the `plugin-infra.sh` script:
@@ -42,9 +47,7 @@ You can specify the RHDH version in the URL (`/release-X.Y/`, e.g., `1.7` in thi
    bash plugin-infra.sh
    ```  
 
----
-
-#### 3. **RHDH Orchestrator Infra Helm Chart**
+#### RHDH Orchestrator Infra Helm Chart
 This method has similar usage and cautions as the RHDH Helper Utility.
 
 ##### Steps
@@ -82,10 +85,40 @@ As for RHDH 1.7 the orchestrator plugin packages are located in **npm.registry.r
 #### Plugin dependencies
 
 The orchestrator plugin instance requires the following dependencies to be installed:
-- A Sonataflowplatform custom resource - created in the namespace of the Backstage CR.
+- A SonataflowPlatform custom resource - created in the namespace of the Backstage CR.
 - A set of NetworkPolicies to allow traffic between Knative resources created in the namespace of Backstage CR, traffic for monitoring, and intra-namespace traffic.
 
-Both of them are configured in the `plugin-deps/sonataflow.yaml` (See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) ) file of the profile and referenced in the dynamic-plugins.yaml file of the Backstage CR as dependencies of **backstage-plugin-orchestrator-backend-dynamic** plugin.
+The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
+
+**Important:** The sonataflowplatform CR contains dataIndex service that requires PostgreSQL database.
+
+```yaml
+      persistence:
+        postgresql:
+          secretRef:
+            name: backstage-psql-secret-{{backstage-name}}
+            userKey: POSTGRES_USER
+            passwordKey: POSTGRES_PASSWORD
+          serviceRef:
+            name: backstage-psql-{{backstage-name}}
+            namespace: {{backstage-ns}}
+            databaseName: backstage_plugin_orchestrator
+```
+
+Where `{{backstage-name}}` is the name of the Backstage Custom Resource (CR) and `{{backstage-ns}}` is the namespace where the Backstage CR is created.
+
+Current **default** implementation of the orchestrator plugin dependencies uses:
+- the PostgreSQL database created by Backstage for Orchestrator plugin, named **backstage_plugin_orchestrator**
+- the Secret created by Backstage operator for the PostgreSQL with **POSTGRES_USER** and **POSTGRES_PASSWORD** keys as the database credentials in the Backstage CR namespace.
+- the Service created by Backstage operator for the PostgreSQL database with the name **backstage-psql-{{backstage-name}}** in the Backstage CR namespace.
+
+See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) for a complete configuration of the orchestrator plugin dependencies.
+
+##### RBAC
+
+To enable the Backstage operator to work with the SonataFlow platform, its ServiceAccount must be granted the appropriate permissions. 
+This is done by the Backstage operator automatically when the SonataFlowPlatform CR is created in the namespace of the Backstage CR by the appropriate Role and RoleBinding resource in the [profile/rhdh/plugin-rbac directory](../config/profile/rhdh/plugin-rbac).
+
 
 
 
