@@ -204,11 +204,7 @@ data:
                       requests:
                         storage: 2Gi
               name: dynamic-plugins-root
-            - name: dynamic-plugins-npmrc
-              secret:
-                defaultMode: 420
-                optional: true
-                secretName: dynamic-plugins-npmrc
+            # TODO Configuring dynamic plugins registry auth this way is deprecated and supported only for documentation backward compatibility.
             - name: dynamic-plugins-registry-auth
               secret:
                 defaultMode: 416
@@ -237,16 +233,13 @@ data:
                     - ALL
               env:
                 - name: NPM_CONFIG_USERCONFIG
-                  value: /opt/app-root/src/.npmrc.dynamic-plugins
+                  value: /opt/app-root/src/.npmrc.dynamic-plugins/.npmrc
                 - name: MAX_ENTRY_SIZE
                   value: "30000000"
               volumeMounts:
                 - mountPath: /dynamic-plugins-root
                   name: dynamic-plugins-root
-                - mountPath: /opt/app-root/src/.npmrc.dynamic-plugins
-                  name: dynamic-plugins-npmrc
-                  readOnly: true
-                  subPath: .npmrc
+                # TODO Configuring dynamic plugins registry auth this way is deprecated and supported only for documentation backward compatibility.
                 - mountPath: /opt/app-root/src/.config/containers
                   name: dynamic-plugins-registry-auth
                   readOnly: true
@@ -383,7 +376,7 @@ data:
           - dynamic-plugins.default.yaml
         plugins:
           - disabled: true
-            package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-1.5.1.tgz"
+            package: "@redhat/backstage-plugin-orchestrator@1.5.1"
             integrity: sha512-7VOe+XGTUzrdO/av0DNHbydOjB3Lo+XdCs6fj3JVODLP7Ypd3GXHf/nssYxG5ZYC9F1t9MNeguE2bZOB6ckqTA==
             pluginConfig:
               dynamicPlugins:
@@ -401,7 +394,7 @@ data:
                           module: OrchestratorPlugin
                           path: /orchestrator
           - disabled: true
-            package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-orchestrator-backend-dynamic-1.5.1.tgz"
+            package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
             integrity: sha512-VIenFStdq9QvvmgmEMG8O7b2wqIebvEcqNeJ9SWZ8jen9t+efTK6D3Rde74LQ1no1QaHLx8RoxNCOuTUEF8O/g==
             pluginConfig:
               orchestrator:
@@ -410,7 +403,7 @@ data:
             dependencies:
               - ref: sonataflow
           - disabled: true
-            package: "https://github.com/rhdhorchestrator/orchestrator-plugins-internal-release/releases/download/v1.5.1/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic-1.5.1.tgz"
+            package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.5.1"
             integrity: sha512-bnVQjVsUZ470Vgm2kd5Lo/bVa2fF0q4GufBDc/8oTQsnP3zZJQqKFvFElBTCjY76RqkECydlvZ1UFybSzvockQ==
             pluginConfig:
               orchestrator:
@@ -431,6 +424,30 @@ data:
       to:
         kind: Service
         name:  # placeholder for 'backstage-<cr-name>'
+  secret-files.yaml: |+
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: dynamic-plugins-npmrc
+      annotations:
+        rhdh.redhat.com/mount-path: /opt/app-root/src/.npmrc.dynamic-plugins
+        rhdh.redhat.com/containers: install-dynamic-plugins
+    type: Opaque
+    stringData:
+      .npmrc: |
+        @redhat:registry=https://npm.registry.redhat.com
+    #---
+    # Placeholder for image registry ayth configuration for OCI dynamic plugins
+    #apiVersion: v1
+    #kind: Secret
+    #metadata:
+    #  name: dynamic-plugins-registry-auth
+    #  annotations:
+    #    rhdh.redhat.com/mount-path: /opt/app-root/src/.config/containers
+    #    rhdh.redhat.com/containers: install-dynamic-plugins
+    #type: Opaque
+
+
   service.yaml: |-
     apiVersion: v1
     kind: Service

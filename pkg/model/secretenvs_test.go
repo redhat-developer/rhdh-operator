@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -72,6 +73,7 @@ func TestDefaultMultiSecretEnv(t *testing.T) {
 	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-container").EnvFrom))
 	mo := model.getRuntimeObjectByType(&SecretEnvs{}).Object().(*multiobject.MultiObject)
 	assert.Equal(t, 3, len(mo.Items))
+	assert.True(t, strings.HasPrefix(mo.Items[0].GetName(), "backstage-envs-"+bs.Name))
 }
 
 func TestSpecifiedSecretEnvs(t *testing.T) {

@@ -63,15 +63,16 @@ var _ = When("create default rhdh", func() {
 					SubPath:   "",
 				},
 				{
-					Name:      "dynamic-plugins-npmrc",
+					Name:      utils.GenerateRuntimeObjectName(backstageName, "backstage-files"),
 					MountPath: "/opt/app-root/src/.npmrc.dynamic-plugins",
-					SubPath:   ".npmrc",
-				},
-				{
-					Name:      "dynamic-plugins-registry-auth",
-					MountPath: "/opt/app-root/src/.config/containers",
 					SubPath:   "",
 				},
+				// TODO - configure this when have defined dynamic plugins OCI registry
+				//{
+				//	Name:      "dynamic-plugins-registry-auth",
+				//	MountPath: "/opt/app-root/src/.config/containers",
+				//	SubPath:   "",
+				//},
 				{
 					Name:      "npmcacache",
 					MountPath: "/opt/app-root/src/.npm/_cacache",
@@ -104,9 +105,9 @@ var _ = When("create default rhdh", func() {
 			}
 
 			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
-			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins"))
+			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
 
-			g.Expect(deploy.Spec.Template.Spec.Volumes).To(HaveLen(7))
+			g.Expect(deploy.Spec.Template.Spec.Volumes).To(HaveLen(6))
 			g.Expect(deploy.Spec.Template.Spec.Containers).To(HaveLen(1))
 			mainCont := deploy.Spec.Template.Spec.Containers[model.BackstageContainerIndex(deploy)]
 			g.Expect(mainCont.Args).To(HaveLen(4))
