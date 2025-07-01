@@ -24,13 +24,13 @@ This method is recommended for production environments, especially when specific
 This recommendation is based on OpenShift Serverless version `1.36`. Refer to the Orchestrator plugin compatibility documentation to ensure the correct version of OpenShift Serverless is supported for your Orchestrator plugin version.
 
 ##### Steps
-1. [Prepare your infrastructure for OpenShift Serverless installation.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/preparing-serverless-install)
-2. [Install the OpenShift Serverless Operator.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/preparing-serverless-install)
-3. [Install Knative Serving.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/installing-knative-serving)
-4. [Install Knative Eventing.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/installing-knative-eventing)
-5. [Install the OpenShift Serverless Logic Operator.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/install-serverless-logic-operator)
+Go to the [OpenShift Serverless documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless) for installation instructions and follow these steps:
+1. Preparing to install OpenShift Serverless.
+2. Installing the OpenShift Serverless Operator.
+3. Installing Knative Serving.
+4. Installing Knative Eventing.
+5. Installing the OpenShift Serverless Logic Operator.
 
----
 
 #### RHDH helper script
 This script provides a quick way to install the OpenShift Serverless infrastructure for the Orchestrator plugin. It is safe to use in empty clusters but should be used with caution in production clusters.
