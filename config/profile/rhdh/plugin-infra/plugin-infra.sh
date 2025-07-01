@@ -3,6 +3,8 @@
 # Plugin Infrastructure Setup Script for RHDH with Orchestrator
 #
 
+set -e
+
 action="${1:-apply}" # Default action is 'apply'
 
 serverless() {

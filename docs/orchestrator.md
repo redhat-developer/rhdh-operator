@@ -25,7 +25,7 @@ This recommendation is based on OpenShift Serverless version `1.36`. Refer to th
 
 ##### Steps
 1. [Prepare your infrastructure for OpenShift Serverless installation.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/preparing-serverless-install)
-2. [Install the OpenShift Serverless Operator.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.33/html/installing_openshift_serverless/preparing-serverless-install)
+2. [Install the OpenShift Serverless Operator.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/preparing-serverless-install)
 3. [Install Knative Serving.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/installing-knative-serving)
 4. [Install Knative Eventing.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/installing-knative-eventing)
 5. [Install the OpenShift Serverless Logic Operator.](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/installing_openshift_serverless/install-serverless-logic-operator)
