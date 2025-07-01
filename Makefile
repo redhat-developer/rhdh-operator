@@ -364,21 +364,18 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 
 .PHONY: plugin-infra
 plugin-infra:
-	@if [ -d "config/profile/$(PROFILE)/plugin-infra" ]; then \
-		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/orchestrator/infra-serverless.yaml; \
-		$(KUBECTL) wait --for=condition=Established crd --all --timeout=60s; \
-		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/orchestrator/infra-knative-cr.yaml; \
-		$(KUBECTL) apply -f config/profile/$(PROFILE)/plugin-infra/orchestrator/infra-sonataflow.yaml; \
+	@if [ -f "config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh" ]; then \
+		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh; \
 	else \
-		echo "Directory config/profile/$(PROFILE)/plugin-infra does not exist."; \
+		echo "File config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh does not exist."; \
 	fi
 
 .PHONY: plugin-infra-undeploy
 plugin-infra-undeploy:
-	@if [ -d "config/profile/$(PROFILE)/plugin-infra" ]; then \
-		$(KUBECTL) delete -f config/profile/$(PROFILE)/plugin-infra/orchestrator; \
+	@if [ -f "config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh" ]; then \
+		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh delete; \
 	else \
-		echo "Directory config/profile/$(PROFILE)/plugin-infra does not exist."; \
+		echo "File config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh does not exist."; \
 	fi
 
 ##@ OLM Deployment
