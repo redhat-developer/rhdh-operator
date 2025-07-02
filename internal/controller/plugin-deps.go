@@ -31,17 +31,6 @@ func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, backstage bs.
 		// Apply the unstructured object
 		lg.V(1).Info("apply plugin dependency: ", "name", obj.GetName(), "kind", obj.GetKind(), "namespace", obj.GetNamespace())
 
-		// Set the namespace if not set
-		//if obj.GetNamespace() == "" {
-		//	obj.SetNamespace(backstage.Namespace)
-		//}
-
-		//err := controllerutil.SetControllerReference(&backstage, obj, r.Scheme)
-		//if err != nil {
-		//	errs = append(errs, fmt.Errorf("failed to set controller reference for %s: %w", obj.GetName(), err))
-		//	continue
-		//}
-
 		if err = r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
 			errs = append(errs, err)
 		}
