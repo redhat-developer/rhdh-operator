@@ -13,9 +13,7 @@ NC='\033[0m'
 IS_OPENSHIFT=""
 IS_HOSTED_CONTROL_PLANE=""
 
-export NAMESPACE_SUBSCRIPTION="rhdh-operator"
 NAMESPACE_OPERATOR="rhdh-operator"
-export OLM_CHANNEL="fast"
 INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
 FILTERED_VERSIONS=(1.4 1.5)
 
@@ -137,7 +135,6 @@ Examples:
 "
 }
 
-export OPERATOR_NAME="rhdh-operator"
 IS_CI_INDEX_IMAGE="false"
 
 TO_REGISTRY=""
@@ -150,7 +147,6 @@ OC_MIRROR_PATH="oc-mirror"
 OC_MIRROR_FLAGS=""
 
 NO_VERSION_FILTER="false"
-export RELATED_IMAGES=()
 
 # example usage:
 # ./prepare-restricted-environment.sh \
@@ -188,7 +184,7 @@ while [[ "$#" -gt 0 ]]; do
     input="${2#v}"
     IFS='.' read -ra parts <<<"$input"
     length=${#parts[@]}
-    if [ $length -ge 2 ]; then
+    if [ "$length" -ge 2 ]; then
       FILTERED_VERSIONS=("${parts[0]}"."${parts[1]}")
     else
       FILTERED_VERSIONS=("${parts[*]}")
@@ -246,7 +242,8 @@ while [[ "$#" -gt 0 ]]; do
     OC_MIRROR_FLAGS="$2"
     shift 1
     ;;
-  '--install-yq') INSTALL_YQ=1 ;;
+  '--install-yq') 
+    INSTALL_YQ=1 ;;
   '-h' | '--help')
     usage
     exit 0
@@ -358,8 +355,8 @@ if [[ -n "${TO_DIR}" ]]; then
   TMPDIR="${TO_DIR}"
 else
   TMPDIR=$(mktemp -d)
-  ## shellcheck disable=SC2064
-  trap 'rm -fr "$TMPDIR" || true' EXIT
+  # shellcheck disable=SC2064
+  trap "rm -fr $TMPDIR || true" EXIT
 fi
 pushd "${TMPDIR}" >/dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
@@ -407,7 +404,7 @@ function merge_registry_auth() {
   done
   tmpFile=$(mktemp)
   # shellcheck disable=SC2064
-  trap " rm -f $tmpFile || true" EXIT
+  trap "rm -f $tmpFile || true" EXIT
   echo '{"auths": {' >"$tmpFile"
   for reg in "${registries[@]}"; do
     echo "  \"$reg\": .auths.\"$reg\"," >>"$tmpFile"
@@ -545,7 +542,7 @@ function extract_last_two_elements() {
   read -ra parts <<<"$input"
 
   local length=${#parts[@]}
-  if [ $length -ge 2 ]; then
+  if [ "$length" -ge 2 ]; then
     echo "${parts[-2]}/${parts[-1]}"
   else
     echo "${parts[*]}"
@@ -675,14 +672,16 @@ function process_bundles() {
 
           all_related_images=()
           debugf "\t finding related images in $file to mirror..."
-          mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ''{print $2}' | uniq)
+          mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
           if ((${#images[@]})); then
             all_related_images+=("${images[@]}")
           fi
           # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
           related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
           if [[ -n "$related_images" ]]; then
-            all_related_images+=("$related_images")
+            while IFS= read -r img; do
+              [[ -n "$img" ]] && all_related_images+=("$img")
+            done <<<"$related_images"
           fi
           for relatedImage in "${all_related_images[@]}"; do
             imgDir="./images/"
@@ -708,7 +707,7 @@ function process_bundles() {
             if [[ -n "$TO_REGISTRY" ]]; then
               mirror_image_to_registry "$relatedImage" "$targetImg"
               debugf "replacing $relatedImage in file '${file}' => $internalTargetImg"
-              sed -i 's#'$relatedImage'#'$internalTargetImg'#g' "$file"
+              sed -i 's#'"$relatedImage"'#'"$internalTargetImg"'#g' "$file"
             else
               if [ ! -d "$imgDir" ]; then
                 mkdir -p "${imgDir}"
@@ -782,7 +781,7 @@ function process_bundles_from_dir() {
       if [[ "$file" == *.clusterserviceversion.yaml || "$file" == *.csv.yaml ]]; then
         all_related_images=()
         debugf "\t finding related images in $file to mirror..."
-        mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ''{print $2}' | uniq)
+        mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
         if ((${#images[@]})); then
           all_related_images+=("${images[@]}")
         fi
@@ -815,7 +814,7 @@ function process_bundles_from_dir() {
           if [[ -n "$TO_REGISTRY" ]]; then
             push_image_from_archive "$imgDir" "$targetImg"
             debugf "replacing $relatedImage in file '${file}' => $targetImgInternal"
-            sed -i 's#'$relatedImage'#'$targetImgInternal'#g' "$file"
+            sed -i 's#'"$relatedImage"'#'"$targetImgInternal"'#g' "$file"
           fi
         done
       fi
@@ -939,7 +938,7 @@ EOF
 
     fi
     nbExtraImgs=${#EXTRA_IMAGES[@]}
-    if [ $nbExtraImgs -ge 1 ]; then
+    if [ "$nbExtraImgs" -ge 1 ]; then
       cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
       additionalImages:
 EOF
@@ -958,7 +957,7 @@ EOF
         --dest-skip-tls \
         --continue-on-error \
         --max-nested-paths=1 \
-        $OC_MIRROR_FLAGS |
+        "$OC_MIRROR_FLAGS" |
         tee "${ocMirrorLogFile}"
       if [[ "${TO_DIR}" != "${TMPDIR}" ]]; then
         cp -f "${TMPDIR}/imageset-config.yaml" "${TO_DIR}/imageset-config.yaml"
@@ -986,7 +985,7 @@ EOF
         --dest-skip-tls \
         --continue-on-error \
         --max-nested-paths=2 \
-        $OC_MIRROR_FLAGS |
+        "$OC_MIRROR_FLAGS" |
         tee "${ocMirrorLogFile}"
     fi
 
@@ -1018,7 +1017,7 @@ EOF
         --skip-missing \
         --dest-skip-tls \
         --continue-on-error \
-        $OC_MIRROR_FLAGS |
+        "$OC_MIRROR_FLAGS" |
         tee "${ocMirrorLogFile}"
     fi
   fi
@@ -1030,18 +1029,18 @@ EOF
     if [[ -n "${icspLocation}" ]]; then
       debugf "ICSP parent location: ${TMPDIR}/${icspLocation}"
       if [[ -n "${TO_REGISTRY}" ]]; then
-        invoke_cluster_cli apply -f ${TMPDIR}/${icspLocation}/imageContentSourcePolicy.yaml
+        invoke_cluster_cli apply -f "${TMPDIR}"/"${icspLocation}"/imageContentSourcePolicy.yaml
       fi
     fi
     if [[ -n "${catalogSourceLocation}" ]]; then
       # Replace some metadata and add the default list of secrets
       debugf "catalogSource parent location: ${TMPDIR}/${catalogSourceLocation}"
-      "$YQ" -i '.metadata.name = "rhdh-catalog"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
-      "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      "$YQ" -i '.metadata.name = "rhdh-catalog"' -i "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
+      "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
       "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' \
-        ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+        "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
       if [[ -n "${TO_REGISTRY}" ]]; then
-        invoke_cluster_cli apply -f ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+        invoke_cluster_cli apply -f "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
       fi
     fi
   fi
@@ -1061,8 +1060,14 @@ else
     manifestsTargetDir="${FROM_DIR}"
   fi
 
-  NAMESPACE_CATALOGSOURCE='$NAMESPACE_CATALOGSOURCE'
-  my_operator_index='$CATALOG_IMAGE'
+  if [[ -z "${NAMESPACE_CATALOGSOURCE:-}" ]]; then
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      NAMESPACE_CATALOGSOURCE="openshift-marketplace"
+    else
+      NAMESPACE_CATALOGSOURCE="olm"
+    fi
+  fi
+  my_operator_index="$(buildCatalogImageUrl "internal")"
   if [[ -n "${TO_REGISTRY}" ]]; then
     # It assumes that the user is also connected to a cluster
     detect_ocp_and_set_env_var
