@@ -47,7 +47,7 @@ data:
                       path: /orchestrator
       - disabled: true
         package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
-        integrity: sha512-VIenFStdq9QvvmgmEMG8O7b2wqIebvEcqNeJ9SWZ8jen9t+efTK6D3Rde74LQ1no1QaHLx8RoxNCOuTUEF8O/g==
+        integrity: sha512-Kr55YbuVwEADwGef9o9wyimcgHmiwehPeAtVHa9g2RQYoSPEa6BeOlaPzB6W5Ke3M2bN/0j0XXtpLuvrlXQogA==
         pluginConfig:
           orchestrator:
             dataIndexService:
@@ -61,7 +61,7 @@ data:
           orchestrator:
             dataIndexService:
               url: http://sonataflow-platform-data-index-service               
-      - disabled: false
+      - disabled: true
         package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.6.0"
         integrity: sha512-Tqn6HO21Q1TQ7TFUoRhwBVCtSBzbQYz+OaanzzIB0R24O6YtVx3wR7Chtr5TzC05Vz5GkBO1+FZid8BKpqljgA==
         pluginConfig:
