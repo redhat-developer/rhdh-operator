@@ -6,12 +6,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func GetPluginDeps(bsName, bsNamespace string, plugins DynamicPlugins) ([]*unstructured.Unstructured, error) {
+func GetPluginDeps(backstage bs.Backstage, plugins DynamicPlugins, scheme *runtime.Scheme) ([]*unstructured.Unstructured, error) {
 	dir := filepath.Join(os.Getenv("LOCALBIN"), "plugin-deps")
 	pdeps, err := plugins.Dependencies()
 	if err != nil {
@@ -26,8 +30,22 @@ func GetPluginDeps(bsName, bsNamespace string, plugins DynamicPlugins) ([]*unstr
 		}
 	}
 
-	return ReadPluginDeps(dir, bsName, bsNamespace, refs)
+	objs, err := ReadPluginDeps(dir, backstage.Name, backstage.Namespace, refs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read plugin dependencies: %w", err)
+	}
 
+	for _, obj := range objs {
+		if obj.GetNamespace() == "" {
+			obj.SetNamespace(backstage.Namespace)
+		}
+		err = controllerutil.SetControllerReference(&backstage, obj, scheme)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set controller reference for plugin dependency %s: %w", obj.GetName(), err)
+		}
+	}
+
+	return objs, nil
 }
 
 // ReadPluginDeps reads the plugin dependencies from the specified directory
@@ -97,7 +115,6 @@ func getDepsFiles(root string, enabledPrefixes []string) ([]string, error) {
 			}
 		}
 
-		// TODO add some warning if file is not in the enabled list
 	}
 
 	return files, nil

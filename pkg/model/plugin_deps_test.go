@@ -5,6 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -113,9 +118,15 @@ plugins:
 	}
 
 	// Call GetPluginDeps
-	bsName := "test-name"
-	bsNamespace := "test-namespace"
-	objects, err := GetPluginDeps(bsName, bsNamespace, dynaPlugins)
+	bs := bsv1.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-name",
+			Namespace: "test-namespace",
+		},
+	}
+	sc := runtime.NewScheme()
+	utilruntime.Must(bsv1.AddToScheme(sc))
+	objects, err := GetPluginDeps(bs, dynaPlugins, sc)
 	assert.NoError(t, err)
 	assert.Len(t, objects, 2)
 
@@ -123,6 +134,14 @@ plugins:
 	actualNames := []string{objects[0].GetName(), objects[1].GetName()}
 	expectedNames := []string{"dep1", "dep2"}
 	assert.ElementsMatch(t, expectedNames, actualNames)
+
+	// Verify ownerReference
+	for _, obj := range objects {
+		ownerRefs := obj.GetOwnerReferences()
+		assert.Len(t, ownerRefs, 1)
+		assert.Equal(t, bs.Name, ownerRefs[0].Name)
+		assert.Equal(t, "Backstage", ownerRefs[0].Kind)
+	}
 }
 
 func TestReadPluginDepsNoFiles(t *testing.T) {
