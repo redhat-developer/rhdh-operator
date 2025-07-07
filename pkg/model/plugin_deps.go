@@ -16,7 +16,12 @@ import (
 )
 
 func GetPluginDeps(backstage bs.Backstage, plugins DynamicPlugins, scheme *runtime.Scheme) ([]*unstructured.Unstructured, error) {
-	dir := filepath.Join(os.Getenv("LOCALBIN"), "plugin-deps")
+
+	dir, ok := os.LookupEnv("PLUGIN_DEPS_DIR_backstage")
+	if !ok {
+		dir = filepath.Join(os.Getenv("LOCALBIN"), "plugin-deps")
+	}
+
 	pdeps, err := plugins.Dependencies()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get plugin dependencies: %w", err)
