@@ -33,6 +33,7 @@ var _ = When("test plugin deps", func() {
 
 	AfterEach(func() {
 		deleteNamespace(ctx, ns)
+		_ = os.Unsetenv("PLUGIN_DEPS_DIR_backstage")
 	})
 
 	It("creates plugin dependencies", func() {
