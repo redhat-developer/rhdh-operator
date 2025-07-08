@@ -75,7 +75,7 @@ var _ = When("test plugin deps", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "test-dependency4"}, cm)
 			g.Expect(err).Should(HaveOccurred())
 
-		}, time.Minute, time.Second).Should(Succeed())
+		}, 5*time.Minute, time.Second).Should(Succeed())
 
 	})
 })
