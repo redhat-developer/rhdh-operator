@@ -357,24 +357,20 @@ data:
     \   includes:\n#      - dynamic-plugins.default.yaml\n#    plugins: []\n#---\napiVersion:
     v1\nkind: ConfigMap\nmetadata:\n  name: default-dynamic-plugins\ndata:\n  dynamic-plugins.yaml:
     |\n    includes:\n      - dynamic-plugins.default.yaml\n    plugins:\n      -
-    disabled: true\n        package: \"@redhat/backstage-plugin-orchestrator@1.6.0\"\n
-    \       integrity: sha512-fOSJv2PgtD2urKwBM7p9W6gV/0UIHSf4pkZ9V/wQO0eg0Zi5Mys/CL1ba3nO9x9l84MX11UBZ2r7PPVJPrmOtw==\n
+    disabled: true\n        package: \"ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator:pr_1214__3.1.3!red-hat-developer-hub-backstage-plugin-orchestrator\"\n
     \       pluginConfig:\n          dynamicPlugins:\n              frontend:\n                red-hat-developer-hub.backstage-plugin-orchestrator:\n
     \                 appIcons:\n                    - importName: OrchestratorIcon\n
     \                     name: orchestratorIcon\n                  dynamicRoutes:\n
     \                   - importName: OrchestratorPage\n                      menuItem:\n
     \                       icon: orchestratorIcon\n                        text:
     Orchestrator\n                      path: /orchestrator\n      - disabled: true\n
-    \       package: \"@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0\"\n
-    \       integrity: sha512-Kr55YbuVwEADwGef9o9wyimcgHmiwehPeAtVHa9g2RQYoSPEa6BeOlaPzB6W5Ke3M2bN/0j0XXtpLuvrlXQogA==\n
+    \       package: \"ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend:pr_1214__6.1.3!red-hat-developer-hub-backstage-plugin-orchestrator-backend\"\n
     \       pluginConfig:\n          orchestrator:\n            dataIndexService:\n
     \             url: http://sonataflow-platform-data-index-service\n        dependencies:\n
-    \         - ref: sonataflow\n      - disabled: true\n        package: \"@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.6.0\"\n
-    \       integrity: sha512-Bueeix4661fXEnfJ9y31Yw91LXJgw6hJUG7lPVdESCi9VwBCjDB9Rm8u2yPqP8sriwr0OMtKtqD+Odn3LOPyVw==\n
+    \         - ref: sonataflow\n      - disabled: true\n        package: \"ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:pr_1214__0.3.7!red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator\"\n
     \       pluginConfig:\n          orchestrator:\n            dataIndexService:\n
     \             url: http://sonataflow-platform-data-index-service               \n
-    \     - disabled: true\n        package: \"@redhat/backstage-plugin-orchestrator-form-widgets@1.6.0\"\n
-    \       integrity: sha512-Tqn6HO21Q1TQ7TFUoRhwBVCtSBzbQYz+OaanzzIB0R24O6YtVx3wR7Chtr5TzC05Vz5GkBO1+FZid8BKpqljgA==\n
+    \     - disabled: true\n        package: \"ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:pr_1214__0.2.6!red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets\"\n
     \       pluginConfig:\n          dynamicPlugins:\n            frontend:\n              red-hat-developer-hub.backstage-plugin-orchestrator-form-widgets:
     { }"
   route.yaml: |-
