@@ -6,10 +6,10 @@ data:
   dynamic-plugins.yaml: |
     plugins:
       - disabled: false
-        package: "plugin"
+        package: "./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-dynamic-home-page"
         dependencies:
           - ref: plugin
       - disabled: true
         package: "disabled"
         dependencies:
-          - ref: disabled      
+          - ref: disabled

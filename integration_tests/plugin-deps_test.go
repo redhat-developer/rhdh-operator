@@ -37,6 +37,13 @@ var _ = When("test plugin deps", func() {
 	})
 
 	It("creates plugin dependencies", func() {
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
+		}
+
+		if useExistingController {
+			Skip("Skipped for real controller")
+		}
 
 		err := os.Setenv("PLUGIN_DEPS_DIR_backstage", "testdata/plugin-deps1")
 		Expect(err).NotTo(HaveOccurred())
