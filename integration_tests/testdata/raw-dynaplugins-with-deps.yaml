@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-dynamic-plugins
+data:
+  dynamic-plugins.yaml: |
+    plugins:
+      - disabled: false
+        package: "./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-dynamic-home-page"
+        dependencies:
+          - ref: plugin
+      - disabled: true
+        package: "disabled"
+        dependencies:
+          - ref: disabled
