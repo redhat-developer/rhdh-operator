@@ -848,10 +848,11 @@ function process_bundles_from_dir() {
 }
 
 function mirror_image_to_registry() {
-  local src_image
-  src_image=$(replaceInternalRegIfNeeded "$1")
+  local src_image="$1"
+  src_image=$(replaceInternalRegIfNeeded "$src_image")
   local dest_image
   dest_image=$2
+  
   echo "Mirroring $src_image to $dest_image..."
   skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image"
 }
