@@ -400,7 +400,7 @@ function merge_registry_auth() {
   registries=("registry.redhat.io" "quay.io")
   for img in "${images[@]}"; do
     reg=$(echo "$img" | cut -d'/' -f1)
-    [[ " ${registries[*]} " =~ $reg ]] || registries+=("$reg")
+    [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
   done
   tmpFile=$(mktemp)
   # shellcheck disable=SC2064
@@ -857,10 +857,11 @@ function mirror_image_to_registry() {
 }
 
 function mirror_image_to_archive() {
-  local src_image
-  dest_image=$(replaceInternalRegIfNeeded "$1")
-  local archive_path
-  archive_path=$2
+  local src_image="$1"
+  local dest_image
+  dest_image=$(replaceInternalRegIfNeeded "$src_image")
+  local archive_path="$2"
+
   debugf "Saving $src_image to $archive_path..."
   skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
 }
@@ -1060,16 +1061,12 @@ else
     manifestsTargetDir="${FROM_DIR}"
   fi
 
-  if [[ -z "${NAMESPACE_CATALOGSOURCE:-}" ]]; then
-    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-      NAMESPACE_CATALOGSOURCE="openshift-marketplace"
-    else
-      NAMESPACE_CATALOGSOURCE="olm"
-    fi
-  fi
-  my_operator_index="$(buildCatalogImageUrl "internal")"
+  # shellcheck disable=SC2016
+  NAMESPACE_CATALOGSOURCE='$NAMESPACE_CATALOGSOURCE'
+  # shellcheck disable=SC2016
+  my_operator_index='$CATALOG_IMAGE'
   if [[ -n "${TO_REGISTRY}" ]]; then
-    # It assumes that the user is also connected to a cluster
+      # It assumes that the user is also connected to a cluster
     detect_ocp_and_set_env_var
     if [[ "${IS_OPENSHIFT}" = "true" ]]; then
       debugf "Detected an OpenShift cluster"
