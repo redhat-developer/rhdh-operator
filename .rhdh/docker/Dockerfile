@@ -2,7 +2,7 @@
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.6-1751538372@sha256:381fb72f087a07432520fa93364f66b5981557f1dd708f3c4692d6d0a76299b3 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:9.6-1752083840 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # hadolint ignore=DL3002
