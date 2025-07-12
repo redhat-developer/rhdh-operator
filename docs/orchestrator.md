@@ -55,32 +55,35 @@ This method has similar usage and cautions as the RHDH Helper Utility.
 
 ### Installing the Orchestrator Plugin
 
-The orchestrator plugin (as of v1.5.1) consists of three dynamic plugins:
+The orchestrator plugin (as of v1.6.0) consists of four dynamic plugins:
 - orchestrator-backend
 - orchestrator-frontend
 - orchestrator-scaffolder-backend-module
+- orchestrator-form-widgets
 
-As for RHDH 1.7 all of these plugins are included in the default dynamic-plugins.yaml file of **install-dynamic-plugins** container but disabled by default.
+In RHDH 1.7, all of these plugins are included in the default dynamic-plugins.yaml file of **install-dynamic-plugins** container but disabled by default.
 To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMap with following data in your Backstage Custom Resource (CR):
 ```yaml
     includes:
       - dynamic-plugins.default.yaml
     plugins:
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator@1.5.1"
+        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator"
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
+        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend"
         dependencies:
           - ref: sonataflow
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
+        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator"
+      - disabled: false
+        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets"
 ```
 
 See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin.
 
 #### Plugin registry
 
-As for RHDH 1.7 the orchestrator plugin packages are located in **npm.registry.redhat.com** NPM registry, which is preconfigured in rhdh default-config.
+In RHDH 1.7, the orchestrator plugin packages are as OCI images and located in **registry.redhat.io** RH registry, which is preconfigured in rhdh default-config.
 
 #### Plugin dependencies
 
