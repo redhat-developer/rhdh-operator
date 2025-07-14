@@ -1796,7 +1796,7 @@ spec:
         - --leader-elect
         command:
         - /manager
-        image: quay.io/rhdh-community/operator:0.7.0
+        image: quay.io/rhdh-community/operator:0.8.0
         livenessProbe:
           httpGet:
             path: /healthz
