@@ -15,7 +15,7 @@ resources:
 images:
 - name: controller
   newName: quay.io/rhdh/rhdh-rhel9-operator
-  newTag: "1.7"
+  newTag: "1.8"
 
 patches:
 - path: patches/deployment-patch.yaml
