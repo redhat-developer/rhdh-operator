@@ -848,8 +848,8 @@ function process_bundles_from_dir() {
 }
 
 function mirror_image_to_registry() {
-  local src_image="$1"
-  src_image=$(replaceInternalRegIfNeeded "$src_image")
+  local src_image
+  src_image=$(replaceInternalRegIfNeeded "$1")
   local dest_image
   dest_image=$2
   
@@ -858,9 +858,10 @@ function mirror_image_to_registry() {
 }
 
 function mirror_image_to_archive() {
-  local src_image="$1"
+  local src_image
   local dest_image
-  dest_image=$(replaceInternalRegIfNeeded "$src_image")
+  dest_image=$(replaceInternalRegIfNeeded "$1")
+  local archive_path
   local archive_path="$2"
 
   debugf "Saving $src_image to $archive_path..."
