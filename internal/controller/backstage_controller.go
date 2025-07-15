@@ -108,6 +108,12 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
 	}
 
+	// Apply the ServiceMonitor if monitoring is enabled
+	if err := r.applyServiceMonitor(ctx, &backstage); err != nil {
+		lg.Error(err, "failed to apply ServiceMonitor")
+		return ctrl.Result{}, errorAndStatus(&backstage, "Failed to apply ServiceMonitor", err)
+	}
+
 	// Apply the plugin dependencies
 	if err := r.applyPluginDeps(ctx, backstage, bsModel.DynamicPlugins); err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply plugin dependencies", err)

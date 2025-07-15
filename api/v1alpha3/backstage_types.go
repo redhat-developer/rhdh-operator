@@ -29,6 +29,10 @@ type BackstageSpec struct {
 	// Configuration for database access. Optional.
 	Database *Database `json:"database,omitempty"`
 
+	// Monitoring config to enable ServiceMonitor for metrics
+	// +optional
+	Monitoring *Monitoring `json:"monitoring,omitempty"`
+
 	// Valid fragment of Deployment to be merged with default/raw configuration.
 	// Set the Deployment's metadata and|or spec fields you want to override or add.
 	// Optional.
@@ -66,6 +70,13 @@ type Database struct {
 	// "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4"
 	// "POSTGRES_HOST": "backstage-psql-bs1"  # For local database, set to "backstage-psql-<CR name>".
 	AuthSecretName string `json:"authSecretName,omitempty"`
+}
+
+type Monitoring struct {
+	// Enable ServiceMonitor for Prometheus scraping
+	// +optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 type Application struct {
@@ -328,4 +339,14 @@ func (s *BackstageSpec) IsRouteEnabled() bool {
 
 func (s *BackstageSpec) IsAuthSecretSpecified() bool {
 	return s.Database != nil && s.Database.AuthSecretName != ""
+}
+
+// IsMonitoringEnabled checks if monitoring is explicitly enabled in the BackstageSpec.
+// Returns false if the Monitoring field is nil (not configured) or explicitly disabled.
+// Returns true only when spec.monitoring.enabled is set to true in the CR.
+func (s *BackstageSpec) IsMonitoringEnabled() bool {
+	if s.Monitoring == nil {
+		return false
+	}
+	return s.Monitoring.Enabled
 }
