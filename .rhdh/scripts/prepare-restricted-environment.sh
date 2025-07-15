@@ -860,9 +860,9 @@ function mirror_image_to_registry() {
 function mirror_image_to_archive() {
   local src_image
   local dest_image
-  dest_image=$(replaceInternalRegIfNeeded "$1")
+  src_image=$(replaceInternalRegIfNeeded "$1")
   local archive_path
-  local archive_path="$2"
+  archive_path="$2"
 
   debugf "Saving $src_image to $archive_path..."
   skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
