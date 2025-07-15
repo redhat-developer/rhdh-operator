@@ -682,6 +682,16 @@ spec:
                       Optional.
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
+              monitoring:
+                description: |
+                  Monitoring configuration for Backstage. If enabled, the operator
+                  will create a ServiceMonitor resource for Prometheus Operator.
+                properties:
+                  enabled:
+                    description: Whether to enable ServiceMonitor creation.
+                    type: boolean
+                    default: false
+                type: object
               rawRuntimeConfig:
                 description: Raw Runtime RuntimeObjects configuration. For Advanced
                   scenarios.
