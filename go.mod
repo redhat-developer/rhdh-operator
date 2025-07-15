@@ -92,6 +92,7 @@ require (
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 <<<<<<< HEAD
+<<<<<<< HEAD
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
@@ -99,13 +100,26 @@ require (
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
 =======
+=======
+>>>>>>> 8993bad (service monitor)
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/term v0.33.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.35.0 // indirect
+<<<<<<< HEAD
 >>>>>>> 3c33a74 (fix(deps): update golang.org/x/exp digest to 6ae5c78 (#1367))
+=======
+=======
+	golang.org/x/sync v0.15.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/term v0.32.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/tools v0.34.0 // indirect
+>>>>>>> f20474f (service monitor)
+>>>>>>> 8993bad (service monitor)
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240528184218-531527333157 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
