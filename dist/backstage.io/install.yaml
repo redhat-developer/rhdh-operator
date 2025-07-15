@@ -1109,6 +1109,14 @@ spec:
                       Optional.
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
+              monitoring:
+                description: Monitoring config to enable ServiceMonitor for metrics
+                properties:
+                  enabled:
+                    default: false
+                    description: Enable ServiceMonitor for Prometheus scraping
+                    type: boolean
+                type: object
               rawRuntimeConfig:
                 description: Raw Runtime RuntimeObjects configuration. For Advanced
                   scenarios.
