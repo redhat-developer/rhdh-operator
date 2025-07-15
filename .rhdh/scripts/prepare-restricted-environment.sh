@@ -859,7 +859,6 @@ function mirror_image_to_registry() {
 
 function mirror_image_to_archive() {
   local src_image
-  local dest_image
   src_image=$(replaceInternalRegIfNeeded "$1")
   local archive_path
   archive_path="$2"
