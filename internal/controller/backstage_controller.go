@@ -34,6 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
 )
 
 const (
@@ -106,6 +107,12 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
+	}
+
+	// Apply the ServiceMonitor if monitoring is enabled
+	if err := r.applyServiceMonitor(ctx, &backstage); err != nil {
+		lg.Error(err, "failed to apply ServiceMonitor")
+		return ctrl.Result{}, errorAndStatus(&backstage, "Failed to apply ServiceMonitor", err)
 	}
 
 	// Apply the plugin dependencies

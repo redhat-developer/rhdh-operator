@@ -29,6 +29,10 @@ type BackstageSpec struct {
 	// Configuration for database access. Optional.
 	Database *Database `json:"database,omitempty"`
 
+	// Monitoring config to enable ServiceMonitor for metrics
+	// +optional
+	Monitoring *Monitoring `json:"monitoring,omitempty"`
+
 	// Valid fragment of Deployment to be merged with default/raw configuration.
 	// Set the Deployment's metadata and|or spec fields you want to override or add.
 	// Optional.
@@ -114,6 +118,14 @@ type Application struct {
 	// Route configuration. Used for OpenShift only.
 	Route *Route `json:"route,omitempty"`
 }
+
+type Monitoring struct {
+	// Enable ServiceMonitor for Prometheus scraping
+	// +optional
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled,omitempty"`
+}
+
 
 type AppConfig struct {
 	// Mount path for all app-config files listed in the ConfigMapRefs field
@@ -328,4 +340,11 @@ func (s *BackstageSpec) IsRouteEnabled() bool {
 
 func (s *BackstageSpec) IsAuthSecretSpecified() bool {
 	return s.Database != nil && s.Database.AuthSecretName != ""
+}
+
+func (s *BackstageSpec) IsMonitoringEnabled() bool {
+	if s.Monitoring == nil {
+		return false
+	}
+	return s.Monitoring.Enabled
 }

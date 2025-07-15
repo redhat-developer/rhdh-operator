@@ -21,6 +21,7 @@ import (
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	openshift "github.com/openshift/api/route/v1"
 	//+kubebuilder:scaffold:imports
@@ -37,6 +38,8 @@ func init() {
 	utilruntime.Must(bsv1.AddToScheme(scheme))
 
 	utilruntime.Must(openshift.Install(scheme))
+
+	utilruntime.Must(monitoringv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
