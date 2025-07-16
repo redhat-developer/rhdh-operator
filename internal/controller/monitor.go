@@ -32,18 +32,24 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 			Name:      backstage.Name + "-metrics",
 			Namespace: backstage.Namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/name": backstage.Name,
+				"app.kubernetes.io/instance": backstage.Name,
+				"app.kubernetes.io/name": "backstage",
 			},
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
 			Selector: metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app.kubernetes.io/name": backstage.Name,
+					"app.kubernetes.io/instance": backstage.Name,
+					"app.kubernetes.io/name":     "backstage",
 				},
 			},
+			NamespaceSelector: monitoringv1.NamespaceSelector{
+				MatchNames: []string{backstage.Namespace},
+			},
 			Endpoints: []monitoringv1.Endpoint{{
-				Port: "http-metrics",
-				Path: "/metrics",
+				Port:     "http-metrics",
+				Path:     "/metrics",
+				Interval: "30s",
 			}},
 		},
 	}
