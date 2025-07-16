@@ -15,17 +15,12 @@ jobs:
         from_branch:
           - release-1.5
           - release-1.6
+          - release-1.7
         to_branch:
           - main
+          - release-1.7
           - release-1.6
           - release-1.5
-        exclude:
-          - from_branch: release-1.5
-            to_branch: release-1.5
-          - from_branch: release-1.6
-            to_branch: release-1.5
-          - from_branch: release-1.6
-            to_branch: release-1.6
 
     name: 'E2E Upgrade: ${{ matrix.from_branch }} => ${{ matrix.to_branch }}'
     concurrency:
@@ -34,16 +29,41 @@ jobs:
     env:
       CONTAINER_ENGINE: podman
     steps:
+      - name: Determine if upgrade path should be skipped
+        id: upgrade-path-checker
+        run: |
+          SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE="false"
+          from_branch=${{ matrix.from_branch }}
+          to_branch=${{ matrix.to_branch }}
+          if [[ "${from_branch}" == "main" ]]; then
+            # This is considered a downgrade or a test using the same from/to branches
+            SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE="true"
+          else
+            from_version="${from_branch#release-}"
+            from_minor=$(echo $from_version | cut -d. -f2)
+            if [[ "${to_branch}" != "main" ]]; then
+              to_version="${to_branch#release-}"
+              to_minor=$(echo $to_version | cut -d. -f2)
+              if [[ $from_minor -ge $to_minor ]]; then
+                SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE="true"
+              fi
+            fi
+          fi
+          echo "SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE=${SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE}" >> $GITHUB_OUTPUT
+
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4 # default branch will be checked out by default on scheduled workflows
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         with:
           fetch-depth: 0
 
       - name: Setup Go
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version-file: 'go.mod'
 
       - name: Set env vars
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         run: |
           distLocation="dist/rhdh/install.yaml"
 
@@ -85,17 +105,18 @@ jobs:
 
       - name: Check if operator images exist in remote registry
         id: operator-image-existence-checker
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         run: |
           echo "FROM_OPERATOR_IMAGE_EXISTS=$(skopeo inspect "docker://${{ env.FROM_OPERATOR_IMAGE }}" > /dev/null && echo "true" || echo "false")" >> $GITHUB_OUTPUT
           echo "TO_OPERATOR_IMAGE_EXISTS=$(skopeo inspect "docker://${{ env.TO_OPERATOR_IMAGE }}" > /dev/null && echo "true" || echo "false")" >> $GITHUB_OUTPUT
 
       - name: Display warning if any of the operator images were not found
-        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'false' || steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'false' }}
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && (steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'false' || steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'false') }}
         run: |
           echo "::warning ::One of the operator images (${{ env.FROM_OPERATOR_IMAGE }} or ${{ env.TO_OPERATOR_IMAGE }}) could not be found for testing the ${{ matrix.from_branch }} => ${{ matrix.to_branch }} upgrade path. They might have expired. Skipping."
 
       - name: Generate Kind Config
-        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           cat <<EOF > /tmp/kind-config.yaml
           apiVersion: kind.x-k8s.io/v1alpha4
@@ -112,7 +133,7 @@ jobs:
           EOF
 
       - name: Create Kind cluster
-        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           cluster_name: test-cluster
@@ -120,7 +141,7 @@ jobs:
           ignore_failed_clean: true
 
       - name: Install Ingress Controller
-        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
           kubectl wait --namespace ingress-nginx \
@@ -129,7 +150,7 @@ jobs:
             --timeout=90s
 
       - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_branch }} => ${{ matrix.to_branch }})'
-        if: ${{ steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: kind
           PROFILE: 'rhdh'
