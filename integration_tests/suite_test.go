@@ -41,6 +41,8 @@ import (
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -117,6 +119,9 @@ var _ = BeforeSuite(func() {
 	err = bsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	utilruntime.Must(openshift.Install(scheme.Scheme))
+
+	err = monitoringv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 
