@@ -15,8 +15,10 @@ jobs:
         from_branch:
           - release-1.5
           - release-1.6
+          - release-1.7
         to_branch:
           - main
+          - release-1.7
           - release-1.6
           - release-1.5
         exclude:
@@ -26,6 +28,12 @@ jobs:
             to_branch: release-1.5
           - from_branch: release-1.6
             to_branch: release-1.6
+          - from_branch: release-1.7
+            to_branch: release-1.5
+          - from_branch: release-1.7
+            to_branch: release-1.6
+          - from_branch: release-1.7
+            to_branch: release-1.7
 
     name: 'E2E Upgrade: ${{ matrix.from_branch }} => ${{ matrix.to_branch }}'
     concurrency:
