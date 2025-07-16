@@ -34,16 +34,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
 )
 
 const (
 	BackstageFieldManager = "backstage-controller"
-	
+
 	// AutoSyncEnvVar: EXT_CONF_SYNC_backstage env variable which defines the value for rhdh.redhat.com/ext-config-sync annotation of external config object (ConfigMap|Secret)
 	// True by default
 	AutoSyncEnvVar = "EXT_CONF_SYNC_backstage"
-	
+
 	// WatchExtConfig: WATCH_EXT_CONF_backstage if false disables watching external config objects (ConfigMaps|Secrets)
 	// True by default
 	WatchExtConfig = "WATCH_EXT_CONF_backstage"
