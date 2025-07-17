@@ -1,11 +1,20 @@
 #!/bin/bash
 #
-# GitOps Infrastructure Setup Script for Orchestrator with  RHDH
+# GitOps/Pipeline Resources Setup Script for Orchestrator with  RHDH
 #
 
 set -e
 
 action="${1:-apply}" # Default action is 'apply'
+
+orchestrator_gitops_namespace() {
+  kubectl "$action" -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orchestrator-gitops
+EOF
+}
 
 argoCD() {
   kubectl "$action" -f - <<'EOF'
@@ -447,10 +456,12 @@ EOF
 # execution
 
 if [ "$action" == "apply" ]; then
+  orchestrator_gitops_namespace
   argoCD
   tekton_tasks
   tekton_pipeline
 elif [ "$action" == "delete" ]; then
+  orchestrator_gitops_namespace
   argoCD
   tekton_tasks
   tekton_pipeline
