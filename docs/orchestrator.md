@@ -133,7 +133,8 @@ See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) for a complete 
 To enable the Backstage operator to work with the SonataFlow platform, its ServiceAccount must be granted the appropriate permissions. 
 This is done by the Backstage operator automatically when the SonataFlowPlatform CR is created in the namespace of the Backstage CR by the appropriate Role and RoleBinding resource in the [profile/rhdh/plugin-rbac directory](../config/profile/rhdh/plugin-rbac).
 
-
+## Optional: Enable GitOps/Pipelines for Orchestrator Workflows
+To enable CI/CD for RHDH Orchestrator workflows, please follow this [guide](orchestrator-gitops.md).
 
 
 
