@@ -166,7 +166,7 @@ ssh-keygen -t rsa -b 4096 -f gitlab_ssh/id_rsa -N "" -C git@<GitLabHost> -q
 ```
 
 - Add the SSH key to your GitLab account using the glab CLI or using the SSH keys setting:
-  You can find those setting in https://\<GitLabHost\>/-/user_settings/ssh_keys
+-  You can find those settings in https://\<GitLabHost\>/-/user_settings/ssh_keys
 - Make sure to authenticate to your GitLab instance using your personal access token / Web authentication prior to using glab CLI.
 
 ```console
