@@ -12,7 +12,7 @@ To install the Orchestrator plugin on OpenShift, the following components are re
 
 ### Methods to Install required infrastructure
 
-There are 3 methods to install the required components for the Orchestrator plugin on OpenShift:
+There are three methods to install the required components for the Orchestrator plugin on OpenShift:
 - [Manual Installation](#manual-installation)
 - [RHDH helper script](#rhdh-helper-script)
 - [RHDH Orchestrator Infra Helm Chart](#rhdh-orchestrator-infra-helm-chart)
@@ -55,10 +55,11 @@ This method has similar usage and cautions as the RHDH Helper Utility.
 
 ### Installing the Orchestrator Plugin
 
-The orchestrator plugin (as of v1.5.1) consists of three dynamic plugins:
+The orchestrator plugin (as of v1.6.0) consists of three dynamic plugins:
 - orchestrator-backend
 - orchestrator-frontend
 - orchestrator-scaffolder-backend-module
+- orchestrator-form-widgets
 
 As for RHDH 1.7 all of these plugins are included in the default dynamic-plugins.yaml file of **install-dynamic-plugins** container but disabled by default.
 To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMap with following data in your Backstage Custom Resource (CR):
@@ -67,13 +68,13 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
       - dynamic-plugins.default.yaml
     plugins:
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator@1.5.1"
+        package: "@redhat/backstage-plugin-orchestrator@1.6.0"
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
+        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
         dependencies:
           - ref: sonataflow
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
+        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
 ```
 
 See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin.
@@ -119,7 +120,8 @@ See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) for a complete 
 To enable the Backstage operator to work with the SonataFlow platform, its ServiceAccount must be granted the appropriate permissions. 
 This is done by the Backstage operator automatically when the SonataFlowPlatform CR is created in the namespace of the Backstage CR by the appropriate Role and RoleBinding resource in the [profile/rhdh/plugin-rbac directory](../config/profile/rhdh/plugin-rbac).
 
-
+## Optional: Enable GitOps/Pipelines for Orchestrator Workflows
+To enable CI/CD for RHDH Orchestrator workflows, please follow this [guide](orchestrator-gitops.md).
 
 
 
