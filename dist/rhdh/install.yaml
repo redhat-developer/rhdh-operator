@@ -1110,6 +1110,8 @@ spec:
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
               monitoring:
+                default:
+                  enabled: false
                 description: Monitoring config to enable ServiceMonitor for metrics
                 properties:
                   enabled:
