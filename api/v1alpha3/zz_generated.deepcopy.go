@@ -5,7 +5,7 @@
 package v1alpha3
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -177,11 +177,7 @@ func (in *BackstageSpec) DeepCopyInto(out *BackstageSpec) {
 		*out = new(Database)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Monitoring != nil {
-		in, out := &in.Monitoring, &out.Monitoring
-		*out = new(Monitoring)
-		**out = **in
-	}
+	out.Monitoring = in.Monitoring
 	if in.Deployment != nil {
 		in, out := &in.Deployment, &out.Deployment
 		*out = new(BackstageDeployment)

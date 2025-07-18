@@ -31,7 +31,8 @@ type BackstageSpec struct {
 
 	// Monitoring config to enable ServiceMonitor for metrics
 	// +optional
-	Monitoring *Monitoring `json:"monitoring,omitempty"`
+	// +kubebuilder:default={enabled:false}
+	Monitoring Monitoring `json:"monitoring,omitempty"`
 
 	// Valid fragment of Deployment to be merged with default/raw configuration.
 	// Set the Deployment's metadata and|or spec fields you want to override or add.
@@ -345,8 +346,5 @@ func (s *BackstageSpec) IsAuthSecretSpecified() bool {
 // Returns false if the Monitoring field is nil (not configured) or explicitly disabled.
 // Returns true only when spec.monitoring.enabled is set to true in the CR.
 func (s *BackstageSpec) IsMonitoringEnabled() bool {
-	if s.Monitoring == nil {
-		return false
-	}
-	return s.Monitoring.Enabled
+    return s.Monitoring.Enabled
 }
