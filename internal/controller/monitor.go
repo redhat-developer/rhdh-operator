@@ -87,7 +87,6 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 }
 
 // Helper to detect if ServiceMonitor CRD is installed
-// Helper to detect if ServiceMonitor CRD is installed
 func (r *BackstageReconciler) serviceMonitorCRDExists(ctx context.Context) bool {
     crd := &apiextensionsv1.CustomResourceDefinition{}
 

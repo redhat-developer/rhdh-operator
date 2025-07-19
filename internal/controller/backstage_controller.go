@@ -106,7 +106,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Apply the ServiceMonitor if monitoring is enabled
 	if err := r.applyServiceMonitor(ctx, &backstage); err != nil {
 		lg.Error(err, "failed to apply ServiceMonitor")
-		return ctrl.Result{}, errorAndStatus(&backstage, "Failed to apply ServiceMonitor", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply ServiceMonitor", err)
 	}
 
 	// This creates array of model objects to be reconsiled
