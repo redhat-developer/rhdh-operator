@@ -10,7 +10,7 @@ require (
 	github.com/openshift/api v0.0.0-20250124120743-e8e07fa2990e
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
-	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
+	golang.org/x/exp v0.0.0-20250718183923-645b1fa84792
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.31.3
 	k8s.io/apiextensions-apiserver v0.31.3
