@@ -9,6 +9,10 @@ import (
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
     "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
     "sigs.k8s.io/controller-runtime/pkg/log"
+
+    apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+    "k8s.io/apimachinery/pkg/types"
+    apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 
@@ -83,7 +87,25 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 }
 
 // Helper to detect if ServiceMonitor CRD is installed
+// Helper to detect if ServiceMonitor CRD is installed
 func (r *BackstageReconciler) serviceMonitorCRDExists(ctx context.Context) bool {
-    // For now assume it's installed
+    crd := &apiextensionsv1.CustomResourceDefinition{}
+
+    // Try to fetch the CRD for ServiceMonitor
+    err := r.Client.Get(ctx, types.NamespacedName{
+        Name: "servicemonitors.monitoring.coreos.com",
+    }, crd)
+
+    if err != nil {
+        if apierrors.IsNotFound(err) {
+            // CRD definitely not installed
+            return false
+        }
+        // If it's another kind of API error, log but fail safe
+        log.FromContext(ctx).Error(err, "Unable to check for ServiceMonitor CRD")
+        return false
+    }
+
     return true
 }
+
