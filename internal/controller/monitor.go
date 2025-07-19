@@ -1,17 +1,16 @@
 package controller
 
 import (
-	"context"
-	"fmt"
+    "context"
+    "fmt"
 
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+    monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+    bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+    "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
 
 func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage *bs.Backstage) error {
     lg := log.FromContext(ctx).WithValues("Backstage", backstage.Name)
@@ -33,18 +32,26 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
         return fmt.Errorf("monitoring enabled but ServiceMonitor CRD not found. Please install Prometheus Operator")
     }
 
-    lg.Info("Monitoring enabled, creating/patching ServiceMonitor")
+    lg.Info("Monitoring enabled, creating/updating ServiceMonitor")
 
-    monitor := &monitoringv1.ServiceMonitor{
+    sm := &monitoringv1.ServiceMonitor{
+        TypeMeta: metav1.TypeMeta{
+            APIVersion: "monitoring.coreos.com/v1",
+            Kind:       "ServiceMonitor",
+        },
         ObjectMeta: metav1.ObjectMeta{
             Name:      backstage.Name + "-metrics",
             Namespace: backstage.Namespace,
-            Labels: map[string]string{
-                "app.kubernetes.io/instance": backstage.Name,
-                "app.kubernetes.io/name":     "backstage",
-            },
         },
-        Spec: monitoringv1.ServiceMonitorSpec{
+    }
+
+    _, err := controllerutil.CreateOrUpdate(ctx, r.Client, sm, func() error {
+        sm.Labels = map[string]string{
+            "app.kubernetes.io/instance": backstage.Name,
+            "app.kubernetes.io/name":     "backstage",
+        }
+
+        sm.Spec = monitoringv1.ServiceMonitorSpec{
             Selector: metav1.LabelSelector{
                 MatchLabels: map[string]string{
                     "app.kubernetes.io/instance": backstage.Name,
@@ -54,25 +61,25 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
             NamespaceSelector: monitoringv1.NamespaceSelector{
                 MatchNames: []string{backstage.Namespace},
             },
-            Endpoints: []monitoringv1.Endpoint{{
-                Port:     "http-metrics",
-                Path:     "/metrics",
-                Interval: "30s",
-            }},
-        },
-    }
+            Endpoints: []monitoringv1.Endpoint{
+                {
+                    Port:     "http-metrics",
+                    Path:     "/metrics",
+                    Interval: "30s",
+                },
+            },
+        }
 
-    // Set controller reference so it gets garbage-collected with the Backstage CR
-    if err := controllerutil.SetControllerReference(backstage, monitor, r.Scheme); err != nil {
-        lg.Error(err, "Failed to set controller reference on ServiceMonitor")
-        return fmt.Errorf("failed to set controller reference on ServiceMonitor: %w", err)
-    }
-
-    lg.Info("Patching ServiceMonitor via server-side apply")
-    return r.Patch(ctx, monitor, client.Apply, &client.PatchOptions{
-        FieldManager: BackstageFieldManager,
-        Force:        ptr.To(true),
+        return controllerutil.SetControllerReference(backstage, sm, r.Scheme)
     })
+
+    if err != nil {
+        lg.Error(err, "Failed to create/update ServiceMonitor")
+        return fmt.Errorf("failed to create/update ServiceMonitor: %w", err)
+    }
+
+    lg.Info("ServiceMonitor successfully created/updated", "name", sm.Name)
+    return nil
 }
 
 // Helper to detect if ServiceMonitor CRD is installed
