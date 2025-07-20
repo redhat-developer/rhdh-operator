@@ -1,4 +1,4 @@
-package v1alpha3
+package v1alpha4
 
 import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

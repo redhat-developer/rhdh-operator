@@ -1,7 +1,7 @@
-// Package v1alpha3 contains API Schema definitions for the  v1alpha3 API group
+// Package v1alpha4 contains API Schema definitions for the  v1alpha4 API group
 // +kubebuilder:object:generate=true
 // +groupName=rhdh.redhat.com
-package v1alpha3
+package v1alpha4
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -10,7 +10,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "rhdh.redhat.com", Version: "v1alpha3"}
+	GroupVersion = schema.GroupVersion{Group: "rhdh.redhat.com", Version: "v1alpha4"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
