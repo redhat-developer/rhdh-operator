@@ -17,6 +17,6 @@ resources:
   controller: true
   domain: rhdh.redhat.com
   kind: Backstage
-  path: github.com/redhat-developer/rhdh-operator/api/v1alpha3
-  version: v1alpha3
-version: "3"
+  path: github.com/redhat-developer/rhdh-operator/api/v1alpha4
+  version: v1alpha4
+version: "4"

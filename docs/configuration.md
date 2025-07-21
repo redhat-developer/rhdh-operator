@@ -194,7 +194,7 @@ spec:
 The desired state of resources created by the Backstage Operator is defined in the Backstage Custom Resource Spec. Here’s an example of a simple Backstage CR:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha3
+apiVersion: rhdh.redhat.com/v1alpha4
 kind: Backstage
 metadata:
   name: mybackstage
@@ -212,7 +212,7 @@ This Custom Resource defines a Backstage instance called **mybackstage** and als
 - Adds additional app-config stored in the **my-app-config** ConfigMap.
 - Adds some extra environment variables stored (as key-value pairs) in the Secret called **my-secrets**.
 
-For API version **v1alpha2** (Operator version **0.3.x**), the Backstage CR Spec contains the following top-level elements:
+For API version **v1alpha2** (Operator version **0.4.x**), the Backstage CR Spec contains the following top-level elements:
 
 * [application](#application-configuration)
 * [deployment](#deployment-configuration)
@@ -548,7 +548,7 @@ Also note that securing Routes with external certificates in TLS secrets (via th
 
 ### Deployment Configuration
   
-Since **v1alpha2** (Operator version **0.3.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
+Since **v1alpha2** (Operator version **0.4.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
 
 For example, the following specification fragment will:
 - Set an additional volume named **my-volume** and mount it to **/my/path** of the Backstage container.

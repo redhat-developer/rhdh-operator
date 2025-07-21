@@ -33,6 +33,16 @@ metadata:
             },
             "name": "developer-hub"
           }
+        },
+        {
+          "apiVersion": "rhdh.redhat.com/v1alpha4",
+          "kind": "Backstage",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "backstage"
+            },
+            "name": "developer-hub"
+          }
         }
       ]
     capabilities: Seamless Upgrades
@@ -93,7 +103,7 @@ spec:
       displayName: Red Hat Developer Hub
       kind: Backstage
       name: backstages.rhdh.redhat.com
-      version: v1alpha3
+      version: v1alpha4
   description: |
     Red Hat Developer Hub is an enterprise-grade platform for building developer portals, containing a supported and opinionated framework. It comes with pre-built plug-ins and configuration settings, supports use of an external database, and can help streamline the process of setting up a self-managed internal developer portal for adopters who are just starting out. By implementing a unified and open platform designed to maximize developer skills, ease onboarding, and increase development productivity, focus can be centered on what really matters: writing great code. Red Hat Developer Hub also offers Software Templates to simplify the development process, which can reduce friction and frustration for development teams, boosting their productivity and increasing an organization's competitive advantage.
 

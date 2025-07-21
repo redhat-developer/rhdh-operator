@@ -33,6 +33,16 @@ metadata:
             },
             "name": "backstage-sample"
           }
+        },
+        {
+          "apiVersion": "rhdh.redhat.com/v1alpha4",
+          "kind": "Backstage",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "backstage"
+            },
+            "name": "backstage-sample"
+          }
         }
       ]
     createdAt: "2025-07-14T15:38:44Z"
@@ -70,7 +80,7 @@ spec:
       displayName: Red Hat Developer Hub
       kind: Backstage
       name: backstages.rhdh.redhat.com
-      version: v1alpha3
+      version: v1alpha4
   description: |
     Backstage Operator
   displayName: Backstage Operator

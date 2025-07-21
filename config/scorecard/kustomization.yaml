@@ -8,10 +8,10 @@ patches:
     group: scorecard.operatorframework.io
     kind: Configuration
     name: config
-    version: v1alpha3
+    version: v1alpha4
 - path: patches/olm.config.yaml
   target:
     group: scorecard.operatorframework.io
     kind: Configuration
     name: config
-    version: v1alpha3
+    version: v1alpha4
