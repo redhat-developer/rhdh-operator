@@ -19,4 +19,4 @@ resources:
   kind: Backstage
   path: github.com/redhat-developer/rhdh-operator/api/v1alpha4
   version: v1alpha4
-version: "4"
+version: "3"
