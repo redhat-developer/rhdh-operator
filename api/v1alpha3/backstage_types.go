@@ -227,7 +227,6 @@ type BackstageStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:storageversion
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"
 
 // Backstage is the Schema for the Red Hat Developer Hub backstages API.

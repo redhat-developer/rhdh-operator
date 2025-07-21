@@ -548,7 +548,7 @@ Also note that securing Routes with external certificates in TLS secrets (via th
 
 ### Deployment Configuration
   
-Since **v1alpha2** (Operator version **0.4.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
+Since **v1alpha2** (Operator version **0.3.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
 
 For example, the following specification fragment will:
 - Set an additional volume named **my-volume** and mount it to **/my/path** of the Backstage container.
