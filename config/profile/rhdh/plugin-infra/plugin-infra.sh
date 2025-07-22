@@ -5,113 +5,69 @@
 
 set -e
 
-action="${1:-apply}" # Default action is 'apply'
+action="apply" # Default action
+branch="main"  # Default branch
+cicd=false   # Default CICD mode
 
-serverless() {
-  kubectl "$action" -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-serverless
----
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: serverless-operator-group
-  namespace: openshift-serverless
-spec:
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: serverless-operator
-  namespace: openshift-serverless
-spec:
-  channel: stable
-  installPlanApproval: Automatic
-  name: serverless-operator
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
-EOF
+# Parse command-line options
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --with-cicd)
+      cicd=true
+      shift
+      ;;
+    apply|delete)
+      action="$1"
+      shift
+      ;;
+    --branch)
+      branch="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
+apply_manifest() {
+  local file="$1"
+  local url="https://raw.githubusercontent.com/redhat-developer/rhdh-operator/${branch}/config/profile/rhdh/plugin-infra/${file}"
+  local script_dir
+  script_dir="$(dirname "$(realpath "$0")")"
+
+  if [ -f "${script_dir}/${file}" ]; then
+    echo "Using local file: ${file}"
+    kubectl "$action" -f "${script_dir}/${file}"
+  else
+    echo "Local file not found. Fetching from URL: ${url}"
+    curl -s "$url" | kubectl "$action" -f -
+  fi
 }
 
-knative() {
-  kubectl "$action" -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: knative-serving
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: knative-eventing
-EOF
-
-  kubectl "$action" -f - <<EOF
-apiVersion: operator.knative.dev/v1beta1
-kind: KnativeEventing
-metadata:
-  name: knative-eventing
-  namespace: knative-eventing
-spec:
-  Registry: {}
----
-apiVersion: operator.knative.dev/v1beta1
-kind: KnativeServing
-metadata:
-  name: knative-serving
-  namespace: knative-serving
-spec:
-  controller-custom-certs:
-    name: ""
-    type: ""
-  registry: {}
-EOF
-}
-
-serverless_logic() {
-  kubectl "$action" -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-serverless-logic
----
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: openshift-serverless-logic
-  namespace: openshift-serverless-logic
-spec:
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: logic-operator-rhel8
-  namespace: openshift-serverless-logic
-spec:
-  channel: alpha  #  channel of an operator package to subscribe to
-  installPlanApproval: Automatic #  whether the update should be installed automatically
-  name: logic-operator-rhel8  #  name of the operator package
-  source: redhat-operators  #  name of the catalog source
-  sourceNamespace: openshift-marketplace
-  startingCSV: logic-operator-rhel8.v1.36.0  # The initial version of the operator
-EOF
-}
-
-# execution
-
+# Execution
 if [ "$action" == "apply" ]; then
-  serverless
+  apply_manifest "serverless.yaml"
   echo "Waiting for CRDs to be established..."
   kubectl wait --for=condition=Established crd --all --timeout=60s
-  knative
-  serverless_logic
+  apply_manifest "knative.yaml"
+  apply_manifest "serverless-logic.yaml"
+  if [ "$cicd" == true ]; then
+    echo "CICD enabled. Executing CICD-specific logic..."
+    apply_manifest "argocd.yaml"
+    apply_manifest "pipeline.yaml"
+  fi
 elif [ "$action" == "delete" ]; then
-  serverless_logic
-  knative
-  serverless
+  apply_manifest "serverless-logic.yaml"
+  apply_manifest "knative.yaml"
+  apply_manifest "serverless.yaml"
+  if [ "$cicd" == true ]; then
+    apply_manifest "argocd.yaml"
+    apply_manifest "pipeline.yaml"
+  fi
 else
   echo "Action '$action' is not supported. Use 'apply' (default) or 'delete'."
   exit 1
 fi
+
