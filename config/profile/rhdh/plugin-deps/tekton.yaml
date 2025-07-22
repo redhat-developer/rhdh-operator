@@ -1,45 +1,9 @@
-#!/bin/bash
-#
-# GitOps/Pipeline Resources Setup Script for Orchestrator with  RHDH
-#
-
-set -e
-
-action="${1:-apply}" # Default action is 'apply'
-
-orchestrator_gitops_namespace() {
-  kubectl "$action" -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: orchestrator-gitops
-EOF
-}
-
-argoCD() {
-  kubectl "$action" -f - <<'EOF'
-apiVersion: argoproj.io/v1alpha1
-kind: AppProject
-metadata:
-  name: orchestrator-gitops
-  namespace: orchestrator-gitops
-spec:
-  destinations:
-  - name: '*'
-    namespace: '*'
-    server: '*'
-  sourceRepos:
-  - '*'
-EOF
-}
-
-tekton_tasks() {
-  kubectl "$action" -f - <<'EOF'
+---
 apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: git-cli
-  namespace: orchestrator-gitops
+  namespace: {{backstage-ns}}
   labels:
     app.kubernetes.io/version: "0.4"
   annotations:
@@ -66,9 +30,9 @@ spec:
         An optional workspace that contains the files that need to be added to git. You can
         access the workspace from your script using `$(workspaces.input.path)`, for instance:
 
-          cp $(workspaces.input.path)/file_that_i_want .
-          git add file_that_i_want
-          # etc
+        cp $(workspaces.input.path)/file_that_i_want .
+        git add file_that_i_want
+        # etc
 
     - name: ssh-directory
       optional: true
@@ -193,7 +157,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: flattener
-  namespace: orchestrator-gitops
+  namespace: {{backstage-ns}}
 spec:
   workspaces:
     - name: workflow-source
@@ -235,7 +199,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: build-manifests
-  namespace: orchestrator-gitops
+  namespace: {{backstage-ns}}
 spec:
   workspaces:
     - name: workflow-source
@@ -257,7 +221,7 @@ apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: build-gitops
-  namespace: orchestrator-gitops
+  namespace: {{backstage-ns}}
 spec:
   workspaces:
     - name: workflow-source
@@ -277,17 +241,12 @@ spec:
         microdnf install -y findutils && microdnf clean all
         cd kustomize
         ./updater.sh $(params.workflowId) $(params.imageTag)
-
-EOF
-}
-
-tekton_pipeline() {
-  kubectl "$action" -f - <<'EOF'
+---
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: workflow-deployment
-  namespace: orchestrator-gitops
+  namespace: {{backstage-ns}}
 spec:
   description: |
     This pipeline clones a git repo, builds a Docker image with Kaniko and
@@ -450,22 +409,3 @@ spec:
             git commit -m "Deployment for workflow commit $WORKFLOW_COMMIT from $(params.gitUrl)"
             # TODO: parametrize branch
             GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=${PARAM_USER_HOME}/.ssh/known_hosts" git push origin main
-EOF
-}
-
-# execution
-
-if [ "$action" == "apply" ]; then
-  orchestrator_gitops_namespace
-  argoCD
-  tekton_tasks
-  tekton_pipeline
-elif [ "$action" == "delete" ]; then
-  orchestrator_gitops_namespace
-  argoCD
-  tekton_tasks
-  tekton_pipeline
-else
-  echo "Action '$action' is not supported. Use 'apply' (default) or 'delete'."
-  exit 1
-fi
