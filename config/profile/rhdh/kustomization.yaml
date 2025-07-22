@@ -43,4 +43,6 @@ configMapGenerator:
   name: default-config
 - files:
   - plugin-deps/sonataflow.yaml
+  - plugin-deps/gitops.yaml
+  - plugin-deps/tekton.yaml
   name: plugin-deps
