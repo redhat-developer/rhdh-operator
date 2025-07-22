@@ -33,7 +33,7 @@ Go to the [OpenShift Serverless documentation](https://docs.redhat.com/en/docume
 3. Installing Knative Serving.
 4. Installing Knative Eventing.
 5. Installing the OpenShift Serverless Logic Operator.
-Opionally:
+Optionally:
 6. Installing the [OpenShift Pipelines Operator](https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines) (Tekton)
 7. Installing the [OpenShift GitOps Operator](https://docs.redhat.com/en/documentation/red_hat_openshift_gitops) (ArgoCD)
 
