@@ -34,7 +34,8 @@ done
 apply_manifest() {
   local file="$1"
   local url="https://raw.githubusercontent.com/redhat-developer/rhdh-operator/${branch}/config/profile/rhdh/plugin-infra/${file}"
-  local script_dir="$(dirname "$(realpath "$0")")"
+  local script_dir
+  script_dir="$(dirname "$(realpath "$0")")"
 
   if [ -f "${script_dir}/${file}" ]; then
     echo "Using local file: ${file}"
