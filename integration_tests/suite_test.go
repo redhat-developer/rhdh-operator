@@ -39,7 +39,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 

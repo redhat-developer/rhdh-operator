@@ -13,14 +13,12 @@ NC='\033[0m'
 IS_OPENSHIFT=""
 IS_HOSTED_CONTROL_PLANE=""
 
-NAMESPACE_SUBSCRIPTION="rhdh-operator"
 NAMESPACE_OPERATOR="rhdh-operator"
-OLM_CHANNEL="fast"
 INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
 FILTERED_VERSIONS=(1.4 1.5)
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
-INSTALL_YQ=0 
+INSTALL_YQ=0
 YQ_VERSION=v4.45.1
 
 function logf() {
@@ -56,13 +54,14 @@ function errorf() {
 
 function check_tool() {
   if ! command -v "$1" >/dev/null; then
-      errorf "Error: Required tool '$1' is not installed."
-      exit 1
+    errorf "Error: Required tool '$1' is not installed."
+    exit 1
   fi
 }
 
 function usage() {
-  FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS[*]}"; FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS_CSV// /,}"
+  FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS[*]}"
+  FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS_CSV// /,}"
   echo "
 This script streamlines the installation of the Red Hat Developer Hub Operator in a disconnected OpenShift or Kubernetes cluster.
 It supports partially disconnected as well as fully disconnected environments.
@@ -136,7 +135,6 @@ Examples:
 "
 }
 
-OPERATOR_NAME="rhdh-operator"
 IS_CI_INDEX_IMAGE="false"
 
 TO_REGISTRY=""
@@ -149,7 +147,6 @@ OC_MIRROR_PATH="oc-mirror"
 OC_MIRROR_FLAGS=""
 
 NO_VERSION_FILTER="false"
-RELATED_IMAGES=()
 
 # example usage:
 # ./prepare-restricted-environment.sh \
@@ -162,49 +159,100 @@ RELATED_IMAGES=()
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
-    # Legacy options. Deprecated but kept for backward compatibility
-    '--prod_operator_index') INDEX_IMAGE="$2"; shift 1;;
-    '--prod_operator_package_name') debugf "--prod_operator_package_name ($2) is no longer used"; shift 1;;
-    '--prod_operator_bundle_name') debugf "--prod_operator_bundle_name ($2) is no longer used"; shift 1;;
-    '--helper_mirror_registry_storage')
-      debugf "--helper_mirror_registry_storage is no longer used. This script assumes you already have a mirror registry in your disconnected environment";
-      shift 1;;
-    '--use_existing_mirror_registry')
-      debugf "--use_existing_mirror_registry is no longer used. This script assumes you already have a mirror registry in your disconnected environment";
-      shift 1;;
-    '--prod_operator_version')
-      input="${2#v}"
-      IFS='.' read -ra parts <<< "$input"
-      length=${#parts[@]}
-      if [ $length -ge 2 ]; then
-       FILTERED_VERSIONS=(${parts[0]}.${parts[1]})
-      else
-       FILTERED_VERSIONS=(${parts[*]})
-      fi
-      debugf "FILTERED_VERSIONS=${FILTERED_VERSIONS[@]}"
-      shift 1;;
+  # Legacy options. Deprecated but kept for backward compatibility
+  '--prod_operator_index')
+    INDEX_IMAGE="$2"
+    shift 1
+    ;;
+  '--prod_operator_package_name')
+    debugf "--prod_operator_package_name ($2) is no longer used"
+    shift 1
+    ;;
+  '--prod_operator_bundle_name')
+    debugf "--prod_operator_bundle_name ($2) is no longer used"
+    shift 1
+    ;;
+  '--helper_mirror_registry_storage')
+    debugf "--helper_mirror_registry_storage is no longer used. This script assumes you already have a mirror registry in your disconnected environment"
+    shift 1
+    ;;
+  '--use_existing_mirror_registry')
+    debugf "--use_existing_mirror_registry is no longer used. This script assumes you already have a mirror registry in your disconnected environment"
+    shift 1
+    ;;
+  '--prod_operator_version')
+    input="${2#v}"
+    IFS='.' read -ra parts <<<"$input"
+    length=${#parts[@]}
+    if [ "$length" -ge 2 ]; then
+      FILTERED_VERSIONS=("${parts[0]}"."${parts[1]}")
+    else
+      FILTERED_VERSIONS=("${parts[*]}")
+    fi
+    debugf "${FILTERED_VERSIONS[@]}"
+    shift 1
+    ;;
 
-    # New options
-    '--index-image') INDEX_IMAGE="$2"; shift 1;;
-    '--ci-index') IS_CI_INDEX_IMAGE="$2"; shift 1;;
-    '--filter-versions')
-      if [[ "$2" == "*" ]]; then
-        NO_VERSION_FILTER="true"
-      else
-        IFS=',' read -r -a FILTERED_VERSIONS <<< "$2"
-      fi
-      shift 1;;
-    '--extra-images') IFS=',' read -r -a EXTRA_IMAGES <<< "$2"; shift 1;;
-    '--to-registry') TO_REGISTRY="$2"; shift 1;;
-    '--to-dir') TO_DIR=$(realpath "$2"); shift 1;;
-    '--from-dir') FROM_DIR="$2"; shift 1;;
-    '--install-operator') INSTALL_OPERATOR="$2"; shift 1;;
-    '--use-oc-mirror') USE_OC_MIRROR="$2"; shift 1;;
-    '--oc-mirror-path') OC_MIRROR_PATH="$2"; shift 1;;
-    '--oc-mirror-flags') OC_MIRROR_FLAGS="$2"; shift 1;;
-    '--install-yq') INSTALL_YQ=1;;
-    '-h'|'--help') usage; exit 0;;
-    *) errorf "Unknown parameter is used: $1."; usage; exit 1;;
+  # New options
+  '--index-image')
+    INDEX_IMAGE="$2"
+    shift 1
+    ;;
+  '--ci-index')
+    IS_CI_INDEX_IMAGE="$2"
+    shift 1
+    ;;
+  '--filter-versions')
+    if [[ "$2" == "*" ]]; then
+      NO_VERSION_FILTER="true"
+    else
+      IFS=',' read -r -a FILTERED_VERSIONS <<<"$2"
+    fi
+    shift 1
+    ;;
+  '--extra-images')
+    IFS=',' read -r -a EXTRA_IMAGES <<<"$2"
+    shift 1
+    ;;
+  '--to-registry')
+    TO_REGISTRY="$2"
+    shift 1
+    ;;
+  '--to-dir')
+    TO_DIR=$(realpath "$2")
+    shift 1
+    ;;
+  '--from-dir')
+    FROM_DIR="$2"
+    shift 1
+    ;;
+  '--install-operator')
+    INSTALL_OPERATOR="$2"
+    shift 1
+    ;;
+  '--use-oc-mirror')
+    USE_OC_MIRROR="$2"
+    shift 1
+    ;;
+  '--oc-mirror-path')
+    OC_MIRROR_PATH="$2"
+    shift 1
+    ;;
+  '--oc-mirror-flags')
+    OC_MIRROR_FLAGS="$2"
+    shift 1
+    ;;
+  '--install-yq') 
+    INSTALL_YQ=1 ;;
+  '-h' | '--help')
+    usage
+    exit 0
+    ;;
+  *)
+    errorf "Unknown parameter is used: $1."
+    usage
+    exit 1
+    ;;
   esac
   shift 1
 done
@@ -212,7 +260,7 @@ done
 function is_openshift() {
   set -euo pipefail
 
-  oc get routes.route.openshift.io &> /dev/null || kubectl get routes.route.openshift.io &> /dev/null
+  oc get routes.route.openshift.io &>/dev/null || kubectl get routes.route.openshift.io &>/dev/null
 }
 
 function detect_ocp_and_set_env_var() {
@@ -224,7 +272,7 @@ function detect_ocp_and_set_env_var() {
   fi
   if [[ "${IS_OPENSHIFT}" == "true" ]] && [[ -z "${IS_HOSTED_CONTROL_PLANE}" ]]; then
     local cpTech
-    cpTech=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' || \
+    cpTech=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' ||
       (warnf 'Could not determine the cluster type => defaulting to the hosted control plane behavior' >&2 && echo 'External'))
     if [[ "${cpTech}" == "External" ]]; then
       # 'External' indicates that the control plane is hosted externally to the cluster
@@ -246,7 +294,7 @@ function invoke_cluster_cli() {
 
   detect_ocp_and_set_env_var
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    if command -v oc &> /dev/null; then
+    if command -v oc &>/dev/null; then
       oc "$command" "$@"
     else
       kubectl "$command" "$@"
@@ -307,10 +355,10 @@ if [[ -n "${TO_DIR}" ]]; then
   TMPDIR="${TO_DIR}"
 else
   TMPDIR=$(mktemp -d)
-  ## shellcheck disable=SC2064
+  # shellcheck disable=SC2064
   trap "rm -fr $TMPDIR || true" EXIT
 fi
-pushd "${TMPDIR}" > /dev/null
+pushd "${TMPDIR}" >/dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
 if [[ $INSTALL_YQ ]]; then
@@ -333,9 +381,10 @@ function merge_registry_auth() {
   fi
   # TODO(rm3l): Overriding XDG_RUNTIME_DIR so it can work with "oc-mirror v1", which does not work with REGISTRY_AUTH_FILE.
   # Remove this when oc-mirror v2 is out of TP.
-  export XDG_RUNTIME_DIR=$(mktemp -d)
+  XDG_RUNTIME_DIR=$(mktemp -d)
+  export XDG_RUNTIME_DIR
   mkdir -p "${XDG_RUNTIME_DIR}/containers"
-  ## shellcheck disable=SC2064
+  # shellcheck disable=SC2064
   trap "rm -fr $XDG_RUNTIME_DIR || true" EXIT
   # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
   # might be restricted in CI environments.
@@ -354,16 +403,16 @@ function merge_registry_auth() {
     [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
   done
   tmpFile=$(mktemp)
-  ## shellcheck disable=SC2064
+  # shellcheck disable=SC2064
   trap "rm -f $tmpFile || true" EXIT
-  echo '{"auths": {' > "$tmpFile"
+  echo '{"auths": {' >"$tmpFile"
   for reg in "${registries[@]}"; do
-    echo "  \"$reg\": .auths.\"$reg\"," >> "$tmpFile"
+    echo "  \"$reg\": .auths.\"$reg\"," >>"$tmpFile"
   done
   sed -i '$ s/,$//' "$tmpFile"
-  echo '}}' >> "$tmpFile"
+  echo '}}' >>"$tmpFile"
   debugf "yq filter: $(cat "$tmpFile")"
-  "$YQ" -o=json "$(cat "$tmpFile")" "${currentRegistryAuthFile}" > "${REGISTRY_AUTH_FILE}"
+  "$YQ" -o=json "$(cat "$tmpFile")" "${currentRegistryAuthFile}" >"${REGISTRY_AUTH_FILE}"
 }
 
 function ocp_prepare_internal_registry() {
@@ -379,13 +428,13 @@ function ocp_prepare_internal_registry() {
   podman login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
   for ns in rhdh-operator openshift4 rhdh rhel9 oc-mirror; do
     # To be able to push images under this scope in the internal image registry
-    if ! oc get namespace "$ns" &> /dev/null; then
+    if ! oc get namespace "$ns" &>/dev/null; then
       oc create namespace "$ns" >&2
     fi
     oc adm policy add-cluster-role-to-user system:image-signer system:serviceaccount:${ns}:default >&2 || true
   done
   for ns in rhdh-operator openshift-marketplace; do
-    if oc -n ${ns} get secret internal-reg-ext-auth-for-rhdh &> /dev/null; then
+    if oc -n ${ns} get secret internal-reg-ext-auth-for-rhdh &>/dev/null; then
       oc -n ${ns} delete secret internal-reg-ext-auth-for-rhdh >&2
     fi
     oc -n ${ns} create secret docker-registry internal-reg-ext-auth-for-rhdh \
@@ -393,7 +442,7 @@ function ocp_prepare_internal_registry() {
       --docker-username=kubeadmin \
       --docker-password="$(oc whoami -t)" \
       --docker-email="admin@internal-registry-ext.example.com" >&2
-    if oc -n ${ns} get secret internal-reg-auth-for-rhdh &> /dev/null; then
+    if oc -n ${ns} get secret internal-reg-auth-for-rhdh &>/dev/null; then
       oc -n ${ns} delete secret internal-reg-auth-for-rhdh >&2
     fi
     oc -n ${ns} create secret docker-registry internal-reg-auth-for-rhdh \
@@ -417,7 +466,7 @@ function buildRegistryUrl() {
     if [[ "${input}" == "internal" ]]; then
       echo "image-registry.openshift-image-registry.svc:5000"
     else
-      echo $(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+      echo "$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')"
     fi
   else
     echo "${TO_REGISTRY}"
@@ -426,7 +475,8 @@ function buildRegistryUrl() {
 
 function buildCatalogImageUrl() {
   if [[ -n "$TO_REGISTRY" ]]; then
-    tag=${INDEX_IMAGE##*:}; [[ "$INDEX_IMAGE" == "$tag" ]] && tag="latest"
+    tag=${INDEX_IMAGE##*:}
+    [[ "$INDEX_IMAGE" == "$tag" ]] && tag="latest"
     echo "$(buildRegistryUrl "${1:-external}")/${2:-rhdh/index}:${tag}"
   else
     echo ""
@@ -447,7 +497,7 @@ function render_index() {
 
   # Filtering out to keep only the elements related to RHDH and to the versions selected
   if [[ "${NO_VERSION_FILTER}" == "true" ]]; then
-    opm render "${INDEX_IMAGE}" --output=yaml > "${local_index_file}"
+    opm render "${INDEX_IMAGE}" --output=yaml >"${local_index_file}"
   else
     chanFilterList=""
     bundleFilterList=""
@@ -464,7 +514,7 @@ function render_index() {
     debugf "chanEntriesFilterList=$chanEntriesFilterList"
     debugf "bundleFilterList=$bundleFilterList"
 
-    opm render "${INDEX_IMAGE}" --output=yaml | \
+    opm render "${INDEX_IMAGE}" --output=yaml |
       "$YQ" 'select(
           (.schema == "olm.package" and .name == "'${prod_operator_package_name}'")
           or
@@ -474,7 +524,7 @@ function render_index() {
           or
           '"$bundleFilterList"'
         )' | "$YQ" '.entries |= map(select('"$chanEntriesFilterList"'))' \
-        > "${local_index_file}"
+      >"${local_index_file}"
   fi
 
   debugf "Got $(cat "${local_index_file}" | wc -l) lines of JSON from the index!"
@@ -489,18 +539,18 @@ function extract_last_two_elements() {
   local input="$1"
   local IFS='/'
 
-  read -ra parts <<< "$input"
+  read -ra parts <<<"$input"
 
   local length=${#parts[@]}
-  if [ $length -ge 2 ]; then
-   echo "${parts[-2]}/${parts[-1]}"
+  if [ "$length" -ge 2 ]; then
+    echo "${parts[-2]}/${parts[-1]}"
   else
-   echo "${parts[*]}"
+    echo "${parts[*]}"
   fi
 }
 
 function mirror_extra_images() {
-  debugf "Extra images: ${EXTRA_IMAGES[@]}..."
+  debugf "Extra images: " "${EXTRA_IMAGES[@]}"
   for img in "${EXTRA_IMAGES[@]}"; do
     if [[ "$img" == *"@sha256:"* ]]; then
       imgDigest="${img##*@sha256:}"
@@ -601,7 +651,7 @@ function process_bundles() {
     originalBundleImg="$bundleImg"
     bundleImg=$(replaceInternalRegIfNeeded "$bundleImg")
     digest="${bundleImg##*@sha256:}"
-    if skopeo inspect "docker://$bundleImg" &> /dev/null; then
+    if skopeo inspect "docker://$bundleImg" &>/dev/null; then
       mkdir -p "bundles/$digest"
       debugf "\t copying and unpacking image $bundleImg locally..."
       if [ ! -d "./bundles/${digest}/src" ]; then
@@ -622,14 +672,16 @@ function process_bundles() {
 
           all_related_images=()
           debugf "\t finding related images in $file to mirror..."
-          images=$(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
-          if [[ -n "$images" ]]; then
-            all_related_images+=($images)
+          mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
+          if ((${#images[@]})); then
+            all_related_images+=("${images[@]}")
           fi
           # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
           related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
           if [[ -n "$related_images" ]]; then
-            all_related_images+=($related_images)
+            while IFS= read -r img; do
+              [[ -n "$img" ]] && all_related_images+=("$img")
+            done <<<"$related_images"
           fi
           for relatedImage in "${all_related_images[@]}"; do
             imgDir="./images/"
@@ -655,7 +707,7 @@ function process_bundles() {
             if [[ -n "$TO_REGISTRY" ]]; then
               mirror_image_to_registry "$relatedImage" "$targetImg"
               debugf "replacing $relatedImage in file '${file}' => $internalTargetImg"
-              sed -i 's#'$relatedImage'#'$internalTargetImg'#g' "$file"
+              sed -i 's#'"$relatedImage"'#'"$internalTargetImg"'#g' "$file"
             else
               if [ ! -d "$imgDir" ]; then
                 mkdir -p "${imgDir}"
@@ -667,17 +719,17 @@ function process_bundles() {
       done
 
       if [[ -n "$TO_REGISTRY" ]]; then
-          # repack the image with the changes
-          debugf "\t Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
-          umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked"
+        # repack the image with the changes
+        debugf "\t Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
+        umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked"
 
-          # Push the bundle to the mirror registry
-          newBundleImage="$(buildRegistryUrl)/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
-          newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
-          debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
-          skopeo copy --remove-signatures --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
+        # Push the bundle to the mirror registry
+        newBundleImage="$(buildRegistryUrl)/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+        newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+        debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
+        skopeo copy --remove-signatures --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
 
-          sed -i "s#${originalBundleImg}#${newBundleImageInternal}#g" "./rhdh/rhdh/render.yaml"
+        sed -i "s#${originalBundleImg}#${newBundleImageInternal}#g" "./rhdh/rhdh/render.yaml"
       fi
     fi
   done
@@ -729,14 +781,14 @@ function process_bundles_from_dir() {
       if [[ "$file" == *.clusterserviceversion.yaml || "$file" == *.csv.yaml ]]; then
         all_related_images=()
         debugf "\t finding related images in $file to mirror..."
-        images=$(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
-        if [[ -n "$images" ]]; then
-          all_related_images+=($images)
+        mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
+        if ((${#images[@]})); then
+          all_related_images+=("${images[@]}")
         fi
         # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
         related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
         if [[ -n "$related_images" ]]; then
-          all_related_images+=($related_images)
+          all_related_images+=("$related_images")
         fi
         for relatedImage in "${all_related_images[@]}"; do
           imgDir="${FROM_DIR}/images/"
@@ -762,24 +814,24 @@ function process_bundles_from_dir() {
           if [[ -n "$TO_REGISTRY" ]]; then
             push_image_from_archive "$imgDir" "$targetImg"
             debugf "replacing $relatedImage in file '${file}' => $targetImgInternal"
-            sed -i 's#'$relatedImage'#'$targetImgInternal'#g' "$file"
+            sed -i 's#'"$relatedImage"'#'"$targetImgInternal"'#g' "$file"
           fi
         done
       fi
     done
 
     if [[ -n "$TO_REGISTRY" ]]; then
-        # repack the image with the changes
-        debugf "\t Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
-        umoci repack --image "${TMPDIR}/bundles/${digest}/src:latest" "${TMPDIR}/bundles/${digest}/unpacked"
+      # repack the image with the changes
+      debugf "\t Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
+      umoci repack --image "${TMPDIR}/bundles/${digest}/src:latest" "${TMPDIR}/bundles/${digest}/unpacked"
 
-        # Push the bundle to the mirror registry
-        newBundleImage="$(buildRegistryUrl)/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
-        newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
-        debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
-        skopeo copy --preserve-digests --remove-signatures --dest-tls-verify=false "oci:${TMPDIR}/bundles/${digest}/src:latest" "docker://${newBundleImage}"
+      # Push the bundle to the mirror registry
+      newBundleImage="$(buildRegistryUrl)/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+      newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+      debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
+      skopeo copy --preserve-digests --remove-signatures --dest-tls-verify=false "oci:${TMPDIR}/bundles/${digest}/src:latest" "docker://${newBundleImage}"
 
-        sed -i "s#${bundleImg}#${newBundleImageInternal}#g" "${TMPDIR}/rhdh/rhdh/render.yaml"
+      sed -i "s#${bundleImg}#${newBundleImageInternal}#g" "${TMPDIR}/rhdh/rhdh/render.yaml"
     fi
   done
 
@@ -800,15 +852,17 @@ function mirror_image_to_registry() {
   src_image=$(replaceInternalRegIfNeeded "$1")
   local dest_image
   dest_image=$2
+  
   echo "Mirroring $src_image to $dest_image..."
   skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image"
 }
 
 function mirror_image_to_archive() {
   local src_image
-  dest_image=$(replaceInternalRegIfNeeded "$1")
+  src_image=$(replaceInternalRegIfNeeded "$1")
   local archive_path
-  archive_path=$2
+  archive_path="$2"
+
   debugf "Saving $src_image to $archive_path..."
   skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
 }
@@ -857,7 +911,7 @@ if [[ "${USE_OC_MIRROR}" = "true" ]]; then
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
   if [[ -z "${FROM_DIR}" ]]; then
     # Direct to registry
-    cat <<EOF > "${TMPDIR}/imageset-config.yaml"
+    cat <<EOF >"${TMPDIR}/imageset-config.yaml"
 apiVersion: mirror.openshift.io/v1alpha2
 kind: ImageSetConfiguration
 storageConfig:
@@ -874,24 +928,24 @@ mirror:
       - name: rhdh
 EOF
     if [[ "${NO_VERSION_FILTER}" != "true" ]]; then
-      cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+      cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
         channels:
           - name: fast
 EOF
       for v in "${FILTERED_VERSIONS[@]}"; do
-        cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+        cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
           - name: fast-${v}
 EOF
       done
 
     fi
     nbExtraImgs=${#EXTRA_IMAGES[@]}
-    if [ $nbExtraImgs -ge 1 ]; then
-      cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+    if [ "$nbExtraImgs" -ge 1 ]; then
+      cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
       additionalImages:
 EOF
       for extraImg in "${EXTRA_IMAGES[@]}"; do
-        cat <<EOF >> "${TMPDIR}/imageset-config.yaml"
+        cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
       - name: "$extraImg"
 EOF
       done
@@ -905,8 +959,8 @@ EOF
         --dest-skip-tls \
         --continue-on-error \
         --max-nested-paths=1 \
-        $OC_MIRROR_FLAGS \
-        | tee "${ocMirrorLogFile}"
+        "$OC_MIRROR_FLAGS" |
+        tee "${ocMirrorLogFile}"
       if [[ "${TO_DIR}" != "${TMPDIR}" ]]; then
         cp -f "${TMPDIR}/imageset-config.yaml" "${TO_DIR}/imageset-config.yaml"
       fi
@@ -933,8 +987,8 @@ EOF
         --dest-skip-tls \
         --continue-on-error \
         --max-nested-paths=2 \
-        $OC_MIRROR_FLAGS \
-        | tee "${ocMirrorLogFile}"
+        "$OC_MIRROR_FLAGS" |
+        tee "${ocMirrorLogFile}"
     fi
 
   else
@@ -965,30 +1019,30 @@ EOF
         --skip-missing \
         --dest-skip-tls \
         --continue-on-error \
-        $OC_MIRROR_FLAGS \
-        | tee "${ocMirrorLogFile}"
+        "$OC_MIRROR_FLAGS" |
+        tee "${ocMirrorLogFile}"
     fi
   fi
 
   if [ -f "${ocMirrorLogFile}" ]; then
     # The xargs here is to trim whitespaces
-    catalogSourceLocation=$(sed -n -e 's/^Writing CatalogSource manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" |xargs)
-    icspLocation=$(sed -n -e 's/^Writing ICSP manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" |xargs)
+    catalogSourceLocation=$(sed -n -e 's/^Writing CatalogSource manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" | xargs)
+    icspLocation=$(sed -n -e 's/^Writing ICSP manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" | xargs)
     if [[ -n "${icspLocation}" ]]; then
       debugf "ICSP parent location: ${TMPDIR}/${icspLocation}"
       if [[ -n "${TO_REGISTRY}" ]]; then
-        invoke_cluster_cli apply -f ${TMPDIR}/${icspLocation}/imageContentSourcePolicy.yaml
+        invoke_cluster_cli apply -f "${TMPDIR}"/"${icspLocation}"/imageContentSourcePolicy.yaml
       fi
     fi
     if [[ -n "${catalogSourceLocation}" ]]; then
       # Replace some metadata and add the default list of secrets
       debugf "catalogSource parent location: ${TMPDIR}/${catalogSourceLocation}"
-      "$YQ" -i '.metadata.name = "rhdh-catalog"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
-      "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+      "$YQ" -i '.metadata.name = "rhdh-catalog"' -i "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
+      "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
       "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' \
-        ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+        "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
       if [[ -n "${TO_REGISTRY}" ]]; then
-        invoke_cluster_cli apply -f ${TMPDIR}/${catalogSourceLocation}/catalogSource-*.yaml
+        invoke_cluster_cli apply -f "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
       fi
     fi
   fi
@@ -1008,30 +1062,32 @@ else
     manifestsTargetDir="${FROM_DIR}"
   fi
 
+  # shellcheck disable=SC2016
   NAMESPACE_CATALOGSOURCE='$NAMESPACE_CATALOGSOURCE'
+  # shellcheck disable=SC2016
   my_operator_index='$CATALOG_IMAGE'
   if [[ -n "${TO_REGISTRY}" ]]; then
-    # It assumes that the user is also connected to a cluster
+      # It assumes that the user is also connected to a cluster
     detect_ocp_and_set_env_var
     if [[ "${IS_OPENSHIFT}" = "true" ]]; then
       debugf "Detected an OpenShift cluster"
-      if ! command -v oc &> /dev/null; then
+      if ! command -v oc &>/dev/null; then
         errorf "Please install oc 4.10+ from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/"
         exit 1
       fi
       # Check we're logged into a cluster
-      if ! oc whoami &> /dev/null; then
+      if ! oc whoami &>/dev/null; then
         errorf "Not logged into an OpenShift cluster"
         exit 1
       fi
     else
-      if ! command -v oc &> /dev/null && ! command -v kubectl &> /dev/null; then
+      if ! command -v oc &>/dev/null && ! command -v kubectl &>/dev/null; then
         errorf "Please install kubectl or oc 4.10+ (from an RPM or https://mirror.openshift.com/pub/openshift-v4/clients/ocp/)"
         exit 1
       fi
       debugf "Falling back to a standard K8s cluster"
       # Check that OLM is installed
-      if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &> /dev/null; then
+      if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
         errorf "
     OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
     Check that you are correctly logged into the cluster and that OLM is installed.
@@ -1048,7 +1104,7 @@ else
     my_operator_index="$(buildCatalogImageUrl "internal")"
   fi
 
-  cat <<EOF > "${manifestsTargetDir}/catalogSource.yaml"
+  cat <<EOF >"${manifestsTargetDir}/catalogSource.yaml"
   apiVersion: operators.coreos.com/v1alpha1
   kind: CatalogSource
   metadata:
@@ -1069,7 +1125,7 @@ EOF
   if [[ -n "${TO_REGISTRY}" ]]; then
     # IDMS will only work on regular OCP clusters. It doesn't work on ROSA or clusters with hosted control planes like on IBM Cloud.
     registry_url_internal=$(buildRegistryUrl)
-    cat <<EOF > "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+    cat <<EOF >"${manifestsTargetDir}/imageDigestMirrorSet.yaml"
   apiVersion: config.openshift.io/v1
   kind: ImageDigestMirrorSet
   metadata:
@@ -1098,7 +1154,7 @@ EOF
           extraImg="${parent_path}"
           targetImg="${extraImg%@*}"
           targetImgLastTwo=$(extract_last_two_elements "$targetImg")
-          cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+          cat <<EOF >>"${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     - mirrors:
       - ${registry_url_internal}/${targetImgLastTwo}
       source: ${targetImg}
@@ -1113,7 +1169,7 @@ EOF
           extraImg="${parent_path}"
           targetImg="${extraImg%:*}"
           targetImgLastTwo=$(extract_last_two_elements "$targetImg")
-          cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+          cat <<EOF >>"${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     - mirrors:
       - ${registry_url_internal}/${targetImgLastTwo}
       source: ${targetImg}
@@ -1122,7 +1178,7 @@ EOF
       fi
     fi
     # Iterate from the --extra-images passed on the CLI
-    debugf "Extra images from CLI: ${EXTRA_IMAGES[@]}..."
+    debugf "Extra images from CLI: " "${EXTRA_IMAGES[@]}"
     for img in "${EXTRA_IMAGES[@]}"; do
       if [[ "$img" == *"@sha256:"* ]]; then
         targetImg="${img%@*}"
@@ -1132,7 +1188,7 @@ EOF
         targetImg="${img}"
       fi
       targetImgLastTwo=$(extract_last_two_elements "$targetImg")
-      cat <<EOF >> "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+      cat <<EOF >>"${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     - mirrors:
       - ${registry_url_internal}/${targetImgLastTwo}
       source: ${targetImg}
@@ -1156,17 +1212,17 @@ fi
 if [[ -n "${TO_REGISTRY}" ]] && [[ "${IS_OPENSHIFT}" == "true" ]] && [[ "${IS_HOSTED_CONTROL_PLANE}" != "true" ]]; then
   infof "Disabling the default Red Hat Ecosystem Catalog."
   invoke_cluster_cli patch OperatorHub cluster --type json \
-      --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+    --patch '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 fi
 
-cat <<EOF > "${manifestsTargetDir}/namespace.yaml"
+cat <<EOF >"${manifestsTargetDir}/namespace.yaml"
 apiVersion: v1
 kind: Namespace
 metadata:
   name: ${NAMESPACE_OPERATOR}
 EOF
 
-cat <<EOF > "${manifestsTargetDir}/operatorGroup.yaml"
+cat <<EOF >"${manifestsTargetDir}/operatorGroup.yaml"
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -1174,7 +1230,7 @@ metadata:
   namespace: ${NAMESPACE_OPERATOR}
 EOF
 
-cat <<EOF > "${manifestsTargetDir}/subscription.yaml"
+cat <<EOF >"${manifestsTargetDir}/subscription.yaml"
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -1251,7 +1307,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   fi
   CR_EXAMPLE="
   cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
-  apiVersion: rhdh.redhat.com/v1alpha3
+  apiVersion: rhdh.redhat.com/v1alpha4
   kind: Backstage
   metadata:
     name: developer-hub

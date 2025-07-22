@@ -27,7 +27,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
