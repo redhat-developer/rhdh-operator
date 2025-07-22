@@ -7,7 +7,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"

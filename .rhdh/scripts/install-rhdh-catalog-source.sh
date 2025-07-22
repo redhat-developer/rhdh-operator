@@ -924,7 +924,7 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
 fi
 CR_EXAMPLE="
 cat <<EOF | ${CLI_TOOL} apply -f -
-apiVersion: rhdh.redhat.com/v1alpha3
+apiVersion: rhdh.redhat.com/v1alpha4
 kind: Backstage
 metadata:
   name: developer-hub

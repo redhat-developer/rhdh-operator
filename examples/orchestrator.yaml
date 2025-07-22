@@ -31,7 +31,7 @@ data:
           # using the guest user to query the '/api/dynamic-plugins-info/loaded-plugins' endpoint.
           dangerouslyAllowOutsideDevelopment: true
 ---
-apiVersion: rhdh.redhat.com/v1alpha3
+apiVersion: rhdh.redhat.com/v1alpha4
 kind: Backstage
 metadata:
   name: orchestrator

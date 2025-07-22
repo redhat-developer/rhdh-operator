@@ -1,7 +1,7 @@
 package model
 
 import (
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
