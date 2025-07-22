@@ -212,7 +212,7 @@ This Custom Resource defines a Backstage instance called **mybackstage** and als
 - Adds additional app-config stored in the **my-app-config** ConfigMap.
 - Adds some extra environment variables stored (as key-value pairs) in the Secret called **my-secrets**.
 
-For API version **v1alpha2** (Operator version **0.4.x**), the Backstage CR Spec contains the following top-level elements:
+For API version **v1alpha2** (Operator version **0.3.x**), the Backstage CR Spec contains the following top-level elements:
 
 * [application](#application-configuration)
 * [deployment](#deployment-configuration)

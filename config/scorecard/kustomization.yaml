@@ -14,4 +14,4 @@ patches:
     group: scorecard.operatorframework.io
     kind: Configuration
     name: config
-    version: v1alpha4
+    version: v1alpha3
