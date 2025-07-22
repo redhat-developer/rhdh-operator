@@ -11,7 +11,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

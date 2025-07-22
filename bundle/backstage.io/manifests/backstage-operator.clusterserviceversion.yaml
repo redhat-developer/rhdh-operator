@@ -33,9 +33,19 @@ metadata:
             },
             "name": "backstage-sample"
           }
+        },
+        {
+          "apiVersion": "rhdh.redhat.com/v1alpha4",
+          "kind": "Backstage",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/name": "backstage"
+            },
+            "name": "backstage-sample"
+          }
         }
       ]
-    createdAt: "2025-07-14T15:38:44Z"
+    createdAt: "2025-07-22T13:40:21Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -71,6 +81,15 @@ spec:
       kind: Backstage
       name: backstages.rhdh.redhat.com
       version: v1alpha3
+    - description: |-
+        Backstage is the Schema for the Red Hat Developer Hub backstages API.
+        It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
+        which can help streamline the process of setting up a self-managed internal
+        developer portal for adopters who are just starting out.
+      displayName: Red Hat Developer Hub
+      kind: Backstage
+      name: backstages.rhdh.redhat.com
+      version: v1alpha4
   description: |
     Backstage Operator
   displayName: Backstage Operator
