@@ -5,14 +5,7 @@ There are three methods to install GitOps/Pipelines Operator
 
 ### Method 1: Install the Operators using Scripts
 
-1. Download the `operators.sh` script:
-   ```bash
-   curl -sSLO https://raw.githubusercontent.com/redhat-developer/rhdh-operator/refs/heads/main/config/profile/rhdh/plugin-infra/gitops/operators.sh
-   ```  
-2. Run the script:
-   ```bash
-   bash operators.sh
-   ```
+Refer to the `RHDH helper script` section in [orchestrator guide](orchestrator.md) and set the `--with-cicd` flag to true when running the script.
 
 ### Method 2: Install the Operators from Demo Charts
 
@@ -222,18 +215,6 @@ To begin serverless workflow development using the "Basic workflow bootstrap pro
 
 3. For detailed instructions and exact steps, refer to the GitLab guide available [here](https://docs.gitlab.com/ci/)
 
-## Create ArgoCD and Tekton Pipeline resources
-
-1. Download the `resources.sh` script:
-   ```bash
-   curl -sSLO https://raw.githubusercontent.com/redhat-developer/rhdh-operator/refs/heads/main/config/profile/rhdh/plugin-infra/gitops/resources.sh
-   ```  
-2. Run the script:
-   ```bash
-   bash resources.sh
-   ```
-This should create the ArgoCD AppProject resource and Tekton pipeline called `workflow-deployment`, for RHDH Orchestrator workflow.
-
 ## Update the Dynamic Plugin ConfigMap for RHDH
 
 To enable the ArgoCD and tekton plugins, update your Dynamic Plugins ConfigMap by adding the following:
@@ -242,15 +223,21 @@ To enable the ArgoCD and tekton plugins, update your Dynamic Plugins ConfigMap b
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-        - package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
-          disabled: false
-        - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
-          disabled: false
-        - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd-backend-dynamic
-          disabled: false
-        - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-argocd-dynamic
-          disabled: false
+       ......
+       - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
+         disabled: false
+         dependencies:
+            - ref: gitops
+       - package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
+         disabled: false
+         dependencies:
+            - ref: tekton
+       - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd-backend-dynamic
+         disabled: false
+       - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-argocd-dynamic
+         disabled: false
 ```
+This should create the ArgoCD AppProject resource and Tekton pipeline called `workflow-deployment`, for RHDH Orchestrator workflow.
 
 Compatibility Matrix
 

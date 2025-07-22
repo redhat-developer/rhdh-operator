@@ -53,7 +53,7 @@ You can specify the RHDH version in the URL (`/release-X.Y/`, e.g., `1.7` in thi
    bash plugin-infra.sh [--with-cicd] [delete] [--branch <branch>]
    ```  
 Flags:
-* `--with-cicd` flag will also install the OpenShift Pipelines Operator (Tekton) and OpenShift GitOps Operator (ArgoCD) in addition to the required components for the Orchestrator plugin.
+* `--with-cicd` flag will also install the OpenShift Pipelines Operator (Tekton) and OpenShift GitOps Operator (ArgoCD) in addition to the required components for the Orchestrator plugin. To continue the configuration for CICD, please follow this [guide](orchestrator-gitops.md).
 * `delete`  will delete the installed components instead of installing them.
 * `--branch <branch>` flag allows to specify the branch of the RHDH Operator repository where the configuration yaml files will be taken (ignored if you have local yaml files). If not specified, it defaults to the `main` branch.
 
@@ -67,7 +67,7 @@ This method has similar usage and cautions as the RHDH Helper Utility.
 
 ### Installing the Orchestrator Plugin
 
-The orchestrator plugin (as of v1.6.0) consists of three dynamic plugins:
+The orchestrator plugin (as of v1.6.0) consists of four dynamic plugins:
 - orchestrator-backend
 - orchestrator-frontend
 - orchestrator-scaffolder-backend-module
