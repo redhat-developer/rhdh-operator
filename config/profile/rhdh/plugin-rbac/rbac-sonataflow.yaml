@@ -28,6 +28,31 @@ rules:
       - patch
       - update
       - watch
+  - apiGroups:
+      - tekton.dev
+    resources:
+      - tasks
+      - pipelines
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - argoproj.io
+    resources:
+      - appprojects
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
