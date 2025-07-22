@@ -53,7 +53,7 @@ stringData:
   MY_SUPER_SECRET_1: "some value" # notsecret
 
 ---
-apiVersion: rhdh.redhat.com/v1alpha3
+apiVersion: rhdh.redhat.com/v1alpha4
 kind: Backstage
 metadata:
   name: bs-raw-runtime-config

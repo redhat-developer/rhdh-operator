@@ -225,7 +225,7 @@ On a vanilla Kubernetes, you can create a Custom Resource (CR) using `kubectl`, 
 [source,yaml]
 ----
 cat <<EOF | kubectl -n rhdh-operator apply -f -
-apiVersion: rhdh.redhat.com/v1alpha3
+apiVersion: rhdh.redhat.com/v1alpha4
 kind: Backstage
 metadata:
   name: developer-hub

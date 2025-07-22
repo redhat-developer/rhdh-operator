@@ -1,4 +1,4 @@
-package v1alpha3
+package v1alpha4
 
 import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -227,6 +227,7 @@ type BackstageStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"
 
 // Backstage is the Schema for the Red Hat Developer Hub backstages API.
