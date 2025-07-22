@@ -8,6 +8,9 @@ To install the Orchestrator plugin on OpenShift, the following components are re
 - **Knative Serving**
 - **Knative Eventing**
 - **OpenShift Serverless Logic Operator**
+Optionally:
+- **OpenShift Pipelines Operator (Tekton)**
+- **OpenShift GitOps Operator (ArgoCD)**
 
 
 ### Methods to Install required infrastructure
@@ -30,6 +33,9 @@ Go to the [OpenShift Serverless documentation](https://docs.redhat.com/en/docume
 3. Installing Knative Serving.
 4. Installing Knative Eventing.
 5. Installing the OpenShift Serverless Logic Operator.
+Optionally:
+6. Installing the [OpenShift Pipelines Operator](https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines) (Tekton)
+7. Installing the [OpenShift GitOps Operator](https://docs.redhat.com/en/documentation/red_hat_openshift_gitops) (ArgoCD)
 
 
 #### RHDH helper script
@@ -44,8 +50,14 @@ This script provides a quick way to install the OpenShift Serverless infrastruct
 You can specify the RHDH version in the URL (`/release-X.Y/`, e.g., `1.7` in this example) or use main.
 2. Run the script:
    ```bash
-   bash plugin-infra.sh
+   bash plugin-infra.sh [--with-cicd] [delete] [--branch <branch>]
    ```  
+Flags:
+* `--with-cicd` flag will also install the OpenShift Pipelines Operator (Tekton) and OpenShift GitOps Operator (ArgoCD) in addition to the required components for the Orchestrator plugin.
+* `delete`  will delete the installed components instead of installing them.
+* `--branch <branch>` flag allows to specify the branch of the RHDH Operator repository where the configuration yaml files will be taken (ignored if you have local yaml files). If not specified, it defaults to the `main` branch.
+
+The script is checking if the directory where plugin-infra.sh is located contains the corresponding configuration files, e.g., serverless.yaml, knative.yaml, serverless-logic.yaml... (see [plugin-infra directory](../config/profile/rhdh/plugin-infra) for the complete list). If the files are not found, it will download them from the specified branch of the RHDH Operator repository.
 
 #### RHDH Orchestrator Infra Helm Chart
 This method has similar usage and cautions as the RHDH Helper Utility.
