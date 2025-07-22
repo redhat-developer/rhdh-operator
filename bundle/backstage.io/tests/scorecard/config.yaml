@@ -7,6 +7,16 @@ stages:
   tests:
   - entrypoint:
     - scorecard-test
+    - basic-check-spec
+    image: quay.io/operator-framework/scorecard-test:v1.37.0
+    labels:
+      suite: basic
+      test: basic-check-spec-test
+    storage:
+      spec:
+        mountPath: {}
+  - entrypoint:
+    - scorecard-test
     - olm-bundle-validation
     image: quay.io/operator-framework/scorecard-test:v1.37.0
     labels:
