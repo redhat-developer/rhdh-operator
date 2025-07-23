@@ -5,7 +5,7 @@ import (
     "fmt"
 
     monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-    bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+    bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
     "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
     "sigs.k8s.io/controller-runtime/pkg/log"
