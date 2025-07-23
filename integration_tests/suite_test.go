@@ -39,6 +39,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
+	bsv1alpha3 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -118,6 +119,10 @@ var _ = BeforeSuite(func() {
 
 	err = bsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+
+	err = bsv1alpha3.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	utilruntime.Must(openshift.Install(scheme.Scheme))
 
 	err = monitoringv1.AddToScheme(scheme.Scheme)
