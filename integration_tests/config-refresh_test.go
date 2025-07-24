@@ -332,7 +332,8 @@ organization:
 				Name:      model.DeploymentName(backstageNameV3),
 			}, deployV3)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deployV3.Spec.Replicas).To(Equal(int32(1)))
+			g.Expect(deployV3.Spec.Replicas).ToNot(BeNil())
+			g.Expect(*deployV3.Spec.Replicas).To(Equal(int32(1)))
 
 			// Check v1alpha4 deployment created
 			deployV4 := &appsv1.Deployment{}
@@ -341,7 +342,8 @@ organization:
 				Name:      model.DeploymentName(backstageNameV4),
 			}, deployV4)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deployV4.Spec.Replicas).To(Equal(int32(1)))
+			g.Expect(deployV4.Spec.Replicas).ToNot(BeNil())
+			g.Expect(*deployV4.Spec.Replicas).To(Equal(int32(1)))
 
 			// Check both resources still exist and are separate
 			fetchedV3 := &bsv1alpha3.Backstage{}
