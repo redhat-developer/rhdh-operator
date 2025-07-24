@@ -53,7 +53,7 @@ You can specify the RHDH version in the URL (`/release-X.Y/`, e.g., `1.7` in thi
    bash plugin-infra.sh [--with-cicd] [delete] [--branch <branch>]
    ```  
 Flags:
-* `--with-cicd` flag will also install the OpenShift Pipelines Operator (Tekton) and OpenShift GitOps Operator (ArgoCD) in addition to the required components for the Orchestrator plugin. To continue the configuration for CICD, please follow this [guide](orchestrator-gitops.md).
+* `--with-cicd` flag will also install the OpenShift Pipelines Operator (Tekton) and OpenShift GitOps Operator (ArgoCD) in addition to the required components for the Orchestrator plugin. To continue the configuration for CICD, please follow this [guide](orchestrator-cicd.md).
 * `delete`  will delete the installed components instead of installing them.
 * `--branch <branch>` flag allows to specify the branch of the RHDH Operator repository where the configuration yaml files will be taken (ignored if you have local yaml files). If not specified, it defaults to the `main` branch.
 
@@ -135,7 +135,7 @@ To enable the Backstage operator to work with the SonataFlow platform, its Servi
 This is done by the Backstage operator automatically when the SonataFlowPlatform CR is created in the namespace of the Backstage CR by the appropriate Role and RoleBinding resource in the [profile/rhdh/plugin-rbac directory](../config/profile/rhdh/plugin-rbac).
 
 ## Optional: Enable GitOps/Pipelines for Orchestrator Workflows
-To enable CI/CD for RHDH Orchestrator workflows, please follow this [guide](orchestrator-gitops.md).
+To enable CI/CD for RHDH Orchestrator workflows, please follow this [guide](orchestrator-cicd.md).
 
 
 
