@@ -28,6 +28,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - apps
   resources:
   - deployments
@@ -46,6 +54,18 @@ rules:
   - ingresses
   verbs:
   - get
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - rhdh.redhat.com
   resources:

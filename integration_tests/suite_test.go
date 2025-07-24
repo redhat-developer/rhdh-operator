@@ -39,7 +39,10 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
+	bsv1alpha3 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -81,7 +84,7 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases"), filepath.Join("..", "config", "crd", "external")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -116,7 +119,14 @@ var _ = BeforeSuite(func() {
 
 	err = bsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+
+	err = bsv1alpha3.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	utilruntime.Must(openshift.Install(scheme.Scheme))
+
+	err = monitoringv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 
