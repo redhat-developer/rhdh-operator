@@ -358,10 +358,10 @@ organization:
 			g.Expect(fetchedV3.ResourceVersion).ToNot(Equal(fetchedV4.ResourceVersion))
 
 			// Verify deployments have appropriate labels indicating their API version
-			g.Expect(deployV3.Labels).To(HaveKey("backstage.io/name"))
-			g.Expect(deployV4.Labels).To(HaveKey("backstage.io/name"))
-			g.Expect(deployV3.Labels["backstage.io/name"]).To(Equal(backstageNameV3))
-			g.Expect(deployV4.Labels["backstage.io/name"]).To(Equal(backstageNameV4))
+			g.Expect(deployV3.Labels).To(HaveKey("app.kubernetes.io/instance"))
+			g.Expect(deployV4.Labels).To(HaveKey("app.kubernetes.io/instance"))
+			g.Expect(deployV3.Labels["app.kubernetes.io/instance"]).To(Equal(backstageNameV3))
+			g.Expect(deployV4.Labels["app.kubernetes.io/instance"]).To(Equal(backstageNameV4))
 
 		}, 60*time.Second, 5*time.Second).Should(Succeed())
 
