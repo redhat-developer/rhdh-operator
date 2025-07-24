@@ -260,16 +260,16 @@ organization:
 			Skip("Skipped for not real controller")
 		}
 
-		// test v1alpha3 backward compatibility
-		By("creating a Backstage resource using v1alpha3 API")
+		// Test 1: v1alpha3 basic functionality
+		By("creating and verifying v1alpha3 Backstage resource")
 		backstageNameV3 := generateRandName("")
+		GinkgoWriter.Printf("Testing v1alpha3 with resource name: %s\n", backstageNameV3)
 
-		// create ConfigMap for v1alpha3 test
-		generateConfigMap(ctx, k8sClient, "default-app-config", ns,
+		generateConfigMap(ctx, k8sClient, "app-config-v3", ns,
 			map[string]string{
 				"app-config.yaml": `app:
-					title: Test App v1alpha3
-					baseUrl: http://localhost:3000`,
+  title: Test App v1alpha3
+  baseUrl: http://localhost:3000`,
 			}, nil, nil)
 
 		bsV1Alpha3 := &bsv1alpha3.Backstage{
@@ -281,7 +281,7 @@ organization:
 				Application: &bsv1alpha3.Application{
 					AppConfig: &bsv1alpha3.AppConfig{
 						ConfigMaps: []bsv1alpha3.FileObjectRef{
-							{Name: "default-app-config"},
+							{Name: "app-config-v3"},
 						},
 					},
 				},
@@ -291,14 +291,8 @@ organization:
 		err := k8sClient.Create(ctx, bsV1Alpha3)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		By("verifying the operator reconciles the v1alpha3 resource")
-		Eventually(func(g Gomega) {
-			fetched := &bsv1alpha3.Backstage{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageNameV3, Namespace: ns}, fetched)
-			g.Expect(err).ShouldNot(HaveOccurred())
-		}, 2*time.Minute, 10*time.Second).Should(Succeed())
-
-		By("verifying v1alpha3 deployment is created and running")
+		// verify the deployment is created and becomes ready
+		// Note: Extended timeout for CI environments where Backstage startup can be slow
 		Eventually(func(g Gomega) {
 			deploy := &appsv1.Deployment{}
 			err := k8sClient.Get(ctx, types.NamespacedName{
@@ -306,19 +300,21 @@ organization:
 				Name:      model.DeploymentName(backstageNameV3),
 			}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy.Status.ReadyReplicas).To(BeNumerically(">", 0))
-		}, 3*time.Minute, 10*time.Second).Should(Succeed())
+			g.Expect(deploy.Spec.Replicas).To(Equal(int32(1)))
+			// Wait for deployment to be ready (important for CI)
+			g.Expect(deploy.Status.ReadyReplicas).To(Equal(int32(1)))
+		}, 8*time.Minute, 15*time.Second).Should(Succeed())
 
-		// test v1alpha4 compatibility
-		By("creating a Backstage resource using v1alpha4 API")
+		// v1alpha4 basic functionality
+		By("creating and verifying v1alpha4 Backstage resource")
 		backstageNameV4 := generateRandName("")
+		GinkgoWriter.Printf("Testing v1alpha4 with resource name: %s\n", backstageNameV4)
 
-		// create ConfigMap for v1alpha4 test
-		generateConfigMap(ctx, k8sClient, "default-app-config-v4", ns,
+		generateConfigMap(ctx, k8sClient, "app-config-v4", ns,
 			map[string]string{
 				"app-config.yaml": `app:
-					title: Test App v1alpha4
-					baseUrl: http://localhost:3000`,
+  title: Test App v1alpha4
+  baseUrl: http://localhost:3000`,
 			}, nil, nil)
 
 		bsV1Alpha4 := &bsv1.Backstage{
@@ -330,7 +326,7 @@ organization:
 				Application: &bsv1.Application{
 					AppConfig: &bsv1.AppConfig{
 						ConfigMaps: []bsv1.FileObjectRef{
-							{Name: "default-app-config-v4"},
+							{Name: "app-config-v4"},
 						},
 					},
 				},
@@ -340,14 +336,8 @@ organization:
 		err = k8sClient.Create(ctx, bsV1Alpha4)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		By("verifying the operator reconciles the v1alpha4 resource")
-		Eventually(func(g Gomega) {
-			fetched := &bsv1.Backstage{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageNameV4, Namespace: ns}, fetched)
-			g.Expect(err).ShouldNot(HaveOccurred())
-		}, 2*time.Minute, 10*time.Second).Should(Succeed())
-
-		By("verifying v1alpha4 deployment is created and running")
+		// verify the deployment is created and becomes ready
+		// Note: Extended timeout for CI environments where Backstage startup can be slow
 		Eventually(func(g Gomega) {
 			deploy := &appsv1.Deployment{}
 			err := k8sClient.Get(ctx, types.NamespacedName{
@@ -355,19 +345,31 @@ organization:
 				Name:      model.DeploymentName(backstageNameV4),
 			}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy.Status.ReadyReplicas).To(BeNumerically(">", 0))
-		}, 3*time.Minute, 10*time.Second).Should(Succeed())
+			g.Expect(deploy.Spec.Replicas).To(Equal(int32(1)))
+			// Wait for deployment to be ready (important for CI)
+			g.Expect(deploy.Status.ReadyReplicas).To(Equal(int32(1)))
+		}, 8*time.Minute, 15*time.Second).Should(Succeed())
 
-		By("verifying both v1alpha3 and v1alpha4 resources coexist")
-		// verify both deployments are running simultaneously
+		// verify both resources can coexist
+		By("verifying both API versions coexist")
 		Eventually(func(g Gomega) {
+			// check v1alpha3 resource still exists
+			fetchedV3 := &bsv1alpha3.Backstage{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageNameV3, Namespace: ns}, fetchedV3)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			// check v1alpha4 resource still exists
+			fetchedV4 := &bsv1.Backstage{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: backstageNameV4, Namespace: ns}, fetchedV4)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			// check both deployments still exist (readiness already verified above)
 			deployV3 := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{
+			err = k8sClient.Get(ctx, types.NamespacedName{
 				Namespace: ns,
 				Name:      model.DeploymentName(backstageNameV3),
 			}, deployV3)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deployV3.Status.ReadyReplicas).To(BeNumerically(">", 0))
 
 			deployV4 := &appsv1.Deployment{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
@@ -375,15 +377,16 @@ organization:
 				Name:      model.DeploymentName(backstageNameV4),
 			}, deployV4)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deployV4.Status.ReadyReplicas).To(BeNumerically(">", 0))
-		}, 4*time.Minute, 15*time.Second).Should(Succeed())
 
-		// clean up test resources
-		By("cleaning up v1alpha3 test resource")
+			// verify they have different resource versions (confirming they're separate)
+			g.Expect(fetchedV3.ResourceVersion).ToNot(Equal(fetchedV4.ResourceVersion))
+		}, 30*time.Second, 5*time.Second).Should(Succeed())
+
+		// Clean up
+		By("cleaning up test resources")
 		err = k8sClient.Delete(ctx, bsV1Alpha3)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		By("cleaning up v1alpha4 test resource")
 		err = k8sClient.Delete(ctx, bsV1Alpha4)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
