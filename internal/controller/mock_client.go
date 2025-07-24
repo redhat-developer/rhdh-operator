@@ -75,8 +75,14 @@ func (m MockClient) Create(_ context.Context, obj client.Object, _ ...client.Cre
 	return nil
 }
 
-func (m MockClient) Delete(_ context.Context, _ client.Object, _ ...client.DeleteOption) error {
-	panic(implementMe)
+func (m MockClient) Delete(_ context.Context, obj client.Object, _ ...client.DeleteOption) error {
+	// Remove the object from the mock store
+	key := NameKind{Name: obj.GetName(), Kind: kind(obj)}
+	if _, exists := m.objects[key]; !exists {
+		return errors.NewNotFound(schema.GroupResource{Group: "", Resource: kind(obj)}, obj.GetName())
+	}
+	delete(m.objects, key)
+	return nil
 }
 
 func (m MockClient) Update(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {

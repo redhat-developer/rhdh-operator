@@ -66,9 +66,8 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 			},
 			Endpoints: []monitoringv1.Endpoint{
 				{
-					Port:     "http-metrics",
-					Path:     "/metrics",
-					Interval: "30s",
+					Port: "http-metrics",
+					Path: "/metrics",
 				},
 			},
 		}
