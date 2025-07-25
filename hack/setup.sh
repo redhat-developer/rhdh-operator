@@ -94,7 +94,7 @@ function createBackstageSecret {
   for key in "${!secretKeys[@]}"; do
     cmd="${cmd} --from-literal=${key}=${secretKeys[$key]}"
   done
-  eval $cmd
+  eval "$cmd"
 }
 
 # Function to display usage instructions
