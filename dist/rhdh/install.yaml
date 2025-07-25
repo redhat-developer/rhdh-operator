@@ -2450,7 +2450,6 @@ data:
     kind: AppProject
     metadata:
       name: orchestrator-gitops
-      namespace: {{backstage-ns}}
     spec:
       destinations:
       - name: '*'
@@ -2561,7 +2560,6 @@ data:
     kind: Task
     metadata:
       name: git-cli
-      namespace: {{backstage-ns}}
       labels:
         app.kubernetes.io/version: "0.4"
       annotations:
@@ -2715,7 +2713,6 @@ data:
     kind: Task
     metadata:
       name: flattener
-      namespace: {{backstage-ns}}
     spec:
       workspaces:
         - name: workflow-source
@@ -2757,7 +2754,6 @@ data:
     kind: Task
     metadata:
       name: build-manifests
-      namespace: {{backstage-ns}}
     spec:
       workspaces:
         - name: workflow-source
@@ -2779,7 +2775,6 @@ data:
     kind: Task
     metadata:
       name: build-gitops
-      namespace: {{backstage-ns}}
     spec:
       workspaces:
         - name: workflow-source
@@ -2804,7 +2799,6 @@ data:
     kind: Pipeline
     metadata:
       name: workflow-deployment
-      namespace: {{backstage-ns}}
     spec:
       description: |
         This pipeline clones a git repo, builds a Docker image with Kaniko and
