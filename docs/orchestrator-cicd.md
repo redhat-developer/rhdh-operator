@@ -71,7 +71,7 @@ To install the OpenShift GitOps Operator with custom configuration:
       - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES
         value: << ARGOCD_NAMESPACE >>
     ```
-
+   Ensure to update the ARGOCD_NAMESPACE with the correct value.
    Detailed information about these environment variables can be found in
    the [OpenShift GitOps Usage Guide](https://github.com/redhat-developer/gitops-operator/blob/master/docs/OpenShift%20GitOps%20Usage%20Guide.md#installation-of-openshift-gitops-without-ready-to-use-argo-cd-instance-for-rosaosd)
    and
@@ -81,7 +81,7 @@ To install the OpenShift GitOps Operator with custom configuration:
 
     ```bash
     oc new-project orchestrator-gitops
-    oc apply -f https://raw.githubusercontent.com/rhdhorchestrator/orchestrator-go-operator/main/docs/gitops/resources/argocd-example.yaml
+    oc apply -f https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/config/profile/rhdh/plugin-infra/argocd-cr.yaml
     ```
 
    Alternatively, if creating a default ArgoCD instance, ensure to exclude Tekton resources from its specification:
@@ -248,6 +248,35 @@ CI/CD pipelines. Follow these steps to enable the necessary permissions:
 
 3. For detailed instructions and exact steps, refer to the GitLab guide available [here](https://docs.gitlab.com/ci/)
 
+## Setting up Authentication for ArgoCD
+
+The `setup.sh` script helps to setup the environment variable by creating the required authentication secret for RHDH.
+
+1. Create a namespace for the RHDH instance if it does not already exist:
+
+   ```console
+   oc new-project rhdh
+   ```
+
+1. Download the setup script from the github repository and run it to create the RHDH secret:
+
+   ```console
+   wget https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/hack/setup.sh -O /tmp/setup.sh && chmod u+x /tmp/setup.sh
+   ```
+
+1. Run the script:
+   ```console
+   /tmp/setup.sh --use-default
+   ```
+
+**NOTE:** If you don't want to use the default values, omit the `--use-default` and the script will prompt you for
+input.
+
+A secret ref called `backstage-backend-auth-secret` should be created containing keys: `ARGOCD_URL`, `ARGOCD_USERNAME`
+and
+`ARGOCD_PASSWORD`. Also, this secret should be mounted when applying the backstage CR as seen in
+this [example](examples/orchestrator-cicd.yaml).
+
 ## Update the Dynamic Plugin ConfigMap for RHDH
 
 To enable the ArgoCD and tekton plugins, update your Dynamic Plugins ConfigMap by adding the following:
@@ -272,7 +301,7 @@ To enable the ArgoCD and tekton plugins, update your Dynamic Plugins ConfigMap b
 ```
 
 This should create the ArgoCD AppProject resource and Tekton pipeline called `workflow-deployment`, for RHDH
-Orchestrator workflow.
+Orchestrator workflow. Please refer to this [example](examples/orchestrator-cicd.yaml) for a complete configuration.
 
 Compatibility Matrix
 

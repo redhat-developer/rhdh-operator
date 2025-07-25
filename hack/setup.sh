@@ -8,7 +8,7 @@ function captureRHDHNamespace {
   if [ "$use_default" == true ]; then
     rhdh_workspace="$default"
   else
-    read -p "Enter RHDH Instance namespace (default: $default): " value
+    read -rp "Enter RHDH Instance namespace (default: $default): " value
     if [ -z "$value" ]; then
         rhdh_workspace="$default"
     else
@@ -23,7 +23,7 @@ function captureArgoCDNamespace {
   if [ "$use_default" == true ]; then
     argocd_namespace="$default"
   else
-    read -p "Enter ArgoCD installation namespace (default: $default): " value
+    read -rp "Enter ArgoCD installation namespace (default: $default): " value
 
     if [ -z "$value" ]; then
         argocd_namespace="$default"
@@ -54,7 +54,7 @@ function captureArgoCDURL {
           fi
       done
     fi
-    argocd_route=$(oc get route -n "$ARGOCD_NAMESPACE" -l app.kubernetes.io/managed-by=$selected_instance -ojsonpath='{.items[0].status.ingress[0].host}')
+    argocd_route=$(oc get route -n "$ARGOCD_NAMESPACE" -l app.kubernetes.io/managed-by="$selected_instance" -ojsonpath='{.items[0].status.ingress[0].host}')
     echo "Found Route at $argocd_route"
     ARGOCD_URL=https://$argocd_route
   fi
@@ -63,8 +63,8 @@ function captureArgoCDURL {
 
 function captureArgoCDCreds {
   if [ -n "$selected_instance" ]; then
-    admin_password=$(oc get secret -n "$ARGOCD_NAMESPACE" ${selected_instance}-cluster -ojsonpath='{.data.admin\.password}' | base64 -d)
-    ARGOCD_USERNAME=admin
+    admin_password=$(oc get secret -n "$ARGOCD_NAMESPACE" "${selected_instance}"-cluster -ojsonpath='{.data.admin\.password}' | base64 -d)
+    ARGOCD_USERNAME="admin"
     ARGOCD_PASSWORD=$admin_password
   fi
 }
@@ -77,8 +77,8 @@ function checkPrerequisite {
 }
 
 function createBackstageSecret {
-  if 2>/dev/null 1>&2 oc get secret backstage-backend-auth-secret -n $RHDH_NAMESPACE; then
-    oc delete secret backstage-backend-auth-secret -n $RHDH_NAMESPACE
+  if 2>/dev/null 1>&2 oc get secret backstage-backend-auth-secret -n "$RHDH_NAMESPACE"; then
+    oc delete secret backstage-backend-auth-secret -n "$RHDH_NAMESPACE"
   fi
   declare -A secretKeys
   if [ -n "$ARGOCD_USERNAME" ]; then
