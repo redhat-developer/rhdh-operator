@@ -46,7 +46,7 @@ var _ = When("testing API version compatibility", func() {
 
 		// test v1alpha3 backward compatibility
 		By("creating a Backstage resource using v1alpha3 API")
-		backstageNameV3 := generateRandName("bs-v1alpha3-")
+		backstageNameV3 := generateRandName("bs-v1alpha3")
 
 		// create ConfigMap for v1alpha3 test
 		generateConfigMap(ctx, k8sClient, "default-app-config", ns,
@@ -95,7 +95,7 @@ var _ = When("testing API version compatibility", func() {
 
 		// test v1alpha4 compatibility
 		By("creating a Backstage resource using v1alpha4 API")
-		backstageNameV4 := generateRandName("bs-v1alpha4-")
+		backstageNameV4 := generateRandName("bs-v1alpha4")
 
 		// create ConfigMap for v1alpha4 test
 		generateConfigMap(ctx, k8sClient, "default-app-config-v4", ns,
