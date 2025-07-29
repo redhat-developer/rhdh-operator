@@ -250,7 +250,7 @@ CI/CD pipelines. Follow these steps to enable the necessary permissions:
 
 ## Setting up Authentication for ArgoCD
 
-The `setup.sh` script helps to setup the environment variable by creating the required authentication secret for RHDH.
+The `secret-setup.sh` script helps to setup the environment variable by creating the required authentication secret for RHDH.
 
 1. Create a namespace for the RHDH instance if it does not already exist:
 
@@ -258,15 +258,15 @@ The `setup.sh` script helps to setup the environment variable by creating the re
    oc new-project rhdh
    ```
 
-1. Download the setup script from the github repository and run it to create the RHDH secret:
+1. Download the secret-setup script from the github repository and run it to create the RHDH secret:
 
    ```console
-   wget https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/hack/setup.sh -O /tmp/setup.sh && chmod u+x /tmp/setup.sh
+   wget https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/plugin-infra/secret-setup.sh -O /tmp/secret-setup.sh && chmod u+x /tmp/secret-setup.sh
    ```
 
 1. Run the script:
    ```console
-   /tmp/setup.sh --use-default
+   /tmp/secret-setup.sh --use-default
    ```
 
 **NOTE:** If you don't want to use the default values, omit the `--use-default` and the script will prompt you for
@@ -307,4 +307,4 @@ Compatibility Matrix
 
 | OpenShift Pipelines Operator version | RHDH Operator Version |
 |--------------------------------------|-----------------------|
-| 4.17                                 | 1.7.x                 |
+| 4.17                                 | 1.8.x                 |
