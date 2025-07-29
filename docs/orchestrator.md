@@ -55,25 +55,28 @@ This method has similar usage and cautions as the RHDH Helper Utility.
 
 ### Installing the Orchestrator Plugin
 
-The orchestrator plugin (as of v1.5.1) consists of three dynamic plugins:
+The orchestrator plugin (as of v1.6.0) consists of four dynamic plugins:
 - orchestrator-backend
 - orchestrator-frontend
 - orchestrator-scaffolder-backend-module
+- orchestrator-form-widgets
 
 As for RHDH 1.7 all of these plugins are included in the default dynamic-plugins.yaml file of **install-dynamic-plugins** container but disabled by default.
 To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMap with following data in your Backstage Custom Resource (CR):
 ```yaml
     includes:
-      - dynamic-plugins.default.yaml
+       - dynamic-plugins.default.yaml
     plugins:
-      - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator@1.5.1"
-      - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
-        dependencies:
-          - ref: sonataflow
-      - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
+       - package: "@redhat/backstage-plugin-orchestrator@1.6.0"
+         disabled: false
+       - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
+         disabled: false
+         dependencies:
+            - ref: sonataflow
+       - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.6.0"
+         disabled: false
+       - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.6.0"
+         disabled: false  
 ```
 
 See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin.
