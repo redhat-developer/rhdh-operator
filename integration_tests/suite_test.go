@@ -127,11 +127,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = bsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-
-	utilruntime.Must(openshift.Install(scheme.Scheme))
-
 	err = monitoringv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	utilruntime.Must(openshift.Install(scheme.Scheme))
 
 	//+kubebuilder:scaffold:scheme
 
