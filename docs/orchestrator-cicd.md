@@ -248,9 +248,9 @@ CI/CD pipelines. Follow these steps to enable the necessary permissions:
 
 3. For detailed instructions and exact steps, refer to the GitLab guide available [here](https://docs.gitlab.com/ci/)
 
-## Setting up Authentication for ArgoCD
+## Setting up Authentication for Workflow CICD
 
-The `secret-setup.sh` script helps to setup the environment variable by creating the required authentication secret for RHDH.
+The `gitops-secret-setup.sh` script helps to setup the environment variable by creating the required authentication secret for RHDH.
 
 1. Create a namespace for the RHDH instance if it does not already exist:
 
@@ -258,23 +258,22 @@ The `secret-setup.sh` script helps to setup the environment variable by creating
    oc new-project rhdh
    ```
 
-1. Download the secret-setup script from the github repository and run it to create the RHDH secret:
+1. Download the gitops-secret-setup script from the github repository and run it to create the RHDH secret:
 
    ```console
-   wget https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/plugin-infra/secret-setup.sh -O /tmp/secret-setup.sh && chmod u+x /tmp/secret-setup.sh
+   wget https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/plugin-infra/gitops-secret-setup.sh -O /tmp/gitops-secret-setup.sh && chmod u+x /tmp/gitops-secret-setup.sh
    ```
 
 1. Run the script:
    ```console
-   /tmp/secret-setup.sh --use-default
+   /tmp/gitops-secret-setup.sh --use-default
    ```
 
 **NOTE:** If you don't want to use the default values, omit the `--use-default` and the script will prompt you for
 input.
 
 A secret ref called `backstage-backend-auth-secret` should be created containing keys: `ARGOCD_URL`, `ARGOCD_USERNAME`
-and
-`ARGOCD_PASSWORD`. Also, this secret should be mounted when applying the backstage CR as seen in
+`ARGOCD_PASSWORD`, etc. Also, this secret should be mounted when applying the backstage CR as seen in
 this [example](examples/orchestrator-cicd.yaml).
 
 ## Update the Dynamic Plugin ConfigMap for RHDH
@@ -289,7 +288,7 @@ To enable the ArgoCD and tekton plugins, update your Dynamic Plugins ConfigMap b
        - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
          disabled: false
          dependencies:
-            - ref: gitops
+            - ref: argocd
        - package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
          disabled: false
          dependencies:

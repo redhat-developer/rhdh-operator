@@ -2,8 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
-  name: orchestrator-gitops
-  namespace: {{backstage-ns}}
+  name: argocd-app-project
 spec:
   destinations:
   - name: '*'

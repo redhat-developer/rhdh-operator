@@ -20,7 +20,7 @@ data:
       - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
         disabled: false
         dependencies:
-          - ref: gitops
+          - ref: argocd
       - package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
         disabled: false
         dependencies:
