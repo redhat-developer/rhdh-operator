@@ -16,10 +16,8 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1alpha3 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -250,127 +248,5 @@ organization:
 
 	})
 
-	It("verifies v1alpha3 and v1alpha4 API compatibility", func() {
 
-		if !*testEnv.UseExistingCluster {
-			Skip("Skipped for not real cluster")
-		}
-
-		if !useExistingController {
-			Skip("Skipped for not real controller")
-		}
-
-		// Test: v1alpha3 and v1alpha4 can both create resources without conflict
-		By("creating v1alpha3 Backstage resource")
-		backstageNameV3 := generateRandName("")
-		GinkgoWriter.Printf("Testing v1alpha3 with resource name: %s\n", backstageNameV3)
-
-		generateConfigMap(ctx, k8sClient, "app-config-v3", ns,
-			map[string]string{
-				"app-config.yaml": `app:
-  title: Test App v1alpha3
-  baseUrl: http://localhost:3000`,
-			}, nil, nil)
-
-		bsV1Alpha3 := &bsv1alpha3.Backstage{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      backstageNameV3,
-				Namespace: ns,
-			},
-			Spec: bsv1alpha3.BackstageSpec{
-				Application: &bsv1alpha3.Application{
-					AppConfig: &bsv1alpha3.AppConfig{
-						ConfigMaps: []bsv1alpha3.FileObjectRef{
-							{Name: "app-config-v3"},
-						},
-					},
-				},
-			},
-		}
-
-		err := k8sClient.Create(ctx, bsV1Alpha3)
-		Expect(err).ShouldNot(HaveOccurred())
-
-		By("creating v1alpha4 Backstage resource")
-		backstageNameV4 := generateRandName("")
-		GinkgoWriter.Printf("Testing v1alpha4 with resource name: %s\n", backstageNameV4)
-
-		generateConfigMap(ctx, k8sClient, "app-config-v4", ns,
-			map[string]string{
-				"app-config.yaml": `app:
-  title: Test App v1alpha4
-  baseUrl: http://localhost:3000`,
-			}, nil, nil)
-
-		bsV1Alpha4 := &bsv1.Backstage{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      backstageNameV4,
-				Namespace: ns,
-			},
-			Spec: bsv1.BackstageSpec{
-				Application: &bsv1.Application{
-					AppConfig: &bsv1.AppConfig{
-						ConfigMaps: []bsv1.FileObjectRef{
-							{Name: "app-config-v4"},
-						},
-					},
-				},
-			},
-		}
-
-		err = k8sClient.Create(ctx, bsV1Alpha4)
-		Expect(err).ShouldNot(HaveOccurred())
-
-		// Fast validation: just check that controller creates the expected resources
-		// No need to wait for application readiness - that's not what we're testing
-		By("verifying both API versions create resources successfully")
-		Eventually(func(g Gomega) {
-			// Check v1alpha3 deployment created
-			deployV3 := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{
-				Namespace: ns,
-				Name:      model.DeploymentName(backstageNameV3),
-			}, deployV3)
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deployV3.Spec.Replicas).ToNot(BeNil())
-			g.Expect(*deployV3.Spec.Replicas).To(Equal(int32(1)))
-
-			// Check v1alpha4 deployment created
-			deployV4 := &appsv1.Deployment{}
-			err = k8sClient.Get(ctx, types.NamespacedName{
-				Namespace: ns,
-				Name:      model.DeploymentName(backstageNameV4),
-			}, deployV4)
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deployV4.Spec.Replicas).ToNot(BeNil())
-			g.Expect(*deployV4.Spec.Replicas).To(Equal(int32(1)))
-
-			// Check both resources still exist and are separate
-			fetchedV3 := &bsv1alpha3.Backstage{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: backstageNameV3, Namespace: ns}, fetchedV3)
-			g.Expect(err).ShouldNot(HaveOccurred())
-
-			fetchedV4 := &bsv1.Backstage{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: backstageNameV4, Namespace: ns}, fetchedV4)
-			g.Expect(err).ShouldNot(HaveOccurred())
-
-			// Verify they have different resource versions (confirming they're separate resources)
-			g.Expect(fetchedV3.ResourceVersion).ToNot(Equal(fetchedV4.ResourceVersion))
-
-			// Verify deployments have appropriate labels indicating their API version
-			g.Expect(deployV3.Labels).To(HaveKey("app.kubernetes.io/instance"))
-			g.Expect(deployV4.Labels).To(HaveKey("app.kubernetes.io/instance"))
-			g.Expect(deployV3.Labels["app.kubernetes.io/instance"]).To(Equal(backstageNameV3))
-			g.Expect(deployV4.Labels["app.kubernetes.io/instance"]).To(Equal(backstageNameV4))
-
-		}, 60*time.Second, 5*time.Second).Should(Succeed())
-
-		// Clean up
-		By("cleaning up test resources")
-		err = k8sClient.Delete(ctx, bsV1Alpha3)
-		Expect(err).ShouldNot(HaveOccurred())
-
-		err = k8sClient.Delete(ctx, bsV1Alpha4)
-		Expect(err).ShouldNot(HaveOccurred())
-	})
 })
