@@ -69,6 +69,67 @@ function captureArgoCDCreds {
   fi
 }
 
+function captureGitToken {
+   if [ -z "$GITHUB_TOKEN" ]; then
+    read -rs -p "Enter GitHub access token: " value
+    echo ""
+    GITHUB_TOKEN=$value
+  else
+    echo "GitHub access token already set."
+  fi
+}
+
+function captureK8sURL {
+  url="$(oc whoami --show-server)"
+  K8S_CLUSTER_URL=$url
+}
+
+function  generateK8sToken {
+  sa_namespace="rhdh"
+  sa_name="rhdh"
+  if [ "$use_default" == false ]; then
+    read -rp "Which namespace should be used or created to check the SA holding the persistent token? (default: $sa_namespace): " selected_namespace
+    if [ -n "$selected_namespace" ]; then
+      sa_namespace="$selected_namespace"
+    fi
+
+    read -rp "What is the name of the SA? (default: $sa_name): " selected_name
+    if [ -n "$selected_name" ]; then
+      sa_name="$selected_name"
+    fi
+  fi
+  if oc get namespace "$sa_namespace" &> /dev/null; then
+    echo "Namespace '$sa_namespace' already exists."
+  else
+    echo "Namespace '$sa_namespace' does not exist. Creating..."
+    oc create namespace "$sa_namespace"
+  fi
+
+  if oc get sa -n "$sa_namespace" "$sa_name" &> /dev/null; then
+    echo "ServiceAccount '$sa_name' already exists in '$sa_namespace'."
+  else
+    echo "ServiceAccount '$sa_name' does not exist in '$sa_namespace'. Creating..."
+    oc create sa "$sa_name" -n "$sa_namespace"
+  fi
+
+  oc adm policy add-cluster-role-to-user cluster-admin -z "$sa_name" -n "$sa_namespace"
+  echo "Added cluster-admin role to '$sa_name' in '$sa_namespace'."
+
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: ${sa_name}
+  namespace: ${sa_namespace}
+  annotations:
+    kubernetes.io/service-account.name: rhdh
+EOF
+
+  K8S_CLUSTER_TOKEN=$(oc -n "$sa_namespace" get secret/"${sa_name}" -o jsonpath='{.data.token}' | base64 -d )
+}
+
+
 function checkPrerequisite {
   if ! command -v oc &> /dev/null; then
     echo "oc is required for this script to run. Exiting."
@@ -81,6 +142,12 @@ function createBackstageSecret {
     oc delete secret backstage-backend-auth-secret -n "$RHDH_NAMESPACE"
   fi
   declare -A secretKeys
+  if [ -n "$K8S_CLUSTER_URL" ]; then
+    secretKeys[K8S_CLUSTER_URL]=$K8S_CLUSTER_URL
+  fi
+  if [ -n "$K8S_CLUSTER_TOKEN" ]; then
+    secretKeys[K8S_CLUSTER_TOKEN]=$K8S_CLUSTER_TOKEN
+  fi
   if [ -n "$ARGOCD_USERNAME" ]; then
     secretKeys[ARGOCD_USERNAME]=$ARGOCD_USERNAME
   fi
@@ -89,6 +156,9 @@ function createBackstageSecret {
   fi
   if [ -n "$ARGOCD_PASSWORD" ]; then
     secretKeys[ARGOCD_PASSWORD]=$ARGOCD_PASSWORD
+  fi
+  if [ -n "$GITHUB_TOKEN" ]; then
+    secretKeys[GITHUB_TOKEN]=$GITHUB_TOKEN
   fi
   cmd="oc create secret generic backstage-backend-auth-secret -n $RHDH_NAMESPACE"
   for key in "${!secretKeys[@]}"; do
@@ -136,10 +206,13 @@ function main {
   fi
 
   checkPrerequisite
+  captureK8sURL
+  generateK8sToken
   captureRHDHNamespace
   captureArgoCDNamespace
   captureArgoCDURL
   captureArgoCDCreds
+  captureGitToken
   createBackstageSecret
 
   echo "Setup completed successfully!"
