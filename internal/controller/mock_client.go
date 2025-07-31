@@ -102,8 +102,17 @@ func (m MockClient) Update(_ context.Context, obj client.Object, _ ...client.Upd
 	return nil
 }
 
-func (m MockClient) Patch(_ context.Context, _ client.Object, _ client.Patch, _ ...client.PatchOption) error {
-	panic(implementMe)
+func (m MockClient) Patch(_ context.Context, obj client.Object, patch client.Patch, _ ...client.PatchOption) error {
+	if obj.GetName() == "" {
+		return fmt.Errorf("patch: object Name should not be empty")
+	}
+
+	dat, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	m.objects[NameKind{Name: obj.GetName(), Kind: kind(obj)}] = dat
+	return nil
 }
 
 func (m MockClient) DeleteAllOf(_ context.Context, _ client.Object, _ ...client.DeleteAllOfOption) error {
