@@ -104,7 +104,8 @@ func TestApplyServiceMonitor_MonitoringEnabled_NoCRD(t *testing.T) {
 	// Apply service monitor (should fail due to missing CRD)
 	err = r.applyServiceMonitor(ctx, backstage)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "ServiceMonitor CRD not found")
+	assert.Contains(t, err.Error(), "failed to apply ServiceMonitor")
+	assert.Contains(t, err.Error(), "no matches for kind")
 }
 
 func TestApplyServiceMonitor_MonitoringEnabled_WithCRD(t *testing.T) {
@@ -265,23 +266,6 @@ func TestApplyServiceMonitor_Update_ExistingServiceMonitor(t *testing.T) {
 	assert.Equal(t, expectedLabels, sm.Labels)
 	assert.Equal(t, "http-metrics", sm.Spec.Endpoints[0].Port)
 	assert.Equal(t, "/metrics", sm.Spec.Endpoints[0].Path)
-}
-
-func TestIsServiceMonitorCRDNotFoundError(t *testing.T) {
-	// Test with nil error
-	assert.False(t, isServiceMonitorCRDNotFoundError(nil))
-
-	// Test with "no matches for kind" error
-	err := fmt.Errorf(`no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`)
-	assert.True(t, isServiceMonitorCRDNotFoundError(err))
-
-	// Test with other error
-	err = fmt.Errorf("some other error")
-	assert.False(t, isServiceMonitorCRDNotFoundError(err))
-
-	// Test with partial match (shouldn't match)
-	err = fmt.Errorf("no matches for kind SomeOtherKind")
-	assert.False(t, isServiceMonitorCRDNotFoundError(err))
 }
 
 // mockServiceMonitorNotFoundClient simulates the behavior when ServiceMonitor CRD is not installed
