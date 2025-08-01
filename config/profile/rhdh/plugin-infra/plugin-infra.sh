@@ -56,6 +56,8 @@ if [ "$action" == "apply" ]; then
   if [ "$cicd" == true ]; then
     echo "CICD enabled. Executing CICD-specific logic..."
     apply_manifest "argocd.yaml"
+    kubectl wait --for=condition=Established crd --all --timeout=60s
+    apply_manifest "argocd-cr.yaml"
     apply_manifest "pipeline.yaml"
   fi
 elif [ "$action" == "delete" ]; then
@@ -64,6 +66,7 @@ elif [ "$action" == "delete" ]; then
   apply_manifest "serverless.yaml"
   if [ "$cicd" == true ]; then
     apply_manifest "argocd.yaml"
+    apply_manifest "argocd-cr.yaml"
     apply_manifest "pipeline.yaml"
   fi
 else

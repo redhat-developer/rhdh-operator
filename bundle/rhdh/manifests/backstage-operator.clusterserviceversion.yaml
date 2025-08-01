@@ -264,6 +264,31 @@ spec:
           - update
           - watch
         - apiGroups:
+          - tekton.dev
+          resources:
+          - tasks
+          - pipelines
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - argoproj.io
+          resources:
+          - appprojects
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - authentication.k8s.io
           resources:
           - tokenreviews

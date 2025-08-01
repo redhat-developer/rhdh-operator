@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orchestrator-plugin
+data:
+  dynamic-plugins.yaml: |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins:
+      - disabled: false
+        package: "@redhat/backstage-plugin-orchestrator@1.6.0"
+      - disabled: false
+        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
+        dependencies:
+          - ref: sonataflow
+      - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.6.0"
+        disabled: false
+      - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.6.0"
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
+        disabled: false
+        dependencies:
+          - ref: argocd
+      - package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
+        disabled: false
+        dependencies:
+          - ref: tekton
+      - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd-backend-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-argocd-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-scaffolder-backend-module-github-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes-backend-dynamic
+        disabled: false
+        pluginConfig:
+          kubernetes:
+            customResources:
+              - group: 'tekton.dev'
+                apiVersion: 'v1'
+                plural: 'pipelines'
+              - group: 'tekton.dev'
+                apiVersion: 'v1'
+                plural: 'pipelineruns'
+              - group: 'tekton.dev'
+                apiVersion: 'v1'
+                plural: 'taskruns'
+              - group: 'route.openshift.io'
+                apiVersion: 'v1'
+                plural: 'routes'
+            serviceLocatorMethod:
+              type: 'multiTenant'
+            clusterLocatorMethods:
+              - type: 'config'
+                clusters:
+                  - name: 'Default Cluster'
+                    url: ${K8S_CLUSTER_URL}
+                    authProvider: 'serviceAccount'
+                    skipTLSVerify: true
+                    serviceAccountToken: ${K8S_CLUSTER_TOKEN}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config-rhdh
+data:
+  app-config-rhdh.yaml: |-
+    integrations:
+      github:
+        - host: github.com
+          token: ${GITHUB_TOKEN}
+    auth:
+      environment: development
+      providers:
+        guest:
+          # using the guest user to query the '/api/dynamic-plugins-info/loaded-plugins' endpoint.
+          dangerouslyAllowOutsideDevelopment: true
+    argocd:
+      appLocatorMethods:
+        - instances:
+            - name: "argocd"
+              url: ${ARGOCD_URL}
+              username: ${ARGOCD_USERNAME}
+              password: ${ARGOCD_PASSWORD}
+          type: config
+    catalog:
+      rules:
+        - allow:
+            [
+              Component,
+              System,
+              Group,
+              Resource,
+              Location,
+              Template,
+              API,
+              User,
+              Domain,
+            ]
+      locations:
+        - type: url
+          target: https://github.com/rhdhorchestrator/orchestrator-go-operator/blob/main/docs/resources/users.yaml
+        - type: url
+          target: https://github.com/rhdhorchestrator/workflow-software-templates/blob/main/entities/workflow-resources.yaml
+        - type: url
+          target: https://github.com/rhdhorchestrator/workflow-software-templates/blob/main/scaffolder-templates/github-workflows/basic-workflow/template.yaml
+
+---
+apiVersion: rhdh.redhat.com/v1alpha4
+kind: Backstage
+metadata:
+  name: orchestrator
+spec:
+  application:
+    appConfig:
+      configMaps:
+        - name: app-config-rhdh
+    dynamicPluginsConfigMapName: orchestrator-plugin
+    extraEnvs:
+      secrets:
+        - name: backstage-backend-auth-secret
