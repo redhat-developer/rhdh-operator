@@ -7,14 +7,11 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage *bs.Backstage) error {
@@ -96,14 +93,5 @@ func isServiceMonitorCRDNotFoundError(err error) bool {
 
 	// Check for "no matches for kind" error which indicates CRD is not installed
 	errMsg := err.Error()
-	return strings.Contains(errMsg, "no matches for kind") && strings.Contains(errMsg, "ServiceMonitor") ||
-		strings.Contains(errMsg, "the server could not find the requested resource") ||
-		(apierrors.IsNotFound(err) && strings.Contains(errMsg, "servicemonitors.monitoring.coreos.com"))
-}
-
-// serviceMonitorCRDExists checks if the ServiceMonitor CRD is installed in the cluster
-func (r *BackstageReconciler) serviceMonitorCRDExists(ctx context.Context) bool {
-	crd := &apiextensionsv1.CustomResourceDefinition{}
-	err := r.Get(ctx, client.ObjectKey{Name: "servicemonitors.monitoring.coreos.com"}, crd)
-	return err == nil
+	return strings.Contains(errMsg, "no matches for kind") && strings.Contains(errMsg, "ServiceMonitor")
 }

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -79,7 +80,20 @@ func TestApplyServiceMonitor_MonitoringDisabled(t *testing.T) {
 
 func TestApplyServiceMonitor_MonitoringEnabled_NoCRD(t *testing.T) {
 	ctx := context.TODO()
-	r := setupMonitorTestReconciler()
+
+	// Create a mock client that will return "no matches for kind" error for ServiceMonitor patch operations
+	scheme := runtime.NewScheme()
+	_ = bs.AddToScheme(scheme)
+	_ = monitoringv1.AddToScheme(scheme)
+
+	mockClient := &mockServiceMonitorNotFoundClient{
+		Client: NewMockClient(),
+	}
+
+	r := BackstageReconciler{
+		Client: mockClient,
+		Scheme: scheme,
+	}
 
 	backstage := createTestBackstage("test-bs", "test-ns", true)
 
@@ -253,78 +267,31 @@ func TestApplyServiceMonitor_Update_ExistingServiceMonitor(t *testing.T) {
 	assert.Equal(t, "/metrics", sm.Spec.Endpoints[0].Path)
 }
 
-func TestServiceMonitorCRDExists(t *testing.T) {
-	ctx := context.TODO()
-	r := setupMonitorTestReconciler()
+func TestIsServiceMonitorCRDNotFoundError(t *testing.T) {
+	// Test with nil error
+	assert.False(t, isServiceMonitorCRDNotFoundError(nil))
 
-	// Test when CRD doesn't exist
-	exists := r.serviceMonitorCRDExists(ctx)
-	assert.False(t, exists)
+	// Test with "no matches for kind" error
+	err := fmt.Errorf(`no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`)
+	assert.True(t, isServiceMonitorCRDNotFoundError(err))
 
-	// Create the CRD
-	crd := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "servicemonitors.monitoring.coreos.com",
-		},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: "monitoring.coreos.com",
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-				{
-					Name:    "v1",
-					Served:  true,
-					Storage: true,
-					Schema: &apiextensionsv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-						},
-					},
-				},
-			},
-			Scope: apiextensionsv1.NamespaceScoped,
-			Names: apiextensionsv1.CustomResourceDefinitionNames{
-				Plural: "servicemonitors",
-				Kind:   "ServiceMonitor",
-			},
-		},
-	}
-	err := r.Create(ctx, crd)
-	assert.NoError(t, err)
+	// Test with other error
+	err = fmt.Errorf("some other error")
+	assert.False(t, isServiceMonitorCRDNotFoundError(err))
 
-	// Test when CRD exists
-	exists = r.serviceMonitorCRDExists(ctx)
-	assert.True(t, exists)
+	// Test with partial match (shouldn't match)
+	err = fmt.Errorf("no matches for kind SomeOtherKind")
+	assert.False(t, isServiceMonitorCRDNotFoundError(err))
 }
 
-// Test edge case where client returns an error other than NotFound
-func TestServiceMonitorCRDExists_ClientError(t *testing.T) {
-	ctx := context.TODO()
-
-	// Create a mock client that returns an error
-	scheme := runtime.NewScheme()
-	_ = apiextensionsv1.AddToScheme(scheme)
-
-	mockClient := &mockErrorClient{
-		Client: NewMockClient(),
-	}
-
-	r := BackstageReconciler{
-		Client: mockClient,
-		Scheme: scheme,
-	}
-
-	// Should return false on client errors
-	exists := r.serviceMonitorCRDExists(ctx)
-	assert.False(t, exists)
-}
-
-// mockErrorClient is a mock client that returns errors for Get operations
-type mockErrorClient struct {
+// mockServiceMonitorNotFoundClient simulates the behavior when ServiceMonitor CRD is not installed
+type mockServiceMonitorNotFoundClient struct {
 	client.Client
 }
 
-func (m *mockErrorClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	if _, ok := obj.(*apiextensionsv1.CustomResourceDefinition); ok {
-		return assert.AnError // Return a generic error
+func (m *mockServiceMonitorNotFoundClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+	if _, ok := obj.(*monitoringv1.ServiceMonitor); ok {
+		return fmt.Errorf(`no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`)
 	}
-	return m.Client.Get(ctx, key, obj, opts...)
+	return m.Client.Patch(ctx, obj, patch, opts...)
 }
