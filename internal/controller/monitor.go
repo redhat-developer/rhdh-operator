@@ -105,8 +105,5 @@ func isServiceMonitorCRDNotFoundError(err error) bool {
 func (r *BackstageReconciler) serviceMonitorCRDExists(ctx context.Context) bool {
 	crd := &apiextensionsv1.CustomResourceDefinition{}
 	err := r.Get(ctx, client.ObjectKey{Name: "servicemonitors.monitoring.coreos.com"}, crd)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
