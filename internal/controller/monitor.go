@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
@@ -12,9 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage *bs.Backstage) error {
@@ -29,12 +28,6 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 			backstage.Name+"-metrics",
 			backstage.Namespace,
 		)
-	}
-
-	// Check if ServiceMonitor CRD exists before creating
-	if !r.serviceMonitorCRDExists(ctx) {
-		lg.Error(nil, "Monitoring enabled but ServiceMonitor CRD not found. Please install Prometheus Operator")
-		return fmt.Errorf("monitoring enabled but ServiceMonitor CRD not found. Please install Prometheus Operator")
 	}
 
 	lg.Info("Monitoring enabled, creating/updating ServiceMonitor")
@@ -81,6 +74,11 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 		FieldManager: BackstageFieldManager,
 		Force:        ptr.To(true),
 	}); err != nil {
+		// Check if the error indicates that ServiceMonitor CRD is not installed
+		if isServiceMonitorCRDNotFoundError(err) {
+			lg.Error(err, "Monitoring enabled but ServiceMonitor CRD not found. Please install Prometheus Operator")
+			return fmt.Errorf("monitoring enabled but ServiceMonitor CRD not found. Please install Prometheus Operator")
+		}
 		lg.Error(err, "Failed to apply ServiceMonitor")
 		return fmt.Errorf("failed to apply ServiceMonitor: %w", err)
 	}
@@ -89,24 +87,15 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 	return nil
 }
 
-// Helper to detect if ServiceMonitor CRD is installed
-func (r *BackstageReconciler) serviceMonitorCRDExists(ctx context.Context) bool {
-	crd := &apiextensionsv1.CustomResourceDefinition{}
-
-	// Try to fetch the CRD for ServiceMonitor
-	err := r.Client.Get(ctx, types.NamespacedName{
-		Name: "servicemonitors.monitoring.coreos.com",
-	}, crd)
-
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// CRD definitely not installed
-			return false
-		}
-		// If it's another kind of API error, log but fail safe
-		log.FromContext(ctx).Error(err, "Unable to check for ServiceMonitor CRD")
+// Helper to detect if the error indicates ServiceMonitor CRD is not found
+func isServiceMonitorCRDNotFoundError(err error) bool {
+	if err == nil {
 		return false
 	}
 
-	return true
+	// Check for "no matches for kind" error which indicates CRD is not installed
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "no matches for kind") && strings.Contains(errMsg, "ServiceMonitor") ||
+		strings.Contains(errMsg, "the server could not find the requested resource") ||
+		(apierrors.IsNotFound(err) && strings.Contains(errMsg, "servicemonitors.monitoring.coreos.com"))
 }

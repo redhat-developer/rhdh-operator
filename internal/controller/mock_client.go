@@ -107,11 +107,21 @@ func (m MockClient) Patch(_ context.Context, obj client.Object, patch client.Pat
 		return fmt.Errorf("patch: object Name should not be empty")
 	}
 
+	// Simulate CRD not found for ServiceMonitor when CRD is not registered
+	objKind := kind(obj)
+	if objKind == "ServiceMonitor" {
+		// Check if ServiceMonitor CRD exists in our mock store
+		crdKey := NameKind{Name: "servicemonitors.monitoring.coreos.com", Kind: "CustomResourceDefinition"}
+		if _, exists := m.objects[crdKey]; !exists {
+			return fmt.Errorf(`no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`)
+		}
+	}
+
 	dat, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
-	m.objects[NameKind{Name: obj.GetName(), Kind: kind(obj)}] = dat
+	m.objects[NameKind{Name: obj.GetName(), Kind: objKind}] = dat
 	return nil
 }
 
