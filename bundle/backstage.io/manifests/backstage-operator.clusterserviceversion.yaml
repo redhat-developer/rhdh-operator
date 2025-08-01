@@ -45,7 +45,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-07-31T18:53:34Z"
+    createdAt: "2025-07-23T22:46:48Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -121,6 +121,14 @@ spec:
           - list
           - watch
         - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
           - apps
           resources:
           - deployments
@@ -139,6 +147,18 @@ spec:
           - ingresses
           verbs:
           - get
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
         - apiGroups:
           - rhdh.redhat.com
           resources:

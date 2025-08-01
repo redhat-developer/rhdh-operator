@@ -75,8 +75,14 @@ func (m MockClient) Create(_ context.Context, obj client.Object, _ ...client.Cre
 	return nil
 }
 
-func (m MockClient) Delete(_ context.Context, _ client.Object, _ ...client.DeleteOption) error {
-	panic(implementMe)
+func (m MockClient) Delete(_ context.Context, obj client.Object, _ ...client.DeleteOption) error {
+	// Remove the object from the mock store
+	key := NameKind{Name: obj.GetName(), Kind: kind(obj)}
+	if _, exists := m.objects[key]; !exists {
+		return errors.NewNotFound(schema.GroupResource{Group: "", Resource: kind(obj)}, obj.GetName())
+	}
+	delete(m.objects, key)
+	return nil
 }
 
 func (m MockClient) Update(_ context.Context, obj client.Object, _ ...client.UpdateOption) error {
@@ -96,8 +102,27 @@ func (m MockClient) Update(_ context.Context, obj client.Object, _ ...client.Upd
 	return nil
 }
 
-func (m MockClient) Patch(_ context.Context, _ client.Object, _ client.Patch, _ ...client.PatchOption) error {
-	panic(implementMe)
+func (m MockClient) Patch(_ context.Context, obj client.Object, patch client.Patch, _ ...client.PatchOption) error {
+	if obj.GetName() == "" {
+		return fmt.Errorf("patch: object Name should not be empty")
+	}
+
+	// Simulate CRD not found for ServiceMonitor when CRD is not registered
+	objKind := kind(obj)
+	if objKind == "ServiceMonitor" {
+		// Check if ServiceMonitor CRD exists in our mock store
+		crdKey := NameKind{Name: "servicemonitors.monitoring.coreos.com", Kind: "CustomResourceDefinition"}
+		if _, exists := m.objects[crdKey]; !exists {
+			return fmt.Errorf(`no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`)
+		}
+	}
+
+	dat, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	m.objects[NameKind{Name: obj.GetName(), Kind: objKind}] = dat
+	return nil
 }
 
 func (m MockClient) DeleteAllOf(_ context.Context, _ client.Object, _ ...client.DeleteAllOfOption) error {

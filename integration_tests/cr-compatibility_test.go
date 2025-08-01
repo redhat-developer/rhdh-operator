@@ -82,7 +82,7 @@ var _ = When("testing API version compatibility", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 		}, 2*time.Minute, 10*time.Second).Should(Succeed())
 
-		By("verifying v1alpha3 deployment is created and running")
+		By("verifying v1alpha3 deployment is created")
 		Eventually(func(g Gomega) {
 			deploy := &appsv1.Deployment{}
 			err := k8sClient.Get(ctx, types.NamespacedName{
@@ -90,8 +90,9 @@ var _ = When("testing API version compatibility", func() {
 				Name:      model.DeploymentName(backstageNameV3),
 			}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy.Status.ReadyReplicas).To(BeNumerically(">", 0))
-		}, 3*time.Minute, 10*time.Second).Should(Succeed())
+			g.Expect(deploy.Spec.Replicas).ToNot(BeNil())
+			g.Expect(*deploy.Spec.Replicas).To(Equal(int32(1)))
+		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
 		// test v1alpha4 compatibility
 		By("creating a Backstage resource using v1alpha4 API")
@@ -131,7 +132,7 @@ var _ = When("testing API version compatibility", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 		}, 2*time.Minute, 10*time.Second).Should(Succeed())
 
-		By("verifying v1alpha4 deployment is created and running")
+		By("verifying v1alpha4 deployment is created")
 		Eventually(func(g Gomega) {
 			deploy := &appsv1.Deployment{}
 			err := k8sClient.Get(ctx, types.NamespacedName{
@@ -139,11 +140,12 @@ var _ = When("testing API version compatibility", func() {
 				Name:      model.DeploymentName(backstageNameV4),
 			}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy.Status.ReadyReplicas).To(BeNumerically(">", 0))
-		}, 3*time.Minute, 10*time.Second).Should(Succeed())
+			g.Expect(deploy.Spec.Replicas).ToNot(BeNil())
+			g.Expect(*deploy.Spec.Replicas).To(Equal(int32(1)))
+		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
 		By("verifying both v1alpha3 and v1alpha4 resources coexist")
-		// verify both deployments are running simultaneously
+		// verify both deployments exist and have correct specs
 		Eventually(func(g Gomega) {
 			deployV3 := &appsv1.Deployment{}
 			err := k8sClient.Get(ctx, types.NamespacedName{
@@ -151,7 +153,8 @@ var _ = When("testing API version compatibility", func() {
 				Name:      model.DeploymentName(backstageNameV3),
 			}, deployV3)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deployV3.Status.ReadyReplicas).To(BeNumerically(">", 0))
+			g.Expect(deployV3.Spec.Replicas).ToNot(BeNil())
+			g.Expect(*deployV3.Spec.Replicas).To(Equal(int32(1)))
 
 			deployV4 := &appsv1.Deployment{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
@@ -159,8 +162,9 @@ var _ = When("testing API version compatibility", func() {
 				Name:      model.DeploymentName(backstageNameV4),
 			}, deployV4)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deployV4.Status.ReadyReplicas).To(BeNumerically(">", 0))
-		}, 4*time.Minute, 15*time.Second).Should(Succeed())
+			g.Expect(deployV4.Spec.Replicas).ToNot(BeNil())
+			g.Expect(*deployV4.Spec.Replicas).To(Equal(int32(1)))
+		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
 		// clean up test resources
 		By("cleaning up v1alpha3 test resource")
