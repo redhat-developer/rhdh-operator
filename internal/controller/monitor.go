@@ -27,13 +27,7 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 		)
 	}
 
-	lg.Info("Monitoring enabled, creating/updating ServiceMonitor")
-
 	sm := &monitoringv1.ServiceMonitor{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "monitoring.coreos.com/v1",
-			Kind:       "ServiceMonitor",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backstage.Name + "-metrics",
 			Namespace: backstage.Namespace,
@@ -71,7 +65,6 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 		FieldManager: BackstageFieldManager,
 		Force:        ptr.To(true),
 	}); err != nil {
-		lg.Error(err, "Failed to apply ServiceMonitor")
 		return fmt.Errorf("failed to apply ServiceMonitor: %w", err)
 	}
 

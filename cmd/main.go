@@ -21,7 +21,6 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
 
@@ -42,7 +41,6 @@ func init() {
 	utilruntime.Must(openshift.Install(scheme))
 
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
-	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

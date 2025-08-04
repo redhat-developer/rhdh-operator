@@ -118,35 +118,6 @@ func TestApplyServiceMonitor_MonitoringEnabled_WithCRD(t *testing.T) {
 	err := r.Create(ctx, backstage)
 	assert.NoError(t, err)
 
-	// Create ServiceMonitor CRD
-	crd := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "servicemonitors.monitoring.coreos.com",
-		},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: "monitoring.coreos.com",
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-				{
-					Name:    "v1",
-					Served:  true,
-					Storage: true,
-					Schema: &apiextensionsv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-						},
-					},
-				},
-			},
-			Scope: apiextensionsv1.NamespaceScoped,
-			Names: apiextensionsv1.CustomResourceDefinitionNames{
-				Plural: "servicemonitors",
-				Kind:   "ServiceMonitor",
-			},
-		},
-	}
-	err = r.Create(ctx, crd)
-	assert.NoError(t, err)
-
 	// Apply service monitor (should succeed)
 	err = r.applyServiceMonitor(ctx, backstage)
 	assert.NoError(t, err)
