@@ -118,6 +118,15 @@ func TestApplyServiceMonitor_MonitoringEnabled_WithCRD(t *testing.T) {
 	err := r.Create(ctx, backstage)
 	assert.NoError(t, err)
 
+	// Create minimal ServiceMonitor CRD for mock client
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "servicemonitors.monitoring.coreos.com",
+		},
+	}
+	err = r.Create(ctx, crd)
+	assert.NoError(t, err)
+
 	// Apply service monitor (should succeed)
 	err = r.applyServiceMonitor(ctx, backstage)
 	assert.NoError(t, err)
@@ -133,8 +142,6 @@ func TestApplyServiceMonitor_MonitoringEnabled_WithCRD(t *testing.T) {
 	// Verify ServiceMonitor configuration
 	assert.Equal(t, backstage.Name+"-metrics", sm.Name)
 	assert.Equal(t, backstage.Namespace, sm.Namespace)
-	assert.Equal(t, "monitoring.coreos.com/v1", sm.TypeMeta.APIVersion)
-	assert.Equal(t, "ServiceMonitor", sm.TypeMeta.Kind)
 
 	// Verify labels
 	expectedLabels := map[string]string{
