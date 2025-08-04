@@ -24,8 +24,9 @@ jobs:
     env:
       CONTAINER_TOOL: podman
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4 # default branch will be checked out by default on scheduled workflows
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
+          ref: ${{ matrix.branch }}
           fetch-depth: 0
 
       - name: Setup Go
