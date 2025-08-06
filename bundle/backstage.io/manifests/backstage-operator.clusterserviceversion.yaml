@@ -45,7 +45,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-07-31T18:53:34Z"
+    createdAt: "2025-08-05T13:32:45Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -139,6 +139,18 @@ spec:
           - ingresses
           verbs:
           - get
+        - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
         - apiGroups:
           - rhdh.redhat.com
           resources:
