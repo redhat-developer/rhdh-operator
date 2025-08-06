@@ -7,6 +7,7 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -57,7 +58,7 @@ func TestApplyServiceMonitor_MonitoringDisabled(t *testing.T) {
 	// Create an existing ServiceMonitor to test deletion
 	existingSM := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      backstage.Name + "-metrics",
+			Name:      utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
 			Namespace: backstage.Namespace,
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{},
@@ -72,7 +73,7 @@ func TestApplyServiceMonitor_MonitoringDisabled(t *testing.T) {
 	// Verify ServiceMonitor was deleted
 	sm := &monitoringv1.ServiceMonitor{}
 	err = r.Get(ctx, types.NamespacedName{
-		Name:      backstage.Name + "-metrics",
+		Name:      utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
 		Namespace: backstage.Namespace,
 	}, sm)
 	assert.True(t, apierrors.IsNotFound(err))
@@ -134,13 +135,13 @@ func TestApplyServiceMonitor_MonitoringEnabled_WithCRD(t *testing.T) {
 	// Verify ServiceMonitor was created
 	sm := &monitoringv1.ServiceMonitor{}
 	err = r.Get(ctx, types.NamespacedName{
-		Name:      backstage.Name + "-metrics",
+		Name:      utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
 		Namespace: backstage.Namespace,
 	}, sm)
 	assert.NoError(t, err)
 
 	// Verify ServiceMonitor configuration
-	assert.Equal(t, backstage.Name+"-metrics", sm.Name)
+	assert.Equal(t, utils.GenerateRuntimeObjectName(backstage.Name, "metrics"), sm.Name)
 	assert.Equal(t, backstage.Namespace, sm.Namespace)
 
 	// Verify labels
@@ -205,7 +206,7 @@ func TestApplyServiceMonitor_Update_ExistingServiceMonitor(t *testing.T) {
 	// Create an existing ServiceMonitor with different configuration
 	existingSM := &monitoringv1.ServiceMonitor{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      backstage.Name + "-metrics",
+			Name:      utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
 			Namespace: backstage.Namespace,
 			Labels: map[string]string{
 				"old-label": "old-value",
@@ -231,7 +232,7 @@ func TestApplyServiceMonitor_Update_ExistingServiceMonitor(t *testing.T) {
 	// Verify ServiceMonitor was updated
 	sm := &monitoringv1.ServiceMonitor{}
 	err = r.Get(ctx, types.NamespacedName{
-		Name:      backstage.Name + "-metrics",
+		Name:      utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
 		Namespace: backstage.Namespace,
 	}, sm)
 	assert.NoError(t, err)

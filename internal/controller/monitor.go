@@ -6,6 +6,7 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,7 +23,7 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 		lg.Info("Monitoring disabled, deleting any existing ServiceMonitor")
 		return r.tryToDelete(ctx,
 			&monitoringv1.ServiceMonitor{},
-			backstage.Name+"-metrics",
+			utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
 			backstage.Namespace,
 		)
 	}
@@ -33,7 +34,7 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 			Kind:       "ServiceMonitor",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      backstage.Name + "-metrics",
+			Name:      utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
 			Namespace: backstage.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/instance": backstage.Name,
