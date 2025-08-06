@@ -133,7 +133,7 @@ Examples:
   # It will automatically replace all references to the internal RH registries with quay.io
   $0 \\
     --ci-index true \\
-    --filter-versions "1.4,1.5"
+    --filter-versions '1.4,1.5'
 "
 }
 
