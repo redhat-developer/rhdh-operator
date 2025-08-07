@@ -79,7 +79,7 @@ Options:
                                             Setting this to 'true' causes the script to replace all references to the internal RH registries
                                             with quay.io when mirroring images. Relevant only if '--use-oc-mirror' is 'false'. 
                                             When set to 'true', --filter-versions must be explicitly specified. Default: false
-  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: $FILTERED_VERSIONS_CSV).
+  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: * (all versions)).
                                             Specify '*' to disable version filtering and include all channels and all versions.
                                             Useful for CI index images for example.
   --to-registry <registry_url>           : Mirror the images into the specified registry, assuming you are already logged into it.
@@ -184,6 +184,7 @@ while [[ "$#" -gt 0 ]]; do
     shift 1
     ;;
   '--prod_operator_version')
+    FILTER_VERSIONS_PROVIDED="true"
     input="${2#v}"
     IFS='.' read -ra parts <<<"$input"
     length=${#parts[@]}
