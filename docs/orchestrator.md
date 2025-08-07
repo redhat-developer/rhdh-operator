@@ -89,7 +89,7 @@ As for RHDH 1.7 the orchestrator plugin packages are located in **npm.registry.r
 
 The orchestrator plugin instance requires the following dependencies to be installed:
 - A SonataflowPlatform custom resource - created in the namespace of the Backstage CR.
-- A set of NetworkPolicies to allow traffic between Knative resources created in the namespace of Backstage CR, traffic for monitoring, and intra-namespace traffic.
+- A set of NetworkPolicies to allow traffic between infra resources (knative and serverless logic operator) created in the namespace of Backstage CR, traffic for monitoring, and intra-namespace traffic.
 
 The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
 
