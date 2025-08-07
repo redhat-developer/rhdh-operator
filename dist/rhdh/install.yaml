@@ -2483,7 +2483,7 @@ data:
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-knative-to-sonataflow-and-workflows # hardcoded
+      name: allow-infra-ns-to-workflow-ns # hardcoded
     spec:
       podSelector: {}
       ingress:
@@ -2496,6 +2496,10 @@ data:
                 matchLabels:
                   # Allow auxiliary knative function for workflow (such as m2k-save-transformation)
                   kubernetes.io/metadata.name: knative-serving
+            - namespaceSelector:
+                matchLabels:
+                  # Allow openshift serverless logic operator controller pod to access all pods in sonataflow
+                  kubernetes.io/metadata.name: openshift-serverless-logic
     ---
     # NetworkPolicy to unblock incoming traffic to the namespace
     apiVersion: networking.k8s.io/v1
