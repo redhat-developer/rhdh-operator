@@ -364,8 +364,14 @@ data:
     \                     name: orchestratorIcon\n                  dynamicRoutes:\n
     \                   - importName: OrchestratorPage\n                      menuItem:\n
     \                       icon: orchestratorIcon\n                        text:
-    Orchestrator\n                      path: /orchestrator\n      - disabled: true\n
-    \       package: \"@redhat/backstage-plugin-orchestrator-backend-dynamic@1.7.0\"\n
+    Orchestrator\n                      path: /orchestrator\n                  entityTabs:\n
+    \                   - path: /workflows\n                      title: Workflows\n
+    \                     mountPoint: entity.page.workflows\n                  mountPoints:\n
+    \                   - mountPoint: entity.page.workflows/cards\n                      importName:
+    OrchestratorCatalogTab\n                      config:\n                        layout:\n
+    \                         gridColumn: '1 / -1'\n                          if:\n
+    \                           anyOf:\n                              - IsOrchestratorCatalogTabAvailable\n
+    \     - disabled: true\n        package: \"@redhat/backstage-plugin-orchestrator-backend-dynamic@1.7.0\"\n
     \       integrity: sha512-CRqcbfTFQqqHbUUl89rz5cCK5HdKEVQ1/IqZekYjec/9hFra36y37AZm2PiwjdW7/aqnvM14TnLIjI1MU8NXZw==\n
     \       pluginConfig:\n          orchestrator:\n            dataIndexService:\n
     \             url: http://sonataflow-platform-data-index-service\n        dependencies:\n

@@ -45,6 +45,19 @@ data:
                         icon: orchestratorIcon
                         text: Orchestrator
                       path: /orchestrator
+                  entityTabs:
+                    - path: /workflows
+                      title: Workflows
+                      mountPoint: entity.page.workflows
+                  mountPoints:
+                    - mountPoint: entity.page.workflows/cards
+                      importName: OrchestratorCatalogTab
+                      config:
+                        layout:
+                          gridColumn: '1 / -1'
+                          if:
+                            anyOf:
+                              - IsOrchestratorCatalogTabAvailable
       - disabled: true
         package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.7.0"
         integrity: sha512-CRqcbfTFQqqHbUUl89rz5cCK5HdKEVQ1/IqZekYjec/9hFra36y37AZm2PiwjdW7/aqnvM14TnLIjI1MU8NXZw==
