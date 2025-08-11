@@ -80,19 +80,26 @@ func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) e
 		return fmt.Errorf("validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
 	}
 
-	dp := model.ExternalConfig.DynamicPlugins
+	dp := &model.ExternalConfig.DynamicPlugins
 
 	if dp.Data == nil || dp.Data[DynamicPluginsFile] == "" {
 		return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
 	}
 
-	if dp.Data[DynamicPluginsFile] != "" {
-		model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
-			dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
+	var err error
+	mergedData, err := mergeDynamicPlugins(model.DynamicPlugins.ConfigMap.Data[DynamicPluginsFile], dp.Data[DynamicPluginsFile])
+
+	if err != nil {
+		return fmt.Errorf("failed to merge dynamic plugins config: %w", err)
 	}
 
-	// if default dynamic-plugins set, the value from model.DynamicPlugins will differ from the one in model.RuntimeObjects
-	model.DynamicPlugins.ConfigMap = &dp
+	model.DynamicPlugins.ConfigMap.Data[DynamicPluginsFile] = mergedData
+	model.getRuntimeObjectByType(&DynamicPlugins{}).setObject(model.DynamicPlugins.ConfigMap)
+
+	if dp.Data[DynamicPluginsFile] != "" {
+		model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+			model.DynamicPlugins.ConfigMap.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(model.DynamicPlugins.ConfigMap.Data))
+	}
 
 	return nil
 }
@@ -120,7 +127,9 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 
 	if p.ConfigMap == nil {
 		if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
-			p.ConfigMap = &corev1.ConfigMap{}
+			p.ConfigMap = &corev1.ConfigMap{
+				Data: map[string]string{},
+			}
 		} else {
 			return false, nil
 		}
@@ -135,6 +144,10 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
 
 	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+		err := addDynamicPluginsFromSpec(backstage.Spec, model)
+		if err != nil {
+			return fmt.Errorf("failed to add dynamic plugins from spec: %w", err)
+		}
 		return nil
 	}
 
@@ -201,6 +214,77 @@ func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
 	}
 
 	return pluginsConfig.Plugins, nil
+}
+
+func mergeDynamicPlugins(modelData string, specData string) (string, error) {
+
+	var modelPluginsConfig, specPluginsConfig DynaPluginsConfig
+	if modelData != "" {
+		if err := yaml.Unmarshal([]byte(modelData), &modelPluginsConfig); err != nil {
+			return "", fmt.Errorf("failed to unmarshal model ConfigMap data: %w", err)
+		}
+	}
+	if specData != "" {
+		if err := yaml.Unmarshal([]byte(specData), &specPluginsConfig); err != nil {
+			return "", fmt.Errorf("failed to unmarshal spec ConfigMap data: %w", err)
+		}
+	}
+
+	// Merge Plugins by package field
+	pluginMap := make(map[string]DynaPlugin)
+	for _, plugin := range modelPluginsConfig.Plugins {
+		pluginMap[plugin.Package] = plugin
+	}
+	for _, plugin := range specPluginsConfig.Plugins {
+
+		if existingPlugin, found := pluginMap[plugin.Package]; found {
+			if plugin.PluginConfig != nil {
+				existingPlugin.PluginConfig = plugin.PluginConfig
+			}
+			if len(plugin.Dependencies) > 0 {
+				existingPlugin.Dependencies = plugin.Dependencies
+			}
+			if plugin.Integrity != "" {
+				existingPlugin.Integrity = plugin.Integrity
+			}
+			existingPlugin.Disabled = plugin.Disabled
+			pluginMap[plugin.Package] = existingPlugin
+		} else {
+			// If the plugin is not found in model, add it from spec
+			if !plugin.Disabled {
+				pluginMap[plugin.Package] = plugin
+			}
+		}
+	}
+	mergedPluginsConfig := modelPluginsConfig
+	mergedPluginsConfig.Plugins = make([]DynaPlugin, 0, len(pluginMap))
+	for _, plugin := range pluginMap {
+		// Only add non-disabled plugins
+		if !plugin.Disabled {
+			mergedPluginsConfig.Plugins = append(mergedPluginsConfig.Plugins, plugin)
+		}
+	}
+
+	// Merge Includes (ensure uniqueness)
+	includeSet := make(map[string]struct{})
+	for _, include := range modelPluginsConfig.Includes {
+		includeSet[include] = struct{}{}
+	}
+	for _, include := range specPluginsConfig.Includes {
+		includeSet[include] = struct{}{}
+	}
+	mergedPluginsConfig.Includes = make([]string, 0, len(includeSet))
+	for include := range includeSet {
+		mergedPluginsConfig.Includes = append(mergedPluginsConfig.Includes, include)
+	}
+
+	// Marshal the merged data back to YAML
+	mergedData, err := yaml.Marshal(mergedPluginsConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal merged plugins config: %w", err)
+	}
+
+	return string(mergedData), nil
 }
 
 // returns initContainer supposed to initialize DynamicPlugins

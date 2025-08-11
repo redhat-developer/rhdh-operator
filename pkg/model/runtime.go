@@ -182,9 +182,7 @@ func addFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
 	}
 
 	addConfigMapEnvsFromSpec(spec, model)
-	if err := addDynamicPluginsFromSpec(spec, model); err != nil {
-		return err
-	}
+
 	if err := addSecretFilesFromSpec(spec, model); err != nil {
 		return err
 	}
