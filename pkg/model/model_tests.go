@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	corev1 "k8s.io/api/core/v1"
+
 	openshift "github.com/openshift/api/route/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
@@ -82,4 +84,13 @@ func readTestYamlFile(name string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read YAML file: %w", err)
 	}
 	return b, nil
+}
+
+func checkIfContainVolumes(volumes []corev1.Volume, name string) bool {
+	for _, volume := range volumes {
+		if volume.Name == name {
+			return true
+		}
+	}
+	return false
 }

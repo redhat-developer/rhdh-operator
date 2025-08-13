@@ -106,6 +106,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 
 	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: platform.IsOpenshift(), DynamicPlugins: DynamicPlugins{}}
 
+	ecs := make([]ExternalConfigContributor, 0)
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
 
@@ -150,47 +151,32 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		} else if added {
 			backstageObject.setMetaInfo(backstage, scheme)
 		}
+		if ecc, ok := backstageObject.(ExternalConfigContributor); ok {
+			// backstageObject is an instance of ExternalConfigContributor
+			ecs = append(ecs, ecc)
+		}
+
 	}
 
 	// set generic metainfo and updateAndValidate all
 	for _, v := range model.RuntimeObjects {
-		err := v.updateAndValidate(model, backstage)
+		err := v.updateAndValidate(backstage)
 		if err != nil {
 			return nil, fmt.Errorf("failed object validation, reason: %s", err)
 		}
 	}
 
 	// Add objects specified in Backstage CR
-	if err := addFromSpec(backstage.Spec, model); err != nil {
-		return nil, err
+	for _, ecc := range ecs {
+		if err := ecc.addExternalConfig(backstage.Spec); err != nil {
+			return nil, fmt.Errorf("failed to contribute external config, reason: %s", err)
+		}
 	}
 
 	// sort for reconciliation number optimization
 	model.sortRuntimeObjects()
 
 	return model, nil
-}
-
-func addFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
-
-	if err := addAppConfigsFromSpec(spec, model); err != nil {
-		return err
-	}
-
-	if err := addConfigMapFilesFromSpec(spec, model); err != nil {
-		return err
-	}
-
-	addConfigMapEnvsFromSpec(spec, model)
-
-	if err := addSecretFilesFromSpec(spec, model); err != nil {
-		return err
-	}
-	if err := addSecretEnvsFromSpec(spec, model); err != nil {
-		return err
-	}
-	addPvcsFromSpec(spec, model)
-	return nil
 }
 
 // Every RuntimeObject.setMetaInfo should as minimum call this

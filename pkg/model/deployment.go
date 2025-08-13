@@ -46,6 +46,7 @@ func (f BackstageDeploymentFactory) newBackstageObject() RuntimeObject {
 
 type BackstageDeployment struct {
 	deployment *appsv1.Deployment
+	model      *BackstageModel
 }
 
 func init() {
@@ -105,6 +106,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 
 	model.backstageDeployment = b
 	model.setRuntimeObject(b)
+	b.model = model
 
 	// override image with env var
 	if os.Getenv(BackstageImageEnvVar) != "" {
@@ -119,14 +121,14 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
+func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error {
 
 	//DbSecret
 	if backstage.Spec.IsAuthSecretSpecified() {
 		b.addEnvVarsFrom([]string{BackstageContainerName()}, SecretObjectKind, backstage.Spec.Database.AuthSecretName, "")
 		//utils.SetDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
-	} else if model.LocalDbSecret != nil {
-		b.addEnvVarsFrom([]string{BackstageContainerName()}, SecretObjectKind, model.LocalDbSecret.secret.Name, "")
+	} else if b.model.LocalDbSecret != nil {
+		b.addEnvVarsFrom([]string{BackstageContainerName()}, SecretObjectKind, b.model.LocalDbSecret.secret.Name, "")
 		//utils.SetDbSecretEnvVar(b.container(), model.LocalDbSecret.secret.Name)
 	}
 

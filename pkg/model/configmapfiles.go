@@ -19,22 +19,23 @@ func (f ConfigMapFilesFactory) newBackstageObject() RuntimeObject {
 
 type ConfigMapFiles struct {
 	ConfigMap *corev1.ConfigMap
+	model     *BackstageModel
 }
 
 func init() {
 	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false)
 }
 
-func addConfigMapFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
+func (p *ConfigMapFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
 		return nil
 	}
 
 	for _, specCm := range spec.Application.ExtraFiles.ConfigMaps {
 
-		mp, wSubpath := model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.ExtraFiles.MountPath)
-		keys := model.ExternalConfig.ExtraFileConfigMapKeys[specCm.Name].All()
-		model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
+		mp, wSubpath := p.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.ExtraFiles.MountPath)
+		keys := p.model.ExternalConfig.ExtraFileConfigMapKeys[specCm.Name].All()
+		p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
 			specCm.Name, mp, specCm.Key, wSubpath, keys)
 	}
 	return nil
@@ -59,6 +60,7 @@ func (p *ConfigMapFiles) EmptyObject() client.Object {
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	p.model = model
 	if p.ConfigMap != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -67,11 +69,11 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+func (p *ConfigMapFiles) updateAndValidate(_ bsv1.Backstage) error {
 
 	keys := append(maps.Keys(p.ConfigMap.Data), maps.Keys(p.ConfigMap.BinaryData)...)
-	m.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
-		p.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, keys)
+	p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
+		p.ConfigMap.Name, p.model.backstageDeployment.defaultMountPath(), "", true, keys)
 
 	return nil
 }

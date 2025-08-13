@@ -40,6 +40,7 @@ func (f DynamicPluginsFactory) newBackstageObject() RuntimeObject {
 
 type DynamicPlugins struct {
 	ConfigMap *corev1.ConfigMap
+	model     *BackstageModel
 }
 
 type DynaPluginsConfig struct {
@@ -69,41 +70,6 @@ func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
 }
 
-func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
-
-	if spec.Application == nil || spec.Application.DynamicPluginsConfigMapName == "" {
-		return nil
-	}
-
-	_, ic := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
-	if ic == nil {
-		return fmt.Errorf("validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
-	}
-
-	dp := &model.ExternalConfig.DynamicPlugins
-
-	if dp.Data == nil || dp.Data[DynamicPluginsFile] == "" {
-		return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
-	}
-
-	var err error
-	mergedData, err := mergeDynamicPlugins(model.DynamicPlugins.ConfigMap.Data[DynamicPluginsFile], dp.Data[DynamicPluginsFile])
-
-	if err != nil {
-		return fmt.Errorf("failed to merge dynamic plugins config: %w", err)
-	}
-
-	model.DynamicPlugins.ConfigMap.Data[DynamicPluginsFile] = mergedData
-	model.getRuntimeObjectByType(&DynamicPlugins{}).setObject(model.DynamicPlugins.ConfigMap)
-
-	if dp.Data[DynamicPluginsFile] != "" {
-		model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
-			model.DynamicPlugins.ConfigMap.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(model.DynamicPlugins.ConfigMap.Data))
-	}
-
-	return nil
-}
-
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) Object() runtime.Object {
 	return p.ConfigMap
@@ -114,7 +80,6 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 	if obj != nil {
 		p.ConfigMap = obj.(*corev1.ConfigMap)
 	}
-
 }
 
 // implementation of RuntimeObject interface
@@ -136,22 +101,15 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 	}
 	model.setRuntimeObject(p)
 	model.DynamicPlugins = *p
+	p.model = model
 	return true, nil
 }
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
+func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
 
-	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
-		err := addDynamicPluginsFromSpec(backstage.Spec, model)
-		if err != nil {
-			return fmt.Errorf("failed to add dynamic plugins from spec: %w", err)
-		}
-		return nil
-	}
-
-	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	_, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
 	if initContainer == nil {
 		return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
 	}
@@ -164,7 +122,21 @@ func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, backstage bsv1
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
 
-	model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+
+		dp := &p.model.ExternalConfig.DynamicPlugins
+		if dp.Data == nil || dp.Data[DynamicPluginsFile] == "" {
+			return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
+		}
+
+		mergedData, err := mergeDynamicPlugins(p.model.DynamicPlugins.ConfigMap.Data[DynamicPluginsFile], dp.Data[DynamicPluginsFile])
+		if err != nil {
+			return fmt.Errorf("failed to merge dynamic plugins config: %w", err)
+		}
+		p.ConfigMap.Data[DynamicPluginsFile] = mergedData
+	}
+
+	p.model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
 		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
 
 	return nil
