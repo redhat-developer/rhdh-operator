@@ -4,19 +4,13 @@ metadata:
   name: orchestrator-plugin
 data:
   dynamic-plugins.yaml: |
-    #includes:
-      #- dynamic-plugins.default.yaml
     plugins:
       - package: "@redhat/backstage-plugin-orchestrator@1.6.0"
-        #disabled: false
       - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
-        #disabled: false
         dependencies:
           - ref: sonataflow
       - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.6.0"
-        #disabled: false
       - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.6.0"
-        #disabled: false
 ---
 apiVersion: v1
 kind: ConfigMap

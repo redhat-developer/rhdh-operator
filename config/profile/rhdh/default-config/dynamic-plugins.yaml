@@ -26,8 +26,8 @@ metadata:
   name: default-dynamic-plugins
 data:
   dynamic-plugins.yaml: |
-    # includes:
-      # - dynamic-plugins.default.yaml
+    includes:
+      - dynamic-plugins.default.yaml
     plugins:
       - disabled: true
         package: "@redhat/backstage-plugin-orchestrator@1.6.0"
