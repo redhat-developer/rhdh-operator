@@ -39,9 +39,8 @@ func (f DynamicPluginsFactory) newBackstageObject() RuntimeObject {
 }
 
 type DynamicPlugins struct {
-	ConfigMap     *corev1.ConfigMap
-	model         *BackstageModel
-	initContainer *corev1.Container
+	ConfigMap *corev1.ConfigMap
+	model     *BackstageModel
 }
 
 type DynaPluginsConfig struct {
