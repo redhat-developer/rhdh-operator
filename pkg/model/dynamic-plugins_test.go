@@ -158,9 +158,9 @@ func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
 	//dynamic-plugins-auth
-	//vol-dplugin
+	//dplugin
 	assert.Equal(t, 4, len(ic.VolumeMounts))
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(DynamicPluginsDefaultName(bs.Name)), ic.VolumeMounts[3].Name)
+	assert.Equal(t, bs.Spec.Application.DynamicPluginsConfigMapName, ic.VolumeMounts[3].Name)
 
 	deps, err := model.DynamicPlugins.Dependencies()
 	assert.NoError(t, err)
@@ -382,6 +382,17 @@ includes:
   - "include-1"
 `
 
+	defDynamicPlugins := &DynamicPlugins{
+		ConfigMap: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: DynamicPluginsDefaultName("test-backstage"),
+			},
+			Data: map[string]string{
+				DynamicPluginsFile: modelData,
+			},
+		},
+	}
+
 	// Sample spec data
 	specData := `
 plugins:
@@ -398,7 +409,7 @@ includes:
 `
 
 	// Call the function
-	mergedData, err := mergeDynamicPlugins(modelData, specData)
+	mergedData, err := defDynamicPlugins.mergeWith(specData)
 
 	// Assertions
 	assert.NoError(t, err)
