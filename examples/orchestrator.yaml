@@ -5,15 +5,15 @@ metadata:
 data:
   dynamic-plugins.yaml: |
     plugins:
-      - package: "@redhat/backstage-plugin-orchestrator@1.6.0"
+      - package: "@redhat/backstage-plugin-orchestrator@1.7.0"
         disabled: false
-      - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
+      - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.7.0"
+        disabled: false
         dependencies:
           - ref: sonataflow
-        disabled: false    
-      - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.6.0"
+      - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.7.0"
         disabled: false
-      - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.6.0"
+      - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.7.0"
         disabled: false
     # Enable Bulk import plugins.
 #      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-bulk-import-backend-dynamic
