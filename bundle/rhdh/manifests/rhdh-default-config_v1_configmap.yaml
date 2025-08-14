@@ -356,7 +356,7 @@ data:
     \   # for an example.\n#    ###########################################################################################################\n#
     \   includes:\n#      - dynamic-plugins.default.yaml\n#    plugins: []\n#---\napiVersion:
     v1\nkind: ConfigMap\nmetadata:\n  name: default-dynamic-plugins\ndata:\n  dynamic-plugins.yaml:
-    |\n    # includes:\n      # - dynamic-plugins.default.yaml\n    plugins:\n      -
+    |\n    includes:\n      - dynamic-plugins.default.yaml\n    plugins:\n      -
     disabled: true\n        package: \"@redhat/backstage-plugin-orchestrator@1.6.0\"\n
     \       integrity: sha512-fOSJv2PgtD2urKwBM7p9W6gV/0UIHSf4pkZ9V/wQO0eg0Zi5Mys/CL1ba3nO9x9l84MX11UBZ2r7PPVJPrmOtw==\n
     \       pluginConfig:\n          dynamicPlugins:\n              frontend:\n                red-hat-developer-hub.backstage-plugin-orchestrator:\n
