@@ -57,6 +57,9 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 					ConfigMaps: []bsv1.EnvObjectRef{},
 				},
 			},
+			Database: &bsv1.Database{
+				EnableLocalDb: ptr.To(false),
+			},
 		},
 	}
 
@@ -79,5 +82,44 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 
 	assert.NotNil(t, bscontainer.Env[0])
 	assert.Equal(t, "ENV1", bscontainer.Env[0].ValueFrom.ConfigMapKeyRef.Key)
+
+}
+
+func TestDefaultAndSpecifiedConfigMapEnvFrom(t *testing.T) {
+
+	bs := bsv1.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bs",
+			Namespace: "ns123",
+		},
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				ExtraEnvs: &bsv1.ExtraEnvs{
+					ConfigMaps: []bsv1.EnvObjectRef{
+						{Name: "mapName", Key: "ENV1"},
+					},
+				},
+			},
+			Database: &bsv1.Database{
+				EnableLocalDb: ptr.To(false),
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-envs.yaml", "raw-cm-envs.yaml")
+
+	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraEnvConfigMapKeys["mapName"] = NewDataObjectKeys(map[string]string{"mapName": "ENV1"}, nil)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	bscontainer := model.backstageDeployment.container()
+	assert.NotNil(t, bscontainer)
+
+	assert.Equal(t, 1, len(bscontainer.EnvFrom))
+	assert.Equal(t, 1, len(bscontainer.Env))
 
 }

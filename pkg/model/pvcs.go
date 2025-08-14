@@ -24,27 +24,29 @@ func init() {
 	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true)
 }
 
-func addPvcsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) {
+func (b *BackstagePvcs) addExternalConfig(spec bsv1.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Pvcs == nil || len(spec.Application.ExtraFiles.Pvcs) == 0 {
-		return
+		return nil
 	}
 
 	for _, pvcSpec := range spec.Application.ExtraFiles.Pvcs {
 
 		subPath := ""
-		mountPath, wSubpath := model.backstageDeployment.mountPath(pvcSpec.MountPath, "", spec.Application.ExtraFiles.MountPath)
+		mountPath, wSubpath := b.model.backstageDeployment.mountPath(pvcSpec.MountPath, "", spec.Application.ExtraFiles.MountPath)
 
 		if wSubpath {
 			mountPath = filepath.Join(mountPath, pvcSpec.Name)
 			subPath = utils.ToRFC1123Label(pvcSpec.Name)
 		}
 
-		addPvc(model.backstageDeployment, pvcSpec.Name, mountPath, subPath, []string{BackstageContainerName()})
+		addPvc(b.model.backstageDeployment, pvcSpec.Name, mountPath, subPath, []string{BackstageContainerName()})
 	}
+	return nil
 }
 
 type BackstagePvcs struct {
-	pvcs *multiobject.MultiObject
+	pvcs  *multiobject.MultiObject
+	model *BackstageModel
 }
 
 func PvcsName(backstageName, originalName string) string {
@@ -64,6 +66,7 @@ func (b *BackstagePvcs) EmptyObject() client.Object {
 }
 
 func (b *BackstagePvcs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	b.model = model
 	if b.pvcs != nil {
 		model.setRuntimeObject(b)
 		return true, nil
@@ -71,14 +74,14 @@ func (b *BackstagePvcs) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 	return false, nil
 }
 
-func (b *BackstagePvcs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+func (b *BackstagePvcs) updateAndValidate(_ bsv1.Backstage) error {
 	for _, o := range b.pvcs.Items {
 		pvc, ok := o.(*corev1.PersistentVolumeClaim)
 		if !ok {
 			return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
 		}
-		mountPath, subPath, containers := m.backstageDeployment.getDefConfigMountInfo(o)
-		addPvc(m.backstageDeployment, pvc.Name, mountPath, subPath, containers)
+		mountPath, subPath, containers := b.model.backstageDeployment.getDefConfigMountInfo(o)
+		addPvc(b.model.backstageDeployment, pvc.Name, mountPath, subPath, containers)
 	}
 	return nil
 }

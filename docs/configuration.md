@@ -507,6 +507,11 @@ spec:
   application:
     dynamicPluginsConfigMapName: "dynamic-plugins-config"
 ```
+
+**NOTE:**
+Before version **0.8.0**, the Operator overrode the default Dynamic Plugins configuration with the one specified in Custom Resource. This meant that the user had to specify all the default plugins in the Custom Resource.
+From version **0.8.0**, the Operator merges the default Dynamic Plugins configuration with the one specified in the Custom Resource. This allows users to override only the parts they want to change, while still keeping the default plugins.
+
 Starting from version **0.7.0**, the Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
 
 ```yaml

@@ -24,6 +24,7 @@ func (f AppConfigFactory) newBackstageObject() RuntimeObject {
 // Mount path is a patch to the follder to place the files to
 type AppConfig struct {
 	ConfigMap *corev1.ConfigMap
+	model     *BackstageModel
 }
 
 func init() {
@@ -34,16 +35,16 @@ func AppConfigDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-appconfig")
 }
 
-func addAppConfigsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
+func (b *AppConfig) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 	if spec.Application == nil || spec.Application.AppConfig == nil || spec.Application.AppConfig.ConfigMaps == nil {
 		return nil
 	}
 
 	for _, specCm := range spec.Application.AppConfig.ConfigMaps {
-		mp, wSubpath := model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
-		updatePodWithAppConfig(model.backstageDeployment, model.backstageDeployment.container(), specCm.Name,
-			mp, specCm.Key, wSubpath, model.ExternalConfig.AppConfigKeys[specCm.Name])
+		mp, wSubpath := b.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
+		updatePodWithAppConfig(b.model.backstageDeployment, b.model.backstageDeployment.container(), specCm.Name,
+			mp, specCm.Key, wSubpath, b.model.ExternalConfig.AppConfigKeys[specCm.Name])
 	}
 	return nil
 }
@@ -67,7 +68,8 @@ func (b *AppConfig) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (b *AppConfig) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+	b.model = model
 	if b.ConfigMap != nil {
 		model.appConfig = b
 		model.setRuntimeObject(b)
@@ -77,8 +79,9 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(m *BackstageModel, backstage bsv1.Backstage) error {
-	updatePodWithAppConfig(m.backstageDeployment, m.backstageDeployment.container(), b.ConfigMap.Name, m.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
+func (b *AppConfig) updateAndValidate(backstage bsv1.Backstage) error {
+	updatePodWithAppConfig(b.model.backstageDeployment, b.model.backstageDeployment.container(), b.ConfigMap.Name,
+		b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
 	return nil
 }
 

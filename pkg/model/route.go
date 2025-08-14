@@ -24,6 +24,7 @@ func (f BackstageRouteFactory) newBackstageObject() RuntimeObject {
 
 type BackstageRoute struct {
 	route *openshift.Route
+	model *BackstageModel
 }
 
 func RouteName(backstageName string) string {
@@ -97,6 +98,7 @@ func (b *BackstageRoute) EmptyObject() client.Object {
 // implementation of RuntimeObject interface
 func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 
+	b.model = model
 	// not Openshift
 	if !model.isOpenshift {
 		return false, nil
@@ -131,9 +133,9 @@ func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backst
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
-	b.route.Spec.To.Name = model.backstageService.service.Name
-	b.updateAppConfigWithBaseUrls(model, backstage)
+func (b *BackstageRoute) updateAndValidate(backstage bsv1.Backstage) error {
+	b.route.Spec.To.Name = b.model.backstageService.service.Name
+	b.updateAppConfigWithBaseUrls(b.model, backstage)
 	return nil
 }
 

@@ -21,6 +21,7 @@ func (f DbServiceFactory) newBackstageObject() RuntimeObject {
 
 type DbService struct {
 	service *corev1.Service
+	model   *BackstageModel
 }
 
 func init() {
@@ -45,6 +46,7 @@ func (b *DbService) setObject(obj runtime.Object) {
 
 // implementation of RuntimeObject interface
 func (b *DbService) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	b.model = model
 	if b.service == nil {
 		if model.localDbEnabled {
 			return false, fmt.Errorf("LocalDb Service not initialized, make sure there is db-service.yaml in default or raw configuration")
@@ -71,7 +73,7 @@ func (b *DbService) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbService) updateAndValidate(_ *BackstageModel, _ bsv1.Backstage) error {
+func (b *DbService) updateAndValidate(_ bsv1.Backstage) error {
 	return nil
 }
 

@@ -19,20 +19,22 @@ func (f ConfigMapEnvsFactory) newBackstageObject() RuntimeObject {
 
 type ConfigMapEnvs struct {
 	ConfigMap *corev1.ConfigMap
+	model     *BackstageModel
 }
 
 func init() {
 	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, false)
 }
 
-func addConfigMapEnvsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) {
+func (p *ConfigMapEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.ConfigMaps == nil {
-		return
+		return nil
 	}
 
 	for _, specCm := range spec.Application.ExtraEnvs.ConfigMaps {
-		model.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, ConfigMapObjectKind, specCm.Name, specCm.Key)
+		p.model.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, ConfigMapObjectKind, specCm.Name, specCm.Key)
 	}
+	return nil
 }
 
 // Object implements RuntimeObject interface
@@ -53,7 +55,8 @@ func (p *ConfigMapEnvs) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+	p.model = model
 	if p.ConfigMap != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -62,9 +65,11 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
-	m.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
-		p.ConfigMap.Name, "")
+func (p *ConfigMapEnvs) updateAndValidate(backstage bsv1.Backstage) error {
+	if p.ConfigMap != nil {
+		p.model.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
+			p.ConfigMap.Name, "")
+	}
 	return nil
 }
 
