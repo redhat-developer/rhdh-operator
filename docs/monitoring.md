@@ -14,7 +14,7 @@ When deploying RHDH using the [RHDH Operator](https://github.com/janus-idp/opera
 
 ### Automatic ServiceMonitor Creation
 
-**NEW**: Starting with operator version X.X.X, the RHDH operator supports automatic creation of OpenShift `ServiceMonitor` resources when monitoring is enabled through the Custom Resource (CR) configuration.
+**NEW**: Starting with operator version 1.8.0, the RHDH operator supports automatic creation of OpenShift `ServiceMonitor` resources when monitoring is enabled through the Custom Resource (CR) configuration.
 
 The operator can automatically create and manage ServiceMonitor resources for your Backstage instances by setting the `spec.monitoring.enabled` field to `true` in your Backstage Custom Resource.
 
@@ -46,6 +46,8 @@ When `monitoring.enabled` is set to `true`, the operator will automatically:
 2. **Configure the ServiceMonitor** to scrape metrics from the `/metrics` endpoint on port `9464`
 3. **Set appropriate labels** for Prometheus discovery (`app.kubernetes.io/instance` and `app.kubernetes.io/name`)
 4. **Manage the lifecycle** of the ServiceMonitor (create, update, delete) along with your Backstage instance
+
+**Note**: The operator automatically configures the Backstage service to expose a port named `http-metrics` mapping to port `9464`, so the ServiceMonitor can correctly scrape the `/metrics` endpoint. No additional service configuration is required.
 
 #### ServiceMonitor Configuration Details
 
