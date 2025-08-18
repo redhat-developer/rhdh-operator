@@ -17,4 +17,4 @@ jobs:
       - name: Validate config
         # See https://docs.renovatebot.com/config-validation/
         run: |
-          npx --yes --package renovate -- renovate-config-validator --strict .github/renovate.json
+          npx --yes --package renovate@36.0.0 -- renovate-config-validator --strict .github/renovate.json
