@@ -16,7 +16,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -218,7 +218,7 @@ organization:
 			_, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "cat /my/secret/sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-		}, 3*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
+		}, 4*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
 
 		cm := &corev1.ConfigMap{}
 		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig1}, cm)
@@ -244,7 +244,7 @@ organization:
 			// let's check, just in case (it is k8s job to refresh it :)
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))
 
-		}, 3*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
+		}, 4*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
 
 	})
 

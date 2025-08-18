@@ -8,11 +8,14 @@ To install the Orchestrator plugin on OpenShift, the following components are re
 - **Knative Serving**
 - **Knative Eventing**
 - **OpenShift Serverless Logic Operator**
+Optionally:
+- **OpenShift Pipelines Operator (Tekton)**
+- **OpenShift GitOps Operator (ArgoCD)**
 
 
 ### Methods to Install required infrastructure
 
-There are 3 methods to install the required components for the Orchestrator plugin on OpenShift:
+There are three methods to install the required components for the Orchestrator plugin on OpenShift:
 - [Manual Installation](#manual-installation)
 - [RHDH helper script](#rhdh-helper-script)
 - [RHDH Orchestrator Infra Helm Chart](#rhdh-orchestrator-infra-helm-chart)
@@ -30,6 +33,9 @@ Go to the [OpenShift Serverless documentation](https://docs.redhat.com/en/docume
 3. Installing Knative Serving.
 4. Installing Knative Eventing.
 5. Installing the OpenShift Serverless Logic Operator.
+Optionally:
+6. Installing the [OpenShift Pipelines Operator](https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines) (Tekton)
+7. Installing the [OpenShift GitOps Operator](https://docs.redhat.com/en/documentation/red_hat_openshift_gitops) (ArgoCD)
 
 
 #### RHDH helper script
@@ -44,8 +50,14 @@ This script provides a quick way to install the OpenShift Serverless infrastruct
 You can specify the RHDH version in the URL (`/release-X.Y/`, e.g., `1.7` in this example) or use main.
 2. Run the script:
    ```bash
-   bash plugin-infra.sh
+   bash plugin-infra.sh [--with-cicd] [delete] [--branch <branch>]
    ```  
+Flags:
+* `--with-cicd` flag will also install the OpenShift Pipelines Operator (Tekton) and OpenShift GitOps Operator (ArgoCD) in addition to the required components for the Orchestrator plugin. To continue the configuration for CICD, please follow this [guide](orchestrator-cicd.md).
+* `delete`  will delete the installed components instead of installing them.
+* `--branch <branch>` flag allows to specify the branch of the RHDH Operator repository where the configuration yaml files will be taken (ignored if you have local yaml files). If not specified, it defaults to the `main` branch.
+
+The script is checking if the directory where plugin-infra.sh is located contains the corresponding configuration files, e.g., serverless.yaml, knative.yaml, serverless-logic.yaml... (see [plugin-infra directory](../config/profile/rhdh/plugin-infra) for the complete list). If the files are not found, it will download them from the specified branch of the RHDH Operator repository.
 
 #### RHDH Orchestrator Infra Helm Chart
 This method has similar usage and cautions as the RHDH Helper Utility.
@@ -55,10 +67,11 @@ This method has similar usage and cautions as the RHDH Helper Utility.
 
 ### Installing the Orchestrator Plugin
 
-The orchestrator plugin (as of v1.5.1) consists of three dynamic plugins:
+The orchestrator plugin (as of v1.6.0) consists of four dynamic plugins:
 - orchestrator-backend
 - orchestrator-frontend
 - orchestrator-scaffolder-backend-module
+- orchestrator-form-widgets
 
 As for RHDH 1.7 all of these plugins are included in the default dynamic-plugins.yaml file of **install-dynamic-plugins** container but disabled by default.
 To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMap with following data in your Backstage Custom Resource (CR):
@@ -66,14 +79,16 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator@1.5.1"
-      - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
-        dependencies:
-          - ref: sonataflow
-      - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.5.1"
+       - package: "@redhat/backstage-plugin-orchestrator@1.6.0"
+         disabled: false
+       - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
+         disabled: false
+         dependencies:
+            - ref: sonataflow
+       - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.6.0"
+         disabled: false
+       - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.6.0"
+         disabled: false  
 ```
 
 See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin.
@@ -86,7 +101,7 @@ As for RHDH 1.7 the orchestrator plugin packages are located in **npm.registry.r
 
 The orchestrator plugin instance requires the following dependencies to be installed:
 - A SonataflowPlatform custom resource - created in the namespace of the Backstage CR.
-- A set of NetworkPolicies to allow traffic between Knative resources created in the namespace of Backstage CR, traffic for monitoring, and intra-namespace traffic.
+- A set of NetworkPolicies to allow traffic between infra resources (knative and serverless logic operator) created in the namespace of Backstage CR, traffic for monitoring, and intra-namespace traffic.
 
 The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
 
@@ -119,7 +134,8 @@ See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) for a complete 
 To enable the Backstage operator to work with the SonataFlow platform, its ServiceAccount must be granted the appropriate permissions. 
 This is done by the Backstage operator automatically when the SonataFlowPlatform CR is created in the namespace of the Backstage CR by the appropriate Role and RoleBinding resource in the [profile/rhdh/plugin-rbac directory](../config/profile/rhdh/plugin-rbac).
 
-
+## Optional: Enable GitOps/Pipelines for Orchestrator Workflows
+To enable CI/CD for RHDH Orchestrator workflows, please follow this [guide](orchestrator-cicd.md).
 
 
 

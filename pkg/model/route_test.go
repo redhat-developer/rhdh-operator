@@ -15,7 +15,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	"github.com/stretchr/testify/assert"
 )

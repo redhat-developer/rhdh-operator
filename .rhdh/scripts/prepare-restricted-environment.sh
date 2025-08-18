@@ -15,7 +15,7 @@ IS_HOSTED_CONTROL_PLANE=""
 
 NAMESPACE_OPERATOR="rhdh-operator"
 INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
-FILTERED_VERSIONS=(1.4 1.5)
+FILTERED_VERSIONS=(*)
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
@@ -77,8 +77,9 @@ Options:
   --index-image <operator-index-image>   : Operator index image (default: $INDEX_IMAGE)
   --ci-index <true|false>                : Indicates that the index image is a CI build. Unsupported.
                                             Setting this to 'true' causes the script to replace all references to the internal RH registries
-                                            with quay.io when mirroring images. Relevant only if '--use-oc-mirror' is 'false'. Default: false
-  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: $FILTERED_VERSIONS_CSV).
+                                            with quay.io when mirroring images. Relevant only if '--use-oc-mirror' is 'false'. 
+                                            When set to 'true', --filter-versions must be explicitly specified. Default: false
+  --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: * (all versions)).
                                             Specify '*' to disable version filtering and include all channels and all versions.
                                             Useful for CI index images for example.
   --to-registry <registry_url>           : Mirror the images into the specified registry, assuming you are already logged into it.
@@ -131,7 +132,8 @@ Examples:
   #   because it detected that it is connected to an OCP cluster.
   # It will automatically replace all references to the internal RH registries with quay.io
   $0 \\
-    --ci-index true
+    --ci-index true \\
+    --filter-versions '1.4,1.5'
 "
 }
 
@@ -147,6 +149,7 @@ OC_MIRROR_PATH="oc-mirror"
 OC_MIRROR_FLAGS=""
 
 NO_VERSION_FILTER="false"
+FILTER_VERSIONS_PROVIDED="false"
 
 # example usage:
 # ./prepare-restricted-environment.sh \
@@ -181,6 +184,7 @@ while [[ "$#" -gt 0 ]]; do
     shift 1
     ;;
   '--prod_operator_version')
+    FILTER_VERSIONS_PROVIDED="true"
     input="${2#v}"
     IFS='.' read -ra parts <<<"$input"
     length=${#parts[@]}
@@ -203,6 +207,7 @@ while [[ "$#" -gt 0 ]]; do
     shift 1
     ;;
   '--filter-versions')
+    FILTER_VERSIONS_PROVIDED="true"
     if [[ "$2" == "*" ]]; then
       NO_VERSION_FILTER="true"
     else
@@ -348,6 +353,12 @@ fi
 if [[ -n "${FROM_DIR}" && -z "${TO_REGISTRY}" ]]; then
   errorf "--to-registry is needed when --from-dir is specified."
   exit 1
+fi
+if [[ "${IS_CI_INDEX_IMAGE}" == "true" ]]; then
+  if [[ "${FILTER_VERSIONS_PROVIDED}" == "false" ]]; then
+    errorf "When --ci-index is true, --filter-versions must be specified."
+    exit 1
+  fi
 fi
 
 if [[ -n "${TO_DIR}" ]]; then
@@ -1307,7 +1318,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   fi
   CR_EXAMPLE="
   cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
-  apiVersion: rhdh.redhat.com/v1alpha3
+  apiVersion: rhdh.redhat.com/v1alpha4
   kind: Backstage
   metadata:
     name: developer-hub

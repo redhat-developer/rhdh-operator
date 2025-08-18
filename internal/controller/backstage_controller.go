@@ -27,7 +27,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,6 +55,7 @@ type BackstageReconciler struct {
 	Platform platform.Platform
 }
 
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
@@ -100,6 +101,11 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	externalConfig, err := r.preprocessSpec(ctx, backstage)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to preprocess backstage spec", err)
+	}
+
+	// Apply the ServiceMonitor if monitoring is enabled
+	if err := r.applyServiceMonitor(ctx, &backstage); err != nil {
+		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply ServiceMonitor", err)
 	}
 
 	// This creates array of model objects to be reconsiled

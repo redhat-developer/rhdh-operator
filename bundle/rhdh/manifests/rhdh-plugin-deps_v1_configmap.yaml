@@ -1,10 +1,23 @@
 apiVersion: v1
 data:
+  argocd.yaml: |-
+    ---
+    apiVersion: argoproj.io/v1alpha1
+    kind: AppProject
+    metadata:
+      name: argocd-app-project
+    spec:
+      destinations:
+      - name: '*'
+        namespace: '*'
+        server: '*'
+      sourceRepos:
+      - '*'
   sonataflow.yaml: |
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-knative-to-sonataflow-and-workflows # hardcoded
+      name: allow-infra-ns-to-workflow-ns # hardcoded
     spec:
       podSelector: {}
       ingress:
@@ -17,6 +30,10 @@ data:
                 matchLabels:
                   # Allow auxiliary knative function for workflow (such as m2k-save-transformation)
                   kubernetes.io/metadata.name: knative-serving
+            - namespaceSelector:
+                matchLabels:
+                  # Allow openshift serverless logic operator controller pod to access all pods in sonataflow
+                  kubernetes.io/metadata.name: openshift-serverless-logic
     ---
     # NetworkPolicy to unblock incoming traffic to the namespace
     apiVersion: networking.k8s.io/v1
@@ -97,6 +114,418 @@ data:
                 name: backstage-psql-{{backstage-name}}
                 namespace: {{backstage-ns}}
                 databaseName: backstage_plugin_orchestrator
+  tekton.yaml: |-
+    ---
+    apiVersion: tekton.dev/v1
+    kind: Task
+    metadata:
+      name: git-cli
+      namespace: {{backstage-ns}}
+      labels:
+        app.kubernetes.io/version: "0.4"
+      annotations:
+        tekton.dev/pipelines.minVersion: "0.21.0"
+        tekton.dev/categories: Git
+        tekton.dev/tags: git
+        tekton.dev/displayName: "git cli"
+        tekton.dev/platforms: "linux/amd64,linux/s390x,linux/ppc64le"
+    spec:
+      description: >-
+        This task can be used to perform git operations.
+
+        Git command that needs to be run can be passed as a script to
+        the task. This task needs authentication to git in order to push
+        after the git operation.
+
+      workspaces:
+        - name: source
+          description: A workspace that contains the fetched git repository.
+
+        - name: input
+          optional: true
+          description: |
+            An optional workspace that contains the files that need to be added to git. You can
+            access the workspace from your script using `$(workspaces.input.path)`, for instance:
+
+            cp $(workspaces.input.path)/file_that_i_want .
+            git add file_that_i_want
+            # etc
+
+        - name: ssh-directory
+          optional: true
+          description: |
+            A .ssh directory with private key, known_hosts, config, etc. Copied to
+            the user's home before git commands are executed. Used to authenticate
+            with the git remote when performing the clone. Binding a Secret to this
+            Workspace is strongly recommended over other volume types.
+
+        - name: basic-auth
+          optional: true
+          description: |
+            A Workspace containing a .gitconfig and .git-credentials file. These
+            will be copied to the user's home before any git commands are run. Any
+            other files in this Workspace are ignored. It is strongly recommended
+            to use ssh-directory over basic-auth whenever possible and to bind a
+            Secret to this Workspace over other volume types.
+      params:
+        - name: BASE_IMAGE
+          description: |
+            The base image for the task.
+          type: string
+          # TODO: Deprecate use of root image.
+          default: cgr.dev/chainguard/git:root-2.39@sha256:7759f87050dd8bacabe61354d75ccd7f864d6b6f8ec42697db7159eccd491139
+
+        - name: GIT_USER_NAME
+          type: string
+          description: |
+            Git user name for performing git operation.
+          default: ""
+
+        - name: GIT_USER_EMAIL
+          type: string
+          description: |
+            Git user email for performing git operation.
+          default: ""
+
+        - name: GIT_SCRIPT
+          description: The git script to run.
+          type: string
+          default: |
+            git help
+
+        - name: USER_HOME
+          description: |
+            Absolute path to the user's home directory. Set this explicitly if you are running the image as a non-root user or have overridden
+            the gitInitImage param with an image containing custom user configuration.
+          type: string
+          default: "/root"
+
+        - name: VERBOSE
+          description: Log the commands that are executed during `git-clone`'s operation.
+          type: string
+          default: "true"
+
+      results:
+        - name: commit
+          description: The precise commit SHA after the git operation.
+
+      steps:
+        - name: git
+          image: $(params.BASE_IMAGE)
+          workingDir: $(workspaces.source.path)
+          env:
+          - name: HOME
+            value: $(params.USER_HOME)
+          - name: PARAM_VERBOSE
+            value: $(params.VERBOSE)
+          - name: PARAM_USER_HOME
+            value: $(params.USER_HOME)
+          - name: WORKSPACE_OUTPUT_PATH
+            value: $(workspaces.output.path)
+          - name: WORKSPACE_SSH_DIRECTORY_BOUND
+            value: $(workspaces.ssh-directory.bound)
+          - name: WORKSPACE_SSH_DIRECTORY_PATH
+            value: $(workspaces.ssh-directory.path)
+          - name: WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND
+            value: $(workspaces.basic-auth.bound)
+          - name: WORKSPACE_BASIC_AUTH_DIRECTORY_PATH
+            value: $(workspaces.basic-auth.path)
+          script: |
+            #!/usr/bin/env sh
+            set -eu
+
+            if [ "${PARAM_VERBOSE}" = "true" ] ; then
+              set -x
+            fi
+
+            if [ "${WORKSPACE_BASIC_AUTH_DIRECTORY_BOUND}" = "true" ] ; then
+              cp "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/.git-credentials" "${PARAM_USER_HOME}/.git-credentials"
+              cp "${WORKSPACE_BASIC_AUTH_DIRECTORY_PATH}/.gitconfig" "${PARAM_USER_HOME}/.gitconfig"
+              chmod 400 "${PARAM_USER_HOME}/.git-credentials"
+              chmod 400 "${PARAM_USER_HOME}/.gitconfig"
+            fi
+
+            if [ "${WORKSPACE_SSH_DIRECTORY_BOUND}" = "true" ] ; then
+              cp -R "${WORKSPACE_SSH_DIRECTORY_PATH}" "${PARAM_USER_HOME}"/.ssh
+              chmod 700 "${PARAM_USER_HOME}"/.ssh
+              chmod -R 400 "${PARAM_USER_HOME}"/.ssh/*
+            fi
+
+            # Setting up the config for the git.
+            git config --global user.email "$(params.GIT_USER_EMAIL)"
+            git config --global user.name "$(params.GIT_USER_NAME)"
+
+            eval '$(params.GIT_SCRIPT)'
+
+            RESULT_SHA="$(git rev-parse HEAD | tr -d '\n')"
+            EXIT_CODE="$?"
+            if [ "$EXIT_CODE" != 0 ]
+            then
+              exit $EXIT_CODE
+            fi
+            # Make sure we don't add a trailing newline to the result!
+            printf "%s" "$RESULT_SHA" > "$(results.commit.path)"
+          # Patch to apply on OpenShift
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+    ---
+    apiVersion: tekton.dev/v1
+    kind: Task
+    metadata:
+      name: flattener
+      namespace: {{backstage-ns}}
+    spec:
+      workspaces:
+        - name: workflow-source
+      params:
+        - name: workflowId
+          description: The workflow ID from the repository
+          type: string
+        - name: convertToFlat
+          description: Whether conversion to flat layout is needed or it's already flattened
+          type: string
+          default: "true"
+      steps:
+        - name: flatten
+          image: registry.access.redhat.com/ubi9-minimal
+          workingDir: $(workspaces.workflow-source.path)
+          script: |
+            ROOT=/workspace/workflow
+            TARGET=flat
+            mkdir -p flat
+
+            if [ -d "workflow/$(params.workflowId)" ]; then
+              cp -r workflow/$(params.workflowId)/src/main/resources flat/$(params.workflowId)
+              cp workflow/$(params.workflowId)/LICENSE flat/$(params.workflowId)
+            else
+              cp -r workflow/src/main/resources flat/$(params.workflowId)
+              cp workflow/LICENSE flat/$(params.workflowId)
+            fi
+
+            if [ "$(params.convertToFlat)" == "false" ]; then
+              rm -rf workflow/src/main/resources
+              mv workflow/src flat/$(params.workflowId)/
+            fi
+
+            ls flat/$(params.workflowId)
+
+            curl -L https://raw.githubusercontent.com/rhdhorchestrator/serverless-workflows/main/pipeline/workflow-builder.Dockerfile -o flat/workflow-builder.Dockerfile
+    ---
+    apiVersion: tekton.dev/v1
+    kind: Task
+    metadata:
+      name: build-manifests
+      namespace: {{backstage-ns}}
+    spec:
+      workspaces:
+        - name: workflow-source
+      params:
+        - name: workflowId
+          description: The workflow ID from the repository
+          type: string
+      steps:
+        - name: build-manifests
+          image: registry.access.redhat.com/ubi9-minimal
+          workingDir: $(workspaces.workflow-source.path)/flat/$(params.workflowId)
+          script: |
+            microdnf install -y tar gzip
+            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.35.0/kn-workflow-linux-amd64.tar.gz"
+            curl -L "$KN_CLI_URL" | tar -xz --no-same-owner && chmod +x kn-workflow-linux-amd64 && mv kn-workflow-linux-amd64 kn-workflow
+            ./kn-workflow gen-manifest --namespace ""
+    ---
+    apiVersion: tekton.dev/v1
+    kind: Task
+    metadata:
+      name: build-gitops
+      namespace: {{backstage-ns}}
+    spec:
+      workspaces:
+        - name: workflow-source
+        - name: workflow-gitops
+      params:
+        - name: workflowId
+          description: The workflow ID from the repository
+          type: string
+        - name: imageTag
+          type: string
+      steps:
+        - name: build-gitops
+          image: registry.access.redhat.com/ubi9-minimal
+          workingDir: $(workspaces.workflow-gitops.path)/workflow-gitops
+          script: |
+            cp $(workspaces.workflow-source.path)/flat/$(params.workflowId)/manifests/* kustomize/base
+            microdnf install -y findutils && microdnf clean all
+            cd kustomize
+            ./updater.sh $(params.workflowId) $(params.imageTag)
+    ---
+    apiVersion: tekton.dev/v1
+    kind: Pipeline
+    metadata:
+      name: workflow-deployment
+      namespace: {{backstage-ns}}
+    spec:
+      description: |
+        This pipeline clones a git repo, builds a Docker image with Kaniko and
+        pushes it to a registry
+      params:
+        - name: gitUrl
+          description: The SSH URL of the repository to clone
+          type: string
+        - name: gitOpsUrl
+          description: The SSH URL of the config repository for pushing the changes
+          type: string
+        - name: workflowId
+          description: The workflow ID from the repository
+          type: string
+        - name: convertToFlat
+          description: Whether conversion to flat layout is needed or it's already flattened
+          type: string
+          default: "true"
+        - name: quayOrgName
+          description: The Quay Organization Name of the published workflow
+          type: string
+        - name: quayRepoName
+          description: The Quay Repository Name of the published workflow
+          type: string
+      workspaces:
+        - name: workflow-source
+        - name: workflow-gitops
+        - name: ssh-creds
+        - name: docker-credentials
+      tasks:
+        - name: fetch-workflow
+          taskRef:
+            name: git-cli
+          workspaces:
+            - name: source
+              workspace: workflow-source
+            - name: ssh-directory
+              workspace: ssh-creds
+          params:
+            - name: GIT_USER_NAME
+              value: The Orchestrator Tekton Pipeline
+            - name: GIT_USER_EMAIL
+              value: rhdhorchestrator@redhat.com
+            - name: USER_HOME
+              value: /home/git
+            - name: GIT_SCRIPT
+              value: |
+                eval "$(ssh-agent -s)"
+                ssh-add "${PARAM_USER_HOME}"/.ssh/id_rsa
+                GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=${PARAM_USER_HOME}/.ssh/known_hosts" git clone $(params.gitUrl) workflow
+                cd workflow
+        - name: fetch-workflow-gitops
+          taskRef:
+            name: git-cli
+          workspaces:
+            - name: source
+              workspace: workflow-gitops
+            - name: ssh-directory
+              workspace: ssh-creds
+          params:
+            - name: GIT_USER_NAME
+              value: The Orchestrator Tekton Pipeline
+            - name: GIT_USER_EMAIL
+              value: rhdhorchestrator@redhat.com
+            - name: USER_HOME
+              value: /home/git
+            - name: GIT_SCRIPT
+              value: |
+                eval "$(ssh-agent -s)"
+                ssh-add "${PARAM_USER_HOME}"/.ssh/id_rsa
+                GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=${PARAM_USER_HOME}/.ssh/known_hosts" git clone $(params.gitOpsUrl) workflow-gitops
+        - name: flatten-workflow
+          runAfter: ["fetch-workflow"]
+          taskRef:
+            name: flattener
+          workspaces:
+            - name: workflow-source
+              workspace: workflow-source
+          params:
+            - name: workflowId
+              value: $(params.workflowId)
+            - name: convertToFlat
+              value: $(params.convertToFlat)
+        - name: build-manifests
+          runAfter: ["flatten-workflow"]
+          taskRef:
+            name: build-manifests
+          workspaces:
+            - name: workflow-source
+              workspace: workflow-source
+          params:
+            - name: workflowId
+              value: $(params.workflowId)
+        - name: build-gitops
+          runAfter: ["build-manifests", "fetch-workflow-gitops"]
+          taskRef:
+            name: build-gitops
+          workspaces:
+            - name: workflow-source
+              workspace: workflow-source
+            - name: workflow-gitops
+              workspace: workflow-gitops
+          params:
+            - name: workflowId
+              value: $(params.workflowId)
+            - name: imageTag
+              value: $(tasks.fetch-workflow.results.commit)
+        - name: build-and-push-image
+          runAfter: ["flatten-workflow"]
+          taskRef:
+            resolver: cluster
+            params:
+            - name: kind
+              value: task
+            - name: name
+              value: buildah
+            - name: namespace
+              value: openshift-pipelines
+          workspaces:
+            - name: source
+              workspace: workflow-source
+            - name: dockerconfig
+              workspace: docker-credentials
+          params:
+            - name: IMAGE
+              value: quay.io/$(params.quayOrgName)/$(params.quayRepoName):$(tasks.fetch-workflow.results.commit)
+            - name: DOCKERFILE
+              value: flat/workflow-builder.Dockerfile
+            - name: CONTEXT
+              value: flat/$(params.workflowId)
+            - name: BUILD_EXTRA_ARGS
+              value: '--authfile=/workspace/dockerconfig/.dockerconfigjson --ulimit nofile=4096:4096 --build-arg WF_RESOURCES=. '
+        - name: push-workflow-gitops
+          runAfter: ["build-gitops", "build-and-push-image"]
+          taskRef:
+            name: git-cli
+          workspaces:
+            - name: source
+              workspace: workflow-gitops
+            - name: ssh-directory
+              workspace: ssh-creds
+          params:
+            - name: GIT_USER_NAME
+              value: The Orchestrator Tekton Pipeline
+            - name: GIT_USER_EMAIL
+              value: rhdhorchestrator@redhat.com
+            - name: USER_HOME
+              value: /home/git
+            - name: GIT_SCRIPT
+              value: |
+                WORKFLOW_COMMIT=$(tasks.fetch-workflow.results.commit)
+
+                eval "$(ssh-agent -s)"
+                ssh-add "${PARAM_USER_HOME}"/.ssh/id_rsa
+
+                cd workflow-gitops
+                git add .
+                git diff
+                # TODO: create PR
+                git commit -m "Deployment for workflow commit $WORKFLOW_COMMIT from $(params.gitUrl)"
+                # TODO: parametrize branch
+                GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=${PARAM_USER_HOME}/.ssh/known_hosts" git push origin main
 kind: ConfigMap
 metadata:
   name: rhdh-plugin-deps

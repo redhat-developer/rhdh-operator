@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
