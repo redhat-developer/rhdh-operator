@@ -14,7 +14,8 @@ jobs:
     name: Renovate Config Validator
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
-      - name: Print Renovate version
+      - name: Print actual renovate version
+        # To make sure we are using the latest (not cached) renovate version
         run: |
           npx --yes --package renovate@latest -- renovate --version
       - name: Validate config

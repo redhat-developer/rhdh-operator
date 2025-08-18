@@ -17,10 +17,8 @@ import (
 func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage *bs.Backstage) error {
 	lg := log.FromContext(ctx).WithValues("Backstage", backstage.Name)
 
-	lg.Info("Checking monitoring status", "enabled", backstage.Spec.IsMonitoringEnabled())
-
 	if !backstage.Spec.IsMonitoringEnabled() {
-		lg.Info("Monitoring disabled, deleting any existing ServiceMonitor")
+		lg.Info("monitoring disabled, deleting any existing ServiceMonitor")
 		return r.tryToDelete(ctx,
 			&monitoringv1.ServiceMonitor{},
 			utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
