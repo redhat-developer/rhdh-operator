@@ -10,7 +10,7 @@
   "labels": [
     "kind/dependency upgrade"
   ],
-  "baseBranches": [
+  "baseBranchPatterns": [
     "main",
     "/^release-1\\..*/"
   ],
@@ -46,7 +46,7 @@
       "matchUpdateTypes": [
         "minor"
       ]
-    },   
+    },
     {
       "groupName": "all patch dependencies",
       "groupSlug": "all-patch",
@@ -56,7 +56,7 @@
       "matchUpdateTypes": [
         "patch"
       ]
-    },          
+    },
     {
       "description": "Do NOT generate PRs to pin or apply digests to dockerfiles",
       "enabled": false,
@@ -83,7 +83,7 @@
         "/^release-1\\..*/"
       ],
       "automerge": false
-    },  
+    },
     {
       "description": "Do automerge patch updates to dockerfiles",
       "enabled": true,
