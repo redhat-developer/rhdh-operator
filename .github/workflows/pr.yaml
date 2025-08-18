@@ -83,7 +83,7 @@ jobs:
         run: make gosec
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@4e828ff8d448a8a6e532957b1811f387a63867e8 # v3
+        uses: github/codeql-action/upload-sarif@96f518a34f7a870018057716cc4d7a5c014bd61c # v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: gosec.sarif
