@@ -23,7 +23,7 @@ metadata:
     operatorframework.io/suggested-namespace: rhdh-operator
     operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <1.7.0'
+    skipRange: '>=1.0.0 <1.7.1'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
@@ -113,5 +113,5 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  replaces: rhdh-operator.v1.6.0
-  version: 1.7.0
+  replaces: rhdh-operator.v1.7.0
+  version: 1.7.1
