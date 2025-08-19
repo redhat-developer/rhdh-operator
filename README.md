@@ -67,6 +67,7 @@ Forwarding from [::1]:17007 -> 7007
 ## More documentation
 
 - [Configuration](docs/configuration.md)
+- [Monitoring](docs/monitoring.md)
 - [Developer Guide](docs/developer.md)
 - [Operator Design](docs/design.md)
 

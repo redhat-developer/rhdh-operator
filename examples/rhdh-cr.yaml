@@ -73,6 +73,9 @@ kind: Backstage
 metadata:
   name: my-rhdh
 spec:
+  # Enable automatic ServiceMonitor creation for metrics monitoring
+  monitoring:
+    enabled: true
   deployment:
     patch:
       spec:
