@@ -2,7 +2,7 @@
 
 The RHDH provides a `/metrics` endpoint on port `9464` that provides OpenTelemetry metrics about your Backstage application. This endpoint can be used to monitor your Backstage instance using OpenTelemetry and Grafana.
 
-When deploying RHDH using the [RHDH Operator](https://github.com/janus-idp/operator), monitoring and logging for your RHDH instance can be configured using the following steps.
+When deploying RHDH using the [RHDH Operator](https://github.com/redhat-developer/rhdh-operator), monitoring for your RHDH instance can be configured using the following steps.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ When deploying RHDH using the [RHDH Operator](https://github.com/janus-idp/opera
 
 ### Automatic ServiceMonitor Creation
 
-**NEW**: Starting with operator version 1.8.0, the RHDH operator supports automatic creation of OpenShift `ServiceMonitor` resources when monitoring is enabled through the Custom Resource (CR) configuration.
+**NEW**: Starting with operator version 0.8.0, the RHDH operator supports automatic creation of Prometheus `ServiceMonitor` resources when monitoring is enabled through the Custom Resource (CR) configuration.
 
 The operator can automatically create and manage ServiceMonitor resources for your Backstage instances by setting the `spec.monitoring.enabled` field to `true` in your Backstage Custom Resource.
 
