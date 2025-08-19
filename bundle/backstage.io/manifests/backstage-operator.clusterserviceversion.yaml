@@ -327,4 +327,4 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 0.7.0
+  version: 0.7.1
