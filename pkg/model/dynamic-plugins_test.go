@@ -421,7 +421,7 @@ includes:
 	assert.NoError(t, err)
 
 	// Validate merged plugins
-	assert.Equal(t, 3, len(mergedConfig.Plugins))
+	assert.Equal(t, 4, len(mergedConfig.Plugins))
 
 	// Validate plugin-a (overridden by specData)
 	//pluginA := mergedConfig.Plugins[0]
@@ -429,9 +429,15 @@ includes:
 	pluginA := findPluginByPackage(mergedConfig.Plugins, "plugin-a")
 	assert.NotNil(t, pluginA)
 	assert.Equal(t, "sha256-overridden", pluginA.Integrity)
+	assert.Equal(t, false, pluginA.Disabled)
 	assert.Equal(t, "overridden", pluginA.PluginConfig["key1"])
 	assert.Equal(t, 1, len(pluginA.Dependencies))
 	assert.Equal(t, "dependency-3", pluginA.Dependencies[0].Ref)
+
+	// Validate plugin-b (disabled, from modelDp)
+	pluginB := findPluginByPackage(mergedConfig.Plugins, "plugin-b")
+	assert.NotNil(t, pluginB)
+	assert.Equal(t, true, pluginB.Disabled)
 
 	// Validate plugin-c (from modelDp, as plugin-b is disabled)
 	//pluginC := mergedConfig.Plugins[1]

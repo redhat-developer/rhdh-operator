@@ -88,7 +88,7 @@ func (p *DynamicPlugins) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	p.model = model
 	if p.ConfigMap == nil {
 		return false, nil
@@ -203,7 +203,7 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 		return "", fmt.Errorf("dynamic plugins ConfigMap is not set")
 	}
 	modelData := p.ConfigMap.Data[DynamicPluginsFile]
-	var modelPluginsConfig, specPluginsConfig DynaPluginsConfig
+	var modelPluginsConfig, specPluginsConfig, mergedPluginsConfig DynaPluginsConfig
 	if modelData != "" {
 		if err := yaml.Unmarshal([]byte(modelData), &modelPluginsConfig); err != nil {
 			return "", fmt.Errorf("failed to unmarshal model ConfigMap data: %w", err)
@@ -235,19 +235,12 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 			existingPlugin.Disabled = plugin.Disabled
 			pluginMap[plugin.Package] = existingPlugin
 		} else {
-			// If the plugin is not found in model, add it from spec
-			if !plugin.Disabled {
-				pluginMap[plugin.Package] = plugin
-			}
+			pluginMap[plugin.Package] = plugin
 		}
 	}
-	mergedPluginsConfig := modelPluginsConfig
 	mergedPluginsConfig.Plugins = make([]DynaPlugin, 0, len(pluginMap))
 	for _, plugin := range pluginMap {
-		// Only add non-disabled plugins
-		if !plugin.Disabled {
-			mergedPluginsConfig.Plugins = append(mergedPluginsConfig.Plugins, plugin)
-		}
+		mergedPluginsConfig.Plugins = append(mergedPluginsConfig.Plugins, plugin)
 	}
 
 	// Merge Includes (ensure uniqueness)
