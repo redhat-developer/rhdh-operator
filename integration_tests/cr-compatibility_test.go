@@ -175,5 +175,4 @@ var _ = When("testing API version compatibility", func() {
 		err = k8sClient.Delete(ctx, bsV1Alpha4)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
-
 })

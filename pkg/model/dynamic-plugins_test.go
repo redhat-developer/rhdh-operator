@@ -128,7 +128,39 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 	//dynamic-plugins-auth
 	//vol-dplugin
 	assert.Equal(t, 4, len(ic.VolumeMounts))
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("dplugin"), ic.VolumeMounts[3].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(DynamicPluginsDefaultName(bs.Name)), ic.VolumeMounts[3].Name)
+
+	deps, err := model.DynamicPlugins.Dependencies()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(deps))
+}
+
+func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+
+	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
+		Data:       map[string]string{DynamicPluginsFile: "dynamic-plugins.yaml: | \n plugins: []"},
+	}
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+	//dynamic-plugins-root
+	//dynamic-plugins-npmrc
+	//dynamic-plugins-auth
+	//dplugin
+	assert.Equal(t, 4, len(ic.VolumeMounts))
+	assert.Equal(t, bs.Spec.Application.DynamicPluginsConfigMapName, ic.VolumeMounts[3].Name)
 
 	deps, err := model.DynamicPlugins.Dependencies()
 	assert.NoError(t, err)
@@ -200,10 +232,9 @@ plugins:
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(deps))
 
-	// dependencies from default config = []
 	depends, err := (model.getRuntimeObjectByType(&DynamicPlugins{})).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(depends))
+	assert.Equal(t, 2, len(depends))
 
 }
 
@@ -318,4 +349,129 @@ plugins:
 	assert.NoError(t, err)
 	assert.NotNil(t, deps)
 	assert.Equal(t, 0, len(deps)) // Ensure it returns an empty slice, not nil
+}
+
+func TestMergeDynamicPlugins(t *testing.T) {
+	// Sample model ConfigMap
+	modelData := `
+plugins:
+  - package: "plugin-a"
+    integrity: "sha256-abc123"
+    disabled: false
+    pluginConfig:
+      key1: "value1"
+    dependencies:
+      - ref: "dependency-1"
+  - package: "plugin-b"
+    integrity: "sha256-def456"
+    disabled: true
+    pluginConfig:
+      key2: "value2"
+    dependencies:
+      - ref: "dependency-2"
+  - package: "plugin-c"
+    integrity: "sha256-ghi789"
+    pluginConfig:
+      key3: "value3"
+  - package: "plugin-d"
+    disabled: true
+    integrity: "sha256-ddd"
+    pluginConfig:
+      key: "value"
+includes:
+  - "include-1"
+`
+
+	defDynamicPlugins := &DynamicPlugins{
+		ConfigMap: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: DynamicPluginsDefaultName("test-backstage"),
+			},
+			Data: map[string]string{
+				DynamicPluginsFile: modelData,
+			},
+		},
+	}
+
+	// Sample spec data
+	specData := `
+plugins:
+  - package: "plugin-a"
+    integrity: "sha256-overridden"
+    pluginConfig:
+      key1: "overridden"
+    dependencies:
+      - ref: "dependency-3"
+  - package: "plugin-d"
+  - package: "plugin-e"
+includes:
+  - "include-2"
+
+`
+
+	// Call the function
+	mergedData, err := defDynamicPlugins.mergeWith(specData)
+
+	// Assertions
+	assert.NoError(t, err)
+	assert.NotNil(t, mergedData)
+
+	// Unmarshal merged data for validation
+	var mergedConfig DynaPluginsConfig
+	err = yaml.Unmarshal([]byte(mergedData), &mergedConfig)
+	assert.NoError(t, err)
+
+	// Validate merged plugins
+	assert.Equal(t, 5, len(mergedConfig.Plugins))
+
+	// Validate plugin-a (overridden by specData)
+	//pluginA := mergedConfig.Plugins[0]
+	//assert.Equal(t, "plugin-a", pluginA.Package)
+	pluginA := findPluginByPackage(mergedConfig.Plugins, "plugin-a")
+	assert.NotNil(t, pluginA)
+	assert.Equal(t, "sha256-overridden", pluginA.Integrity)
+	assert.Equal(t, false, pluginA.Disabled)
+	assert.Equal(t, "overridden", pluginA.PluginConfig["key1"])
+	assert.Equal(t, 1, len(pluginA.Dependencies))
+	assert.Equal(t, "dependency-3", pluginA.Dependencies[0].Ref)
+
+	// Validate plugin-b (disabled, from modelDp)
+	pluginB := findPluginByPackage(mergedConfig.Plugins, "plugin-b")
+	assert.NotNil(t, pluginB)
+	assert.Equal(t, true, pluginB.Disabled)
+
+	// Validate plugin-c (from modelDp, as plugin-b is disabled)
+	//pluginC := mergedConfig.Plugins[1]
+	pluginC := findPluginByPackage(mergedConfig.Plugins, "plugin-c")
+	assert.NotNil(t, pluginC)
+	//assert.Equal(t, "plugin-c", pluginC.Package)
+	assert.Equal(t, "sha256-ghi789", pluginC.Integrity)
+	assert.Equal(t, "value3", pluginC.PluginConfig["key3"])
+
+	//pluginD := mergedConfig.Plugins[2]
+	pluginD := findPluginByPackage(mergedConfig.Plugins, "plugin-d")
+	assert.NotNil(t, pluginD)
+	//assert.Equal(t, "plugin-d", pluginD.Package)
+	assert.Equal(t, "sha256-ddd", pluginD.Integrity)
+
+	// Validate merged includes
+	assert.ElementsMatch(t, []string{"include-1", "include-2"}, mergedConfig.Includes)
+
+	// Marshal the merged configuration into YAML
+	marshalledE, err := yaml.Marshal(findPluginByPackage(mergedConfig.Plugins, "plugin-e"))
+
+	assert.NoError(t, err)
+	// Validate that the marshalled string omits empty fields
+	assert.NotContains(t, string(marshalledE), "integrity", "The string should not contain 'integrity:'")
+	// Validate that the marshalled string always includes disabled field
+	assert.Contains(t, string(marshalledE), "disabled", "The string should not contain 'disabled:'")
+}
+
+func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {
+	for _, plugin := range plugins {
+		if plugin.Package == packageName {
+			return &plugin
+		}
+	}
+	return nil
 }

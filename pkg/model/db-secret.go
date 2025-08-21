@@ -21,6 +21,7 @@ func (f DbSecretFactory) newBackstageObject() RuntimeObject {
 
 type DbSecret struct {
 	secret *corev1.Secret
+	model  *BackstageModel
 }
 
 func init() {
@@ -47,6 +48,7 @@ func (b *DbSecret) setObject(obj runtime.Object) {
 // implementation of RuntimeObject interface
 func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 
+	b.model = model
 	// do not add if specified
 	if backstage.Spec.IsAuthSecretSpecified() {
 		return false, nil
@@ -67,11 +69,11 @@ func (b *DbSecret) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
+func (b *DbSecret) updateAndValidate(_ bsv1.Backstage) error {
 
 	pswd, _ := utils.GeneratePassword(24)
 
-	service := model.LocalDbService
+	service := b.model.LocalDbService
 
 	b.secret.StringData = map[string]string{
 		"POSTGRES_PASSWORD":         pswd,
