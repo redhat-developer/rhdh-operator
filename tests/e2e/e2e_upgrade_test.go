@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 
 	"github.com/redhat-developer/rhdh-operator/tests/helper"
@@ -16,16 +15,9 @@ import (
 
 var _ = Describe("Operator upgrade with existing instances", func() {
 
-	var (
-		projectDir string
-		ns         string
-	)
+	var ns string
 
 	BeforeEach(func() {
-		var err error
-		projectDir, err = helper.GetProjectDir()
-		Expect(err).ShouldNot(HaveOccurred())
-
 		ns = fmt.Sprintf("e2e-test-%d-%s", GinkgoParallelProcess(), helper.RandString(5))
 		helper.CreateNamespace(ns)
 	})
@@ -38,7 +30,6 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 
 		const crName = "my-backstage-app"
 
-		var defaultFromDeploymentManifest = filepath.Join(projectDir, "tests", "e2e", "testdata", "rhdh-operator-1.5.yaml")
 		var fromDeploymentManifest string
 
 		BeforeEach(func() {
@@ -50,11 +41,8 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 			// because this test needs to start from a previous version, then perform the upgrade.
 			uninstallOperator()
 
-			var manifestSet bool
-			fromDeploymentManifest, manifestSet = os.LookupEnv("FROM_OPERATOR_MANIFEST")
-			if !manifestSet {
-				fromDeploymentManifest = defaultFromDeploymentManifest
-			}
+			fromDeploymentManifest = os.Getenv("FROM_OPERATOR_MANIFEST")
+			Expect(fromDeploymentManifest).NotTo(BeEmpty(), "The FROM_OPERATOR_MANIFEST env var must not be empty")
 
 			cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", fromDeploymentManifest)
 			_, err := helper.Run(cmd)
@@ -93,8 +81,10 @@ metadata:
 			}
 			uninstallOperator()
 
-			cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", fromDeploymentManifest, "--ignore-not-found=true")
-			_, _ = helper.Run(cmd)
+			if fromDeploymentManifest != "" {
+				cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", fromDeploymentManifest, "--ignore-not-found=true")
+				_, _ = helper.Run(cmd)
+			}
 		})
 
 		It("should successfully reconcile existing CR when upgrading the operator", func() {
