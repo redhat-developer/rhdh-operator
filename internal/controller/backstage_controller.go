@@ -183,7 +183,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 	}
 
 	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
-		return r.tryToFixUpgradeGlitch(ctx, obj, err)
+		return fmt.Errorf("failed to apply object: %w", err)
 	}
 	lg.V(1).Info("apply object ", objDispKind(obj, r.Scheme), obj.GetName())
 	return nil
@@ -268,27 +268,4 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return b.Complete(r)
-}
-
-func (r *BackstageReconciler) tryToFixUpgradeGlitch(ctx context.Context, obj client.Object, inError error) error {
-
-	lg := log.FromContext(ctx)
-
-	lg.V(1).Info(
-		"failed to apply object => trying to delete it (and losing any custom labels/annotations on it) so it can be recreated upon next reconciliation...",
-		objDispKind(obj, r.Scheme), obj.GetName(),
-		"cause", inError,
-	)
-	// Some resources like StatefulSets allow patching a limited set of fields. A FieldValueForbidden error is returned.
-	// Some other resources like Services do not support updating the primary/secondary clusterIP || ipFamily. A FieldValueInvalid error is returned.
-	// That's why we are trying to delete them first, taking care of orphaning the dependents so that they can be retained.
-	// They will be recreated at the next reconciliation.
-	// If they cannot be recreated at the next reconciliation, the expected error will be returned.
-	if err := r.Delete(ctx, obj, client.PropagationPolicy(metav1.DeletePropagationOrphan)); err != nil {
-		return fmt.Errorf("failed to delete object %s so it can be recreated: %w", obj, err)
-	}
-	lg.V(1).Info("deleted object. If you had set any custom labels/annotations on it manually, you will need to add them again",
-		objDispKind(obj, r.Scheme), obj.GetName(),
-	)
-	return nil
 }
