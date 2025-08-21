@@ -27,13 +27,14 @@ func (f SecretFilesFactory) newBackstageObject() RuntimeObject {
 
 type SecretFiles struct {
 	secrets *multiobject.MultiObject
+	model   *BackstageModel
 }
 
 func init() {
 	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true)
 }
 
-func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
+func (p *SecretFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
 		return nil
@@ -44,9 +45,9 @@ func addSecretFilesFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) erro
 		if specSec.MountPath == "" && specSec.Key == "" {
 			return fmt.Errorf("key is required if defaultMountPath is not specified for secret %s", specSec.Name)
 		}
-		mp, wSubpath := model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
-		keys := model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
-		model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, SecretObjectKind,
+		mp, wSubpath := p.model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
+		keys := p.model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
+		p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, SecretObjectKind,
 			specSec.Name, mp, specSec.Key, wSubpath, keys)
 	}
 	return nil
@@ -72,6 +73,7 @@ func (p *SecretFiles) EmptyObject() client.Object {
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	p.model = model
 	if p.secrets != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -80,7 +82,7 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool,
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
 
 	for _, item := range p.secrets.Items {
 		secret, ok := item.(*corev1.Secret)
@@ -89,8 +91,8 @@ func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) err
 		}
 
 		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
-		mountPath, subPath, containers := m.backstageDeployment.getDefConfigMountInfo(item)
-		m.backstageDeployment.mountFilesFrom(containers, SecretObjectKind,
+		mountPath, subPath, containers := p.model.backstageDeployment.getDefConfigMountInfo(item)
+		p.model.backstageDeployment.mountFilesFrom(containers, SecretObjectKind,
 			item.GetName(), mountPath, "", subPath != "", keys)
 	}
 	return nil

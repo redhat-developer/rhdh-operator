@@ -40,21 +40,22 @@ func (f DynamicPluginsFactory) newBackstageObject() RuntimeObject {
 
 type DynamicPlugins struct {
 	ConfigMap *corev1.ConfigMap
+	model     *BackstageModel
 }
 
 type DynaPluginsConfig struct {
 	// we do not really support Includes here, that's what is processed by the installation script
 	// in the dynamic-plugins container. Keeping it here for the sake of completeness
-	Includes []string     `yaml:"includes"`
-	Plugins  []DynaPlugin `yaml:"plugins"`
+	Includes []string     `yaml:"includes,omitempty"`
+	Plugins  []DynaPlugin `yaml:"plugins,omitempty"`
 }
 
 type DynaPlugin struct {
-	Package      string                 `yaml:"package"`
-	Integrity    string                 `yaml:"integrity"`
+	Package      string                 `yaml:"package,omitempty"`
+	Integrity    string                 `yaml:"integrity,omitempty"`
 	Disabled     bool                   `yaml:"disabled"`
-	PluginConfig map[string]interface{} `yaml:"pluginConfig"`
-	Dependencies []PluginDependency     `yaml:"dependencies"`
+	PluginConfig map[string]interface{} `yaml:"pluginConfig,omitempty"`
+	Dependencies []PluginDependency     `yaml:"dependencies,omitempty"`
 }
 
 type PluginDependency struct {
@@ -69,34 +70,6 @@ func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
 }
 
-func addDynamicPluginsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
-
-	if spec.Application == nil || spec.Application.DynamicPluginsConfigMapName == "" {
-		return nil
-	}
-
-	_, ic := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
-	if ic == nil {
-		return fmt.Errorf("validation failed, dynamic plugin name configured but no InitContainer %s defined", dynamicPluginInitContainerName)
-	}
-
-	dp := model.ExternalConfig.DynamicPlugins
-
-	if dp.Data == nil || dp.Data[DynamicPluginsFile] == "" {
-		return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
-	}
-
-	if dp.Data[DynamicPluginsFile] != "" {
-		model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
-			dp.Name, ic.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
-	}
-
-	// if default dynamic-plugins set, the value from model.DynamicPlugins will differ from the one in model.RuntimeObjects
-	model.DynamicPlugins.ConfigMap = &dp
-
-	return nil
-}
-
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) Object() runtime.Object {
 	return p.ConfigMap
@@ -107,7 +80,6 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 	if obj != nil {
 		p.ConfigMap = obj.(*corev1.ConfigMap)
 	}
-
 }
 
 // implementation of RuntimeObject interface
@@ -116,15 +88,17 @@ func (p *DynamicPlugins) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
-
+func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	p.model = model
 	if p.ConfigMap == nil {
-		if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
-			p.ConfigMap = &corev1.ConfigMap{}
-		} else {
-			return false, nil
-		}
+		return false, nil
 	}
+
+	// if the ConfigMap is set but does not have the data or expected key
+	if p.ConfigMap.Data == nil || p.ConfigMap.Data[DynamicPluginsFile] == "" {
+		return false, fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
+	}
+
 	model.setRuntimeObject(p)
 	model.DynamicPlugins = *p
 	return true, nil
@@ -132,27 +106,16 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage bsv1.Backst
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-func (p *DynamicPlugins) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
+func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
 
-	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
-		return nil
-	}
-
-	_, initContainer := DynamicPluginsInitContainer(model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	_, initContainer := p.getInitContainer()
 	if initContainer == nil {
 		return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
 	}
-	// override image with env var
-	// [GA] Do we need this feature?
-	if os.Getenv(BackstageImageEnvVar) != "" {
-		// TODO workaround for the (janus-idp, rhdh) case where we have
-		// exactly the same image for initContainer and want it to be overriden
-		// the same way as Backstage's one
-		initContainer.Image = os.Getenv(BackstageImageEnvVar)
+	if backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "" {
+		p.model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+			p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
 	}
-
-	model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
-		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
 
 	return nil
 }
@@ -163,9 +126,40 @@ func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
+func (p *DynamicPlugins) addExternalConfig(spec bsv1.BackstageSpec) error {
+	if spec.Application != nil && spec.Application.DynamicPluginsConfigMapName != "" {
+
+		_, initContainer := p.getInitContainer()
+		if initContainer == nil {
+			return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
+		}
+
+		dp := &p.model.ExternalConfig.DynamicPlugins
+
+		// if the ConfigMap is set but does not have the data or expected key
+		if dp.Data == nil || dp.Data[DynamicPluginsFile] == "" {
+			return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
+		}
+		if p.ConfigMap != nil {
+			mergedData, err := p.mergeWith(dp.Data[DynamicPluginsFile])
+			if err != nil {
+				return fmt.Errorf("failed to merge dynamic plugins config: %w", err)
+			}
+			p.ConfigMap.Data[DynamicPluginsFile] = mergedData
+			p.model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+				p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
+		} else {
+			p.model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+				dp.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
+		}
+
+	}
+	return nil
+}
+
 // Dependencies returns a list of plugin dependencies
 func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
-	ps, err := p.pluginsFromConfigMap()
+	ps, err := p.GetPlugins()
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +178,7 @@ func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
 }
 
 // returns a list of plugins from the configMap
-func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
+func (p *DynamicPlugins) GetPlugins() ([]DynaPlugin, error) {
 	if p.ConfigMap == nil {
 		return []DynaPlugin{}, nil
 	}
@@ -201,6 +195,83 @@ func (p *DynamicPlugins) pluginsFromConfigMap() ([]DynaPlugin, error) {
 	}
 
 	return pluginsConfig.Plugins, nil
+}
+
+func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
+
+	if p.ConfigMap == nil {
+		return "", fmt.Errorf("dynamic plugins ConfigMap is not set")
+	}
+	modelData := p.ConfigMap.Data[DynamicPluginsFile]
+	var modelPluginsConfig, specPluginsConfig, mergedPluginsConfig DynaPluginsConfig
+	if modelData != "" {
+		if err := yaml.Unmarshal([]byte(modelData), &modelPluginsConfig); err != nil {
+			return "", fmt.Errorf("failed to unmarshal model ConfigMap data: %w", err)
+		}
+	}
+	if specData != "" {
+		if err := yaml.Unmarshal([]byte(specData), &specPluginsConfig); err != nil {
+			return "", fmt.Errorf("failed to unmarshal spec ConfigMap data: %w", err)
+		}
+	}
+
+	// Merge Plugins by package field
+	pluginMap := make(map[string]DynaPlugin)
+	for _, plugin := range modelPluginsConfig.Plugins {
+		pluginMap[plugin.Package] = plugin
+	}
+	for _, plugin := range specPluginsConfig.Plugins {
+
+		if existingPlugin, found := pluginMap[plugin.Package]; found {
+			if plugin.PluginConfig != nil {
+				existingPlugin.PluginConfig = plugin.PluginConfig
+			}
+			if len(plugin.Dependencies) > 0 {
+				existingPlugin.Dependencies = plugin.Dependencies
+			}
+			if plugin.Integrity != "" {
+				existingPlugin.Integrity = plugin.Integrity
+			}
+			existingPlugin.Disabled = plugin.Disabled
+			pluginMap[plugin.Package] = existingPlugin
+		} else {
+			pluginMap[plugin.Package] = plugin
+		}
+	}
+	mergedPluginsConfig.Plugins = make([]DynaPlugin, 0, len(pluginMap))
+	for _, plugin := range pluginMap {
+		mergedPluginsConfig.Plugins = append(mergedPluginsConfig.Plugins, plugin)
+	}
+
+	// Merge Includes (ensure uniqueness)
+	includeSet := make(map[string]struct{})
+	for _, include := range modelPluginsConfig.Includes {
+		includeSet[include] = struct{}{}
+	}
+	for _, include := range specPluginsConfig.Includes {
+		includeSet[include] = struct{}{}
+	}
+	mergedPluginsConfig.Includes = make([]string, 0, len(includeSet))
+	for include := range includeSet {
+		mergedPluginsConfig.Includes = append(mergedPluginsConfig.Includes, include)
+	}
+
+	// Marshal the merged data back to YAML
+	mergedData, err := yaml.Marshal(mergedPluginsConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal merged plugins config: %w", err)
+	}
+
+	return string(mergedData), nil
+}
+func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
+	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+
+	// override image with env var
+	if os.Getenv(BackstageImageEnvVar) != "" {
+		initContainer.Image = os.Getenv(BackstageImageEnvVar)
+	}
+	return i, initContainer
 }
 
 // returns initContainer supposed to initialize DynamicPlugins

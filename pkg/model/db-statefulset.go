@@ -26,6 +26,7 @@ func (f DbStatefulSetFactory) newBackstageObject() RuntimeObject {
 
 type DbStatefulSet struct {
 	statefulSet *appsv1.StatefulSet
+	model       *BackstageModel
 }
 
 func init() {
@@ -50,6 +51,7 @@ func (b *DbStatefulSet) setObject(obj runtime.Object) {
 
 // implementation of RuntimeObject interface
 func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	b.model = model
 	if b.statefulSet == nil {
 		if model.localDbEnabled {
 			return false, fmt.Errorf("LocalDb StatefulSet not configured, make sure there is db-statefulset.yaml in default or raw configuration")
@@ -79,10 +81,10 @@ func (b *DbStatefulSet) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbStatefulSet) updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error {
+func (b *DbStatefulSet) updateAndValidate(backstage bsv1.Backstage) error {
 
 	// point ServiceName to localDb
-	b.statefulSet.Spec.ServiceName = model.LocalDbService.service.Name
+	b.statefulSet.Spec.ServiceName = b.model.LocalDbService.service.Name
 
 	if backstage.Spec.Application != nil && backstage.Spec.Application.ImagePullSecrets != nil {
 		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
@@ -90,8 +92,8 @@ func (b *DbStatefulSet) updateAndValidate(model *BackstageModel, backstage bsv1.
 
 	if backstage.Spec.IsAuthSecretSpecified() {
 		b.setDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
-	} else if model.LocalDbSecret != nil {
-		b.setDbSecretEnvVar(b.container(), model.LocalDbSecret.secret.Name)
+	} else if b.model.LocalDbSecret != nil {
+		b.setDbSecretEnvVar(b.container(), b.model.LocalDbSecret.secret.Name)
 	}
 	return nil
 }

@@ -29,7 +29,7 @@ func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, backstage bs.
 	var errs []error
 	for _, obj := range objects {
 		// Apply the unstructured object
-		lg.V(1).Info("apply plugin dependency: ", "name", obj.GetName(), "kind", obj.GetKind(), "namespace", obj.GetNamespace())
+		lg.V(1).Info("apply plugin dependency: ", "name", obj.GetName(), "kind", obj.GetKind(), "namespace", obj.GetNamespace(), "for plugins: ", plugins)
 
 		if err = r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
 			errs = append(errs, err)
