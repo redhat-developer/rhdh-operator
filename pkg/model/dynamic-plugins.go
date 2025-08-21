@@ -46,16 +46,16 @@ type DynamicPlugins struct {
 type DynaPluginsConfig struct {
 	// we do not really support Includes here, that's what is processed by the installation script
 	// in the dynamic-plugins container. Keeping it here for the sake of completeness
-	Includes []string     `yaml:"includes"`
-	Plugins  []DynaPlugin `yaml:"plugins"`
+	Includes []string     `yaml:"includes,omitempty"`
+	Plugins  []DynaPlugin `yaml:"plugins,omitempty"`
 }
 
 type DynaPlugin struct {
-	Package      string                 `yaml:"package"`
-	Integrity    string                 `yaml:"integrity"`
+	Package      string                 `yaml:"package,omitempty"`
+	Integrity    string                 `yaml:"integrity,omitempty"`
 	Disabled     bool                   `yaml:"disabled"`
-	PluginConfig map[string]interface{} `yaml:"pluginConfig"`
-	Dependencies []PluginDependency     `yaml:"dependencies"`
+	PluginConfig map[string]interface{} `yaml:"pluginConfig,omitempty"`
+	Dependencies []PluginDependency     `yaml:"dependencies,omitempty"`
 }
 
 type PluginDependency struct {

@@ -403,6 +403,7 @@ plugins:
     dependencies:
       - ref: "dependency-3"
   - package: "plugin-d"
+  - package: "plugin-e"
 includes:
   - "include-2"
 
@@ -421,7 +422,7 @@ includes:
 	assert.NoError(t, err)
 
 	// Validate merged plugins
-	assert.Equal(t, 4, len(mergedConfig.Plugins))
+	assert.Equal(t, 5, len(mergedConfig.Plugins))
 
 	// Validate plugin-a (overridden by specData)
 	//pluginA := mergedConfig.Plugins[0]
@@ -455,6 +456,15 @@ includes:
 
 	// Validate merged includes
 	assert.ElementsMatch(t, []string{"include-1", "include-2"}, mergedConfig.Includes)
+
+	// Marshal the merged configuration into YAML
+	marshalledE, err := yaml.Marshal(findPluginByPackage(mergedConfig.Plugins, "plugin-e"))
+
+	assert.NoError(t, err)
+	// Validate that the marshalled string omits empty fields
+	assert.NotContains(t, string(marshalledE), "integrity", "The string should not contain 'integrity:'")
+	// Validate that the marshalled string always includes disabled field
+	assert.Contains(t, string(marshalledE), "disabled", "The string should not contain 'disabled:'")
 }
 
 func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {
