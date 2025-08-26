@@ -129,7 +129,7 @@ Current **default** implementation of the orchestrator plugin dependencies uses:
 
 See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) for a complete configuration of the orchestrator plugin dependencies.
 
-**Note**: Currently, RHDH Orchestrator workflow is configured and setup to run within a single namespace by default.
+**Note**: Currently, RHDH Orchestrator workflow is configured and setup to run within the same namespace as RHDH instance (CR).
 However, to enable and configure the deployment of workflows in a separated namespace, please follow the steps in this [section](#optional-enabling-workflow-in-a-different-namespace).
 ##### RBAC
 
@@ -143,7 +143,7 @@ To enable CI/CD for RHDH Orchestrator workflows, please follow this [guide](orch
 To enable workflow deployment in another namespace other than where RHDH Orchestrator infrastructure are deployed and configured,
 please follow these steps below.
 
-**Note**: The `$RHDH_NAMESPACE` is the namespace where RHDH Orchestrator services are running.
+**Note**: The `$RHDH_NAMESPACE` is the namespace where RHDH instance (CR) is deployed.
 Please ensure to update this value as needed.
 
 1. Add `SonataFlowClusterPlatform` Custom Resource: 
