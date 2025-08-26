@@ -33,6 +33,13 @@ data:
         guest:
           # using the guest user to query the '/api/dynamic-plugins-info/loaded-plugins' endpoint.
           dangerouslyAllowOutsideDevelopment: true
+    backend:
+      auth:
+        externalAccess:
+          - type: static
+            options:
+              token: ${BACKEND_SECRET}
+              subject: orchestrator
 ---
 apiVersion: rhdh.redhat.com/v1alpha4
 kind: Backstage
@@ -44,3 +51,6 @@ spec:
       configMaps:
         - name: app-config-rhdh
     dynamicPluginsConfigMapName: orchestrator-plugin
+    extraEnvs:
+      secrets:
+        - name: backstage-backend-auth-secret
