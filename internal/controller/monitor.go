@@ -5,13 +5,14 @@ import (
 	"fmt"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
 func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage *bs.Backstage) error {
