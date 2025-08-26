@@ -21,6 +21,7 @@ func (f BackstageServiceFactory) newBackstageObject() RuntimeObject {
 
 type BackstageService struct {
 	service *corev1.Service
+	model   *BackstageModel
 }
 
 func init() {
@@ -45,6 +46,7 @@ func (b *BackstageService) setObject(obj runtime.Object) {
 
 // implementation of RuntimeObject interface
 func (b *BackstageService) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	b.model = model
 	if b.service == nil {
 		return false, fmt.Errorf("Backstage Service is not initialized, make sure there is service.yaml in default or raw configuration")
 	}
@@ -61,7 +63,7 @@ func (b *BackstageService) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) updateAndValidate(_ *BackstageModel, _ bsv1.Backstage) error {
+func (b *BackstageService) updateAndValidate(_ bsv1.Backstage) error {
 	return nil
 }
 

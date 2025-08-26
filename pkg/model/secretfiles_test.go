@@ -137,7 +137,7 @@ func TestFailedValidation(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
-	assert.EqualError(t, err, "key is required if defaultMountPath is not specified for secret secret1")
+	assert.EqualError(t, err, "failed to contribute external config, reason: key is required if defaultMountPath is not specified for secret secret1")
 
 }
 
@@ -161,8 +161,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 0, len(deployment.container().Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret1"), deployment.podSpec().Volumes[1].Name)
-
+	assert.True(t, checkIfContainVolumes(deployment.podSpec().Volumes, utils.GenerateVolumeNameFromCmOrSecret("secret1")))
 }
 
 func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
@@ -185,6 +184,6 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 0, len(deployment.container().Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret1"), deployment.podSpec().Volumes[1].Name)
+	assert.True(t, checkIfContainVolumes(deployment.podSpec().Volumes, "secret1"))
 
 }

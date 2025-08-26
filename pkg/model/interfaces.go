@@ -37,7 +37,12 @@ type RuntimeObject interface {
 	addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error)
 	// at this stage all the information is added to the model
 	// this step is for updating the final references and validate the object
-	updateAndValidate(model *BackstageModel, backstage bsv1.Backstage) error
+	updateAndValidate(backstage bsv1.Backstage) error
 	// sets object name, labels and other necessary meta information
 	setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme)
+}
+
+type ExternalConfigContributor interface {
+	// addExternalConfig adds external configuration to deployment
+	addExternalConfig(spec bsv1.BackstageSpec) error
 }

@@ -24,13 +24,14 @@ func (f SecretEnvsFactory) newBackstageObject() RuntimeObject {
 
 type SecretEnvs struct {
 	secrets *multiobject.MultiObject
+	model   *BackstageModel
 }
 
 func init() {
 	registerConfig(SecretEnvsObjectKey, SecretEnvsFactory{}, true)
 }
 
-func addSecretEnvsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error {
+func (p *SecretEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.Secrets == nil {
 		return nil
 	}
@@ -66,6 +67,7 @@ func (p *SecretEnvs) EmptyObject() client.Object {
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+	p.model = model
 	if p.secrets != nil {
 		model.setRuntimeObject(p)
 		return true, nil
@@ -74,7 +76,7 @@ func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, 
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) error {
+func (p *SecretEnvs) updateAndValidate(_ bsv1.Backstage) error {
 
 	for _, item := range p.secrets.Items {
 		_, ok := item.(*corev1.Secret)
@@ -85,7 +87,7 @@ func (p *SecretEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) erro
 		if err != nil {
 			return fmt.Errorf("failed to parse containers annotation on secret %s: %w", item.GetName(), err)
 		}
-		m.backstageDeployment.addEnvVarsFrom(toContainers, SecretObjectKind, item.GetName(), "")
+		p.model.backstageDeployment.addEnvVarsFrom(toContainers, SecretObjectKind, item.GetName(), "")
 	}
 
 	return nil
