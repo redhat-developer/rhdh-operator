@@ -6,8 +6,6 @@ import (
 	"testing"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -15,6 +13,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
 func setupMonitorTestReconciler() BackstageReconciler {
