@@ -148,16 +148,16 @@ Please ensure to update this value as needed.
 
 1. Add `SonataFlowClusterPlatform` Custom Resource: 
   ```console
-     oc create -f - <<EOF
-     apiVersion: sonataflow.org/v1alpha08
-     kind: SonataFlowClusterPlatform
-     metadata:
-       name: cluster-platform
-     spec:
-       platformRef:
-         name: sonataflow-platform
-         namespace: $RHDH_NAMESPACE
-     EOF
+  oc create -f - <<EOF
+  apiVersion: sonataflow.org/v1alpha08
+  kind: SonataFlowClusterPlatform
+  metadata:
+    name: cluster-platform
+  spec:
+    platformRef:
+      name: sonataflow-platform
+      namespace: $RHDH_NAMESPACE
+  EOF
    ```
 
 2. Add Network Policies: To allow communication between RHDH namespace and the workflow namespace, 
