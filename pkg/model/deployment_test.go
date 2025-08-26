@@ -257,26 +257,31 @@ spec:
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageDeployment)
+	d := model.backstageDeployment
 
-	cs, err := model.backstageDeployment.filterContainerNames(nil)
+	f := containersFilter{}
+	cs, err := f.getContainers(d)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, len(cs))
-	assert.Equal(t, BackstageContainerName(), cs[0])
+	assert.Equal(t, BackstageContainerName(), cs[0].Name)
 
-	cs, err = model.backstageDeployment.filterContainerNames([]string{})
+	f = containersFilter{names: []string{}}
+	cs, err = f.getContainers(d)
 	assert.Equal(t, 1, len(cs))
-	assert.Equal(t, BackstageContainerName(), cs[0])
+	assert.Equal(t, BackstageContainerName(), cs[0].Name)
 
-	cs, err = model.backstageDeployment.filterContainerNames([]string{"*"})
+	f = containersFilter{names: []string{"*"}}
+	cs, err = f.getContainers(d)
 	assert.Equal(t, 4, len(cs))
 
-	cs, err = model.backstageDeployment.filterContainerNames([]string{"c123"})
+	f = containersFilter{names: []string{"c123"}}
+	cs, err = f.getContainers(d)
 	assert.Error(t, err)
-	//assert.Equal(t, 1, len(cs))
-	//assert.Nil(t, model.backstageDeployment.containerByName("c123"))
 
-	cs, err = model.backstageDeployment.filterContainerNames([]string{"c1", "c2"})
+	f = containersFilter{names: []string{"c1", "c2"}}
+	cs, err = f.getContainers(d)
 	assert.Equal(t, 2, len(cs))
-	assert.Equal(t, "c1", cs[0])
+	assert.Equal(t, "c1", cs[0].Name)
 	assert.NotNil(t, model.backstageDeployment.containerByName("c1"))
 
 }

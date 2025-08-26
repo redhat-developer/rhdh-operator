@@ -47,7 +47,7 @@ func (p *SecretFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 		}
 		mp, wSubpath := p.model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
 		keys := p.model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
-		p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, SecretObjectKind,
+		p.model.backstageDeployment.mountFilesFrom(containersFilter{}, SecretObjectKind,
 			specSec.Name, mp, specSec.Key, wSubpath, keys)
 	}
 	return nil
@@ -87,17 +87,17 @@ func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
 	for _, item := range p.secrets.Items {
 		secret, ok := item.(*corev1.Secret)
 		if !ok {
-			return fmt.Errorf("payload is not corev1.Secret: %T", item)
+			return fmt.Errorf("payload is not Secret kind: %T", item)
 		}
 
 		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
-		mountPath, subPath := m.backstageDeployment.getDefConfigMountPath(item)
-		containers, err := m.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
-		if err != nil {
-			return fmt.Errorf("cannot get containers for secret %s: %w", item.GetName(), err)
-		}
-		m.backstageDeployment.mountFilesFrom(containers, SecretObjectKind,
+		mountPath, subPath := p.model.backstageDeployment.getDefConfigMountPath(item)
+		//containers, err := p.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
+		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
 			item.GetName(), mountPath, "", subPath != "", keys)
+		if err != nil {
+			return fmt.Errorf("failed to add files from secret %s: %w", item.GetName(), err)
+		}
 	}
 	return nil
 }

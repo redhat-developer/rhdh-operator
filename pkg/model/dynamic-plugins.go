@@ -113,7 +113,7 @@ func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
 		return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
 	}
 	if backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "" {
-		p.model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+		p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
 			p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
 	}
 
@@ -146,10 +146,10 @@ func (p *DynamicPlugins) addExternalConfig(spec bsv1.BackstageSpec) error {
 				return fmt.Errorf("failed to merge dynamic plugins config: %w", err)
 			}
 			p.ConfigMap.Data[DynamicPluginsFile] = mergedData
-			p.model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+			p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
 				p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
 		} else {
-			p.model.backstageDeployment.mountFilesFrom([]string{dynamicPluginInitContainerName}, ConfigMapObjectKind,
+			p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
 				dp.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
 		}
 

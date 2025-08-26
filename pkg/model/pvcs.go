@@ -39,7 +39,10 @@ func (b *BackstagePvcs) addExternalConfig(spec bsv1.BackstageSpec) error {
 			subPath = utils.ToRFC1123Label(pvcSpec.Name)
 		}
 
-		addPvc(b.model.backstageDeployment, pvcSpec.Name, mountPath, subPath, []string{BackstageContainerName()})
+		err := addPvc(b.model.backstageDeployment, pvcSpec.Name, mountPath, subPath, containersFilter{})
+		if err != nil {
+			return fmt.Errorf("failed to add pvc %s: %w", pvcSpec.Name, err)
+		}
 	}
 	return nil
 }
@@ -80,12 +83,12 @@ func (b *BackstagePvcs) updateAndValidate(_ bsv1.Backstage) error {
 		if !ok {
 			return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
 		}
-		mountPath, subPath := m.backstageDeployment.getDefConfigMountPath(o)
-		containers, err := m.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(o.GetAnnotations()[ContainersAnnotation]))
+		mountPath, subPath := b.model.backstageDeployment.getDefConfigMountPath(o)
+		//containers, err := b.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(o.GetAnnotations()[ContainersAnnotation]))
+		err := addPvc(b.model.backstageDeployment, pvc.Name, mountPath, subPath, containersFilter{annotation: o.GetAnnotations()[ContainersAnnotation]})
 		if err != nil {
 			return fmt.Errorf("failed to get containers for pvc %s: %w", o.GetName(), err)
 		}
-		addPvc(m.backstageDeployment, pvc.Name, mountPath, subPath, containers)
 	}
 	return nil
 }
@@ -99,7 +102,7 @@ func (b *BackstagePvcs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Sc
 	}
 }
 
-func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string, affectedContainers []string) {
+func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string, filter containersFilter) error {
 
 	volName := utils.ToRFC1123Label(pvcName)
 	volSrc := corev1.VolumeSource{
@@ -109,9 +112,14 @@ func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string, affect
 	}
 	bsd.deployment.Spec.Template.Spec.Volumes =
 		append(bsd.deployment.Spec.Template.Spec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
+	affectedContainers, err := filter.getContainers(bsd)
+	if err != nil {
+		return fmt.Errorf("failed to filter containers for pvc %s: %w", pvcName, err)
+	}
 	for _, c := range affectedContainers {
-		update := bsd.containerByName(c)
-		update.VolumeMounts = append(update.VolumeMounts,
+		//update := bsd.containerByName(c)
+		c.VolumeMounts = append(c.VolumeMounts,
 			corev1.VolumeMount{Name: volName, MountPath: mountPath, SubPath: subPath})
 	}
+	return nil
 }

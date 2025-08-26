@@ -35,7 +35,7 @@ func (p *ConfigMapFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 		mp, wSubpath := p.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.ExtraFiles.MountPath)
 		keys := p.model.ExternalConfig.ExtraFileConfigMapKeys[specCm.Name].All()
-		p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
+		p.model.backstageDeployment.mountFilesFrom(containersFilter{}, ConfigMapObjectKind,
 			specCm.Name, mp, specCm.Key, wSubpath, keys)
 	}
 	return nil
@@ -72,7 +72,7 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 func (p *ConfigMapFiles) updateAndValidate(_ bsv1.Backstage) error {
 
 	keys := append(maps.Keys(p.ConfigMap.Data), maps.Keys(p.ConfigMap.BinaryData)...)
-	p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
+	p.model.backstageDeployment.mountFilesFrom(containersFilter{}, ConfigMapObjectKind,
 		p.ConfigMap.Name, p.model.backstageDeployment.defaultMountPath(), "", true, keys)
 
 	return nil

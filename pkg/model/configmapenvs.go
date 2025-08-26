@@ -32,7 +32,7 @@ func (p *ConfigMapEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
 	}
 
 	for _, specCm := range spec.Application.ExtraEnvs.ConfigMaps {
-		p.model.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, ConfigMapObjectKind, specCm.Name, specCm.Key)
+		p.model.backstageDeployment.addEnvVarsFrom(containersFilter{}, ConfigMapObjectKind, specCm.Name, specCm.Key)
 	}
 	return nil
 }
@@ -67,7 +67,7 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage bsv1.Backsta
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) updateAndValidate(backstage bsv1.Backstage) error {
 	if p.ConfigMap != nil {
-		p.model.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
+		p.model.backstageDeployment.addEnvVarsFrom(containersFilter{}, ConfigMapObjectKind,
 			p.ConfigMap.Name, "")
 	}
 	return nil
