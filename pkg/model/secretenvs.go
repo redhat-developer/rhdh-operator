@@ -36,7 +36,11 @@ func addSecretEnvsFromSpec(spec bsv1.BackstageSpec, model *BackstageModel) error
 	}
 
 	for _, specSec := range spec.Application.ExtraEnvs.Secrets {
-		model.backstageDeployment.addEnvVarsFrom([]string{BackstageContainerName()}, SecretObjectKind, specSec.Name, specSec.Key)
+		toContainers, err := model.backstageDeployment.filterContainerNames(specSec.Containers)
+		if err != nil {
+			return fmt.Errorf("failed to filter containers on secret %s: %w", specSec.Name, err)
+		}
+		model.backstageDeployment.addEnvVarsFrom(toContainers, SecretObjectKind, specSec.Name, specSec.Key)
 	}
 	return nil
 }
@@ -77,9 +81,9 @@ func (p *SecretEnvs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) erro
 		if !ok {
 			return fmt.Errorf("payload is not corev1.Secret: %T", item)
 		}
-		toContainers := utils.FilterContainers(m.backstageDeployment.allContainers(), item.GetAnnotations()[ContainersAnnotation])
-		if toContainers == nil {
-			toContainers = []string{BackstageContainerName()}
+		toContainers, err := m.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
+		if err != nil {
+			return fmt.Errorf("failed to parse containers annotation on secret %s: %w", item.GetName(), err)
 		}
 		m.backstageDeployment.addEnvVarsFrom(toContainers, SecretObjectKind, item.GetName(), "")
 	}

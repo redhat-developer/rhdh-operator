@@ -89,7 +89,11 @@ func (p *SecretFiles) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) err
 		}
 
 		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
-		mountPath, subPath, containers := m.backstageDeployment.getDefConfigMountInfo(item)
+		mountPath, subPath := m.backstageDeployment.getDefConfigMountPath(item)
+		containers, err := m.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
+		if err != nil {
+			return fmt.Errorf("cannot get containers for secret %s: %w", item.GetName(), err)
+		}
 		m.backstageDeployment.mountFilesFrom(containers, SecretObjectKind,
 			item.GetName(), mountPath, "", subPath != "", keys)
 	}

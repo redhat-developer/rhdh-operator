@@ -217,7 +217,9 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 		b.setReplicas(backstage.Spec.Application.Replicas)
 		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
 		b.setImage(backstage.Spec.Application.Image)
-		b.addExtraEnvs(backstage.Spec.Application.ExtraEnvs)
+		if err := b.addExtraEnvs(backstage.Spec.Application.ExtraEnvs); err != nil {
+			return fmt.Errorf("can not add extra envs: %w", err)
+		}
 	}
 
 	// set from backstage.Spec.Deployment
@@ -244,20 +246,15 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 	return nil
 }
 
-// getDefConfigMountInfo returns the mount path, subpath and the containers to mount the object (defined in default configuration) to
-func (b *BackstageDeployment) getDefConfigMountInfo(obj client.Object) (mountPath string, subPath string, toContainers []string) {
+// getDefConfigMountPath returns the mount path and subpath (defined in default configuration)
+func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath string, subPath string) {
+
 	mountPath, ok := obj.GetAnnotations()[DefaultMountPathAnnotation]
 	subPath = ""
 	if !ok {
 		volName := utils.ToRFC1123Label(obj.GetName())
 		mountPath = filepath.Join(b.defaultMountPath(), volName)
 		subPath = volName
-	}
-	// filter containers to mount the object to
-	toContainers = utils.FilterContainers(b.allContainers(), obj.GetAnnotations()[ContainersAnnotation])
-	// if no containers specified, mount to Backstage container only
-	if toContainers == nil {
-		toContainers = []string{BackstageContainerName()}
 	}
 	return
 }
@@ -286,28 +283,31 @@ func (b *BackstageDeployment) setImage(image *string) {
 	}
 }
 
-// adds environment variables to the Backstage Container
-func (b *BackstageDeployment) addContainerEnvVar(env bsv1.Env) {
-	b.container().Env =
-		append(b.container().Env, corev1.EnvVar{
-			Name:  env.Name,
-			Value: env.Value,
-		})
-}
-
 // adds environment from source to the Backstage Container
-func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) {
-	if extraEnvs != nil {
-		for _, e := range extraEnvs.Envs {
-			b.addContainerEnvVar(e)
+func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
+	if extraEnvs == nil {
+		return nil
+	}
+	for _, env := range extraEnvs.Envs {
+		containerNames, err := b.filterContainerNames(env.Containers)
+		if err != nil {
+			return fmt.Errorf("can not filter containers to add env %s: %w", env.Name, err)
+		}
+		for _, c := range containerNames {
+			container := b.containerByName(c)
+			container.Env =
+				append(container.Env, corev1.EnvVar{
+					Name:  env.Name,
+					Value: env.Value,
+				})
 		}
 	}
+	return nil
 }
 
 // MountFilesFrom adds Volume to specified podSpec and related VolumeMounts to specified belonging to this podSpec container
 // from ConfigMap or Secret volume source
-// podSpec - PodSpec to add Volume to
-// container - container to add VolumeMount(s) to
+// containers - array of containers to add VolumeMount(s) to
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // mountPath - mount path, default one or  as it specified in BackstageCR.spec.Application.AppConfig|ExtraFiles
@@ -353,16 +353,15 @@ func (b *BackstageDeployment) mountFilesFrom(containers []string, kind ObjectKin
 			container.VolumeMounts = append(container.VolumeMounts, vm)
 		}
 	}
-
 }
 
 // AddEnvVarsFrom adds environment variable to specified container
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // varName - name of env variable
-func (b *BackstageDeployment) addEnvVarsFrom(containerNames []string, kind ObjectKind, objectName, varName string) {
+func (b *BackstageDeployment) addEnvVarsFrom(containers []string, kind ObjectKind, objectName, varName string) {
 
-	for _, c := range containerNames {
+	for _, c := range containers {
 		container := b.containerByName(c)
 		if varName == "" {
 			envFromSrc := corev1.EnvFromSource{}
@@ -397,4 +396,30 @@ func (b *BackstageDeployment) addEnvVarsFrom(containerNames []string, kind Objec
 			})
 		}
 	}
+}
+
+// filterContainerNames filters the containers to mount the object to
+// if filterNames is nil or empty, returns Backstage container
+// if filterNames contains "*", returns allContainers in deployment
+// if filterNames contains unknown container name, returns error
+func (b *BackstageDeployment) filterContainerNames(filterNames []string) ([]string, error) {
+	allContainers := b.allContainers()
+
+	if filterNames == nil || len(filterNames) == 0 {
+		return []string{BackstageContainerName()}, nil
+	}
+
+	if len(filterNames) == 1 && filterNames[0] == "*" {
+		return allContainers, nil
+	}
+
+	result := []string{}
+	for _, c := range filterNames {
+		container := b.containerByName(c)
+		if container == nil {
+			return nil, fmt.Errorf("container %s not found", c)
+		}
+		result = append(result, c)
+	}
+	return result, nil
 }

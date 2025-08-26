@@ -77,7 +77,11 @@ func (b *BackstagePvcs) updateAndValidate(m *BackstageModel, _ bsv1.Backstage) e
 		if !ok {
 			return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
 		}
-		mountPath, subPath, containers := m.backstageDeployment.getDefConfigMountInfo(o)
+		mountPath, subPath := m.backstageDeployment.getDefConfigMountPath(o)
+		containers, err := m.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(o.GetAnnotations()[ContainersAnnotation]))
+		if err != nil {
+			return fmt.Errorf("failed to get containers for pvc %s: %w", o.GetName(), err)
+		}
 		addPvc(m.backstageDeployment, pvc.Name, mountPath, subPath, containers)
 	}
 	return nil

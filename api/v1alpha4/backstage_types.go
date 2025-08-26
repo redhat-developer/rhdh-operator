@@ -193,6 +193,13 @@ type EnvObjectRef struct {
 	// Key in the object
 	// +optional
 	Key string `json:"key,omitempty"`
+
+	// If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
+	// If it contains only "*", it means all containers and no other names are allowed.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:XValidation:rule="!(self[0]==\"*\"  && size(self) != 1)",message="If '*' is specified, no other container names are allowed"
+	Containers []string `json:"containers,omitempty"`
 }
 
 type FileObjectRef struct {
@@ -208,6 +215,13 @@ type FileObjectRef struct {
 	// Path to mount the Object. If not specified default-path/Name will be used
 	// +optional
 	MountPath string `json:"mountPath"`
+
+	// If set, the file will be mounted only in the specified containers, otherwise in backstage container only.
+	// If it contains only "*", it means all containers and no other names are allowed.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:XValidation:rule="!(self[0]==\"*\"  && size(self) != 1)",message="If '*' is specified, no other container names are allowed"
+	Containers []string `json:"containers,omitempty"`
 }
 
 type PvcRef struct {
@@ -218,6 +232,13 @@ type PvcRef struct {
 	// Path to mount PVC. If not specified default-path/Name will be used
 	// +optional
 	MountPath string `json:"mountPath"`
+
+	// If set, the file will be mounted only in the specified containers, otherwise in backstage container only.
+	// If it contains only "*", it means all containers and no other names are allowed.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:XValidation:rule="!(self[0]==\"*\"  && size(self) != 1)",message="If '*' is specified, no other container names are allowed"
+	Containers []string `json:"containers,omitempty"`
 }
 
 type Env struct {
@@ -228,6 +249,13 @@ type Env struct {
 	// Value of the environment variable
 	//+kubebuilder:validation:Required
 	Value string `json:"value"`
+
+	// If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
+	// If it contains only "*", it means all containers and no other names are allowed.
+	// +optional
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:XValidation:rule="!(self[0]==\"*\"  && size(self) != 1)",message="If '*' is specified, no other container names are allowed"
+	Containers []string `json:"containers,omitempty"`
 }
 
 // BackstageStatus defines the observed state of Backstage
