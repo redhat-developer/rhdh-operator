@@ -117,12 +117,89 @@ Current **default** implementation of the orchestrator plugin dependencies uses:
 
 See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) for a complete configuration of the orchestrator plugin dependencies.
 
+**Note**: Currently, RHDH Orchestrator workflow is configured and setup to run within the same namespace as RHDH instance (CR).
+However, to enable and configure the deployment of workflows in a separated namespace, please follow the steps in this [section](#optional-enabling-workflow-in-a-different-namespace).
 ##### RBAC
 
 To enable the Backstage operator to work with the SonataFlow platform, its ServiceAccount must be granted the appropriate permissions. 
 This is done by the Backstage operator automatically when the SonataFlowPlatform CR is created in the namespace of the Backstage CR by the appropriate Role and RoleBinding resource in the [profile/rhdh/plugin-rbac directory](../config/profile/rhdh/plugin-rbac).
 
 
+
+## Optional: Enabling workflow in a different namespace
+To enable workflow deployment in another namespace other than where RHDH Orchestrator infrastructure are deployed and configured,
+please follow these steps below.
+
+**Note**: The `$RHDH_NAMESPACE` is the namespace where RHDH instance (CR) is deployed.
+Please ensure to update this value as needed.
+
+1. Add `SonataFlowClusterPlatform` Custom Resource: 
+  ```console
+  oc create -f - <<EOF
+  apiVersion: sonataflow.org/v1alpha08
+  kind: SonataFlowClusterPlatform
+  metadata:
+    name: cluster-platform
+  spec:
+    platformRef:
+      name: sonataflow-platform
+      namespace: $RHDH_NAMESPACE
+  EOF
+   ```
+
+2. Add Network Policies: To allow communication between RHDH namespace and the workflow namespace, 
+two network policies need to be added.
+
+   ###### Allow Traffic from the Workflow Namespace:
+   To allow RHDH services to accept traffic from workflows, create an additional network policy within
+   the RHDH instance namespace.
+
+   ```console
+   oc create -f - <<EOF
+   apiVersion: networking.k8s.io/v1
+   kind: NetworkPolicy
+   metadata:
+     name: allow-external-workflows-to-rhdh
+     # Namespace where network policies are deployed
+     namespace: $RHDH_NAMESPACE
+   spec:
+     podSelector: {}
+     ingress:
+       - from:
+         - namespaceSelector:
+             matchLabels:
+               # Allow SonataFlow services to communicate with new/additional workflow namespace.
+               kubernetes.io/metadata.name: $ADDITIONAL_WORKFLOW_NAMESPACE
+   EOF
+   ```
+   ###### Allow traffic from RHDH and Knative namespaces:
+   To allow traffic from RHDH, SonataFlow and Knative, create a network policy within the new/additional workflow namespace.
+
+   ```console
+   oc create -f - <<EOF
+   apiVersion: networking.k8s.io/v1
+   kind: NetworkPolicy
+   metadata:
+     name: allow-rhdh-and-knative-to-workflows
+     namespace: $ADDITIONAL_WORKFLOW_NAMESPACE
+   spec:
+     podSelector: {}
+     ingress:
+       - from:
+         - namespaceSelector:
+             matchLabels:
+               # Allows traffic from pods in the RHDH namespace.
+               kubernetes.io/metadata.name: $RHDH_NAMESPACE
+         - namespaceSelector:
+             matchLabels:
+               # Allows traffic from pods in the Knative Eventing namespace.
+               kubernetes.io/metadata.name: knative-eventing
+         - namespaceSelector:
+             matchLabels:
+               # Allows traffic from pods in the Knative Serving namespace.
+               kubernetes.io/metadata.name: knative-serving
+   EOF
+   ```
 
 
 
