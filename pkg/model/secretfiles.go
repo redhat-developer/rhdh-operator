@@ -43,7 +43,7 @@ func (p *SecretFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 	for _, specSec := range spec.Application.ExtraFiles.Secrets {
 
 		if specSec.MountPath == "" && specSec.Key == "" {
-			return fmt.Errorf("key is required if defaultMountPath is not specified for secret %s", specSec.Name)
+			return fmt.Errorf("key or mountPath has to be specified for secret %s", specSec.Name)
 		}
 		mp, wSubpath := p.model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
 		keys := p.model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()

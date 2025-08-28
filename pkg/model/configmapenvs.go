@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
