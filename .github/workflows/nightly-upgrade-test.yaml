@@ -35,7 +35,7 @@ jobs:
     env:
       CONTAINER_ENGINE: podman
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4 # default branch will be checked out by default on scheduled workflows
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5 # default branch will be checked out by default on scheduled workflows
         with:
           fetch-depth: 0
 
