@@ -3,10 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
-	"reflect"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -215,11 +214,19 @@ func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Bac
 	return nil
 }
 
-// tryToDelete tries to delete the object by name and namespace, does not throw error if object not found
+// tryToDelete tries to delete the object by name and namespace, does not throw error if object not found or CRD does not exist
 func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object, name string, ns string) error {
 	obj.SetName(name)
 	obj.SetNamespace(ns)
-	if err := r.Delete(ctx, obj); err != nil && !errors.IsNotFound(err) {
+	if err := r.Delete(ctx, obj); err != nil {
+		if meta.IsNoMatchError(err) {
+			// RHDHBUGS-1990: no match for kind or resource, which can happen for example if the Prometheus CRDs
+			// are not installed when trying to delete a ServiceMonitor resource
+			return nil
+		}
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to delete %s: %w", name, err)
 	}
 	return nil

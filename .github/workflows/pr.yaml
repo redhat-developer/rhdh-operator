@@ -15,7 +15,7 @@ jobs:
     # see list of approvers in OWNERS file
     environment:
       ${{ (github.event.pull_request.head.repo.full_name == github.repository ||
-        contains(fromJSON('["gazarenkov","nickboldt","rm3l","kim-tsao","kadel","Fortune-Ndlovu","subhashkhileri","zdrapela","openshift-cherrypick-robot"]'), github.actor)) && 'internal' || 'external' }}
+        contains(fromJSON('["gazarenkov","nickboldt","rm3l","kim-tsao","kadel","Fortune-Ndlovu","subhashkhileri","zdrapela","openshift-cherrypick-robot"]'), github.event.pull_request.user.login)) && 'internal' || 'external' }}
     runs-on: ubuntu-latest
     steps:
       - name: approved
@@ -32,7 +32,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: ${{github.event.pull_request.head.repo.full_name}}
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       # check changes in this commit for regex include and exclude matches
       - name: Get changed files
@@ -82,7 +82,7 @@ jobs:
             echo "[SeaLights] Downloading SeaLights Golang & CLI Agents..."
             # Architectures available: darwin-amd64, darwin-arm64, linux-amd64, linux-arm64
             SL_OS_ARCH=linux-amd64
-            SL_GO_AGENT_VERSION=v1.1.195
+            SL_GO_AGENT_VERSION=v1.1.196
             SL_CLI_AGENT_VERSION=v1.0.49
 
             wget -nv -O sealights-go-agent.tar.gz https://agents.sealights.co/slgoagent/${SL_GO_AGENT_VERSION}/slgoagent-${SL_OS_ARCH}.tar.gz

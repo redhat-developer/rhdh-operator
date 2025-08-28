@@ -123,7 +123,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Source packages outside of tests
-PKGS := $(shell go list ./... | grep -v /e2e | grep -v /v1alpha1 | grep -v /v1alpha2)
+PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|integration_tests|api/v1alpha([1-2]))')
 
 .PHONY: all
 all: build
@@ -467,7 +467,7 @@ CONTROLLER_TOOLS_VERSION ?= v0.14.0
 ENVTEST_VERSION ?= release-0.17
 GOLANGCI_LINT_VERSION ?= v1.64.8
 GOIMPORTS_VERSION ?= v0.16.1
-GOSEC_VERSION ?= v2.20.0
+GOSEC_VERSION ?= v2.22.8
 GINKGO_VERSION ?= v2.22.2
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
