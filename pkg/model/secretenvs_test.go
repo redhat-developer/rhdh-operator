@@ -158,3 +158,25 @@ func TestSpecifiedSecretEnvsWithContainers(t *testing.T) {
 		assert.Equal(t, "ENV1", c.Env[0].Name)
 	}
 }
+
+func TestSecretEnvsWithNonExistedContainerFailed(t *testing.T) {
+	bs := *secretEnvsTestBackstage.DeepCopy()
+	bs.Spec.Application = &bsv1.Application{
+		ExtraEnvs: &bsv1.ExtraEnvs{
+			Secrets: []bsv1.EnvObjectRef{
+				{
+					Name:       "secName",
+					Key:        "ENV1",
+					Containers: []string{"install-dynamic-plugins", "another-container"},
+				},
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.ErrorContains(t, err, "not found")
+
+}

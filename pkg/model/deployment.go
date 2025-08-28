@@ -292,7 +292,7 @@ func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
 		filter := containersFilter{names: env.Containers}
 		containers, err := filter.getContainers(b)
 		if err != nil {
-			return fmt.Errorf("can not filter containers to add env %s: %w", env.Name, err)
+			return fmt.Errorf("can not get containers to add env %s: %w", env.Name, err)
 		}
 		for _, container := range containers {
 			container.Env =
@@ -318,7 +318,7 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 
 	containers, err := containersFilter.getContainers(b)
 	if err != nil {
-		return fmt.Errorf("can not filter containers to mount %s: %w", objectName, err)
+		return fmt.Errorf("can not get containers to mount %s: %w", objectName, err)
 	}
 
 	volName := utils.GenerateVolumeNameFromCmOrSecret(objectName)
@@ -370,7 +370,7 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 
 	containers, err := containersFilter.getContainers(b)
 	if err != nil {
-		return fmt.Errorf("can not filter containers to add env %s: %w", varName, err)
+		return fmt.Errorf("can not get containers to add env %s: %w", varName, err)
 	}
 
 	for _, c := range containers {

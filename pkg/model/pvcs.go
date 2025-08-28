@@ -39,7 +39,7 @@ func (b *BackstagePvcs) addExternalConfig(spec bsv1.BackstageSpec) error {
 			subPath = utils.ToRFC1123Label(pvcSpec.Name)
 		}
 
-		err := addPvc(b.model.backstageDeployment, pvcSpec.Name, mountPath, subPath, containersFilter{})
+		err := addPvc(b.model.backstageDeployment, pvcSpec.Name, mountPath, subPath, containersFilter{names: pvcSpec.Containers})
 		if err != nil {
 			return fmt.Errorf("failed to add pvc %s: %w", pvcSpec.Name, err)
 		}
@@ -84,7 +84,6 @@ func (b *BackstagePvcs) updateAndValidate(_ bsv1.Backstage) error {
 			return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
 		}
 		mountPath, subPath := b.model.backstageDeployment.getDefConfigMountPath(o)
-		//containers, err := b.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(o.GetAnnotations()[ContainersAnnotation]))
 		err := addPvc(b.model.backstageDeployment, pvc.Name, mountPath, subPath, containersFilter{annotation: o.GetAnnotations()[ContainersAnnotation]})
 		if err != nil {
 			return fmt.Errorf("failed to get containers for pvc %s: %w", o.GetName(), err)
@@ -114,7 +113,7 @@ func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string, filter
 		append(bsd.deployment.Spec.Template.Spec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
 	affectedContainers, err := filter.getContainers(bsd)
 	if err != nil {
-		return fmt.Errorf("failed to filter containers for pvc %s: %w", pvcName, err)
+		return fmt.Errorf("failed to mount files for pvc %s: %w", pvcName, err)
 	}
 	for _, c := range affectedContainers {
 		//update := bsd.containerByName(c)

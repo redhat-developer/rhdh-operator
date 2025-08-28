@@ -212,7 +212,7 @@ This Custom Resource defines a Backstage instance called **mybackstage** and als
 - Adds additional app-config stored in the **my-app-config** ConfigMap.
 - Adds some extra environment variables stored (as key-value pairs) in the Secret called **my-secrets**.
 
-For API version **v1alpha2** (Operator version **0.3.x**), the Backstage CR Spec contains the following top-level elements:
+Since API version **v1alpha2** (Operator version **0.3.x**), the Backstage CR Spec contains the following top-level elements:
 
 * [application](#application-configuration)
 * [deployment](#deployment-configuration)
@@ -269,7 +269,7 @@ On the other hand, Backstage application merges the chain of **app-config** file
 
 #### Extra Files
 
-Extra files can be mounted to the Backstage container from pre-created ConfigMaps or Secrets. For example, consider the following objects in the namespace:
+Extra files can be mounted from pre-created ConfigMaps or Secrets. By default, they are mounted to the Backstage (**backstage-backend**) container, but starting from **v1alpha4** (**v0.8**) it is possible to specify the container(s) and initContainer(s) names in the **containers** field. For example, consider the following objects in the namespace:
 
 ```yaml
 apiVersion: v1
@@ -334,11 +334,18 @@ spec:
         - name: cm1
         - name: cm2
           key: file21.txt
+          containers:
+            - "*"
         - name: cm3
           mountPath: /my/cm3/path
+          containers:
+            - backstage-backend
+            - install-dynamic-plugins
       secrets:
         - name: secret1
           key: file3.txt
+          containers:
+            - install-dynamic-plugins
         - name: secret2
           mountPath: /my/secret2/path
 ```
@@ -349,6 +356,11 @@ Since **v1alpha3 (v0.4)** Backstage CRD introduced **mountPath** field which all
 * If **key** specified, with or without **mountPath**: the specified key/value will be mounted with **subPath**
 * If only **mountPath** specified: a directory containing all the key/value will be mounted without **subPath**
 
+Since **v1alpha4 (v0.8)** it is possible to specify the container(s) and initContainer(s) names in the **containers** field. If not specified, the volume will be mounted to the Backstage container only. The following options are supported:
+* No or empty field: the volume will be mounted to the Backstage container only
+* \* (asterisk) as the first and only array element: the volume will be mounted to all the containers
+* explicit container names as the array elements
+
 **Note**: A volume mounted with **subPath** is not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). So, by default, the Operator watches such ConfigMaps/Secrets and refreshes the Backstage Pod when they change. 
   
 **Note:** To limit read access to Secrets by the Operator Service Account (for security reasons), we do not support mounting files from Secrets without mountPath and key specified.
@@ -358,16 +370,16 @@ In our example, the following files will be mounted:
 ```
 // Each file is mounted individually (related resources are watched by Operator):
 /my/path/
-  file11.txt
-  file12.txt
-  file21.txt
-  file3.txt
+  file11.txt - to backstage-backend container only
+  file12.txt - to backstage-backend container only
+  file21.txt - to all containers
+  file3.txt - to install-dynamic-plugins container only
 // Directory mounted (related resources are auto-updated):
-/my/cm3/path/
-  file31.txt
-  file32.txt
-/my/secret2/path/
-  file1
+/my/cm3/path/ - to backstage-backend and install-dynamic-plugins containers
+  file31.txt 
+  file32.txt 
+/my/secret2/path/ - to backstage-backend container only
+  file1 
   file2  
 ```
 
@@ -378,6 +390,12 @@ Since **v1alpha3** (Operator version **0.4.0**), it is also possible to mount di
 * Then **spec.application.extraFiles.mountPath**/<pvc-name> if defined
 * Then Backstage container's **WorkingDir** if defined
 * And if nothing defined it falls to default path (**/opt/app-root/src**)
+
+Same as for ConfigMaps and Secrets, since **v1alpha4 (v0.8)** it is possible to specify the container(s) and initContainer(s) names in the **containers** field. If not specified, the volume will be mounted to the Backstage container only. The following options are supported:
+* No or empty field: the volume will be mounted to the Backstage container only
+* \* (asterisk) as the first and only array element: the volume will be mounted to all the containers
+* explicit container names as the array elements
+
 
 For example, consider the following objects in the namespace:
 
@@ -425,7 +443,14 @@ As a result, the following directories will be mounted:
 
 #### Extra Environment Variables
 
-Extra environment variables can be injected into the Backstage container from pre-created ConfigMaps or Secrets, as well as specified directly in the Custom Resource. For instance, consider the following objects in the namespace:
+Extra environment variables can be injected into the Backstage container from pre-created ConfigMaps or Secrets, as well as specified directly in the Custom Resource. 
+
+Since **v1alpha4 (v0.8)** it is possible to specify the container(s) and initContainer(s) names in the **containers** field. If not specified, the environment variables will be injected to the Backstage container only. The following options are supported:
+* No or empty field: the volume will be mounted to the Backstage container only
+* \* (asterisk) as the first and only array element: the volume will be mounted to all the containers
+* explicit container names as the array elements
+
+For instance, consider the following objects in the namespace:
 
 ```yaml
 apiVersion: v1
@@ -455,20 +480,24 @@ spec:
       configMaps:
         - name: cm1
           key: ENV_VAR1
+          containers:
+            - "*" 
       secrets:
         - name: secret1
       envs:
         - name: MY_VAR
           value: "my-value"
+          containers:
+           - install-dynamic-plugins
 ```
 
 Similar to **extraFiles**, you can specify a key name to inject only a particular environment variable. In our example, the following environment variables will be injected:
 
 ```
-ENV_VAR1 = 1
-ENV_VAR3 = 3
-ENV_VAR4 = 4
-MY_VAR = my-value
+ENV_VAR1 = 1 - to all containers
+ENV_VAR3 = 3 - to backstage-backend container only
+ENV_VAR4 = 4 - to backstage-backend container only
+MY_VAR = my-value - to install-dynamic-plugins container only
 ```
 
 #### Dynamic Plugins
@@ -514,11 +543,11 @@ From version **0.8.0**, the Operator merges the default Dynamic Plugins configur
 
 Starting from version **0.7.0**, the Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
 
-```yaml
+
 
 #### Deployment Parameters
 
-**NOTE:** These fields are deprecated for versions **>= 0.3.0** in favor of the [spec.deployment](#deployment-configuration).
+**NOTE:** These fields are deprecated for versions **>= v0.3** and will be removed in **v0.9** in favor of the [spec.deployment](#deployment-configuration).
   
 ```yaml
 spec:

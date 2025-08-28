@@ -47,8 +47,11 @@ func (p *SecretFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 		}
 		mp, wSubpath := p.model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
 		keys := p.model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
-		p.model.backstageDeployment.mountFilesFrom(containersFilter{}, SecretObjectKind,
+		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: specSec.Containers}, SecretObjectKind,
 			specSec.Name, mp, specSec.Key, wSubpath, keys)
+		if err != nil {
+			return fmt.Errorf("failed to mount files on secret %s: %w", specSec.Name, err)
+		}
 	}
 	return nil
 }

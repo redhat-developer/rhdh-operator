@@ -39,7 +39,7 @@ func (p *SecretEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
 	for _, specSec := range spec.Application.ExtraEnvs.Secrets {
 		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{names: specSec.Containers}, SecretObjectKind, specSec.Name, specSec.Key)
 		if err != nil {
-			return fmt.Errorf("failed to filter containers on secret %s: %w", specSec.Name, err)
+			return fmt.Errorf("failed to add env vars on secret %s: %w", specSec.Name, err)
 		}
 	}
 	return nil
