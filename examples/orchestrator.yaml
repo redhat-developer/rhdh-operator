@@ -53,4 +53,4 @@ spec:
     dynamicPluginsConfigMapName: orchestrator-plugin
     extraEnvs:
       secrets:
-        - name: backstage-backend-auth-secret
+        - name: backstage-backend-auth-secret # secret that contains the BACKEND_SECRET key
