@@ -79,7 +79,9 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
          disabled: false  
 ```
 
-See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin.
+See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin. 
+Ensure to add a secret with the BACKEND_SECRET key/value and update
+the secret name in the `Backstage` CR under the `extraEnvs` field.
 
 #### Plugin registry
 
