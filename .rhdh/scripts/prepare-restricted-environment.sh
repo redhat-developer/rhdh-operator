@@ -149,7 +149,7 @@ OC_MIRROR_PATH="oc-mirror"
 OC_MIRROR_FLAGS=""
 
 NO_VERSION_FILTER="false"
-FILTER_VERSIONS_PROVIDED="false"
+FILTER_VERSIONS_PROVIDED="true"
 
 # example usage:
 # ./prepare-restricted-environment.sh \
