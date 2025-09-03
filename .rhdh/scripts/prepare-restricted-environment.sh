@@ -952,10 +952,11 @@ function resolve_plugin_index() {
   local index_url="$1"
   debugf "Resolving plugin index from: $index_url"
   
-  # Extract registry and tag from OCI URL
-  if [[ "$index_url" =~ oci://([^:]+):(.+) ]]; then
-    local registry="${BASH_REMATCH[1]}"
-    local tag="${BASH_REMATCH[2]}"
+  if [[ "$index_url" == oci://* ]]; then
+    # Extract registry and tag from OCI URL
+    local full_path="${index_url#oci://}"
+    local registry="${full_path%:*}"
+    local tag="${full_path##*:}"
     
     # Create temporary directory for index
     local index_dir
