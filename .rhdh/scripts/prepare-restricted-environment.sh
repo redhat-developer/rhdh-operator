@@ -162,41 +162,6 @@ FILTER_VERSIONS_PROVIDED="false"
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
-  # Legacy options. Deprecated but kept for backward compatibility
-  '--prod_operator_index')
-    INDEX_IMAGE="$2"
-    shift 1
-    ;;
-  '--prod_operator_package_name')
-    debugf "--prod_operator_package_name ($2) is no longer used"
-    shift 1
-    ;;
-  '--prod_operator_bundle_name')
-    debugf "--prod_operator_bundle_name ($2) is no longer used"
-    shift 1
-    ;;
-  '--helper_mirror_registry_storage')
-    debugf "--helper_mirror_registry_storage is no longer used. This script assumes you already have a mirror registry in your disconnected environment"
-    shift 1
-    ;;
-  '--use_existing_mirror_registry')
-    debugf "--use_existing_mirror_registry is no longer used. This script assumes you already have a mirror registry in your disconnected environment"
-    shift 1
-    ;;
-  '--prod_operator_version')
-    FILTER_VERSIONS_PROVIDED="true"
-    input="${2#v}"
-    IFS='.' read -ra parts <<<"$input"
-    length=${#parts[@]}
-    if [ "$length" -ge 2 ]; then
-      FILTERED_VERSIONS=("${parts[0]}"."${parts[1]}")
-    else
-      FILTERED_VERSIONS=("${parts[*]}")
-    fi
-    debugf "${FILTERED_VERSIONS[@]}"
-    shift 1
-    ;;
-
   # New options
   '--index-image')
     INDEX_IMAGE="$2"
