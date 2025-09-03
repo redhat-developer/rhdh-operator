@@ -961,12 +961,17 @@ function resolve_plugin_index() {
     local index_dir
     index_dir=$(mktemp -d)
     # shellcheck disable=SC2064
-    trap "rm -rf '$index_dir'" EXIT
+
+    # Use local cleanup function instead of EXIT trap
+    cleanup_index_dir() {
+      rm -rf "$index_dir"
+    }
     
     # Pull the index OCI artifact
     debugf "Pulling plugin index from $registry:$tag"
     if ! skopeo copy --preserve-digests --all "docker://$registry:$tag" "dir:$index_dir"; then
       errorf "Failed to pull plugin index from $registry:$tag"
+      cleanup_index_dir
       return 1
     fi
     
@@ -981,6 +986,7 @@ function resolve_plugin_index() {
       if [[ -n "$plugins" ]]; then
         IFS=$'\n' read -r -a PLUGIN_IMAGES <<< "$plugins"
         debugf "Resolved ${#PLUGIN_IMAGES[@]} plugins from index"
+        cleanup_index_dir
         return 0
       fi
     fi
@@ -995,6 +1001,7 @@ function resolve_plugin_index() {
       if [[ -n "$plugins" ]]; then
         IFS=$'\n' read -r -a PLUGIN_IMAGES <<< "$plugins"
         debugf "Resolved ${#PLUGIN_IMAGES[@]} plugins from $json_file"
+        cleanup_index_dir
         return 0
       fi
     done
@@ -1002,9 +1009,11 @@ function resolve_plugin_index() {
     warnf "Could not parse plugin references from index, treating as single plugin"
     # If we can't parse the index, treat the index itself as a plugin
     PLUGIN_IMAGES=("$registry:$tag")
+    cleanup_index_dir
     return 0
   else
     errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry:tag"
+    cleanup_index_dir
     return 1
   fi
 }
