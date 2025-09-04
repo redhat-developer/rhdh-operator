@@ -23,7 +23,7 @@ func (f *containersFilter) getContainers(deployment *BackstageDeployment) ([]*co
 		f.names = utils.ParseCommaSeparated(f.annotation)
 	}
 
-	if f.names == nil || len(f.names) == 0 {
+	if len(f.names) == 0 {
 		return []*corev1.Container{deployment.container()}, nil
 	}
 

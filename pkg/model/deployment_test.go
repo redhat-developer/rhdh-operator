@@ -266,20 +266,20 @@ spec:
 	assert.Equal(t, BackstageContainerName(), cs[0].Name)
 
 	f = containersFilter{names: []string{}}
-	cs, err = f.getContainers(d)
+	cs, _ = f.getContainers(d)
 	assert.Equal(t, 1, len(cs))
 	assert.Equal(t, BackstageContainerName(), cs[0].Name)
 
 	f = containersFilter{names: []string{"*"}}
-	cs, err = f.getContainers(d)
+	cs, _ = f.getContainers(d)
 	assert.Equal(t, 4, len(cs))
 
 	f = containersFilter{names: []string{"c123"}}
-	cs, err = f.getContainers(d)
+	_, err = f.getContainers(d)
 	assert.Error(t, err)
 
 	f = containersFilter{names: []string{"c1", "c2"}}
-	cs, err = f.getContainers(d)
+	cs, _ = f.getContainers(d)
 	assert.Equal(t, 2, len(cs))
 	assert.Equal(t, "c1", cs[0].Name)
 	assert.NotNil(t, model.backstageDeployment.containerByName("c1"))

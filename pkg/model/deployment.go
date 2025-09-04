@@ -124,10 +124,15 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error {
 
 	//DbSecret
+	var err error
 	if backstage.Spec.IsAuthSecretSpecified() {
-		b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, backstage.Spec.Database.AuthSecretName, "")
+		err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, backstage.Spec.Database.AuthSecretName, "")
 	} else if b.model.LocalDbSecret != nil {
-		b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, b.model.LocalDbSecret.secret.Name, "")
+		err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, b.model.LocalDbSecret.secret.Name, "")
+	}
+
+	if err != nil {
+		return fmt.Errorf("can not add env vars from db secret: %w", err)
 	}
 
 	return nil
@@ -212,7 +217,14 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 // it merges the deployment object with the patch from the backstage configuration
 func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 
-	// set from backstage.Spec.Deployment, it has to be the first action as it changes the deployment object
+	// set from backstage.Spec.Application
+	if backstage.Spec.Application != nil {
+		b.setReplicas(backstage.Spec.Application.Replicas)
+		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
+		b.setImage(backstage.Spec.Application.Image)
+	}
+
+	// set from backstage.Spec.Deployment
 	if backstage.Spec.Deployment != nil {
 		if conf := backstage.Spec.Deployment.Patch; conf != nil {
 
@@ -234,11 +246,8 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 		}
 	}
 
-	// set from backstage.Spec.Application
+	// call it after setting from backstage.Spec.Deployment
 	if backstage.Spec.Application != nil {
-		b.setReplicas(backstage.Spec.Application.Replicas)
-		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-		b.setImage(backstage.Spec.Application.Image)
 		if err := b.addExtraEnvs(backstage.Spec.Application.ExtraEnvs); err != nil {
 			return fmt.Errorf("can not add extra envs: %w", err)
 		}
