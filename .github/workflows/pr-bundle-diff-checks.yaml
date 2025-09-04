@@ -45,6 +45,10 @@ jobs:
           repository: ${{github.event.pull_request.head.repo.full_name}}
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Switch to PR branch
+        run: |
+          git checkout "${{ github.event.pull_request.head.ref }}"    
+
       - name: Setup Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
