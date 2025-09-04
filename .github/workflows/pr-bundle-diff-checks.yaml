@@ -66,6 +66,11 @@ jobs:
           # Inspired from https://github.com/operator-framework/operator-sdk/issues/6285#issuecomment-1415350333
           echo "MANIFESTS_CHANGED=$(if git diff --quiet -I'^    createdAt: ' bundle config dist; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
+      - name: Debug git status
+        run: |
+          git status
+          git branch -a    
+
       - name: Commit any manifest changes
         if: ${{ steps.manifests-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
         run: |
