@@ -1,17 +1,14 @@
 name: PR Bundle Manifests Validator
 
 on:
-  workflow_dispatch:
-
-#on:
-#  # pull_request_target needed to be able to commit and push bundle diffs to external fork PRs.
-#  # But we included a manual authorization safeguard to prevent PWN requests. See the 'authorize' job below.
-#  pull_request_target:
-#    branches:
-#    - main
-#    - rhdh-1.[0-9]+
-#    - 1.[0-9]+.x
-#    - release-1.[0-9]+
+  # pull_request_target needed to be able to commit and push bundle diffs to external fork PRs.
+  # But we included a manual authorization safeguard to prevent PWN requests. See the 'authorize' job below.
+  pull_request_target:
+    branches:
+    - main
+    - rhdh-1.[0-9]+
+    - 1.[0-9]+.x
+    - release-1.[0-9]+
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}
@@ -48,12 +45,6 @@ jobs:
           repository: ${{github.event.pull_request.head.repo.full_name}}
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Ensure on PR branch (fork-safe)
-        run: |
-          git remote add prhead https://github.com/${{ github.event.pull_request.head.repo.full_name }}.git
-          git fetch prhead ${{ github.event.pull_request.head.ref }}
-          git checkout -B "${{ github.event.pull_request.head.ref }}" "prhead/${{ github.event.pull_request.head.ref }}"
-
       - name: Setup Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
@@ -68,11 +59,6 @@ jobs:
           # The `git diff` below checks if only the createdAt field has changed. If is the only change, it is ignored.
           # Inspired from https://github.com/operator-framework/operator-sdk/issues/6285#issuecomment-1415350333
           echo "MANIFESTS_CHANGED=$(if git diff --quiet -I'^    createdAt: ' bundle config dist; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
-
-      - name: Debug git status
-        run: |
-          git status
-          git branch -a    
 
       - name: Commit any manifest changes
         if: ${{ steps.manifests-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
