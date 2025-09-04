@@ -19,21 +19,23 @@ type containersFilter struct {
 // If a container name is not found in deployment, it returns an error.
 func (f *containersFilter) getContainers(deployment *BackstageDeployment) ([]*corev1.Container, error) {
 
+	containerNames := f.names
 	if f.annotation != "" {
-		f.names = utils.ParseCommaSeparated(f.annotation)
+		containerNames = utils.ParseCommaSeparated(f.annotation)
 	}
 
-	if len(f.names) == 0 {
+	// default return backstage container
+	if len(containerNames) == 0 {
 		return []*corev1.Container{deployment.container()}, nil
 	}
 
-	var filter = f.names
-	if len(f.names) == 1 && f.names[0] == "*" {
-		filter = deployment.allContainers()
+	// replace * with all containers
+	if len(containerNames) == 1 && containerNames[0] == "*" {
+		containerNames = deployment.allContainers()
 	}
 
 	containers := []*corev1.Container{}
-	for _, c := range filter {
+	for _, c := range containerNames {
 		container := deployment.containerByName(c)
 		if container == nil {
 			return nil, fmt.Errorf("container %s not found", c)
