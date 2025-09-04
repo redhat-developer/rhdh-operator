@@ -212,17 +212,7 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 // it merges the deployment object with the patch from the backstage configuration
 func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 
-	// set from backstage.Spec.Application
-	if backstage.Spec.Application != nil {
-		b.setReplicas(backstage.Spec.Application.Replicas)
-		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-		b.setImage(backstage.Spec.Application.Image)
-		if err := b.addExtraEnvs(backstage.Spec.Application.ExtraEnvs); err != nil {
-			return fmt.Errorf("can not add extra envs: %w", err)
-		}
-	}
-
-	// set from backstage.Spec.Deployment
+	// set from backstage.Spec.Deployment, it has to be the first action as it changes the deployment object
 	if backstage.Spec.Deployment != nil {
 		if conf := backstage.Spec.Deployment.Patch; conf != nil {
 
@@ -241,6 +231,16 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 			if err != nil {
 				return fmt.Errorf("can not unmarshal merged deployment: %w", err)
 			}
+		}
+	}
+
+	// set from backstage.Spec.Application
+	if backstage.Spec.Application != nil {
+		b.setReplicas(backstage.Spec.Application.Replicas)
+		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
+		b.setImage(backstage.Spec.Application.Image)
+		if err := b.addExtraEnvs(backstage.Spec.Application.ExtraEnvs); err != nil {
+			return fmt.Errorf("can not add extra envs: %w", err)
 		}
 	}
 	return nil

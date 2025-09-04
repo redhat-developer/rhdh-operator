@@ -285,3 +285,34 @@ spec:
 	assert.NotNil(t, model.backstageDeployment.containerByName("c1"))
 
 }
+
+func TestEnvVarsWithSidecars(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+  template:
+    spec:
+      containers:
+        - name: sidecar
+          image: busybox
+`),
+	}
+	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
+		Envs: []bsv1.Env{
+			{Name: "VAR1", Value: "v1", Containers: []string{"sidecar"}},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+	sidecar := model.backstageDeployment.containerByName("sidecar")
+	assert.NotNil(t, sidecar)
+	assert.Equal(t, 1, len(sidecar.Env))
+	assert.Equal(t, "VAR1", sidecar.Env[0].Name)
+
+}

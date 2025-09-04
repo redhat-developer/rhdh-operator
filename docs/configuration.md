@@ -2,7 +2,29 @@
 
 It is highly recommended to read the [Design](design.md) document to understand the components that make up Backstage.
 
-The Backstage Operator supports three configuration levels: Default, Raw, and Custom Resource Config.
+## Table of Contents
+- [Default Configuration](#default-configuration)
+  - [Default Configuration Files](#default-configuration-files)
+  - [Default Mount Path](#default-mount-path)
+  - [Annotations](#annotations)
+    - [rhdh.redhat.com/mount-path](#rhdhredhatcommount-path-to-configure-mount-path)
+    - [rhdh.redhat.com/containers](#rhdhredhatcomcontainers-for-mounting-volume-to-specific-containers)
+  - [Metadata Generation](#metadata-generation)
+  - [Multi Objects](#multi-objects)
+  - [Default Base URLs](#default-base-urls)
+- [Raw Configuration](#raw-configuration)
+- [Custom Resource Spec](#custom-resource-spec)
+  - [Application Configuration](#application-configuration)
+    - [app-config](#app-config)
+    - [Extra Files](#extra-files)
+      - [PersistentVolumeClaims](#persistentvolumeclaims)
+    - [Extra Environment Variables](#extra-environment-variables)
+    - [Dynamic Plugins](#dynamic-plugins)
+    - [Deployment Parameters](#deployment-parameters)
+    - [Route](#route)
+  - [Deployment Configuration](#deployment-configuration)
+  - [Database Configuration](#database-configuration)
+
 
 ## Default Configuration
   

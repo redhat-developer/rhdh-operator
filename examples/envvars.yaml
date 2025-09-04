@@ -1,69 +1,47 @@
-#apiVersion: v1
-#kind: ConfigMap
-#metadata:
-#  name: cm1
-#data:
-#  file11.txt: |
-#    My file11 content
-#  file12.txt: |
-#    My file12 content
-#
-#---
-#apiVersion: v1
-#kind: ConfigMap
-#metadata:
-#  name: cm2
-#data:
-#  file21.txt: |
-#    My file21 content
-#  file22.txt: |
-#    My file22 content
-#
-#---
-#apiVersion: v1
-#kind: ConfigMap
-#metadata:
-#  name: cm3
-#data:
-#  file31.txt: |
-#    My file31 content
-#  file32.txt: |
-#    My file32 content
-#
-#---
-#apiVersion: v1
-#kind: ConfigMap
-#metadata:
-#  name: cm4
-#data:
-#  file41.txt: |
-#    My file41 content
-#  file42.txt: |
-#    My file42 content
-#
-#---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm1
+data:
+  ENV_CM1: "cm1"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm2
+data:
+  ENV_CM2: "cm2"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm3
+data:
+  ENV_CM3_1: "cm3-1"
+  ENV_CM3_2: "cm3-2"
+---
 apiVersion: v1
 kind: Secret
 metadata:
   name: secret1
 stringData:
-  ENV1: "env1"
-
+  ENV1: "secret1"
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: secret2
 stringData:
-  ENV2: "env2"
-
+  ENV2: "secret2"
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: secret3
 stringData:
-  ENV3: "env3"
+  ENV3: "secret3"
 
 ---
 apiVersion: v1
@@ -71,42 +49,51 @@ kind: ConfigMap
 metadata:
   name: no-plugins
 data:
-  dynamic-plugins.yaml: "plugins: []\n"
+  dynamic-plugins.yaml: "includes: []\nplugins: []\n"
 ---
 apiVersion: rhdh.redhat.com/v1alpha4
 kind: Backstage
 metadata:
   name: my-rhdh-envs
 spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: sidecar
+                image: busybox
+                command: ["sh", "-c", "while true; do echo 'Container is running...'; sleep 5; done"]
   application:
     dynamicPluginsConfigMapName: no-plugins
     extraEnvs:
       envs:
-        - name: ENV4
+        - name: ENV4 # in backstage-backend container only
           value: "env4"
-        - name: ENV5
+        - name: ENV5  # only in install-dynamic-plugins container
           value: "env5"
           containers:
-            - install-dynamic-plugins
-        - name: ENV6
+            - sidecar
+        - name: ENV6 # in all containers
           value: "env6"
           containers:
             - "*"
-      #configMaps:
-        #- name: cm1 # /my/path/file11.txt and /my/path/file12.txt expected, watched
-        #- name: cm2 # /my/path/file21.txt expected, watched
-        #  key: file21.txt
-        #- name: cm3  # /my/cm3/path/file31.txt and /my/cm3/path/file312.txt expected, not watched
-        #  mountPath: /my/cm3/path
-        #- name: cm4  # /my/cm4/path/file41.txt expected, watched
-        #  mountPath: /my/cm4/path
-        #  key: file41.txt
+      configMaps:
+        - name: cm1 # ENV_CM1 in backstage-backend only
+        - name: cm2 # ENV_CM2 in all containers
+          containers:
+            - "*"
+        - name: cm3  # ENV_CM3_1 in sidecar only
+          key: ENV_CM3_1
+          containers:
+            - sidecar
       secrets:
         - name: secret1
           key: ENV1
         - name: secret2
           containers:
-            - install-dynamic-plugins
+            - sidecar
         - name: secret3
           containers:
             - "*"
