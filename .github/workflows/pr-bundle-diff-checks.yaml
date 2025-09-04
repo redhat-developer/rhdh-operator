@@ -45,9 +45,11 @@ jobs:
           repository: ${{github.event.pull_request.head.repo.full_name}}
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Ensure on PR branch
+      - name: Ensure on PR branch (fork-safe)
         run: |
-          git checkout -B "${{ github.event.pull_request.head.ref }}" "origin/${{ github.event.pull_request.head.ref }}"
+          git remote add prhead https://github.com/${{ github.event.pull_request.head.repo.full_name }}.git
+          git fetch prhead ${{ github.event.pull_request.head.ref }}
+          git checkout -B "${{ github.event.pull_request.head.ref }}" "prhead/${{ github.event.pull_request.head.ref }}"
 
       - name: Setup Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
