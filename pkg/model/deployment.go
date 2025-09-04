@@ -349,7 +349,6 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 	b.podSpec().Volumes = append(b.podSpec().Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
 
 	for _, container := range containers {
-		//container := b.containerByName(c)
 		if !withSubPath {
 			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{Name: volName, MountPath: mountPath})
 			continue
@@ -382,8 +381,7 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 		return fmt.Errorf("can not get containers to add env %s: %w", varName, err)
 	}
 
-	for _, c := range containers {
-		container := b.containerByName(c.Name)
+	for _, container := range containers {
 		if varName == "" {
 			envFromSrc := corev1.EnvFromSource{}
 			if kind == ConfigMapObjectKind {
