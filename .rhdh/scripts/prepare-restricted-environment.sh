@@ -409,8 +409,21 @@ fi
 
 # Validate plugin options
 if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
-  if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" ]]; then
-    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index or --plugin-list to specify plugins to mirror."
+  # Check if plugins are available from external sources or from directory
+  plugins_available=false
+  
+  # Check for external plugin sources
+  if [[ -n "$PLUGIN_INDEX" || -n "$PLUGIN_LIST_FILE" ]]; then
+    plugins_available=true
+  fi
+  
+  # Check for existing plugins in --from-dir
+  if [[ -n "$FROM_DIR" && -d "${FROM_DIR}/plugins" ]]; then
+    plugins_available=true
+  fi
+  
+  if [[ "$plugins_available" == "false" ]]; then
+    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index or --plugin-list to specify plugins to mirror, or ensure plugins exist in --from-dir/plugins."
   fi
   
   if [[ -n "$PLUGIN_INDEX" && -n "$PLUGIN_LIST_FILE" ]]; then
@@ -1150,7 +1163,9 @@ function mirror_plugin_artifacts_from_dir() {
     if [[ -n "$TO_REGISTRY" ]]; then
       if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
         # Create the corresponding project if it doesn't exist
-        local projectNameForOcpReg=${parent_path%%/*}
+        # Extract the first two path elements and sanitize for namespace (replace dots with dashes)
+        local projectNameForOcpReg
+        projectNameForOcpReg=$(echo "${parent_path}" | cut -d'/' -f1-2 | sed 's/\./-/g')
         oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
       fi
       local lastTwo
@@ -1171,7 +1186,9 @@ function mirror_plugin_artifacts_from_dir() {
     if [[ -n "$TO_REGISTRY" ]]; then
       if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
         # Create the corresponding project if it doesn't exist
-        local projectNameForOcpReg=${parent_path%%/*}
+        # Extract the first two path elements and sanitize for namespace (replace dots with dashes)
+        local projectNameForOcpReg
+        projectNameForOcpReg=$(echo "${parent_path}" | cut -d'/' -f1-2 | sed 's/\./-/g')
         oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
       fi
       local lastTwo
