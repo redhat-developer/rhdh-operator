@@ -78,24 +78,42 @@ kind: Backstage
 metadata:
   name: my-rhdh-file-mounts
 spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: sidecar
+                image: busybox
+                command: [ "sh", "-c", "while true; do echo 'Container is running...'; sleep 5; done" ]
   application:
     extraFiles:
-      mountPath: /my/path
+      mountPath: /my/extra
       configMaps:
-        - name: cm1 # /my/path/file11.txt and /my/path/file12.txt expected, watched
-        - name: cm2 # /my/path/file21.txt expected, watched
+        - name: cm1 # /my/extra/file11.txt and /my/path/file12.txt on backtage-backend
+        - name: cm2 # /my/extra/file21.txt expected on sidecar
           key: file21.txt
-        - name: cm3  # /my/cm3/path/file31.txt and /my/cm3/path/file312.txt expected, not watched
+          containers:
+            - sidecar
+        - name: cm3  # /my/cm3/path/file31.txt and /my/cm3/path/file312.txt on all containers
           mountPath: /my/cm3/path
-        - name: cm4  # /my/cm4/path/file41.txt expected, watched
+          containers:
+            - "*"
+        - name: cm4  # /my/cm4/path/file41.txt on backstage-backend
           mountPath: /my/cm4/path
           key: file41.txt
       secrets:
-        - name: secret1 # /my/path/secret11.txt expected, watched
+        - name: secret1 # /my/extra/secret11.txt on backstage-backend only
           key: secret11.txt
-        - name: secret2 # /my/secret2/path/secret21.txt and /my/secret2/path/secret22.txt expected, not watched
+        - name: secret2 # /my/secret2/path/secret21.txt and /my/secret2/path/secret22.txt on sidecar only
           mountPath: /my/secret2/path
-        - name: secret3 # /my/secret3/path/secret31.txt expected, watched
-          mountPath: /my/secret3/path
+          containers:
+            - sidecar
+        - name: secret3 # /my/secret3/secret31.txt on all containers
+          mountPath: /my/secret3
           key: secret31.txt
-#        - name: secret4  <-- this is forbidden
+          containers:
+            - "*"
+
+

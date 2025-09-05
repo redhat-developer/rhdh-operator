@@ -138,3 +138,54 @@ func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
 	assert.Equal(t, filepath.Join("/my/path", "conf1.yaml"), deployment.container().VolumeMounts[0].MountPath)
 
 }
+
+func TestSpecifiedCMFilesWithContainers(t *testing.T) {
+
+	bs := *configMapFilesTestBackstage.DeepCopy()
+	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm1", Containers: []string{"install-dynamic-plugins", "another-container"}})
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
+	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm3", MountPath: "rel", Containers: []string{"*"}})
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
+
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm1"] = NewDataObjectKeys(map[string]string{"conf1.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm2"] = NewDataObjectKeys(map[string]string{"conf2.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm3"] = NewDataObjectKeys(map[string]string{"conf3.yaml": "data"}, nil)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.True(t, len(model.RuntimeObjects) > 0)
+
+	deployment := model.backstageDeployment
+	assert.NotNil(t, deployment)
+
+	assert.Equal(t, 3, len(deployment.containerByName("install-dynamic-plugins").VolumeMounts))
+	assert.Equal(t, 1, len(deployment.containerByName("backstage-backend").VolumeMounts))
+	assert.Equal(t, "cm3", deployment.containerByName("backstage-backend").VolumeMounts[0].Name)
+	assert.Equal(t, 2, len(deployment.containerByName("another-container").VolumeMounts))
+
+}
+
+func TestCMFilesWithNonExistedContainerFailed(t *testing.T) {
+	bs := *configMapFilesTestBackstage.DeepCopy()
+	bs.Spec.Application = &bsv1.Application{
+		ExtraFiles: &bsv1.ExtraFiles{
+			ConfigMaps: []bsv1.FileObjectRef{
+				{
+					Name:       "cmName",
+					Containers: []string{"another-container"},
+				},
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.ErrorContains(t, err, "not found")
+
+}

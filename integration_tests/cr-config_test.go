@@ -4,6 +4,10 @@ import (
 	"context"
 	"time"
 
+	"sigs.k8s.io/yaml"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/utils/ptr"
@@ -62,7 +66,18 @@ var _ = When("create backstage with CR configured", func() {
 		secretEnv1 := generateSecret(ctx, k8sClient, "secret-env1", ns, map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
 		_ = generateSecret(ctx, k8sClient, "secret-env2", ns, map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
 
+		patch, _ := yaml.YAMLToJSON([]byte(`
+spec:
+  template:
+    spec:
+      containers:
+        - name: sidecar
+          image: busybox
+`))
 		bs := bsv1.BackstageSpec{
+			Deployment: &bsv1.BackstageDeployment{
+				Patch: &apiextensionsv1.JSON{Raw: patch},
+			},
 			Application: &bsv1.Application{
 				AppConfig: &bsv1.AppConfig{
 					MountPath: "/my/mount/path",
@@ -77,20 +92,20 @@ var _ = When("create backstage with CR configured", func() {
 					ConfigMaps: []bsv1.FileObjectRef{
 						{Name: cmFile1},
 						{Name: cmFile2, Key: "cm21"},
-						{Name: cmFile3},
+						{Name: cmFile3, Containers: []string{"*"}},
 						{Name: cmFileWithPath, MountPath: "/cm/file/withpath"},
 					},
 					Secrets: []bsv1.FileObjectRef{
 						{Name: secretFile1, Key: "sec11"},
 						{Name: secretFile2, Key: "sec21"},
-						{Name: secretFile3, Key: "sec.31"},
+						{Name: secretFile3, Key: "sec.31", Containers: []string{"sidecar"}},
 						{Name: secretFileWithPath, MountPath: "/secret/file/withpath"},
 					},
 				},
 				ExtraEnvs: &bsv1.ExtraEnvs{
 					ConfigMaps: []bsv1.EnvObjectRef{
 						{Name: cmEnv1},
-						{Name: cmEnv2, Key: "cm21"},
+						{Name: cmEnv2, Key: "cm21", Containers: []string{"*"}},
 					},
 					Secrets: []bsv1.EnvObjectRef{
 						{Name: secretEnv1, Key: "sec11"},
@@ -101,6 +116,7 @@ var _ = When("create backstage with CR configured", func() {
 				},
 			},
 		}
+
 		backstageName := createAndReconcileBackstage(ctx, ns, bs, "")
 
 		Eventually(func(g Gomega) {
@@ -109,7 +125,14 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			podSpec := deploy.Spec.Template.Spec
-			c := podSpec.Containers[model.BackstageContainerIndex(deploy)]
+			backstageContainer := podSpec.Containers[model.BackstageContainerIndex(deploy)]
+			sidecarContainer := corev1.Container{}
+			for i := range podSpec.Containers {
+				if podSpec.Containers[i].Name == "sidecar" {
+					sidecarContainer = podSpec.Containers[i]
+					break
+				}
+			}
 
 			By("checking if app-config volumes are added to PodSpec")
 			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig1)).To(BeAddedAsVolumeToPodSpec(podSpec))
@@ -117,18 +140,18 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig3)).To(BeAddedAsVolumeToPodSpec(podSpec))
 
 			By("checking if app-config volumes are mounted to the Backstage container")
-			g.Expect("/my/mount/path/key11").To(BeMountedToContainer(c))
-			g.Expect("/my/mount/path/key12").To(BeMountedToContainer(c))
-			g.Expect("/my/mount/path/key21").To(BeMountedToContainer(c))
-			g.Expect("/my/mount/path/key22").NotTo(BeMountedToContainer(c))
-			g.Expect("/my/mount/path/key.31").To(BeMountedToContainer(c))
+			g.Expect("/my/mount/path/key11").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/mount/path/key12").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/mount/path/key21").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/mount/path/key22").NotTo(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/mount/path/key.31").To(BeMountedToContainer(backstageContainer))
 
 			By("checking if app-config args are added to the Backstage container")
-			g.Expect("/my/mount/path/key11").To(BeAddedAsArgToContainer(c))
-			g.Expect("/my/mount/path/key12").To(BeAddedAsArgToContainer(c))
-			g.Expect("/my/mount/path/key21").To(BeAddedAsArgToContainer(c))
-			g.Expect("/my/mount/path/key22").NotTo(BeAddedAsArgToContainer(c))
-			g.Expect("/my/mount/path/key.31").To(BeAddedAsArgToContainer(c))
+			g.Expect("/my/mount/path/key11").To(BeAddedAsArgToContainer(backstageContainer))
+			g.Expect("/my/mount/path/key12").To(BeAddedAsArgToContainer(backstageContainer))
+			g.Expect("/my/mount/path/key21").To(BeAddedAsArgToContainer(backstageContainer))
+			g.Expect("/my/mount/path/key22").NotTo(BeAddedAsArgToContainer(backstageContainer))
+			g.Expect("/my/mount/path/key.31").To(BeAddedAsArgToContainer(backstageContainer))
 
 			By("checking if extra-cm-file volumes are added to PodSpec")
 			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmFile1)).To(BeAddedAsVolumeToPodSpec(podSpec))
@@ -136,12 +159,13 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmFile3)).To(BeAddedAsVolumeToPodSpec(podSpec))
 
 			By("checking if extra-cm-file volumes are mounted to the Backstage container")
-			g.Expect("/my/file/path/cm11").To(BeMountedToContainer(c))
-			g.Expect("/my/file/path/cm12").To(BeMountedToContainer(c))
-			g.Expect("/my/file/path/cm21").To(BeMountedToContainer(c))
-			g.Expect("/my/file/path/cm22").NotTo(BeMountedToContainer(c))
-			g.Expect("/my/file/path/cm.31").To(BeMountedToContainer(c))
-			g.Expect("/cm/file/withpath").To(BeMountedToContainer(c))
+			g.Expect("/my/file/path/cm11").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/cm12").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/cm21").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/cm22").NotTo(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/cm.31").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/cm.31").To(BeMountedToContainer(sidecarContainer))
+			g.Expect("/cm/file/withpath").To(BeMountedToContainer(backstageContainer))
 
 			By("checking if extra-secret-file volumes are added to PodSpec")
 			g.Expect(utils.GenerateVolumeNameFromCmOrSecret("secret-file1")).To(BeAddedAsVolumeToPodSpec(podSpec))
@@ -150,20 +174,22 @@ var _ = When("create backstage with CR configured", func() {
 
 			By("checking if extra-secret-file volumes are mounted to the Backstage container")
 
-			g.Expect("/my/file/path/sec11").To(BeMountedToContainer(c))
-			g.Expect("/my/file/path/sec12").NotTo(BeMountedToContainer(c))
-			g.Expect("/my/file/path/sec21").To(BeMountedToContainer(c))
-			g.Expect("/my/file/path/sec22").NotTo(BeMountedToContainer(c))
-			g.Expect("/my/file/path/sec.31").To(BeMountedToContainer(c))
-			g.Expect("/secret/file/withpath").To(BeMountedToContainer(c))
+			g.Expect("/my/file/path/sec11").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/sec12").NotTo(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/sec21").To(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/sec22").NotTo(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/sec.31").NotTo(BeMountedToContainer(backstageContainer))
+			g.Expect("/my/file/path/sec.31").To(BeMountedToContainer(sidecarContainer))
+			g.Expect("/secret/file/withpath").To(BeMountedToContainer(backstageContainer))
 
 			By("checking if extra-envvars are injected to the Backstage container as EnvFrom")
-			g.Expect("cm-env1").To(BeEnvFromForContainer(c))
+			g.Expect("cm-env1").To(BeEnvFromForContainer(backstageContainer))
 
 			By("checking if environment variables are injected to the Backstage container as EnvVar")
-			g.Expect("env1").To(BeEnvVarForContainer(c))
-			g.Expect("cm21").To(BeEnvVarForContainer(c))
-			g.Expect("sec11").To(BeEnvVarForContainer(c))
+			g.Expect("env1").To(BeEnvVarForContainer(backstageContainer))
+			g.Expect("cm21").To(BeEnvVarForContainer(sidecarContainer))
+			g.Expect("cm21").To(BeEnvVarForContainer(backstageContainer))
+			g.Expect("sec11").To(BeEnvVarForContainer(backstageContainer))
 
 		}, time.Minute, time.Second).Should(Succeed(), controllerMessage())
 	})

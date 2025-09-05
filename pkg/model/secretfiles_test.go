@@ -137,7 +137,7 @@ func TestFailedValidation(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
-	assert.EqualError(t, err, "failed to contribute external config, reason: key is required if defaultMountPath is not specified for secret secret1")
+	assert.ErrorContains(t, err, "key or mountPath has to be specified for secret secret1")
 
 }
 
@@ -185,5 +185,57 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 	assert.Equal(t, 0, len(deployment.container().Args))
 	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
 	assert.True(t, checkIfContainVolumes(deployment.podSpec().Volumes, "secret1"))
+
+}
+
+func TestSpecifiedSecretFilesWithContainers(t *testing.T) {
+
+	bs := *secretFilesTestBackstage.DeepCopy()
+	sf := &bs.Spec.Application.ExtraFiles.Secrets
+
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf1.yaml", Containers: []string{"install-dynamic-plugins", "another-container"}})
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret3", MountPath: "rel", Containers: []string{"*"}})
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
+
+	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileSecretKeys["secret1"] = NewDataObjectKeys(map[string]string{"conf1.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileSecretKeys["secret2"] = NewDataObjectKeys(map[string]string{"conf2.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileSecretKeys["secret3"] = NewDataObjectKeys(map[string]string{"conf3.yaml": "data"}, nil)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.True(t, len(model.RuntimeObjects) > 0)
+
+	deployment := model.backstageDeployment
+	assert.NotNil(t, deployment)
+
+	assert.Equal(t, 3, len(deployment.containerByName("install-dynamic-plugins").VolumeMounts))
+	assert.Equal(t, 1, len(deployment.containerByName("backstage-backend").VolumeMounts))
+	assert.Equal(t, "secret3", deployment.containerByName("backstage-backend").VolumeMounts[0].Name)
+	assert.Equal(t, 2, len(deployment.containerByName("another-container").VolumeMounts))
+
+}
+
+func TestSecretFilesWithNonExistedContainerFailed(t *testing.T) {
+	bs := *configMapFilesTestBackstage.DeepCopy()
+	bs.Spec.Application = &bsv1.Application{
+		ExtraFiles: &bsv1.ExtraFiles{
+			ConfigMaps: []bsv1.FileObjectRef{
+				{
+					Name:       "secretName",
+					Containers: []string{"another-container"},
+				},
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.ErrorContains(t, err, "not found")
 
 }

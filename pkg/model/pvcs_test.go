@@ -126,3 +126,65 @@ func TestSpecifiedPvcs(t *testing.T) {
 	assert.Equal(t, "my-pvc2", d.container().VolumeMounts[1].Name)
 	assert.Equal(t, "/my/pvc/path", d.container().VolumeMounts[1].MountPath)
 }
+
+func TestSpecifiedPvcsWithContainers(t *testing.T) {
+	bs := bsv1.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pvc",
+		},
+		Spec: bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				ExtraFiles: &bsv1.ExtraFiles{
+					Pvcs: []bsv1.PvcRef{
+						{
+							Name:       "my-pvc1",
+							Containers: []string{"*"},
+						},
+						{
+							Name:       "my-pvc2",
+							MountPath:  "/my/pvc/path",
+							Containers: []string{"install-dynamic-plugins"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
+
+	testObj.externalConfig.ExtraPvcKeys = []string{"my-pvc1", "my-pvc2"}
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+	d := model.backstageDeployment
+
+	assert.Equal(t, 2, len(d.podSpec().Volumes))
+	// only my-pvc1 (*)
+	assert.Equal(t, 1, len(d.container().VolumeMounts))
+	// my-pvc1 (*) and my-pvc2 (listed)
+	assert.Equal(t, 2, len(d.containerByName("install-dynamic-plugins").VolumeMounts))
+
+}
+
+func TestPvcsWithNonExistedContainerFailed(t *testing.T) {
+	bs := *configMapFilesTestBackstage.DeepCopy()
+	bs.Spec.Application = &bsv1.Application{
+		ExtraFiles: &bsv1.ExtraFiles{
+			Pvcs: []bsv1.PvcRef{
+				{
+					Name:       "pvcName",
+					Containers: []string{"another-container"},
+				},
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.ErrorContains(t, err, "not found")
+
+}

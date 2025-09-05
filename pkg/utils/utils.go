@@ -233,20 +233,33 @@ func BoolEnvVar(envvar string, def bool) bool {
 	return def
 }
 
-func FilterContainers(allContainers []string, filter string) []string {
-	if filter == "*" {
-		return allContainers
-	} else if filter == "" {
-		return nil
-	}
-
-	filtered := []string{}
-	for _, c := range allContainers {
-		for _, cname := range strings.Split(filter, ",") {
-			if c == strings.TrimSpace(cname) {
-				filtered = append(filtered, c)
-			}
+// ParseCommaSeparatedString parses a comma-separated string into a slice of strings.
+// It trims whitespace from each part and ignores empty parts.
+func ParseCommaSeparated(input string) []string {
+	result := make([]string, 0)
+	for _, part := range strings.Split(input, ",") {
+		t := strings.TrimSpace(part)
+		if t != "" {
+			result = append(result, t)
 		}
 	}
-	return filtered
+	return result
 }
+
+//func FilterContainers(allContainers []string, filter string) []string {
+//	if filter == "*" {
+//		return allContainers
+//	} else if filter == "" {
+//		return nil
+//	}
+//
+//	filtered := []string{}
+//	for _, c := range allContainers {
+//		for _, cname := range strings.Split(filter, ",") {
+//			if c == strings.TrimSpace(cname) {
+//				filtered = append(filtered, c)
+//			}
+//		}
+//	}
+//	return filtered
+//}

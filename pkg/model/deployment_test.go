@@ -234,3 +234,85 @@ spec:
 	assert.Equal(t, "deployment-image", model.backstageDeployment.container().Image)
 	assert.Equal(t, int32(3), *model.backstageDeployment.deployment.Spec.Replicas)
 }
+
+func TestFilterContainers(t *testing.T) {
+
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+ template:
+   spec:
+     containers:
+       - name: c1
+       - name: c2
+     initContainers:
+       - name: c3
+`),
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+	d := model.backstageDeployment
+
+	f := containersFilter{}
+	cs, err := f.getContainers(d)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(cs))
+	assert.Equal(t, BackstageContainerName(), cs[0].Name)
+
+	f = containersFilter{names: []string{}}
+	cs, _ = f.getContainers(d)
+	assert.Equal(t, 1, len(cs))
+	assert.Equal(t, BackstageContainerName(), cs[0].Name)
+
+	f = containersFilter{names: []string{"*"}}
+	cs, _ = f.getContainers(d)
+	assert.Equal(t, 4, len(cs))
+
+	f = containersFilter{names: []string{"c123"}}
+	_, err = f.getContainers(d)
+	assert.Error(t, err)
+
+	f = containersFilter{names: []string{"c1", "c2"}}
+	cs, _ = f.getContainers(d)
+	assert.Equal(t, 2, len(cs))
+	assert.Equal(t, "c1", cs[0].Name)
+	assert.NotNil(t, model.backstageDeployment.containerByName("c1"))
+
+}
+
+func TestEnvVarsWithSidecars(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+  template:
+    spec:
+      containers:
+        - name: sidecar
+          image: busybox
+`),
+	}
+	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
+		Envs: []bsv1.Env{
+			{Name: "VAR1", Value: "v1", Containers: []string{"sidecar"}},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+	sidecar := model.backstageDeployment.containerByName("sidecar")
+	assert.NotNil(t, sidecar)
+	assert.Equal(t, 1, len(sidecar.Env))
+	assert.Equal(t, "VAR1", sidecar.Env[0].Name)
+
+}

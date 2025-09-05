@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,8 +37,11 @@ func (p *ConfigMapFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 		mp, wSubpath := p.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.ExtraFiles.MountPath)
 		keys := p.model.ExternalConfig.ExtraFileConfigMapKeys[specCm.Name].All()
-		p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
+		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: specCm.Containers}, ConfigMapObjectKind,
 			specCm.Name, mp, specCm.Key, wSubpath, keys)
+		if err != nil {
+			return fmt.Errorf("failed to mount files on configmap %s: %w", specCm.Name, err)
+		}
 	}
 	return nil
 }
@@ -72,9 +77,12 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 func (p *ConfigMapFiles) updateAndValidate(_ bsv1.Backstage) error {
 
 	keys := append(maps.Keys(p.ConfigMap.Data), maps.Keys(p.ConfigMap.BinaryData)...)
-	p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, ConfigMapObjectKind,
+	err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: p.ConfigMap.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
 		p.ConfigMap.Name, p.model.backstageDeployment.defaultMountPath(), "", true, keys)
 
+	if err != nil {
+		return fmt.Errorf("failed to add files from configmap %s: %w", p.ConfigMap.Name, err)
+	}
 	return nil
 }
 
