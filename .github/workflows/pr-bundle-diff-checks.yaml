@@ -57,21 +57,25 @@ jobs:
           # Inspired from https://github.com/operator-framework/operator-sdk/issues/6285#issuecomment-1415350333
           echo "MANIFESTS_CHANGED=$(if git diff --quiet -I'^    createdAt: ' bundle config dist; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
-      - name: Commit any manifest changes
+      - name: Commit and push any manifest changes
         if: ${{ steps.manifests-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
         run: |
+          git remote add fork "https://github.com/${{ github.event.pull_request.head.repo.full_name }}.git"
+          git fetch fork ${{ github.event.pull_request.head.ref }}
+          git checkout -B pr-branch fork/${{ github.event.pull_request.head.ref }}
+
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git fetch --prune
-          git pull --rebase --autostash
+
           git add -A .
           git commit \
             -m "Regenerate bundle/installer manifests" \
             -m "Co-authored-by: $GITHUB_ACTOR <$GITHUB_ACTOR@users.noreply.github.com>"
-          git push
+
+          git push fork pr-branch:${{ github.event.pull_request.head.ref }}
 
       - name: Comment on PR if manifests were updated
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         if: ${{ !cancelled() && steps.manifests-diff-checker.outputs.MANIFESTS_CHANGED == 'true' }}
         continue-on-error: true
         env:
