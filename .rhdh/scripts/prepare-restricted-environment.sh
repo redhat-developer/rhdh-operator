@@ -400,7 +400,7 @@ fi
 
 # Validate plugin options
 if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
-  if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" ]]; then
+  if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" && -z "$FROM_DIR" ]]; then
     warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index or --plugin-list to specify plugins to mirror."
   fi
   
