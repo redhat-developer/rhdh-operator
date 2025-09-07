@@ -27,6 +27,7 @@ PLUGIN_LIST_FILE=""
 PLUGIN_REGISTRY=""
 MIRROR_PLUGINS="true"
 PLUGIN_IMAGES=()
+PLUGIN_DIRECT_ARGS=()
 
 function logf() {
   set -euo pipefail
@@ -114,7 +115,7 @@ Options:
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
-  --plugin-index <oci-url>               : Plugin catalog index OCI artifact (e.g., oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.8)
+  --plugin-index <oci-url>               : Plugin catalog index OCI artifact (e.g., oci://quay.io/rhdh/plugin-catalog-index:1.8)
   --plugin-list <file>                   : Local file with plugin OCI references (one per line)
   --plugin-registry <registry>           : Internal registry for plugins (defaults to --to-registry if not specified)
   --mirror-plugins <true|false>          : Whether to mirror dynamic plugins (default: true)
@@ -147,14 +148,46 @@ Examples:
     --filter-versions '1.4,1.5'
 
   # Mirror operator images and plugins from a plugin catalog index
+  # Replace '1.8' with the desired RHDH version (e.g., 1.6, 1.7, 1.8)
   $0 \\
     --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.8
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8
 
   # Mirror operator images and specific plugins from a local file
+  # Create a text file with one plugin OCI URL per line
   $0 \\
     --to-registry registry.example.com \\
     --plugin-list /path/to/plugins.txt
+
+  # Mirror operator images and specific plugins directly
+  # Replace plugin names and versions with actual plugins you want to mirror
+  $0 \\
+    --to-registry registry.example.com \\
+    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8 \\
+    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
+
+  # Mirror operator images with plugins from catalog + additional plugins
+  # Combines default plugins from catalog with your custom plugins
+  $0 \\
+    --to-registry registry.example.com \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6 \\
+    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-3scale-backend:1.7
+
+  # Mirror operator images with plugins from catalog + plugin file
+  # Combines default plugins from catalog with plugins listed in a file
+  $0 \\
+    --to-registry registry.example.com \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    --plugin-list /path/to/custom-plugins.txt
+
+  # Mirror operator images with plugins from all sources combined
+  # Maximum flexibility: catalog + file + direct plugin specifications
+  $0 \\
+    --to-registry registry.example.com \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    --plugin-list /path/to/custom-plugins.txt \\
+    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-ocm:1.8
 "
 }
 
@@ -291,9 +324,15 @@ while [[ "$#" -gt 0 ]]; do
     exit 0
     ;;
   *)
-    errorf "Unknown parameter is used: $1."
-    usage
-    exit 1
+    # Check if this looks like an OCI URL for a plugin
+    if [[ "$1" =~ ^oci:// ]]; then
+      PLUGIN_DIRECT_ARGS+=("$1")
+      debugf "Added direct plugin argument: $1"
+    else
+      errorf "Unknown parameter is used: $1."
+      usage
+      exit 1
+    fi
     ;;
   esac
   shift 1
@@ -400,13 +439,8 @@ fi
 
 # Validate plugin options
 if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
-  if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" && -z "$FROM_DIR" ]]; then
-    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index or --plugin-list to specify plugins to mirror."
-  fi
-  
-  if [[ -n "$PLUGIN_INDEX" && -n "$PLUGIN_LIST_FILE" ]]; then
-    errorf "Cannot specify both --plugin-index and --plugin-list. Use only one."
-    exit 1
+  if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" && ${#PLUGIN_DIRECT_ARGS[@]} -eq 0 && -z "$FROM_DIR" ]]; then
+    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index, --plugin-list, or direct OCI URLs to specify plugins to mirror."
   fi
   
   if [[ -n "$PLUGIN_INDEX" && ! "$PLUGIN_INDEX" =~ ^oci:// ]]; then
@@ -465,7 +499,7 @@ function merge_registry_auth() {
   registries=("registry.redhat.io" "quay.io")
   for img in "${images[@]}"; do
     reg=$(echo "$img" | cut -d'/' -f1)
-    [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
+    [[ " ${registries[*]} " =~ $reg ]] || registries+=("$reg")
   done
   tmpFile=$(mktemp)
   # shellcheck disable=SC2064
@@ -1043,23 +1077,71 @@ function mirror_plugin_artifacts() {
     PLUGIN_REGISTRY="$TO_REGISTRY"
   fi
   
-  # Resolve plugin list
+  # Resolve plugin list from all sources
+  local all_plugins=()
+  
+  # Add plugins from catalog index
   if [[ -n "$PLUGIN_INDEX" ]]; then
     debugf "Resolving plugins from index: $PLUGIN_INDEX"
-    if ! resolve_plugin_index "$PLUGIN_INDEX"; then
+    local temp_plugins=()
+    if resolve_plugin_index "$PLUGIN_INDEX"; then
+      temp_plugins=("${PLUGIN_IMAGES[@]}")
+      all_plugins+=("${temp_plugins[@]}")
+      debugf "Added ${#temp_plugins[@]} plugins from catalog index"
+    else
       errorf "Failed to resolve plugin index: $PLUGIN_INDEX"
       return 1
     fi
-  elif [[ -n "$PLUGIN_LIST_FILE" ]]; then
+  fi
+  
+  # Add plugins from file
+  if [[ -n "$PLUGIN_LIST_FILE" ]]; then
     debugf "Loading plugins from file: $PLUGIN_LIST_FILE"
-    if ! load_plugin_list_from_file "$PLUGIN_LIST_FILE"; then
+    local temp_plugins=()
+    if load_plugin_list_from_file "$PLUGIN_LIST_FILE"; then
+      temp_plugins=("${PLUGIN_IMAGES[@]}")
+      all_plugins+=("${temp_plugins[@]}")
+      debugf "Added ${#temp_plugins[@]} plugins from file"
+    else
       errorf "Failed to load plugin list from file: $PLUGIN_LIST_FILE"
       return 1
     fi
-  else
-    debugf "No plugin source specified, skipping plugin mirroring"
+  fi
+  
+  # Add direct plugin arguments
+  if [[ ${#PLUGIN_DIRECT_ARGS[@]} -gt 0 ]]; then
+    debugf "Adding ${#PLUGIN_DIRECT_ARGS[@]} direct plugin arguments"
+    all_plugins+=("${PLUGIN_DIRECT_ARGS[@]}")
+  fi
+  
+  # Check if we have any plugins
+  if [[ ${#all_plugins[@]} -eq 0 ]]; then
+    debugf "No plugin sources specified, skipping plugin mirroring"
     return 0
   fi
+  
+  # Deduplicate plugins (remove duplicates while preserving order)
+  PLUGIN_IMAGES=()
+  local seen_plugins=()
+  for plugin in "${all_plugins[@]}"; do
+    # Check if we've seen this plugin before
+    local is_duplicate=false
+    for seen in "${seen_plugins[@]}"; do
+      if [[ "$plugin" == "$seen" ]]; then
+        is_duplicate=true
+        break
+      fi
+    done
+    
+    if [[ "$is_duplicate" == "false" ]]; then
+      PLUGIN_IMAGES+=("$plugin")
+      seen_plugins+=("$plugin")
+    else
+      debugf "Skipping duplicate plugin: $plugin"
+    fi
+  done
+  
+  debugf "Total unique plugins to mirror: ${#PLUGIN_IMAGES[@]}"
   
   if [[ ${#PLUGIN_IMAGES[@]} -eq 0 ]]; then
     warnf "No plugins to mirror"
