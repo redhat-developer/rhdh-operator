@@ -115,7 +115,7 @@ Options:
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
-  --plugin-index <oci-url>               : Plugin catalog index OCI artifact (e.g., oci://quay.io/rhdh/plugin-catalog-index:1.8)
+  --plugin-index <oci-url>               : Plugin catalog repository to query for version-specific plugins (e.g., oci://quay.io/rhdh/plugin-catalog:1.8)
   --plugin-list <file>                   : Local file with plugin OCI references (one per line)
   --plugin-registry <registry>           : Internal registry for plugins (defaults to --to-registry if not specified)
   --mirror-plugins <true|false>          : Whether to mirror dynamic plugins (default: true)
@@ -148,10 +148,10 @@ Examples:
     --filter-versions '1.4,1.5'
 
   # Mirror operator images and plugins from a plugin catalog index
-  # Replace '1.8' with the desired RHDH version (e.g., 1.6, 1.7, 1.8)
+  # Replace '1.8' with the desired RHDH version
   $0 \\
     --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8
+    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8
 
   # Mirror operator images and specific plugins from a local file
   # Create a text file with one plugin OCI URL per line
@@ -170,7 +170,7 @@ Examples:
   # Combines default plugins from catalog with your custom plugins
   $0 \\
     --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 \\
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6 \\
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-3scale-backend:1.7
 
@@ -178,14 +178,14 @@ Examples:
   # Combines default plugins from catalog with plugins listed in a file
   $0 \\
     --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 \\
     --plugin-list /path/to/custom-plugins.txt
 
   # Mirror operator images with plugins from all sources combined
   # Maximum flexibility: catalog + file + direct plugin specifications
   $0 \\
     --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 \\
     --plugin-list /path/to/custom-plugins.txt \\
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-ocm:1.8
 "
@@ -975,61 +975,43 @@ function push_image_from_archive() {
 
 function resolve_plugin_index() {
   local index_url="$1"
-  debugf "Resolving plugin index from: $index_url"
+  debugf "Resolving plugins from catalog repository: $index_url"
   
-  # Extract registry and tag from OCI URL
+  # Extract registry and version from OCI URL
   if [[ "$index_url" =~ oci://([^:]+):(.+) ]]; then
     local registry="${BASH_REMATCH[1]}"
-    local tag="${BASH_REMATCH[2]}"
+    local version="${BASH_REMATCH[2]}"
     
-    # Create temporary directory for index
-    local index_dir
-    index_dir=$(mktemp -d)
-    # shellcheck disable=SC2064
-    trap "rm -rf '$index_dir'" EXIT
+    debugf "Querying registry $registry for all tags matching version $version"
     
-    # Pull the index OCI artifact
-    debugf "Pulling plugin index from $registry:$tag"
-    if ! skopeo copy --preserve-digests --all "docker://$registry:$tag" "dir:$index_dir"; then
-      errorf "Failed to pull plugin index from $registry:$tag"
+    # Query the registry for all tags and filter by version
+    local all_tags
+    if ! all_tags=$(skopeo list-tags "docker://$registry" 2>/dev/null | jq -r '.Tags[]' 2>/dev/null); then
+      errorf "Failed to query tags from registry $registry"
       return 1
     fi
     
-    # Parse the index to extract plugin references
-    # This assumes the index contains JSON with plugin references
-    if [ -f "$index_dir/index.json" ]; then
-      debugf "Found index.json, parsing plugin references"
-      # Extract plugin references using jq (assuming they're in a known format)
-      # This is a placeholder - actual parsing depends on index format
-      local plugins
-      plugins=$(jq -r '.plugins[]?.registryReference // empty' "$index_dir/index.json" 2>/dev/null || echo "")
-      if [[ -n "$plugins" ]]; then
-        IFS=$'\n' read -r -a PLUGIN_IMAGES <<< "$plugins"
-        debugf "Resolved ${#PLUGIN_IMAGES[@]} plugins from index"
-        return 0
-      fi
+    # Filter tags that match the version pattern
+    local matching_tags
+    matching_tags=$(echo "$all_tags" | grep -E ".*${version}(\.[0-9]+)?$" || echo "")
+    
+    if [[ -z "$matching_tags" ]]; then
+      warnf "No tags found matching version $version in registry $registry"
+      return 1
     fi
     
-    # Fallback: try to find any JSON files that might contain plugin info
-    local json_files
-    json_files=$(find "$index_dir" -name "*.json" -type f)
-    for json_file in $json_files; do
-      debugf "Checking JSON file: $json_file"
-      local plugins
-      plugins=$(jq -r '.plugins[]?.registryReference // .[]?.registryReference // empty' "$json_file" 2>/dev/null || echo "")
-      if [[ -n "$plugins" ]]; then
-        IFS=$'\n' read -r -a PLUGIN_IMAGES <<< "$plugins"
-        debugf "Resolved ${#PLUGIN_IMAGES[@]} plugins from $json_file"
-        return 0
+    # Convert to full OCI URLs
+    PLUGIN_IMAGES=()
+    while IFS= read -r tag; do
+      if [[ -n "$tag" ]]; then
+        PLUGIN_IMAGES+=("$registry:$tag")
       fi
-    done
+    done <<< "$matching_tags"
     
-    warnf "Could not parse plugin references from index, treating as single plugin"
-    # If we can't parse the index, treat the index itself as a plugin
-    PLUGIN_IMAGES=("$registry:$tag")
+    debugf "Found ${#PLUGIN_IMAGES[@]} plugins matching version $version"
     return 0
   else
-    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry:tag"
+    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry:version"
     return 1
   fi
 }
