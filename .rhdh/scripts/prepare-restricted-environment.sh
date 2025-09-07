@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script to streamline installing the official RHDH Catalog Source in a disconnected OpenShift or Kubernetes cluster.
+# Script to streamline installing the official RHDH Catalog Source and dynamic plugins as OCI artifacts in a disconnected OpenShift or Kubernetes cluster.
 #
 # Requires: oc (OCP) or kubectl (K8s), jq, yq, umoci, base64, opm, skopeo
 
@@ -70,7 +70,7 @@ function usage() {
   FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS[*]}"
   FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS_CSV// /,}"
   echo "
-This script streamlines the installation of the Red Hat Developer Hub Operator in a disconnected OpenShift or Kubernetes cluster.
+This script streamlines the installation of the Red Hat Developer Hub Operator and dynamic plugins as OCI artifacts in a disconnected OpenShift or Kubernetes cluster.
 It supports partially disconnected as well as fully disconnected environments.
 In a partially disconnected environment, the host from which this script is executed has access to the Internet and the Red Hat ecosystem catalog,
 and can push the images directly to the mirror registry and the cluster.
@@ -114,7 +114,7 @@ Options:
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
-  --plugin-index <oci-url>               : Plugin catalog index OCI artifact (e.g., oci://quay.io/rhdh/plugin-catalog-index:1.8)
+  --plugin-index <oci-url>               : Plugin catalog index OCI artifact (e.g., oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.8)
   --plugin-list <file>                   : Local file with plugin OCI references (one per line)
   --plugin-registry <registry>           : Internal registry for plugins (defaults to --to-registry if not specified)
   --mirror-plugins <true|false>          : Whether to mirror dynamic plugins (default: true)
@@ -140,7 +140,7 @@ Examples:
     --to-registry registry.example.com
 
   # Install the Catalog Source from a CI index image by pushing the images to the internal OCP mirror registry,
-  #   because it detected that it is connected to it is connected to an OCP cluster.
+  #   because it detected that it is connected to an OCP cluster.
   # It will automatically replace all references to the internal RH registries with quay.io
   $0 \\
     --ci-index true \\
@@ -149,18 +149,12 @@ Examples:
   # Mirror operator images and plugins from a plugin catalog index
   $0 \\
     --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8
+    --plugin-index oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.8
 
   # Mirror operator images and specific plugins from a local file
   $0 \\
     --to-registry registry.example.com \\
     --plugin-list /path/to/plugins.txt
-
-  # Mirror operator images and plugins with custom plugin registry
-  $0 \\
-    --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
-    --plugin-registry plugins.example.com
 "
 }
 
