@@ -198,7 +198,7 @@ type EnvObjectRef struct {
 	// If it contains only "*", it means all containers and no other names are allowed.
 	// +optional
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="!(self[0]==\"*\"  && size(self) != 1)",message="If '*' is specified, no other container names are allowed"
+	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
 	Containers []string `json:"containers,omitempty"`
 }
 
@@ -220,7 +220,7 @@ type FileObjectRef struct {
 	// If it contains only "*", it means all containers and no other names are allowed.
 	// +optional
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="!(self[0]==\"*\"  && size(self) != 1)",message="If '*' is specified, no other container names are allowed"
+	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
 	Containers []string `json:"containers,omitempty"`
 }
 
@@ -237,7 +237,7 @@ type PvcRef struct {
 	// If it contains only "*", it means all containers and no other names are allowed.
 	// +optional
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="!(self[0]==\"*\"  && size(self) != 1)",message="If '*' is specified, no other container names are allowed"
+	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
 	Containers []string `json:"containers,omitempty"`
 }
 
@@ -254,7 +254,7 @@ type Env struct {
 	// If it contains only "*", it means all containers and no other names are allowed.
 	// +optional
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="!(self[0]==\"*\"  && size(self) != 1)",message="If '*' is specified, no other container names are allowed"
+	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
 	Containers []string `json:"containers,omitempty"`
 }
 
