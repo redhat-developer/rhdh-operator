@@ -62,7 +62,7 @@ jobs:
 
       - name: Setup Go
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version-file: 'go.mod'
 
@@ -169,7 +169,7 @@ jobs:
 
       - name: Upload SARIF file
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: github/codeql-action/upload-sarif@2d92b76c45b91eb80fc44c74ce3fce0ee94e8f9d # v3
+        uses: github/codeql-action/upload-sarif@f1f6e5f6af878fb37288ce1c627459e94dbf7d01 # v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: gosec.sarif
