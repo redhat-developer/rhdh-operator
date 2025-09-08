@@ -43,12 +43,15 @@ func (p *SecretFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 	for _, specSec := range spec.Application.ExtraFiles.Secrets {
 
 		if specSec.MountPath == "" && specSec.Key == "" {
-			return fmt.Errorf("key is required if defaultMountPath is not specified for secret %s", specSec.Name)
+			return fmt.Errorf("key or mountPath has to be specified for secret %s", specSec.Name)
 		}
 		mp, wSubpath := p.model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
 		keys := p.model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
-		p.model.backstageDeployment.mountFilesFrom([]string{BackstageContainerName()}, SecretObjectKind,
+		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: specSec.Containers}, SecretObjectKind,
 			specSec.Name, mp, specSec.Key, wSubpath, keys)
+		if err != nil {
+			return fmt.Errorf("failed to mount files on secret %s: %w", specSec.Name, err)
+		}
 	}
 	return nil
 }
@@ -87,13 +90,17 @@ func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
 	for _, item := range p.secrets.Items {
 		secret, ok := item.(*corev1.Secret)
 		if !ok {
-			return fmt.Errorf("payload is not corev1.Secret: %T", item)
+			return fmt.Errorf("payload is not Secret kind: %T", item)
 		}
 
 		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
-		mountPath, subPath, containers := p.model.backstageDeployment.getDefConfigMountInfo(item)
-		p.model.backstageDeployment.mountFilesFrom(containers, SecretObjectKind,
+		mountPath, subPath := p.model.backstageDeployment.getDefConfigMountPath(item)
+		//containers, err := p.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
+		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
 			item.GetName(), mountPath, "", subPath != "", keys)
+		if err != nil {
+			return fmt.Errorf("failed to add files from secret %s: %w", item.GetName(), err)
+		}
 	}
 	return nil
 }
