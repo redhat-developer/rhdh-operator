@@ -1267,7 +1267,7 @@ spec:
                               x-kubernetes-validations:
                               - message: If '*' is specified, no other container names
                                   are allowed
-                                rule: '!(self[0]=="*"  && size(self) != 1)'
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
@@ -1317,7 +1317,7 @@ spec:
                               x-kubernetes-validations:
                               - message: If '*' is specified, no other container names
                                   are allowed
-                                rule: '!(self[0]=="*"  && size(self) != 1)'
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
@@ -1346,7 +1346,7 @@ spec:
                               x-kubernetes-validations:
                               - message: If '*' is specified, no other container names
                                   are allowed
-                                rule: '!(self[0]=="*"  && size(self) != 1)'
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             name:
                               description: Name of the environment variable
                               type: string
@@ -1376,7 +1376,7 @@ spec:
                               x-kubernetes-validations:
                               - message: If '*' is specified, no other container names
                                   are allowed
-                                rule: '!(self[0]=="*"  && size(self) != 1)'
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
@@ -1414,7 +1414,7 @@ spec:
                               x-kubernetes-validations:
                               - message: If '*' is specified, no other container names
                                   are allowed
-                                rule: '!(self[0]=="*"  && size(self) != 1)'
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
@@ -1453,7 +1453,7 @@ spec:
                               x-kubernetes-validations:
                               - message: If '*' is specified, no other container names
                                   are allowed
-                                rule: '!(self[0]=="*"  && size(self) != 1)'
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             mountPath:
                               description: Path to mount PVC. If not specified default-path/Name
                                 will be used
@@ -1482,7 +1482,7 @@ spec:
                               x-kubernetes-validations:
                               - message: If '*' is specified, no other container names
                                   are allowed
-                                rule: '!(self[0]=="*"  && size(self) != 1)'
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
