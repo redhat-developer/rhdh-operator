@@ -213,6 +213,11 @@ FILTER_VERSIONS_PROVIDED="false"
 # --to-registry "$MY_MIRROR_REGISTRY" (either this or to-dir needs to specified, both can be specified)
 # --install-operator "true"
 # --use-oc-mirror "false"
+# [ --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 ] (plugin catalog repository)
+# [ --plugin-list /path/to/plugins.txt ] (local file with plugin OCI references)
+# [ --plugin-registry "$PLUGIN_REGISTRY" ] (internal registry for plugins, defaults to --to-registry)
+# [ --mirror-plugins true|false ] (whether to mirror dynamic plugins, default: true)
+# [ oci://quay.io/rhdh-plugin-catalog/plugin-name:version ] (direct plugin OCI URLs)
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
