@@ -1,0 +1,35 @@
+[jira]
+jira_api_token = "${{ secrets.JIRA_API_TOKEN }}"
+jira_base_url = "https://issues.redhat.com"
+
+[github_app]
+# what should be launched automatically
+pr_commands = [
+    "/review",
+    "/describe --pr_description.final_update_message=false",
+    "/improve",
+]
+
+[pr_reviewer] # /review #
+persistent_comment = true
+require_tests_review = false
+require_ticket_analysis_review = true
+enable_review_labels_security = true
+enable_review_labels_effort = true
+
+[pr_description] # /describe #
+enable_pr_diagram = true
+publish_labels = true
+final_update_message = true
+# without this, it can interfere with Sourcery AI
+publish_description_as_comment = true
+publish_description_as_comment_persistent = true
+add_original_user_description = false
+
+[pr_code_suggestions]
+commitable_code_suggestions = false
+
+[config]
+ignore_pr_authors = ["renovate","openshift-cherrypick-robot","rhdh-bot"]
+ignore_pr_labels = ["do-not-merge/work-in-progress"]
+ignore_pr_title = ["^((DO[\\s_-]*NOT[\\s_-]*MERGE)|DNM|dnm|((do[\\s_-]*not[\\s_-]*merge)))"]
