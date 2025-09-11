@@ -32,3 +32,7 @@ commitable_code_suggestions = false
 
 [config]
 ignore_pr_authors = ["renovate","openshift-cherrypick-robot","rhdh-bot"]
+
+[rag_arguments]
+enable_rag=true
+rag_repo_list=['redhat-developer/rhdh','redhat-developer/red-hat-developers-documentation-rhdh','redhat-developer/rhdh-operator','redhat-developer/rhdh-chart']
