@@ -9,6 +9,7 @@ pr_commands = [
     "/describe --pr_description.final_update_message=false",
     "/improve",
 ]
+feedback_on_draft_pr = true
 
 [pr_reviewer] # /review #
 persistent_comment = true
@@ -18,7 +19,7 @@ enable_review_labels_security = true
 enable_review_labels_effort = true
 
 [pr_description] # /describe #
-enable_pr_diagram = true
+enable_pr_diagram = false
 publish_labels = true
 final_update_message = true
 # without this, it can interfere with Sourcery AI
@@ -31,5 +32,3 @@ commitable_code_suggestions = false
 
 [config]
 ignore_pr_authors = ["renovate","openshift-cherrypick-robot","rhdh-bot"]
-ignore_pr_labels = ["do-not-merge/work-in-progress"]
-ignore_pr_title = ["^((DO[\\s_-]*NOT[\\s_-]*MERGE)|DNM|dnm|((do[\\s_-]*not[\\s_-]*merge)))"]
