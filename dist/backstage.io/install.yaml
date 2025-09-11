@@ -1256,6 +1256,18 @@ spec:
                           More details on https://backstage.io/docs/conf/writing/.
                         items:
                           properties:
+                            containers:
+                              description: |-
+                                If set, the file will be mounted only in the specified containers, otherwise in backstage container only.
+                                If it contains only "*", it means all containers and no other names are allowed.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-validations:
+                              - message: If '*' is specified, no other container names
+                                  are allowed
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
@@ -1294,6 +1306,18 @@ spec:
                           Otherwise, only the specified key will be injected as an additional environment variable.
                         items:
                           properties:
+                            containers:
+                              description: |-
+                                If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
+                                If it contains only "*", it means all containers and no other names are allowed.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-validations:
+                              - message: If '*' is specified, no other container names
+                                  are allowed
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
@@ -1311,6 +1335,18 @@ spec:
                           variables.
                         items:
                           properties:
+                            containers:
+                              description: |-
+                                If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
+                                If it contains only "*", it means all containers and no other names are allowed.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-validations:
+                              - message: If '*' is specified, no other container names
+                                  are allowed
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             name:
                               description: Name of the environment variable
                               type: string
@@ -1329,6 +1365,18 @@ spec:
                           Otherwise, only the specified key will be injected as environment variable.
                         items:
                           properties:
+                            containers:
+                              description: |-
+                                If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
+                                If it contains only "*", it means all containers and no other names are allowed.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-validations:
+                              - message: If '*' is specified, no other container names
+                                  are allowed
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
@@ -1355,6 +1403,18 @@ spec:
                           Otherwise, only the specified key will be mounted as a file.
                         items:
                           properties:
+                            containers:
+                              description: |-
+                                If set, the file will be mounted only in the specified containers, otherwise in backstage container only.
+                                If it contains only "*", it means all containers and no other names are allowed.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-validations:
+                              - message: If '*' is specified, no other container names
+                                  are allowed
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string
@@ -1382,6 +1442,18 @@ spec:
                           For each item in this array, a key must be specified that will be mounted as a file.
                         items:
                           properties:
+                            containers:
+                              description: |-
+                                If set, the file will be mounted only in the specified containers, otherwise in backstage container only.
+                                If it contains only "*", it means all containers and no other names are allowed.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-validations:
+                              - message: If '*' is specified, no other container names
+                                  are allowed
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             mountPath:
                               description: Path to mount PVC. If not specified default-path/Name
                                 will be used
@@ -1399,6 +1471,18 @@ spec:
                           For each item in this array, a key must be specified that will be mounted as a file.
                         items:
                           properties:
+                            containers:
+                              description: |-
+                                If set, the file will be mounted only in the specified containers, otherwise in backstage container only.
+                                If it contains only "*", it means all containers and no other names are allowed.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-validations:
+                              - message: If '*' is specified, no other container names
+                                  are allowed
+                                rule: '!(size(self) != 1 && self[0]=="*")'
                             key:
                               description: Key in the object
                               type: string

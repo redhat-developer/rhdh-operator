@@ -4,7 +4,7 @@ on:
   # pull_request_target needed to be able to commit and push bundle diffs to external fork PRs.
   # But we included a manual authorization safeguard to prevent PWN requests. See the 'authorize' job below.
   pull_request_target:
-    branches: 
+    branches:
     - main
     - rhdh-1.[0-9]+
     - 1.[0-9]+.x

@@ -43,7 +43,7 @@ func (b *AppConfig) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 	for _, specCm := range spec.Application.AppConfig.ConfigMaps {
 		mp, wSubpath := b.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
-		updatePodWithAppConfig(b.model.backstageDeployment, b.model.backstageDeployment.container(), specCm.Name,
+		updatePodWithAppConfig(b.model.backstageDeployment, specCm.Name,
 			mp, specCm.Key, wSubpath, b.model.ExternalConfig.AppConfigKeys[specCm.Name])
 	}
 	return nil
@@ -68,7 +68,7 @@ func (b *AppConfig) EmptyObject() client.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	b.model = model
 	if b.ConfigMap != nil {
 		model.appConfig = b
@@ -79,8 +79,8 @@ func (b *AppConfig) addToModel(model *BackstageModel, backstage bsv1.Backstage) 
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(backstage bsv1.Backstage) error {
-	updatePodWithAppConfig(b.model.backstageDeployment, b.model.backstageDeployment.container(), b.ConfigMap.Name,
+func (b *AppConfig) updateAndValidate(_ bsv1.Backstage) error {
+	updatePodWithAppConfig(b.model.backstageDeployment, b.ConfigMap.Name,
 		b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
 	return nil
 }
@@ -91,9 +91,11 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 }
 
 // updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args
-func updatePodWithAppConfig(bsd *BackstageDeployment, container *corev1.Container, cmName, mountPath, key string, withSubPath bool, cmData []string) {
-	bsd.mountFilesFrom([]string{container.Name}, ConfigMapObjectKind,
+func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key string, withSubPath bool, cmData []string) {
+
+	_ = bsd.mountFilesFrom(containersFilter{}, ConfigMapObjectKind,
 		cmName, mountPath, key, withSubPath, cmData)
+	container := bsd.container()
 
 	for _, file := range cmData {
 		if key == "" || key == file {
