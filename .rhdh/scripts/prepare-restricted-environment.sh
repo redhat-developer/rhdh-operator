@@ -27,7 +27,7 @@ PLUGIN_LIST_FILE=""
 PLUGIN_REGISTRY=""
 MIRROR_PLUGINS="true"
 PLUGIN_IMAGES=()
-PLUGIN_DIRECT_ARGS=()
+
 
 function logf() {
   set -euo pipefail
@@ -106,7 +106,7 @@ Options:
                                             From there, you will be able to re-run this script with '--from-dir' to push
                                             the images to your private registry.
   --install-operator <true|false>        : Install the RHDH operator right after creating the CatalogSource (default: true)
-  --extra-images <list>                  : Comma-separated list of extra images to mirror
+  --extra-images <list>                  : Comma-separated list of extra images to mirror (including OCI plugin URL)
   --use-oc-mirror <true|false>           : Whether to use the 'oc-mirror' tool (default: false).
                                             This is the recommended way for mirroring on regular OpenShift clusters.
                                             Bear in mind however that this relies on resources like ImageContentSourcePolicy,
@@ -159,35 +159,25 @@ Examples:
     --to-registry registry.example.com \\
     --plugin-list /path/to/plugins.txt
 
-  # Mirror operator images and specific plugins directly
-  # Replace plugin names and versions with actual plugins you want to mirror
+  # Mirror operator images with plugins using --extra-images flag
+  # Unified approach: specify both regular images and plugin OCI URLs in one flag
   $0 \\
-    --to-registry registry.example.com \\
-    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8 \\
-    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
+    --extra-images 'registry.redhat.io/ubi9/ubi:latest,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7'
 
-  # Mirror operator images with plugins from catalog + additional plugins
+  # Mirror operator images with plugins from catalog + additional plugins via --extra-images flag
   # Combines default plugins from catalog with your custom plugins
   $0 \\
     --to-registry registry.example.com \\
     --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 \\
-    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6 \\
-    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-3scale-backend:1.7
+    --extra-images 'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-3scale-backend:1.7'
 
-  # Mirror operator images with plugins from catalog + plugin file
+  # Mirror operator images with plugins from catalog + plugin file + additional plugins via --extra-images flag
   # Combines default plugins from catalog with plugins listed in a file
   $0 \\
     --to-registry registry.example.com \\
     --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 \\
-    --plugin-list /path/to/custom-plugins.txt
-
-  # Mirror operator images with plugins from all sources combined
-  # Maximum flexibility: catalog + file + direct plugin specifications
-  $0 \\
-    --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 \\
     --plugin-list /path/to/custom-plugins.txt \\
-    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-ocm:1.8
+    --extra-images 'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-ocm:1.8'
 "
 }
 
@@ -217,7 +207,7 @@ FILTER_VERSIONS_PROVIDED="false"
 # [ --plugin-list /path/to/plugins.txt ] (local file with plugin OCI references)
 # [ --plugin-registry "$PLUGIN_REGISTRY" ] (internal registry for plugins, defaults to --to-registry)
 # [ --mirror-plugins true|false ] (whether to mirror dynamic plugins, default: true)
-# [ oci://quay.io/rhdh-plugin-catalog/plugin-name:version ] (direct plugin OCI URLs)
+# [ --extra-images "img1,oci://plugin1,oci://plugin2" ] (extra images to mirror, including OCI plugin URLs)
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
@@ -329,15 +319,6 @@ while [[ "$#" -gt 0 ]]; do
     exit 0
     ;;
   *)
-    # Check if this looks like an OCI URL for a plugin
-    if [[ "$1" =~ ^oci:// ]]; then
-      PLUGIN_DIRECT_ARGS+=("$1")
-      debugf "Added direct plugin argument: $1"
-    else
-      errorf "Unknown parameter is used: $1."
-      usage
-      exit 1
-    fi
     ;;
   esac
   shift 1
@@ -444,8 +425,8 @@ fi
 
 # Validate plugin options
 if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
-  if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" && ${#PLUGIN_DIRECT_ARGS[@]} -eq 0 && -z "$FROM_DIR" ]]; then
-    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index, --plugin-list, or direct OCI URLs to specify plugins to mirror."
+  if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" && ${#EXTRA_IMAGES[@]} -eq 0 && -z "$FROM_DIR" ]]; then
+    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index, --plugin-list, or --extra-images with OCI URLs to specify plugins to mirror."
   fi
   
   if [[ -n "$PLUGIN_INDEX" && ! "$PLUGIN_INDEX" =~ ^oci:// ]]; then
@@ -1095,10 +1076,15 @@ function mirror_plugin_artifacts() {
     fi
   fi
   
-  # Add direct plugin arguments
-  if [[ ${#PLUGIN_DIRECT_ARGS[@]} -gt 0 ]]; then
-    debugf "Adding ${#PLUGIN_DIRECT_ARGS[@]} direct plugin arguments"
-    all_plugins+=("${PLUGIN_DIRECT_ARGS[@]}")
+  # Add plugins from --extra-images
+ if [[ ${#EXTRA_IMAGES[@]} -gt 0 ]]; then
+    debugf "Processing ${#EXTRA_IMAGES[@]} images from --extra-images for plugins"
+    for img in "${EXTRA_IMAGES[@]}"; do
+      if [[ "$img" =~ ^oci:// ]]; then
+        all_plugins+=("$img")
+        debugf "Added OCI plugin from --extra-images: $img"
+      fi
+    done
   fi
   
   # Check if we have any plugins
@@ -1337,7 +1323,18 @@ EOF
           done
         fi
       fi
-    fi
+      
+      # Add plugins from --extra-images
+      if [[ ${#EXTRA_IMAGES[@]} -gt 0 ]]; then
+        debugf "Adding plugin images from --extra-images to oc-mirror config"
+        for img in "${EXTRA_IMAGES[@]}"; do
+          if [[ "$img" =~ ^oci:// ]]; then
+            cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
+      - name: "$img"
+EOF
+          fi
+        done
+      fi
 
     if [[ -n "${TO_DIR}" ]]; then
       "${OC_MIRROR_PATH}" \
@@ -1416,7 +1413,20 @@ EOF
           done
         fi
       fi
-    fi
+      
+      # Add plugins from --extra-images
+      if [[ ${#EXTRA_IMAGES[@]} -gt 0 ]]; then
+        debugf "Adding plugin images from --extra-images to oc-mirror from-dir config"
+        for img in "${EXTRA_IMAGES[@]}"; do
+          if [[ "$img" =~ ^oci:// ]]; then
+            # Add to the existing imageset config
+            if [ -f "${FROM_DIR}/imageset-config.yaml" ]; then
+              # Append plugin images to the existing config
+              echo "      - name: \"$img\"" >> "${FROM_DIR}/imageset-config.yaml"
+            fi
+          fi
+        done
+      fi
     if [[ -n "${TO_REGISTRY}" ]]; then
       registryUrl=$(buildRegistryUrl)
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
