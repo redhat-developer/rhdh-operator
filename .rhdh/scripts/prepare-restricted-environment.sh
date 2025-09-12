@@ -467,7 +467,9 @@ function merge_registry_auth() {
   registries=("registry.redhat.io" "quay.io")
   for img in "${images[@]}"; do
     reg=$(echo "$img" | cut -d'/' -f1)
-    [[ " ${registries[*]} " =~ $reg ]] || registries+=("$reg")
+    if [[ ! " ${registries[*]} " == *" $reg "* ]]; then
+      registries+=("$reg")
+    fi
   done
   tmpFile=$(mktemp)
   # shellcheck disable=SC2064
