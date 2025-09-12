@@ -67,15 +67,15 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
     includes:
        - dynamic-plugins.default.yaml
     plugins:
-       - package: "@redhat/backstage-plugin-orchestrator@1.6.0"
+       - package: "@redhat/backstage-plugin-orchestrator@1.7.1"
          disabled: false
-       - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.6.0"
+       - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.7.1"
          disabled: false
          dependencies:
             - ref: sonataflow
-       - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.6.0"
+       - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.7.1"
          disabled: false
-       - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.6.0"
+       - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.7.1"
          disabled: false  
 ```
 
