@@ -1,10 +1,34 @@
 #!/bin/bash
 #
-# Script to streamline installing the official RHDH Catalog Source in a disconnected OpenShift or Kubernetes cluster.
+# Script to streamline installing the official RHDH Catalog Source and dynamic plugins as OCI artifacts in a disconnected OpenShift or Kubernetes cluster.
 #
-# Requires: oc (OCP) or kubectl (K8s), jq, yq, umoci, base64, opm, skopeo
+# Requires: oc (OCP) or kubectl (K8s), jq, yq (mikefarah version), umoci, base64, opm, skopeo
 
 set -euo pipefail
+
+# Preflight checks - validate all required tools before doing anything
+function check_tool() {
+  if ! command -v "$1" >/dev/null; then
+    echo "Error: Required tool '$1' is not installed." >&2
+    exit 1
+  fi
+}
+
+# Check core required tools
+check_tool "yq"
+check_tool "umoci"
+check_tool "skopeo"
+check_tool "jq"
+check_tool "opm"
+check_tool "base64"
+
+# Check podman if we'll be pushing to a registry (determined by --to-registry argument)
+# Note: This is a basic check; full validation happens after argument parsing
+if command -v podman >/dev/null 2>&1; then
+  PODMAN_AVAILABLE=true
+else
+  PODMAN_AVAILABLE=false
+fi
 
 SCRIPT_PATH=$(realpath "$0")
 
@@ -20,6 +44,12 @@ FILTERED_VERSIONS=(*)
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
 YQ_VERSION=v4.45.1
+
+# Plugin-related variables
+PLUGIN_INDEX=""
+PLUGIN_LIST_FILE=""
+MIRROR_PLUGINS="true"
+PLUGIN_IMAGES=()
 
 function logf() {
   set -euo pipefail
@@ -52,18 +82,12 @@ function errorf() {
   logf "ERROR" "\033[0;31m" "$1"
 }
 
-function check_tool() {
-  if ! command -v "$1" >/dev/null; then
-    errorf "Error: Required tool '$1' is not installed."
-    exit 1
-  fi
-}
 
 function usage() {
   FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS[*]}"
   FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS_CSV// /,}"
   echo "
-This script streamlines the installation of the Red Hat Developer Hub Operator in a disconnected OpenShift or Kubernetes cluster.
+This script streamlines the installation of the Red Hat Developer Hub Operator and dynamic plugins as OCI artifacts in a disconnected OpenShift or Kubernetes cluster.
 It supports partially disconnected as well as fully disconnected environments.
 In a partially disconnected environment, the host from which this script is executed has access to the Internet and the Red Hat ecosystem catalog,
 and can push the images directly to the mirror registry and the cluster.
@@ -98,7 +122,7 @@ Options:
                                             From there, you will be able to re-run this script with '--from-dir' to push
                                             the images to your private registry.
   --install-operator <true|false>        : Install the RHDH operator right after creating the CatalogSource (default: true)
-  --extra-images <list>                  : Comma-separated list of extra images to mirror
+  --extra-images <list>                  : Comma-separated list of extra images to mirror (including OCI plugin URLs starting with oci://)
   --use-oc-mirror <true|false>           : Whether to use the 'oc-mirror' tool (default: false).
                                             This is the recommended way for mirroring on regular OpenShift clusters.
                                             Bear in mind however that this relies on resources like ImageContentSourcePolicy,
@@ -107,6 +131,9 @@ Options:
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
+  --plugin-index <oci-url>               : Plugin catalog repository to query for version-specific plugins (e.g., oci://quay.io/rhdh/plugin-catalog:1.8)
+  --plugin-list <file>                   : Local .txt file with plugin OCI references (oci:// URL per line, comments with '#' are ignored).
+  --mirror-plugins <true|false>          : Whether to mirror dynamic plugins (default: true)
 
 Examples:
 
@@ -134,6 +161,28 @@ Examples:
   $0 \\
     --ci-index true \\
     --filter-versions '1.4,1.5'
+
+  # Mirror operator images and plugins from a plugin catalog index
+  # Replace '1.8' with the desired RHDH version
+  $0 \\
+    --to-registry registry.example.com \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8
+
+  # Mirror operator images and specific plugins from a local file
+  # Create a .txt file with one plugin OCI URL per line. Example plugins.txt content:
+  #   # Red Hat Developer Hub Plugin List
+  #   oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
+  #   oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
+  #   oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6
+  $0 \\
+    --to-registry registry.example.com \\
+    --plugin-list /path/to/plugins.txt
+
+  # Mirror operator images with plugins using --extra-images flag
+  # Unified approach: specify both regular images and plugin OCI URLs in one flag
+  $0 \\
+    --to-registry registry.example.com \\
+    --extra-images 'registry.redhat.io/ubi9/ubi:latest,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7'
 "
 }
 
@@ -159,6 +208,10 @@ FILTER_VERSIONS_PROVIDED="false"
 # --to-registry "$MY_MIRROR_REGISTRY" (either this or to-dir needs to specified, both can be specified)
 # --install-operator "true"
 # --use-oc-mirror "false"
+# [ --mirror-plugins true|false ] (whether to mirror dynamic plugins, default: true)
+# [ --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 ] (plugin catalog repository)
+# [ --plugin-list /path/to/plugins.txt ] (local file with plugin OCI references)
+# [ --extra-images "img1,oci://plugin1,oci://plugin2" ] (extra images to mirror, including oci:// plugin URLs)
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
@@ -249,14 +302,23 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   '--install-yq') 
     INSTALL_YQ=1 ;;
+  '--plugin-index')
+    PLUGIN_INDEX="$2"
+    shift 1
+    ;;
+  '--plugin-list')
+    PLUGIN_LIST_FILE="$2"
+    shift 1
+    ;;
+  '--mirror-plugins')
+    MIRROR_PLUGINS="$2"
+    shift 1
+    ;;
   '-h' | '--help')
     usage
     exit 0
     ;;
   *)
-    errorf "Unknown parameter is used: $1."
-    usage
-    exit 1
     ;;
   esac
   shift 1
@@ -361,6 +423,18 @@ if [[ "${IS_CI_INDEX_IMAGE}" == "true" ]]; then
   fi
 fi
 
+# Validate plugin options
+if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
+  if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" && ${#EXTRA_IMAGES[@]} -eq 0 && -z "$FROM_DIR" ]]; then
+    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index, --plugin-list, --extra-images with oci:// URLs to specify plugins to mirror."
+  fi
+  
+  if [[ -n "$PLUGIN_INDEX" && ! "$PLUGIN_INDEX" =~ ^oci:// ]]; then
+    errorf "Plugin index must be in OCI format: oci://registry/org/image@sha256:digest"
+    exit 1
+  fi
+fi
+
 if [[ -n "${TO_DIR}" ]]; then
   mkdir -p "${TO_DIR}"
   TMPDIR="${TO_DIR}"
@@ -411,7 +485,9 @@ function merge_registry_auth() {
   registries=("registry.redhat.io" "quay.io")
   for img in "${images[@]}"; do
     reg=$(echo "$img" | cut -d'/' -f1)
-    [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
+    if [[ ! " ${registries[*]} " == *" $reg "* ]]; then
+      registries+=("$reg")
+    fi
   done
   tmpFile=$(mktemp)
   # shellcheck disable=SC2064
@@ -477,7 +553,7 @@ function buildRegistryUrl() {
     if [[ "${input}" == "internal" ]]; then
       echo "image-registry.openshift-image-registry.svc:5000"
     else
-      echo "$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')"
+      oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}'
     fi
   else
     echo "${TO_REGISTRY}"
@@ -538,7 +614,7 @@ function render_index() {
       >"${local_index_file}"
   fi
 
-  debugf "Got $(cat "${local_index_file}" | wc -l) lines of JSON from the index!"
+  debugf "Got $(wc -l < "${local_index_file}") lines of JSON from the index!"
 
   if [ ! -s "${local_index_file}" ]; then
     errorf "[ERROR] 'opm render $INDEX_IMAGE' returned an empty output, which likely means that this index Image does not contain the rhdh operator."
@@ -885,11 +961,268 @@ function push_image_from_archive() {
   skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image"
 }
 
-check_tool "yq"
-check_tool "umoci"
-check_tool "skopeo"
-if [[ -n "$TO_REGISTRY" ]]; then
-  check_tool "podman"
+function resolve_plugin_index() {
+  local index_url="$1"
+  debugf "Resolving plugins from catalog repository: $index_url"
+  
+  # Extract registry and version from OCI URL
+  if [[ "$index_url" =~ oci://([^:]+):(.+) ]]; then
+    local registry="${BASH_REMATCH[1]}"
+    local version="${BASH_REMATCH[2]}"
+    
+    debugf "Querying registry $registry for all tags matching version $version"
+    
+    # Query the registry for all tags and filter by version
+    local all_tags
+    if ! all_tags=$(skopeo list-tags "docker://$registry" 2>/dev/null | jq -r '.Tags[]' 2>/dev/null); then
+      errorf "Failed to query tags from registry $registry"
+      return 1
+    fi
+    
+    # Filter tags that match the version pattern
+    local matching_tags
+    matching_tags=$(echo "$all_tags" | grep -E ".*${version}(\.[0-9]+)?$" || echo "")
+    
+    if [[ -z "$matching_tags" ]]; then
+      warnf "No tags found matching version $version in registry $registry"
+      return 1
+    fi
+    
+    # Convert to full OCI URLs
+    PLUGIN_IMAGES=()
+    while IFS= read -r tag; do
+      if [[ -n "$tag" ]]; then
+        PLUGIN_IMAGES+=("$registry:$tag")
+      fi
+    done <<< "$matching_tags"
+    
+    debugf "Found ${#PLUGIN_IMAGES[@]} plugins matching version $version"
+    return 0
+  else
+    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry/org/image@sha256:digest"
+    return 1
+  fi
+}
+
+function load_plugin_list_from_file() {
+  local file_path="$1"
+  debugf "Loading plugin list from file: $file_path"
+  
+  if [[ ! -f "$file_path" ]]; then
+    errorf "Plugin list file not found: $file_path"
+    return 1
+  fi
+  
+  # Read plugin references from file (one per line, skip comments and empty lines)
+  local plugins=()
+  while IFS= read -r line; do
+    # Skip comments and empty lines
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    
+    # Trim whitespace
+    line="${line#"${line%%[! ]*}"}"
+    line="${line%"${line##*[! ]}"}"
+    
+    if [[ -n "$line" ]]; then
+      plugins+=("$line")
+    fi
+  done < "$file_path"
+  
+  if [[ ${#plugins[@]} -eq 0 ]]; then
+    warnf "No valid plugin references found in file: $file_path"
+    return 1
+  fi
+  
+  PLUGIN_IMAGES=("${plugins[@]}")
+  debugf "Loaded ${#PLUGIN_IMAGES[@]} plugins from file: $file_path"
+  return 0
+}
+
+function mirror_plugin_artifacts() {
+  debugf "Starting plugin artifact mirroring..."
+  
+  
+  # Resolve plugin list from all sources
+  local all_plugins=()
+  
+  # Add plugins from catalog index
+  if [[ -n "$PLUGIN_INDEX" ]]; then
+    debugf "Resolving plugins from index: $PLUGIN_INDEX"
+    local temp_plugins=()
+    if resolve_plugin_index "$PLUGIN_INDEX"; then
+      temp_plugins=("${PLUGIN_IMAGES[@]}")
+      all_plugins+=("${temp_plugins[@]}")
+      debugf "Added ${#temp_plugins[@]} plugins from catalog index"
+    else
+      errorf "Failed to resolve plugin index: $PLUGIN_INDEX"
+      return 1
+    fi
+  fi
+  
+  # Add plugins from file
+  if [[ -n "$PLUGIN_LIST_FILE" ]]; then
+    debugf "Loading plugins from file: $PLUGIN_LIST_FILE"
+    local temp_plugins=()
+    if load_plugin_list_from_file "$PLUGIN_LIST_FILE"; then
+      temp_plugins=("${PLUGIN_IMAGES[@]}")
+      all_plugins+=("${temp_plugins[@]}")
+      debugf "Added ${#temp_plugins[@]} plugins from file"
+    else
+      errorf "Failed to load plugin list from file: $PLUGIN_LIST_FILE"
+      return 1
+    fi
+  fi
+  
+  # Add plugins from --extra-images
+  if [[ ${#EXTRA_IMAGES[@]} -gt 0 ]]; then
+    debugf "Processing ${#EXTRA_IMAGES[@]} images from --extra-images for plugins"
+    for img in "${EXTRA_IMAGES[@]}"; do
+      if [[ "$img" =~ ^oci:// ]]; then
+        all_plugins+=("$img")
+        debugf "Added OCI plugin from --extra-images: $img"
+      fi
+    done
+  fi
+  
+  # Check if we have any plugins
+  if [[ ${#all_plugins[@]} -eq 0 ]]; then
+    debugf "No plugin sources specified, skipping plugin mirroring"
+    return 0
+  fi
+  
+  # Deduplicate plugins (remove duplicates while preserving order)
+  PLUGIN_IMAGES=()
+  local seen_plugins=()
+  for plugin in "${all_plugins[@]}"; do
+    # Check if we've seen this plugin before
+    local is_duplicate=false
+    for seen in "${seen_plugins[@]}"; do
+      if [[ "$plugin" == "$seen" ]]; then
+        is_duplicate=true
+        break
+      fi
+    done
+    
+    if [[ "$is_duplicate" == "false" ]]; then
+      PLUGIN_IMAGES+=("$plugin")
+      seen_plugins+=("$plugin")
+    else
+      debugf "Skipping duplicate plugin: $plugin"
+    fi
+  done
+  
+  debugf "Total unique plugins to mirror: ${#PLUGIN_IMAGES[@]}"
+  
+  if [[ ${#PLUGIN_IMAGES[@]} -eq 0 ]]; then
+    warnf "No plugins to mirror"
+    return 0
+  fi
+  
+  debugf "Mirroring ${#PLUGIN_IMAGES[@]} plugin artifacts..."
+  
+  for img in "${PLUGIN_IMAGES[@]}"; do
+    debugf "Processing plugin: $img"
+    
+    # Determine target image name
+    local targetImg
+    if [[ "$img" == *"@sha256:"* ]]; then
+      local imgDigest="${img##*@sha256:}"
+      local imgDir="./plugins/${img%@*}/sha256_$imgDigest"
+      local lastTwo
+      lastTwo=$(extract_last_two_elements "${img%@*}")
+      targetImg="$(buildRegistryUrl)/${lastTwo}:$imgDigest"
+    elif [[ "$img" == *":"* ]]; then
+      local imgTag="${img##*:}"
+      local imgDir="./plugins/${img%:*}/tag_$imgTag"
+      local lastTwo
+      lastTwo=$(extract_last_two_elements "${img%:*}")
+      targetImg="$(buildRegistryUrl)/${lastTwo}:$imgTag"
+    else
+      local imgDir="./plugins/${img}/tag_latest"
+      local lastTwo
+      lastTwo=$(extract_last_two_elements "${img}")
+      targetImg="$(buildRegistryUrl)/${lastTwo}:latest"
+    fi
+    
+    if [[ -n "$TO_REGISTRY" ]]; then
+      if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
+        # Create the corresponding project if it doesn't exist
+        local projectNameForOcpReg=${lastTwo%%/*}
+        oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
+      fi
+      mirror_image_to_registry "$img" "$targetImg"
+    else
+      if [ ! -d "$imgDir" ]; then
+        mkdir -p "${imgDir}"
+        mirror_image_to_archive "$img" "$imgDir"
+      fi
+    fi
+  done
+  
+  debugf "Plugin artifact mirroring completed."
+}
+
+function mirror_plugin_artifacts_from_dir() {
+  debugf "Starting plugin artifact mirroring from directory..."
+  
+  BASE_DIR="${FROM_DIR}/plugins"
+  if [ ! -d "${BASE_DIR}" ]; then
+    debugf "No plugins directory found in ${FROM_DIR}, skipping plugin mirroring from directory"
+    return 0
+  fi
+  
+  debugf "Processing plugins from ${BASE_DIR}..."
+  
+  # Process plugins with SHA256 digests
+  find "$BASE_DIR" -type d -name "sha256_*" | while read -r sha256_dir; do
+    relative_path=${sha256_dir#"$BASE_DIR/"}
+    sha256_hash=${sha256_dir##*/sha256_}
+    parent_path=$(dirname "$relative_path")
+    debugf "Processing plugin with SHA256: $parent_path@sha256:$sha256_hash"
+    
+    if [[ -n "$TO_REGISTRY" ]]; then
+      if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
+        # Create the corresponding project if it doesn't exist
+        local projectNameForOcpReg=${parent_path%%/*}
+        oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
+      fi
+      local lastTwo
+      lastTwo=$(extract_last_two_elements "$parent_path")
+      local targetImg
+      targetImg="$(buildRegistryUrl)/${lastTwo}:$sha256_hash"
+      push_image_from_archive "$sha256_dir" "$targetImg"
+    fi
+  done
+
+  # Process plugins with tags
+  find "$BASE_DIR" -type d -name "tag_*" | while read -r tag_dir; do
+    relative_path=${tag_dir#"$BASE_DIR/"}
+    tag_hash=${tag_dir##*/tag_}
+    parent_path=$(dirname "$relative_path")
+    debugf "Processing plugin with tag: $parent_path:$tag_hash"
+    
+    if [[ -n "$TO_REGISTRY" ]]; then
+      if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
+        # Create the corresponding project if it doesn't exist
+        local projectNameForOcpReg=${parent_path%%/*}
+        oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
+      fi
+      local lastTwo
+      lastTwo=$(extract_last_two_elements "$parent_path")
+      local targetImg
+      targetImg="$(buildRegistryUrl)/${lastTwo}:$tag_hash"
+      push_image_from_archive "$tag_dir" "$targetImg"
+    fi
+  done
+  
+  debugf "Plugin artifact mirroring from directory completed."
+}
+
+# Validate podman is available if we need to push to registry
+if [[ -n "${TO_REGISTRY:-}" && "${PODMAN_AVAILABLE:-false}" != "true" ]]; then
+  errorf "Error: podman is required when pushing to registry (--to-registry specified) but is not installed."
+  exit 1
 fi
 
 if [[ -n "${TO_DIR}" ]]; then
@@ -962,6 +1295,44 @@ EOF
       done
     fi
 
+    # Add plugin images to oc-mirror config if plugins are enabled
+    if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
+      # Resolve plugin list first
+      if [[ -n "$PLUGIN_INDEX" ]]; then
+        debugf "Resolving plugins from index for oc-mirror: $PLUGIN_INDEX"
+        if resolve_plugin_index "$PLUGIN_INDEX"; then
+          debugf "Adding ${#PLUGIN_IMAGES[@]} plugin images to oc-mirror config"
+          for pluginImg in "${PLUGIN_IMAGES[@]}"; do
+            cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
+      - name: "$pluginImg"
+    
+EOF
+          done
+        fi
+      elif [[ -n "$PLUGIN_LIST_FILE" ]]; then
+        debugf "Loading plugins from file for oc-mirror: $PLUGIN_LIST_FILE"
+        if load_plugin_list_from_file "$PLUGIN_LIST_FILE"; then
+          debugf "Adding ${#PLUGIN_IMAGES[@]} plugin images to oc-mirror config"
+          for pluginImg in "${PLUGIN_IMAGES[@]}"; do
+            cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
+      - name: "$pluginImg"
+EOF
+          done
+        fi
+      fi
+      
+      # Add plugins from --extra-images
+      if [[ ${#EXTRA_IMAGES[@]} -gt 0 ]]; then
+        debugf "Adding plugin images from --extra-images to oc-mirror config"
+        for img in "${EXTRA_IMAGES[@]}"; do
+          if [[ "$img" =~ ^oci:// ]]; then
+            cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
+      - name: "$img"
+EOF
+          fi
+        done
+      fi
+
     if [[ -n "${TO_DIR}" ]]; then
       "${OC_MIRROR_PATH}" \
         --config="${TMPDIR}/imageset-config.yaml" \
@@ -1001,6 +1372,7 @@ EOF
         "$OC_MIRROR_FLAGS" |
         tee "${ocMirrorLogFile}"
     fi
+  fi
 
   else
     # from dir
@@ -1008,6 +1380,51 @@ EOF
       errorf "Directory not found: ${FROM_DIR}"
       exit 1
     fi
+    
+    # Handle plugins from directory if plugins are enabled
+    if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
+      # Resolve plugin list first
+      if [[ -n "$PLUGIN_INDEX" ]]; then
+        debugf "Resolving plugins from index for oc-mirror from-dir: $PLUGIN_INDEX"
+        if resolve_plugin_index "$PLUGIN_INDEX"; then
+          debugf "Adding ${#PLUGIN_IMAGES[@]} plugin images to oc-mirror from-dir config"
+          # Update the imageset config to include plugins
+          for pluginImg in "${PLUGIN_IMAGES[@]}"; do
+            # Add to the existing imageset config
+            if [ -f "${FROM_DIR}/imageset-config.yaml" ]; then
+              # Append plugin images to the existing config
+              echo "      - name: \"$pluginImg\"" >> "${FROM_DIR}/imageset-config.yaml"
+            fi
+          done
+        fi
+      elif [[ -n "$PLUGIN_LIST_FILE" ]]; then
+        debugf "Loading plugins from file for oc-mirror from-dir: $PLUGIN_LIST_FILE"
+        if load_plugin_list_from_file "$PLUGIN_LIST_FILE"; then
+          debugf "Adding ${#PLUGIN_IMAGES[@]} plugin images to oc-mirror from-dir config"
+          # Update the imageset config to include plugins
+          for pluginImg in "${PLUGIN_IMAGES[@]}"; do
+            # Add to the existing imageset config
+            if [ -f "${FROM_DIR}/imageset-config.yaml" ]; then
+              # Append plugin images to the existing config
+              echo "      - name: \"$pluginImg\"" >> "${FROM_DIR}/imageset-config.yaml"
+            fi
+          done
+        fi
+      fi
+      
+      # Add plugins from --extra-images
+      if [[ ${#EXTRA_IMAGES[@]} -gt 0 ]]; then
+        debugf "Adding plugin images from --extra-images to oc-mirror from-dir config"
+        for img in "${EXTRA_IMAGES[@]}"; do
+          if [[ "$img" =~ ^oci:// ]]; then
+            # Add to the existing imageset config
+            if [ -f "${FROM_DIR}/imageset-config.yaml" ]; then
+              # Append plugin images to the existing config
+              echo "      - name: \"$img\"" >> "${FROM_DIR}/imageset-config.yaml"
+            fi
+          fi
+        done
+      fi
     if [[ -n "${TO_REGISTRY}" ]]; then
       registryUrl=$(buildRegistryUrl)
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
@@ -1057,6 +1474,7 @@ EOF
       fi
     fi
   fi
+fi
 else
   if [[ -z "${FROM_DIR}" ]]; then
     render_index
@@ -1066,6 +1484,16 @@ else
     mirror_extra_images_from_dir
   fi
   mirror_extra_images
+
+  # Mirror plugins from directory if plugins are enabled
+  if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
+    mirror_plugin_artifacts_from_dir
+  fi
+
+  # Mirror plugins if enabled
+  if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
+    mirror_plugin_artifacts
+  fi
 
   # create OLM resources
   manifestsTargetDir="${TMPDIR}"
@@ -1205,6 +1633,26 @@ EOF
       source: ${targetImg}
 EOF
     done
+
+    # Add plugin image mirrors
+    if [[ "${MIRROR_PLUGINS}" == "true" && ${#PLUGIN_IMAGES[@]} -gt 0 ]]; then
+      debugf "Adding plugin image mirrors to IDMS"
+      for img in "${PLUGIN_IMAGES[@]}"; do
+        if [[ "$img" == *"@sha256:"* ]]; then
+          targetImg="${img%@*}"
+        elif [[ "$img" == *":"* ]]; then
+          targetImg="${img%:*}"
+        else
+          targetImg="${img}"
+        fi
+        targetImgLastTwo=$(extract_last_two_elements "$targetImg")
+        cat <<EOF >>"${manifestsTargetDir}/imageDigestMirrorSet.yaml"
+    - mirrors:
+      - ${registry_url_internal}/${targetImgLastTwo}
+      source: ${targetImg}
+EOF
+      done
+    fi
 
     # Create the IDMS (OCP-specific) and CatalogSource.
     # IDMS resources never really worked on clusters with hosted control planes, and it looks like it is no longer
