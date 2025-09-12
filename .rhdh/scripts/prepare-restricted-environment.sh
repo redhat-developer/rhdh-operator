@@ -24,7 +24,6 @@ YQ_VERSION=v4.45.1
 # Plugin-related variables
 PLUGIN_INDEX=""
 PLUGIN_LIST_FILE=""
-PLUGIN_REGISTRY=""
 MIRROR_PLUGINS="true"
 PLUGIN_IMAGES=()
 
@@ -115,12 +114,7 @@ Options:
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
   --plugin-index <oci-url>               : Plugin catalog repository to query for version-specific plugins (e.g., oci://quay.io/rhdh/plugin-catalog:1.8)
-  --plugin-list <file>                   : Local .txt file with plugin OCI references (one per line). Example file content:
-                                            # Red Hat Developer Hub Plugin List
-                                            oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
-                                            oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
-                                            oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6
-  --plugin-registry <registry>           : Internal registry for plugins (defaults to --to-registry if not specified)
+  --plugin-list <file>                   : Local .txt file with plugin OCI references (oci:// URL per line, comments with '#' are ignored).
   --mirror-plugins <true|false>          : Whether to mirror dynamic plugins (default: true)
 
 Examples:
@@ -157,8 +151,7 @@ Examples:
     --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8
 
   # Mirror operator images and specific plugins from a local file
-  # Create a .txt file with one plugin OCI URL per line
-  # Example plugins.txt content:
+  # Create a .txt file with one plugin OCI URL per line. Example plugins.txt content:
   #   # Red Hat Developer Hub Plugin List
   #   oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
   #   oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
@@ -172,21 +165,6 @@ Examples:
   $0 \\
     --to-registry registry.example.com \\
     --extra-images 'registry.redhat.io/ubi9/ubi:latest,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7'
-
-  # Mirror operator images with plugins from catalog + additional plugins via --extra-images flag
-  # Combines default plugins from catalog with your custom plugins
-  $0 \\
-    --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 \\
-    --extra-images 'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-3scale-backend:1.7'
-
-  # Mirror operator images with plugins from catalog + plugin file + additional plugins via --extra-images flag
-  # Combines default plugins from catalog with plugins listed in a file
-  $0 \\
-    --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 \\
-    --plugin-list /path/to/custom-plugins.txt \\
-    --extra-images 'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-ocm:1.8'
 "
 }
 
@@ -212,11 +190,10 @@ FILTER_VERSIONS_PROVIDED="false"
 # --to-registry "$MY_MIRROR_REGISTRY" (either this or to-dir needs to specified, both can be specified)
 # --install-operator "true"
 # --use-oc-mirror "false"
+# [ --mirror-plugins true|false ] (whether to mirror dynamic plugins, default: true)
 # [ --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8 ] (plugin catalog repository)
 # [ --plugin-list /path/to/plugins.txt ] (local file with plugin OCI references)
-# [ --plugin-registry "$PLUGIN_REGISTRY" ] (internal registry for plugins, defaults to --to-registry)
-# [ --mirror-plugins true|false ] (whether to mirror dynamic plugins, default: true)
-# [ --extra-images "img1,oci://plugin1,oci://plugin2" ] (extra images to mirror, including OCI plugin URLs)
+# [ --extra-images "img1,oci://plugin1,oci://plugin2" ] (extra images to mirror, including oci:// plugin URLs)
 
 while [[ "$#" -gt 0 ]]; do
   case $1 in
@@ -313,10 +290,6 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   '--plugin-list')
     PLUGIN_LIST_FILE="$2"
-    shift 1
-    ;;
-  '--plugin-registry')
-    PLUGIN_REGISTRY="$2"
     shift 1
     ;;
   '--mirror-plugins')
@@ -435,7 +408,7 @@ fi
 # Validate plugin options
 if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
   if [[ -z "$PLUGIN_INDEX" && -z "$PLUGIN_LIST_FILE" && ${#EXTRA_IMAGES[@]} -eq 0 && -z "$FROM_DIR" ]]; then
-    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index, --plugin-list, or --extra-images with OCI URLs to specify plugins to mirror."
+    warnf "Plugin mirroring is enabled but no plugin source specified. Use --plugin-index, --plugin-list, --extra-images with oci:// URLs to specify plugins to mirror."
   fi
   
   if [[ -n "$PLUGIN_INDEX" && ! "$PLUGIN_INDEX" =~ ^oci:// ]]; then
@@ -1049,10 +1022,6 @@ function load_plugin_list_from_file() {
 function mirror_plugin_artifacts() {
   debugf "Starting plugin artifact mirroring..."
   
-  # Set plugin registry to TO_REGISTRY if not specified
-  if [[ -z "$PLUGIN_REGISTRY" ]]; then
-    PLUGIN_REGISTRY="$TO_REGISTRY"
-  fi
   
   # Resolve plugin list from all sources
   local all_plugins=()
