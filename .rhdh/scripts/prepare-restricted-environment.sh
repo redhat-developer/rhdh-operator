@@ -412,7 +412,7 @@ if [[ "${MIRROR_PLUGINS}" == "true" ]]; then
   fi
   
   if [[ -n "$PLUGIN_INDEX" && ! "$PLUGIN_INDEX" =~ ^oci:// ]]; then
-    errorf "Plugin index must be in OCI format: oci://registry:tag"
+    errorf "Plugin index must be in OCI format: oci://registry/org/image@sha256:digest"
     exit 1
   fi
 fi
