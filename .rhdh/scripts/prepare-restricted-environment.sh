@@ -28,7 +28,6 @@ PLUGIN_REGISTRY=""
 MIRROR_PLUGINS="true"
 PLUGIN_IMAGES=()
 
-
 function logf() {
   set -euo pipefail
 
@@ -106,7 +105,7 @@ Options:
                                             From there, you will be able to re-run this script with '--from-dir' to push
                                             the images to your private registry.
   --install-operator <true|false>        : Install the RHDH operator right after creating the CatalogSource (default: true)
-  --extra-images <list>                  : Comma-separated list of extra images to mirror (including OCI plugin URL)
+  --extra-images <list>                  : Comma-separated list of extra images to mirror (including OCI plugin URLs starting with oci://)
   --use-oc-mirror <true|false>           : Whether to use the 'oc-mirror' tool (default: false).
                                             This is the recommended way for mirroring on regular OpenShift clusters.
                                             Bear in mind however that this relies on resources like ImageContentSourcePolicy,
@@ -116,7 +115,11 @@ Options:
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
   --plugin-index <oci-url>               : Plugin catalog repository to query for version-specific plugins (e.g., oci://quay.io/rhdh/plugin-catalog:1.8)
-  --plugin-list <file>                   : Local file with plugin OCI references (one per line)
+  --plugin-list <file>                   : Local .txt file with plugin OCI references (one per line). Example file content:
+                                            # Red Hat Developer Hub Plugin List
+                                            oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
+                                            oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
+                                            oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6
   --plugin-registry <registry>           : Internal registry for plugins (defaults to --to-registry if not specified)
   --mirror-plugins <true|false>          : Whether to mirror dynamic plugins (default: true)
 
@@ -154,7 +157,12 @@ Examples:
     --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8
 
   # Mirror operator images and specific plugins from a local file
-  # Create a text file with one plugin OCI URL per line
+  # Create a .txt file with one plugin OCI URL per line
+  # Example plugins.txt content:
+  #   # Red Hat Developer Hub Plugin List
+  #   oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
+  #   oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
+  #   oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6
   $0 \\
     --to-registry registry.example.com \\
     --plugin-list /path/to/plugins.txt
