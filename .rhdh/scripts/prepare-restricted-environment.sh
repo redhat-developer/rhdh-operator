@@ -2,9 +2,33 @@
 #
 # Script to streamline installing the official RHDH Catalog Source and dynamic plugins as OCI artifacts in a disconnected OpenShift or Kubernetes cluster.
 #
-# Requires: oc (OCP) or kubectl (K8s), jq, yq, umoci, base64, opm, skopeo
+# Requires: oc (OCP) or kubectl (K8s), jq, yq (mikefarah version), umoci, base64, opm, skopeo
 
 set -euo pipefail
+
+# Preflight checks - validate all required tools before doing anything
+function check_tool() {
+  if ! command -v "$1" >/dev/null; then
+    echo "Error: Required tool '$1' is not installed." >&2
+    exit 1
+  fi
+}
+
+# Check core required tools
+check_tool "yq"
+check_tool "umoci"
+check_tool "skopeo"
+check_tool "jq"
+check_tool "opm"
+check_tool "base64"
+
+# Check podman if we'll be pushing to a registry (determined by --to-registry argument)
+# Note: This is a basic check; full validation happens after argument parsing
+if command -v podman >/dev/null 2>&1; then
+  PODMAN_AVAILABLE=true
+else
+  PODMAN_AVAILABLE=false
+fi
 
 SCRIPT_PATH=$(realpath "$0")
 
@@ -58,12 +82,6 @@ function errorf() {
   logf "ERROR" "\033[0;31m" "$1"
 }
 
-function check_tool() {
-  if ! command -v "$1" >/dev/null; then
-    errorf "Error: Required tool '$1' is not installed."
-    exit 1
-  fi
-}
 
 function usage() {
   FILTERED_VERSIONS_CSV="${FILTERED_VERSIONS[*]}"
@@ -1201,12 +1219,10 @@ function mirror_plugin_artifacts_from_dir() {
   debugf "Plugin artifact mirroring from directory completed."
 }
 
-check_tool "yq"
-check_tool "umoci"
-check_tool "skopeo"
-check_tool "jq"
-if [[ -n "$TO_REGISTRY" ]]; then
-  check_tool "podman"
+# Validate podman is available if we need to push to registry
+if [[ -n "${TO_REGISTRY:-}" && "${PODMAN_AVAILABLE:-false}" != "true" ]]; then
+  errorf "Error: podman is required when pushing to registry (--to-registry specified) but is not installed."
+  exit 1
 fi
 
 if [[ -n "${TO_DIR}" ]]; then
