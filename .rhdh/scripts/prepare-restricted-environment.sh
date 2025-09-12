@@ -1075,7 +1075,7 @@ function mirror_plugin_artifacts() {
   fi
   
   # Add plugins from --extra-images
- if [[ ${#EXTRA_IMAGES[@]} -gt 0 ]]; then
+  if [[ ${#EXTRA_IMAGES[@]} -gt 0 ]]; then
     debugf "Processing ${#EXTRA_IMAGES[@]} images from --extra-images for plugins"
     for img in "${EXTRA_IMAGES[@]}"; do
       if [[ "$img" =~ ^oci:// ]]; then
@@ -1372,6 +1372,7 @@ EOF
         "$OC_MIRROR_FLAGS" |
         tee "${ocMirrorLogFile}"
     fi
+  fi
 
   else
     # from dir
@@ -1799,5 +1800,4 @@ More details about image pull secrets in https://kubernetes.io/docs/tasks/config
   https://backstage-developer-hub-${NAMESPACE_OPERATOR}.${CLUSTER_ROUTER_BASE}
   "
   fi
-fi
 fi
