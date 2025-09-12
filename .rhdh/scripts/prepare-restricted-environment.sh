@@ -981,7 +981,7 @@ function resolve_plugin_index() {
     debugf "Found ${#PLUGIN_IMAGES[@]} plugins matching version $version"
     return 0
   else
-    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry:version"
+    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry/org/image@sha256:digest"
     return 1
   fi
 }
