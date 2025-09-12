@@ -170,6 +170,7 @@ Examples:
   # Mirror operator images with plugins using --extra-images flag
   # Unified approach: specify both regular images and plugin OCI URLs in one flag
   $0 \\
+    --to-registry registry.example.com \\
     --extra-images 'registry.redhat.io/ubi9/ubi:latest,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8,oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7'
 
   # Mirror operator images with plugins from catalog + additional plugins via --extra-images flag
