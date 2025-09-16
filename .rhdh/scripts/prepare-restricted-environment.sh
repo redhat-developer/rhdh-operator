@@ -14,12 +14,10 @@ function check_tool() {
   fi
 }
 
-# Check core required tools
-check_tool "yq"
+# Check core required tools (yq check moved after argument parsing)
 check_tool "umoci"
 check_tool "skopeo"
 check_tool "jq"
-check_tool "opm"
 check_tool "base64"
 
 # Check podman if we'll be pushing to a registry (determined by --to-registry argument)
@@ -323,6 +321,16 @@ while [[ "$#" -gt 0 ]]; do
   esac
   shift 1
 done
+
+# Check yq tool after argument parsing (in case --install-yq was specified)
+if [[ ! $INSTALL_YQ ]]; then
+  check_tool "yq"
+fi
+
+# Check opm tool only when not using --from-dir (not needed for fully disconnected use case)
+if [[ -z "${FROM_DIR}" ]]; then
+  check_tool "opm"
+fi
 
 function is_openshift() {
   set -euo pipefail
