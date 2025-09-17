@@ -949,9 +949,7 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
         file://"${TO_DIR}" \
-        --skip-missing \
-        --dest-skip-tls \
-        --continue-on-error \
+        --dest-tls-verify=false \
         --max-nested-paths=1 \
         "$OC_MIRROR_FLAGS" \
         --v2 |
@@ -978,9 +976,7 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
         "docker://${registryUrl}" \
-        --skip-missing \
-        --dest-skip-tls \
-        --continue-on-error \
+        --dest-tls-verify=false \
         --max-nested-paths=2 \
         "$OC_MIRROR_FLAGS" \
         --v2 |
@@ -1012,9 +1008,7 @@ EOF
         -c "${FROM_DIR}/imageset-config.yaml" \
         --from "${FROM_DIR}" \
         "docker://${registryUrl}" \
-        --skip-missing \
-        --dest-skip-tls \
-        --continue-on-error \
+        --dest-tls-verify=false \
         "$OC_MIRROR_FLAGS" \
         --v2 |
         tee "${ocMirrorLogFile}"
