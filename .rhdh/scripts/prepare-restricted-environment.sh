@@ -408,17 +408,18 @@ function merge_registry_auth() {
     reg=$(echo "$img" | cut -d'/' -f1)
     [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
   done
-  tmpFile=$(mktemp)
-  # shellcheck disable=SC2064
-  trap "rm -f $tmpFile || true" EXIT
-  echo '{"auths": {' >"$tmpFile"
-  for reg in "${registries[@]}"; do
-    echo "  \"$reg\": .auths.\"$reg\"," >>"$tmpFile"
-  done
-  sed -i '$ s/,$//' "$tmpFile"
-  echo '}}' >>"$tmpFile"
-  debugf "yq filter: $(cat "$tmpFile")"
-  "$YQ" -o=json "$(cat "$tmpFile")" "${currentRegistryAuthFile}" >"${REGISTRY_AUTH_FILE}"
+  # Simply use the existing auth file if it has the required registries
+  if "$YQ" '.auths | has("registry.redhat.io") and (.auths."registry.redhat.io" != null)' "${currentRegistryAuthFile}" 2>/dev/null; then
+    debugf "Using existing auth file with registry.redhat.io credentials"
+    # No need to copy if it's the same file
+    if [[ "${currentRegistryAuthFile}" != "${REGISTRY_AUTH_FILE}" ]]; then
+      cp "${currentRegistryAuthFile}" "${REGISTRY_AUTH_FILE}"
+    fi
+  else
+    debugf "Registry auth file missing required credentials, proceeding without auth"
+    # Create a minimal auth file with just the structure
+    echo '{"auths": {}}' > "${REGISTRY_AUTH_FILE}"
+  fi
 }
 
 function ocp_prepare_internal_registry() {
@@ -950,7 +951,7 @@ EOF
         -c "${TMPDIR}/imageset-config.yaml" \
         file://"${TO_DIR}" \
         --dest-tls-verify=false \
-        --max-nested-paths=1 \
+        # --max-nested-paths=1 \
         "$OC_MIRROR_FLAGS" \
         --v2 |
         tee "${ocMirrorLogFile}"
