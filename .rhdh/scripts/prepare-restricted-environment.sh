@@ -412,7 +412,7 @@ function merge_registry_auth() {
   registries=("registry.redhat.io" "quay.io")
   for img in "${images[@]}"; do
     reg=$(echo "$img" | cut -d'/' -f1)
-    [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
+    [[ " ${registries[*]} " =~ $reg ]] || registries+=("$reg")
   done
   # Simply use the existing auth file if it has the required registries
   if "$YQ" '.auths | has("registry.redhat.io") and (.auths."registry.redhat.io" != null)' "${currentRegistryAuthFile}" 2>/dev/null; then
@@ -479,7 +479,7 @@ function buildRegistryUrl() {
     if [[ "${input}" == "internal" ]]; then
       echo "image-registry.openshift-image-registry.svc:5000"
     else
-      echo "$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')"
+      oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}'
     fi
   else
     echo "${TO_REGISTRY}"
@@ -540,7 +540,7 @@ function render_index() {
       >"${local_index_file}"
   fi
 
-  debugf "Got $(cat "${local_index_file}" | wc -l) lines of JSON from the index!"
+  debugf "Got $(wc -l < "${local_index_file}") lines of JSON from the index!"
 
   if [ ! -s "${local_index_file}" ]; then
     errorf "[ERROR] 'opm render $INDEX_IMAGE' returned an empty output, which likely means that this index Image does not contain the rhdh operator."
@@ -974,8 +974,8 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
         file://"${TO_DIR}" \
-        ${CACHE_FLAG} \
-        ${AUTH_FLAG} \
+        "${CACHE_FLAG}" \
+        "${AUTH_FLAG}" \
         --dest-tls-verify=false \
         "$OC_MIRROR_FLAGS" \
         --v2 |
@@ -1002,8 +1002,8 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
         --workspace file://"${TMPDIR}" \
-        ${CACHE_FLAG} \
-        ${AUTH_FLAG} \
+        "${CACHE_FLAG}" \
+        "${AUTH_FLAG}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         --max-nested-paths=2 \
@@ -1036,8 +1036,8 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${FROM_DIR}/imageset-config.yaml" \
         --from file://"${FROM_DIR}" \
-        ${CACHE_FLAG} \
-        ${AUTH_FLAG} \
+        "${CACHE_FLAG}" \
+        "${AUTH_FLAG}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         "$OC_MIRROR_FLAGS" \
