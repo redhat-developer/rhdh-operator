@@ -44,6 +44,7 @@ func installRhdhOperatorManifest(operatorManifest string) {
 	withSL := os.Getenv("SEALIGHTS_ENABLED") == "true"
 	if withSL {
 		data, err := os.ReadFile(p)
+		Expect(err).ShouldNot(HaveOccurred())
 		updated := strings.ReplaceAll(string(data), "quay.io/rhdh/rhdh-rhel9-operator", "quay.io/rhdh/rhdh-rhel9-operator-sealights")
 		err = os.WriteFile(p, []byte(updated), 0644)
 		Expect(err).ShouldNot(HaveOccurred())
