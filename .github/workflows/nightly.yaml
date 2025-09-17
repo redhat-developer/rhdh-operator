@@ -208,6 +208,20 @@ jobs:
             --selector=app.kubernetes.io/component=controller \
             --timeout=90s
 
+      - name: E2E prerequisites for Sealights
+        if: ${{ vars.SEALIGHTS_ENABLED == 'true' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        env:
+          SEALIGHTS_BOT_QUAY_USERNAME: ${{secrets.SEALIGHTS_BOT_QUAY_USERNAME}}
+          SEALIGHTS_BOT_QUAY_PASSWORD: ${{secrets.SEALIGHTS_BOT_QUAY_PASSWORD}}
+        run: |
+          kubectl create namespace rhdh-operator
+          # Needed because the Operator Sealights image is private
+          kubectl -n rhdh-operator create secret docker-registry rhdh-pull-secret \
+            --docker-server=quay.io \
+            --docker-username="$SEALIGHTS_BOT_QUAY_USERNAME" \
+            --docker-password="$SEALIGHTS_BOT_QUAY_PASSWORD" \
+            --docker-email=asoro@redhat.com
+
       - name: Run E2E tests
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
@@ -218,6 +232,7 @@ jobs:
           BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT: ${{ vars.BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT }}
           OPERATOR_MANIFEST: ${{ env.OPERATOR_MANIFEST }}
           IMG: ${{ env.OPERATOR_IMAGE }}
+          SEALIGHTS_ENABLED: ${{ vars.SEALIGHTS_ENABLED }}
         run: make test-e2e
 
       - name: Remove SeaLights secrets
