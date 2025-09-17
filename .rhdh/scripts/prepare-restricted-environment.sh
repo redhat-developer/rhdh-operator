@@ -911,7 +911,9 @@ if [[ -n "${FROM_DIR}" ]]; then
 fi
 
 if [[ "${USE_OC_MIRROR}" = "true" ]]; then
-  # oc-mirror v2 properly supports REGISTRY_AUTH_FILE, no workarounds needed
+  # oc-mirror v2 has issues with REGISTRY_AUTH_FILE env var, use --authfile instead
+  # Unset REGISTRY_AUTH_FILE to avoid parsing issues
+  unset REGISTRY_AUTH_FILE
 
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
@@ -921,6 +923,14 @@ if [[ "${USE_OC_MIRROR}" = "true" ]]; then
     CACHE_DIR="${HOME}/.oc-mirror-cache"
   fi
   CACHE_FLAG="--cache-dir ${CACHE_DIR}"
+  
+  # Set up auth file flag
+  currentRegistryAuthFile="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json"
+  if [[ -f "${currentRegistryAuthFile}" ]]; then
+    AUTH_FLAG="--authfile ${currentRegistryAuthFile}"
+  else
+    AUTH_FLAG=""
+  fi
   
   if [[ -z "${FROM_DIR}" ]]; then
     # Direct to registry
@@ -963,8 +973,9 @@ EOF
     if [[ -n "${TO_DIR}" ]]; then
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
-        --workspace file://"${TO_DIR}" \
+        file://"${TO_DIR}" \
         ${CACHE_FLAG} \
+        ${AUTH_FLAG} \
         --dest-tls-verify=false \
         "$OC_MIRROR_FLAGS" \
         --v2 |
@@ -992,6 +1003,7 @@ EOF
         -c "${TMPDIR}/imageset-config.yaml" \
         --workspace file://"${TMPDIR}" \
         ${CACHE_FLAG} \
+        ${AUTH_FLAG} \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         --max-nested-paths=2 \
@@ -1023,9 +1035,9 @@ EOF
 
       "${OC_MIRROR_PATH}" \
         -c "${FROM_DIR}/imageset-config.yaml" \
-        --from "${FROM_DIR}" \
-        --workspace file://"${TMPDIR}" \
+        --from file://"${FROM_DIR}" \
         ${CACHE_FLAG} \
+        ${AUTH_FLAG} \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         "$OC_MIRROR_FLAGS" \
