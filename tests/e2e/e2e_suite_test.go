@@ -184,8 +184,8 @@ func installOperatorWithMakeDeploy(withOlm bool) {
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
-	_start = time.Now()
 	//runs *only* on process #1
+	_start = time.Now()
 	fmt.Fprintln(GinkgoWriter, "isOpenshift:", helper.IsOpenShift())
 
 	if operatorManifest := os.Getenv("OPERATOR_MANIFEST"); operatorManifest != "" {
