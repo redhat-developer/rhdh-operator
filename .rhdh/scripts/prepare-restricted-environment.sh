@@ -107,6 +107,7 @@ Options:
                                             ROSA clusters and clusters with hosted control planes.
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
+  --cache-dir <path>                     : Directory for oc-mirror cache (default: $HOME/.oc-mirror-cache)
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
 
 Examples:
@@ -148,6 +149,7 @@ EXTRA_IMAGES=()
 USE_OC_MIRROR="false"
 OC_MIRROR_PATH="oc-mirror"
 OC_MIRROR_FLAGS=""
+CACHE_DIR=""
 
 NO_VERSION_FILTER="false"
 FILTER_VERSIONS_PROVIDED="false"
@@ -246,6 +248,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   '--oc-mirror-flags')
     OC_MIRROR_FLAGS="$2"
+    shift 1
+    ;;
+  '--cache-dir')
+    CACHE_DIR="$2"
     shift 1
     ;;
   '--install-yq') 
@@ -909,6 +915,13 @@ if [[ "${USE_OC_MIRROR}" = "true" ]]; then
 
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
+  
+  # Set up cache directory
+  if [[ -z "${CACHE_DIR}" ]]; then
+    CACHE_DIR="${HOME}/.oc-mirror-cache"
+  fi
+  CACHE_FLAG="--cache-dir ${CACHE_DIR}"
+  
   if [[ -z "${FROM_DIR}" ]]; then
     # Direct to registry
     cat <<EOF >"${TMPDIR}/imageset-config.yaml"
@@ -932,7 +945,8 @@ EOF
           - name: fast-${v}
 EOF
       done
-
+      cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
+EOF
     fi
     nbExtraImgs=${#EXTRA_IMAGES[@]}
     if [ "$nbExtraImgs" -ge 1 ]; then
@@ -949,9 +963,9 @@ EOF
     if [[ -n "${TO_DIR}" ]]; then
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
-        file://"${TO_DIR}" \
+        --workspace file://"${TO_DIR}" \
+        ${CACHE_FLAG} \
         --dest-tls-verify=false \
-        # --max-nested-paths=1 \
         "$OC_MIRROR_FLAGS" \
         --v2 |
         tee "${ocMirrorLogFile}"
@@ -976,6 +990,8 @@ EOF
 
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
+        --workspace file://"${TMPDIR}" \
+        ${CACHE_FLAG} \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         --max-nested-paths=2 \
@@ -1008,6 +1024,8 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${FROM_DIR}/imageset-config.yaml" \
         --from "${FROM_DIR}" \
+        --workspace file://"${TMPDIR}" \
+        ${CACHE_FLAG} \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         "$OC_MIRROR_FLAGS" \
