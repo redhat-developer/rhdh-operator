@@ -99,9 +99,9 @@ spec:
           args:
             - |
               set -e
-              DB_EXISTS=$(PGPASSWORD=${POSTGRES_PASSWORD} psql -h ${POSTGRES_HOST} -p ${POSTGRES_PORT} -U ${POSTGRES_USER} -tAc "SELECT 1 FROM pg_database WHERE datname='sonataflow'" postgres)
+              DB_EXISTS=$(PGPASSWORD=${POSTGRES_PASSWORD} psql -h ${POSTGRES_HOST} -p ${POSTGRES_PORT} -U ${POSTGRES_USER} -tAc "SELECT 1 FROM pg_database WHERE datname='backstage_plugin_orchestrator'" postgres)
               if [ -z "$DB_EXISTS" ]; then
-                PGPASSWORD=${POSTGRES_PASSWORD} psql -h ${POSTGRES_HOST} -p ${POSTGRES_PORT} -U ${POSTGRES_USER} -c "CREATE DATABASE sonataflow;" postgres
+                PGPASSWORD=${POSTGRES_PASSWORD} psql -h ${POSTGRES_HOST} -p ${POSTGRES_PORT} -U ${POSTGRES_USER} -c "CREATE DATABASE backstage_plugin_orchestrator;" postgres
               fi
       restartPolicy: Never
 ---
@@ -124,7 +124,7 @@ spec:
           serviceRef:
             name: backstage-psql-{{backstage-name}}
             namespace: {{backstage-ns}}
-            databaseName: sonataflow
+            databaseName: backstage_plugin_orchestrator
     jobService:
       enabled: true
       persistence:
@@ -136,4 +136,4 @@ spec:
           serviceRef:
             name: backstage-psql-{{backstage-name}}
             namespace: {{backstage-ns}}
-            databaseName: sonataflow
+            databaseName: backstage_plugin_orchestrator

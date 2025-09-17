@@ -120,7 +120,7 @@ The orchestrator-backend plugin uses the service **sonataflow-platform-data-inde
           serviceRef:
             name: backstage-psql-{{backstage-name}}
             namespace: {{backstage-ns}}
-            databaseName: sonataflow
+            databaseName: backstage_plugin_orchestrator
 ```
 
 Where `{{backstage-name}}` is the name of the Backstage Custom Resource (CR) and `{{backstage-ns}}` is the namespace where the Backstage CR is created.
@@ -128,6 +128,7 @@ Where `{{backstage-name}}` is the name of the Backstage Custom Resource (CR) and
 Current **default** implementation of the orchestrator plugin dependencies uses:
 - the Secret created by Backstage operator for the PostgreSQL with **POSTGRES_USER** and **POSTGRES_PASSWORD** keys as the database credentials in the Backstage CR namespace.
 - the Service created by Backstage operator for the PostgreSQL database with the name **backstage-psql-{{backstage-name}}** in the Backstage CR namespace.
+- the PostgreSQL database to store the orchestrator workflows data named **backstage_plugin_orchestrator**
 
 See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) for a complete configuration of the orchestrator plugin dependencies.
 
