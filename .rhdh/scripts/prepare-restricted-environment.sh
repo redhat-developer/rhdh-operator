@@ -910,8 +910,6 @@ EOF
           - name: fast-${v}
 EOF
       done
-      cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
-EOF
     fi
     nbExtraImgs=${#EXTRA_IMAGES[@]}
     if [ "$nbExtraImgs" -ge 1 ]; then
