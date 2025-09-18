@@ -6,8 +6,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -153,6 +155,54 @@ func GetNonEmptyLines(output string) []string {
 	}
 
 	return res
+}
+
+func DownloadFile(url string) (string, error) {
+	var in io.ReadCloser
+	var err error
+
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		resp, err := http.Get(url)
+		if err != nil {
+			return "", fmt.Errorf("failed to GET remote file: %w", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("bad status: %s", resp.Status)
+		}
+		in = resp.Body
+	} else {
+		in, err = os.Open(url)
+		if err != nil {
+			return "", fmt.Errorf("failed to open local file: %w", err)
+		}
+	}
+	defer in.Close()
+
+	// Create a temporary file in system temp dir
+	tmpFile, err := os.CreateTemp("", "download-*"+filepath.Ext(url))
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer tmpFile.Close()
+
+	_, err = io.Copy(tmpFile, in)
+	if err != nil {
+		return "", fmt.Errorf("copy failed: %w", err)
+	}
+
+	return tmpFile.Name(), nil
+}
+
+func AddPullSecretToDeployment(ns string, deploy string, pullSecret string) error {
+	cmd := exec.Command(
+		GetPlatformTool(),
+		"-n", ns,
+		"patch", "deployment", deploy,
+		"-p", fmt.Sprintf(`{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"%s"}]}}}}`, pullSecret),
+		"--type=merge",
+	)
+	_, err := Run(cmd)
+	return err
 }
 
 // Run executes the provided command within this context

@@ -24,6 +24,7 @@ const (
 	defaultDeployTestMode = ""
 )
 
+var _start time.Time
 var _namespace = "rhdh-operator"
 var testMode = os.Getenv("BACKSTAGE_OPERATOR_TEST_MODE")
 var managerPodLabel = "app=rhdh-operator"
@@ -33,6 +34,39 @@ func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
 	fmt.Fprintln(GinkgoWriter, "Starting Backstage Operator suite")
 	RunSpecs(t, "Backstage E2E suite")
+}
+
+func installRhdhOperatorManifest(operatorManifest string) {
+	p, dErr := helper.DownloadFile(operatorManifest)
+	Expect(dErr).ShouldNot(HaveOccurred())
+	defer os.Remove(p)
+	fmt.Fprintf(GinkgoWriter, "Installing RHDH Operator Manifest: %q\n", p)
+
+	withSL := os.Getenv("SEALIGHTS_ENABLED") == "true"
+	if withSL {
+		data, err := os.ReadFile(p)
+		Expect(err).ShouldNot(HaveOccurred())
+		updated := strings.ReplaceAll(string(data), "quay.io/rhdh/rhdh-rhel9-operator", "quay.io/rhdh/rhdh-rhel9-operator-sealights")
+		err = os.WriteFile(p, []byte(updated), 0644)
+		Expect(err).ShouldNot(HaveOccurred())
+	}
+
+	cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
+	_, err := helper.Run(cmd)
+	Expect(err).ShouldNot(HaveOccurred())
+
+	if withSL {
+		// Sealights image is private => user is expected to create a pull secret in the rhdh-operator namespace
+		Eventually(func(g Gomega) {
+			cmd := exec.Command(helper.GetPlatformTool(), "-n", _namespace, "get", "deployment", "rhdh-operator")
+			_, rErr := helper.Run(cmd)
+			g.Expect(rErr).ShouldNot(HaveOccurred())
+		}, time.Minute, 3*time.Second).Should(Succeed())
+
+		// Patch Deployment
+		err = helper.AddPullSecretToDeployment(_namespace, "rhdh-operator", "rhdh-pull-secret")
+		Expect(err).ShouldNot(HaveOccurred())
+	}
 }
 
 func installRhdhOperator(flavor string) (podLabel string) {
@@ -151,12 +185,11 @@ func installOperatorWithMakeDeploy(withOlm bool) {
 
 var _ = SynchronizedBeforeSuite(func() []byte {
 	//runs *only* on process #1
+	_start = time.Now()
 	fmt.Fprintln(GinkgoWriter, "isOpenshift:", helper.IsOpenShift())
 
 	if operatorManifest := os.Getenv("OPERATOR_MANIFEST"); operatorManifest != "" {
-		cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", operatorManifest)
-		_, err := helper.Run(cmd)
-		Expect(err).ShouldNot(HaveOccurred())
+		installRhdhOperatorManifest(operatorManifest)
 	} else {
 		switch testMode {
 		case rhdhLatestTestMode, rhdhNextTestMode:
@@ -184,11 +217,13 @@ var _ = SynchronizedAfterSuite(func() {
 	//runs on *all* processes
 },
 	// the function below *only* on process #1
-	uninstallOperator,
+	func() {
+		defer uninstallOperator()
+		fmt.Println(fetchOperatorLogs(managerPodLabel, false)())
+	},
 )
 
-func verifyControllerUp(g Gomega, managerPodLabel string) {
-	// Get pod name
+func getControllerPodName() (string, error) {
 	cmd := exec.Command(helper.GetPlatformTool(), "get",
 		"pods", "-l", managerPodLabel,
 		"-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}"+
@@ -196,14 +231,22 @@ func verifyControllerUp(g Gomega, managerPodLabel string) {
 		"-n", _namespace,
 	)
 	podOutput, err := helper.Run(cmd)
-	g.Expect(err).ShouldNot(HaveOccurred())
+	if err != nil {
+		return "", err
+	}
 	podNames := helper.GetNonEmptyLines(string(podOutput))
-	g.Expect(podNames).Should(HaveLen(1), fmt.Sprintf("expected 1 controller pods running, but got %d", len(podNames)))
-	controllerPodName := podNames[0]
-	g.Expect(controllerPodName).ShouldNot(BeEmpty())
+	if len(podNames) == 0 {
+		return "", fmt.Errorf("no pods found")
+	}
+	return podNames[0], nil
+}
+
+func verifyControllerUp(g Gomega, managerPodLabel string) {
+	controllerPodName, err := getControllerPodName()
+	g.Expect(err).ShouldNot(HaveOccurred())
 
 	// Validate pod status
-	cmd = exec.Command(helper.GetPlatformTool(), "get",
+	cmd := exec.Command(helper.GetPlatformTool(), "get",
 		"pods", controllerPodName, "-o", "jsonpath={.status.phase}",
 		"-n", _namespace,
 	)
@@ -212,8 +255,19 @@ func verifyControllerUp(g Gomega, managerPodLabel string) {
 	g.Expect(string(status)).Should(Equal("Running"), fmt.Sprintf("controller pod in %s status", status))
 }
 
-func getPodLogs(ns string, label string) string {
-	cmd := exec.Command(helper.GetPlatformTool(), "logs", "--all-containers", "-l", label, "-n", ns)
+func getPodLogs(ns string, podName string, label string) string {
+	opts := []string{
+		"-n", ns,
+		"logs",
+		"--all-containers",
+		"--since-time", _start.Format(time.RFC3339),
+	}
+	if podName != "" {
+		opts = append(opts, podName)
+	} else if label != "" {
+		opts = append(opts, "-l", label)
+	}
+	cmd := exec.Command(helper.GetPlatformTool(), opts...)
 	output, _ := helper.Run(cmd)
 	return string(output)
 }
@@ -226,7 +280,13 @@ func describePod(ns string, label string) string {
 
 func fetchOperatorLogs(managerPodLabel string, raw bool) func() string {
 	return func() string {
-		logs := getPodLogs(_namespace, managerPodLabel)
+		var logs string
+		controllerPodName, err := getControllerPodName()
+		if err != nil {
+			logs = fmt.Sprintf("Failed to get controller pod name: %v", err)
+		} else {
+			logs = getPodLogs(_namespace, controllerPodName, managerPodLabel)
+		}
 		if raw {
 			return logs
 		}
@@ -236,7 +296,7 @@ func fetchOperatorLogs(managerPodLabel string, raw bool) func() string {
 
 func fetchOperandLogs(ns string, crLabel string, raw bool) func() string {
 	return func() string {
-		logs := getPodLogs(ns, crLabel)
+		logs := getPodLogs(ns, "", crLabel)
 		if raw {
 			return logs
 		}
