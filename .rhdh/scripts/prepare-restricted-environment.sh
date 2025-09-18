@@ -867,9 +867,7 @@ if [[ -n "${FROM_DIR}" ]]; then
 fi
 
 if [[ "${USE_OC_MIRROR}" = "true" ]]; then
-  # oc-mirror v2 has issues with REGISTRY_AUTH_FILE env var, use --authfile instead
-  # Unset REGISTRY_AUTH_FILE to avoid parsing issues
-  unset REGISTRY_AUTH_FILE
+  # oc-mirror v2 uses --authfile flag for authentication
 
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
