@@ -927,7 +927,7 @@ EOF
 
     if [[ -n "${TO_DIR}" ]]; then
       "${OC_MIRROR_PATH}" \
-        -c "${TMPDIR}/imageset-config.yaml" \
+        --config="${TMPDIR}/imageset-config.yaml" \
         file://"${TO_DIR}" \
         "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
         "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
@@ -955,7 +955,7 @@ EOF
       mirror_image_to_registry "registry.redhat.io/ubi9/ubi:latest" "${my_operator_index}-tmp"
 
       "${OC_MIRROR_PATH}" \
-        -c "${TMPDIR}/imageset-config.yaml" \
+        --config="${TMPDIR}/imageset-config.yaml" \
         --workspace file://"${TMPDIR}" \
         "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
         "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
