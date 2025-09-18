@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Script to streamline installing the official RHDH Catalog Source in a disconnected OpenShift or Kubernetes cluster.
-# Uses oc-mirror v2 for image mirroring (v1 is deprecated in OCP 4.18+).
+# Can be instructed to use oc-mirror v2 for image mirroring (v1 is deprecated in OCP 4.18+).
 #
 # Requires: oc (OCP) or kubectl (K8s), jq, yq, umoci, base64, opm, skopeo, oc-mirror v2
 
@@ -103,11 +103,11 @@ Options:
   --use-oc-mirror <true|false>           : Whether to use the 'oc-mirror' tool v2 (default: false).
                                             This is the recommended way for mirroring on regular OpenShift clusters.
                                             oc-mirror v2 generates ImageDigestMirrorSet and ImageTagMirrorSet resources
-                                            instead of ImageContentSourcePolicy, providing better compatibility with
-                                            ROSA clusters and clusters with hosted control planes.
+                                            instead of ImageContentSourcePolicy. Bear in mind however that these resources
+                                            don't seem to work well on ROSA clusters or clusters with hosted control
+                                            planes (like HyperShift or Red Hat OpenShift on IBM Cloud).
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
-  --cache-dir <path>                     : Directory for oc-mirror cache (default: $HOME/.oc-mirror-cache)
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
 
 Examples:
@@ -248,10 +248,6 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   '--oc-mirror-flags')
     OC_MIRROR_FLAGS="$2"
-    shift 1
-    ;;
-  '--cache-dir')
-    CACHE_DIR="$2"
     shift 1
     ;;
   '--install-yq') 
@@ -918,10 +914,8 @@ if [[ "${USE_OC_MIRROR}" = "true" ]]; then
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
   
-  # Set up cache directory
-  if [[ -z "${CACHE_DIR}" ]]; then
-    CACHE_DIR="${HOME}/.oc-mirror-cache"
-  fi
+  # Set up cache directory (use default if not specified via --oc-mirror-flags)
+  CACHE_DIR="${HOME}/.oc-mirror-cache"
   CACHE_FLAG="--cache-dir"
   CACHE_DIR_VALUE="${CACHE_DIR}"
   
