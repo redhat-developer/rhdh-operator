@@ -922,14 +922,17 @@ if [[ "${USE_OC_MIRROR}" = "true" ]]; then
   if [[ -z "${CACHE_DIR}" ]]; then
     CACHE_DIR="${HOME}/.oc-mirror-cache"
   fi
-  CACHE_FLAG="--cache-dir ${CACHE_DIR}"
+  CACHE_FLAG="--cache-dir"
+  CACHE_DIR_VALUE="${CACHE_DIR}"
   
   # Set up auth file flag
   currentRegistryAuthFile="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json"
   if [[ -f "${currentRegistryAuthFile}" ]]; then
-    AUTH_FLAG="--authfile ${currentRegistryAuthFile}"
+    AUTH_FLAG="--authfile"
+    AUTH_FILE_VALUE="${currentRegistryAuthFile}"
   else
     AUTH_FLAG=""
+    AUTH_FILE_VALUE=""
   fi
   
   if [[ -z "${FROM_DIR}" ]]; then
@@ -974,8 +977,8 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
         file://"${TO_DIR}" \
-        "${CACHE_FLAG}" \
-        "${AUTH_FLAG}" \
+        "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
+        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         --dest-tls-verify=false \
         "$OC_MIRROR_FLAGS" \
         --v2 |
@@ -1002,8 +1005,8 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${TMPDIR}/imageset-config.yaml" \
         --workspace file://"${TMPDIR}" \
-        "${CACHE_FLAG}" \
-        "${AUTH_FLAG}" \
+        "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
+        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         --max-nested-paths=2 \
@@ -1036,8 +1039,8 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${FROM_DIR}/imageset-config.yaml" \
         --from file://"${FROM_DIR}" \
-        "${CACHE_FLAG}" \
-        "${AUTH_FLAG}" \
+        "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
+        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         "$OC_MIRROR_FLAGS" \
