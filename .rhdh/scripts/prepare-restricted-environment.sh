@@ -384,45 +384,6 @@ else
   YQ=$(which yq)
 fi
 
-function merge_registry_auth() {
-  set -euo pipefail
-
-  currentRegistryAuthFile="${REGISTRY_AUTH_FILE:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json}"
-  debugf "currentRegistryAuthFile: $currentRegistryAuthFile"
-  if [ ! -f "${currentRegistryAuthFile}" ]; then
-    debugf "Missing registry auth file. Will proceed without any existing auth against the registry hosting the index image: $INDEX_IMAGE"
-    return
-  fi
-  # oc-mirror v2 properly supports REGISTRY_AUTH_FILE without workarounds
-  # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
-  # might be restricted in CI environments.
-  # This also ensures that the credentials don't conflict with any existing creds for the same registry
-  export REGISTRY_AUTH_FILE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json"
-  debugf "REGISTRY_AUTH_FILE: $REGISTRY_AUTH_FILE"
-
-  # Merge existing authentication from currentRegistryAuthFile into REGISTRY_AUTH_FILE
-  images=("${INDEX_IMAGE}")
-  if [[ -n "${TO_REGISTRY}" ]]; then
-    images+=("$(buildRegistryUrl)")
-  fi
-  registries=("registry.redhat.io" "quay.io")
-  for img in "${images[@]}"; do
-    reg=$(echo "$img" | cut -d'/' -f1)
-    [[ " ${registries[*]} " =~ $reg ]] || registries+=("$reg")
-  done
-  # Simply use the existing auth file if it has the required registries
-  if "$YQ" '.auths | has("registry.redhat.io") and (.auths."registry.redhat.io" != null)' "${currentRegistryAuthFile}" 2>/dev/null; then
-    debugf "Using existing auth file with registry.redhat.io credentials"
-    # No need to copy if it's the same file
-    if [[ "${currentRegistryAuthFile}" != "${REGISTRY_AUTH_FILE}" ]]; then
-      cp "${currentRegistryAuthFile}" "${REGISTRY_AUTH_FILE}"
-    fi
-  else
-    debugf "Registry auth file missing required credentials, proceeding without auth"
-    # Create a minimal auth file with just the structure
-    echo '{"auths": {}}' > "${REGISTRY_AUTH_FILE}"
-  fi
-}
 
 function ocp_prepare_internal_registry() {
   set -euo pipefail
@@ -899,7 +860,6 @@ if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
   ocp_prepare_internal_registry
 fi
 
-merge_registry_auth
 
 manifestsTargetDir="${TMPDIR}"
 if [[ -n "${FROM_DIR}" ]]; then
