@@ -932,6 +932,7 @@ EOF
         "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
         "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         --dest-tls-verify=false \
+        --max-nested-paths=2 \
         "$OC_MIRROR_FLAGS" \
         --v2 |
         tee "${ocMirrorLogFile}"
@@ -995,6 +996,7 @@ EOF
         "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
+        --max-nested-paths=2 \
         "$OC_MIRROR_FLAGS" \
         --v2 |
         tee "${ocMirrorLogFile}"
