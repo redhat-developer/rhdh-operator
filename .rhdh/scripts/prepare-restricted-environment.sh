@@ -103,8 +103,8 @@ Options:
   --use-oc-mirror <true|false>           : Whether to use the 'oc-mirror' tool v2 (default: false).
                                             This is the recommended way for mirroring on regular OpenShift clusters.
                                             oc-mirror v2 generates ImageDigestMirrorSet and ImageTagMirrorSet resources
-                                            instead of ImageContentSourcePolicy. Bear in mind however that these resources
-                                            don't seem to work well on ROSA clusters or clusters with hosted control
+                                            instead of ImageContentSourcePolicy. Bear in mind however that ImageDigestMirrorSet
+                                            and ImageTagMirrorSet don't seem to work well on ROSA clusters or clusters with hosted control
                                             planes (like HyperShift or Red Hat OpenShift on IBM Cloud).
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
