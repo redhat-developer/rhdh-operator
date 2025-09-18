@@ -479,7 +479,7 @@ function buildRegistryUrl() {
     if [[ "${input}" == "internal" ]]; then
       echo "image-registry.openshift-image-registry.svc:5000"
     else
-      oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}'
+      echo "$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')"
     fi
   else
     echo "${TO_REGISTRY}"
@@ -540,7 +540,7 @@ function render_index() {
       >"${local_index_file}"
   fi
 
-  debugf "Got $(wc -l < "${local_index_file}") lines of JSON from the index!"
+  debugf "Got $(cat "${local_index_file}" | wc -l) lines of JSON from the index!"
 
   if [ ! -s "${local_index_file}" ]; then
     errorf "[ERROR] 'opm render $INDEX_IMAGE' returned an empty output, which likely means that this index Image does not contain the rhdh operator."
