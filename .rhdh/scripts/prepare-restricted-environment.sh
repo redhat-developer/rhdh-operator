@@ -129,7 +129,7 @@ Options:
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
-  --plugin-index <oci-url>               : Plugin catalog repository to query for version-specific plugins (e.g., oci://quay.io/rhdh/plugin-catalog:1.8)
+  --plugin-index <oci-url>               : Plugin catalog index to query for version-specific plugins (e.g., oci://quay.io/rhdh/plugin-catalog-index:1.8)
   --plugin-list <file>                   : Local .txt file with plugin OCI references (oci:// URL per line, comments with '#' are ignored).
   --mirror-plugins <true|false>          : Whether to mirror dynamic plugins (default: true)
 
@@ -164,7 +164,7 @@ Examples:
   # Replace '1.8' with the desired RHDH version
   $0 \\
     --to-registry registry.example.com \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog:1.8
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8
 
   # Mirror operator images and specific plugins from a local file
   # Create a .txt file with one plugin OCI URL per line. Example plugins.txt content:
@@ -971,7 +971,7 @@ function push_image_from_archive() {
 
 function resolve_plugin_index() {
   local index_url="$1"
-  debugf "Resolving plugins from catalog repository: $index_url"
+  debugf "Resolving plugins from catalog index: $index_url"
   
   # Extract registry and version from OCI URL
   if [[ "$index_url" =~ oci://([^:]+):(.+) ]]; then
