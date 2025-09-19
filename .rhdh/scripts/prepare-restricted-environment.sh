@@ -149,7 +149,6 @@ EXTRA_IMAGES=()
 USE_OC_MIRROR="false"
 OC_MIRROR_PATH="oc-mirror"
 OC_MIRROR_FLAGS=""
-CACHE_DIR=""
 
 NO_VERSION_FILTER="false"
 FILTER_VERSIONS_PROVIDED="false"
@@ -872,11 +871,6 @@ if [[ "${USE_OC_MIRROR}" = "true" ]]; then
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
   
-  # Set up cache directory (use default if not specified via --oc-mirror-flags)
-  CACHE_DIR="${HOME}/.oc-mirror-cache"
-  CACHE_FLAG="--cache-dir"
-  CACHE_DIR_VALUE="${CACHE_DIR}"
-  
   # Set up auth file flag
   currentRegistryAuthFile="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json"
   if [[ -f "${currentRegistryAuthFile}" ]]; then
@@ -927,7 +921,6 @@ EOF
       "${OC_MIRROR_PATH}" \
         --config="${TMPDIR}/imageset-config.yaml" \
         file://"${TO_DIR}" \
-        "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
         "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         --dest-tls-verify=false \
         --max-nested-paths=2 \
@@ -956,7 +949,6 @@ EOF
       "${OC_MIRROR_PATH}" \
         --config="${TMPDIR}/imageset-config.yaml" \
         --workspace file://"${TMPDIR}" \
-        "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
         "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
@@ -990,7 +982,6 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${FROM_DIR}/imageset-config.yaml" \
         --from file://"${FROM_DIR}" \
-        "${CACHE_FLAG}" "${CACHE_DIR_VALUE}" \
         "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
