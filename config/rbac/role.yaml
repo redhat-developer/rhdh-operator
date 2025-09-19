@@ -41,6 +41,15 @@ rules:
   - update
   - watch
 - apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - patch
+  - update
+- apiGroups:
   - config.openshift.io
   resources:
   - ingresses

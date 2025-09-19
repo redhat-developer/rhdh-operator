@@ -104,6 +104,7 @@ As for RHDH 1.7 the orchestrator plugin packages are located in **npm.registry.r
 The orchestrator plugin instance requires the following dependencies to be installed:
 - A SonataflowPlatform custom resource - created in the namespace of the Backstage CR.
 - A set of NetworkPolicies to allow traffic between infra resources (knative and serverless logic operator) created in the namespace of Backstage CR, traffic for monitoring, and intra-namespace traffic.
+- A PostgreSQL database to store the orchestrator workflows data.
 
 The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
 
@@ -125,9 +126,9 @@ The orchestrator-backend plugin uses the service **sonataflow-platform-data-inde
 Where `{{backstage-name}}` is the name of the Backstage Custom Resource (CR) and `{{backstage-ns}}` is the namespace where the Backstage CR is created.
 
 Current **default** implementation of the orchestrator plugin dependencies uses:
-- the PostgreSQL database created by Backstage for Orchestrator plugin, named **backstage_plugin_orchestrator**
 - the Secret created by Backstage operator for the PostgreSQL with **POSTGRES_USER** and **POSTGRES_PASSWORD** keys as the database credentials in the Backstage CR namespace.
 - the Service created by Backstage operator for the PostgreSQL database with the name **backstage-psql-{{backstage-name}}** in the Backstage CR namespace.
+- the PostgreSQL database to store the orchestrator workflows data named **backstage_plugin_orchestrator**
 
 See [profile/rhdh/plugin-deps](/config/profile/rhdh/plugin-deps) for a complete configuration of the orchestrator plugin dependencies.
 
