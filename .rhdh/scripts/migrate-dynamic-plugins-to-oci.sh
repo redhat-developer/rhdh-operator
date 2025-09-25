@@ -25,7 +25,7 @@ BACKSTAGE_NAME=""
 DRY_RUN=false
 AIRGAP=false
 TMPDIR=$(mktemp -d)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # Not currently used
 
 # Colors for output
 RED='\033[0;31m'
@@ -231,9 +231,9 @@ extract_catalog_index() {
     log_success "Catalog index extracted successfully"
     
     # Store paths for later use
-    CATALOG_DYNAMIC_PLUGINS="$catalog_dir/unpacked/rootfs/dynamic-plugins.default.yaml"
+    # CATALOG_DYNAMIC_PLUGINS="$catalog_dir/unpacked/rootfs/dynamic-plugins.default.yaml"  # Not currently used
     CATALOG_INDEX_JSON="$catalog_dir/unpacked/rootfs/index.json"
-    CATALOG_ENTITIES_DIR="$catalog_dir/unpacked/rootfs/catalog-entities"
+    # CATALOG_ENTITIES_DIR="$catalog_dir/unpacked/rootfs/catalog-entities"  # Not currently used
     
     # Debug: Check file structure and copy catalog index
     log_info "Debug: Checking catalog index file structure..."
@@ -268,10 +268,8 @@ analyze_current_plugins() {
     
     log_success "Current plugin configuration extracted"
     
-    # Check if dynamic-plugins.default.yaml is included
-    local includes_default=false
-    if grep -q "dynamic-plugins.default.yaml" "$current_config"; then
-        includes_default=true
+        # Check if dynamic-plugins.default.yaml is included
+        if grep -q "dynamic-plugins.default.yaml" "$current_config"; then
         log_info "Configuration includes dynamic-plugins.default.yaml"
         
         # Get the RHDH container image to extract the default config
@@ -337,7 +335,7 @@ analyze_current_plugins() {
     fi
     
     # Store for later use
-    CURRENT_CONFIG="$current_config"
+    # CURRENT_CONFIG="$current_config"  # Not currently used
     ALL_BUNDLED_PLUGINS="$all_bundled_plugins"
 }
 
@@ -426,7 +424,8 @@ find_oci_equivalents() {
 generate_migration_plan() {
     log_info "Generating migration plan..."
     
-    local migration_plan="/tmp/migration-plan-$(date +%Y%m%d-%H%M%S).yaml"
+    local migration_plan
+    migration_plan="/tmp/migration-plan-$(date +%Y%m%d-%H%M%S).yaml"
     
     cat > "$migration_plan" << EOF
 # Migration Plan for Dynamic Plugins to OCI Artifacts
