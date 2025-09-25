@@ -14,7 +14,7 @@ IS_OPENSHIFT=""
 IS_HOSTED_CONTROL_PLANE=""
 
 NAMESPACE_OPERATOR="rhdh-operator"
-INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
+INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.19"
 FILTERED_VERSIONS=(*)
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
