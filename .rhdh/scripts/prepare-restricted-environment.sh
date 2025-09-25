@@ -1001,7 +1001,7 @@ function resolve_plugin_index() {
     # Create temporary directory for extracting the catalog index
     local temp_dir
     temp_dir=$(mktemp -d)
-    trap "rm -rf '$temp_dir'" EXIT
+    trap 'rm -rf "$temp_dir"' EXIT
     
     # Extract the catalog index image
     if ! skopeo copy "docker://$registry:$version" "dir:$temp_dir/catalog-index" 2>/dev/null; then
