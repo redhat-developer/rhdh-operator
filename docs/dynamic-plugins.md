@@ -7,9 +7,9 @@ Dynamic plugins can be configured to be loaded from different registries, such a
 For dynamic plugins packaged in an NPM registry, ensure the **.npmrc** file is properly configured. By default, RHDH uses https://registry.npmjs.org registry and supports additional user-defined **.npmrc** files via the **NPM_CONFIG_USERCONFIG** environment variable, pointing to **/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc** .
 
 The default RHDH configuration includes extra .npmrc settings in **secret-files.yaml**:
-````
+```
 @redhat:registry=https://npm.registry.redhat.com
-````
+```
 
 To use your own **.npmrc** configuration:
 
