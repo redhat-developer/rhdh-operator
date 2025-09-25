@@ -349,23 +349,46 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 	b.podSpec().Volumes = append(b.podSpec().Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
 
 	for _, container := range containers {
-		if !withSubPath {
-			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{Name: volName, MountPath: mountPath})
-			continue
-		}
+		var newMounts []corev1.VolumeMount
+		replaced := false
 
-		if len(dataKeys) > 0 {
+		// Prepare the new VolumeMount(s)
+		var mountsToAdd []corev1.VolumeMount
+		if !withSubPath {
+			mountsToAdd = []corev1.VolumeMount{{Name: volName, MountPath: mountPath}}
+		} else if len(dataKeys) > 0 {
 			for _, file := range dataKeys {
 				if fileName == "" || fileName == file {
-					vm := corev1.VolumeMount{Name: volName, MountPath: filepath.Join(mountPath, file), SubPath: file, ReadOnly: true}
-					container.VolumeMounts = append(container.VolumeMounts, vm)
+					mountsToAdd = append(mountsToAdd, corev1.VolumeMount{
+						Name: volName, MountPath: filepath.Join(mountPath, file), SubPath: file, ReadOnly: true,
+					})
 				}
 			}
 		} else {
-			vm := corev1.VolumeMount{Name: volName, MountPath: filepath.Join(mountPath, fileName), SubPath: fileName, ReadOnly: true}
-			container.VolumeMounts = append(container.VolumeMounts, vm)
+			mountsToAdd = []corev1.VolumeMount{{Name: volName, MountPath: filepath.Join(mountPath, fileName), SubPath: fileName, ReadOnly: true}}
 		}
+
+		// Replace or append
+		for _, mount := range container.VolumeMounts {
+			replacedHere := false
+			for _, newMount := range mountsToAdd {
+				if mount.MountPath == newMount.MountPath {
+					newMounts = append(newMounts, newMount)
+					replaced = true
+					replacedHere = true
+					break
+				}
+			}
+			if !replacedHere {
+				newMounts = append(newMounts, mount)
+			}
+		}
+		if !replaced {
+			newMounts = append(newMounts, mountsToAdd...)
+		}
+		container.VolumeMounts = newMounts
 	}
+
 	return nil
 }
 

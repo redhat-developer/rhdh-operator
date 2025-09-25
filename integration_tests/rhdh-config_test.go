@@ -214,4 +214,61 @@ var _ = When("create default rhdh", func() {
 		}, 10*time.Second, time.Second).Should(Succeed())
 
 	})
+
+	It("replaces .npmrc", func() {
+
+		// This test relies on the fact that RHDH default config contains secret-files.yaml for .nmrc with:
+		//  name: dynamic-plugins-npmrc
+		//  annotations:
+		//    rhdh.redhat.com/mount-path: /opt/app-root/src/.npmrc.dynamic-plugins
+		//    rhdh.redhat.com/containers: install-dynamic-plugins
+		// and check if it replaced with one defined in spec.deployment
+
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
+		}
+
+		ctx := context.Background()
+		ns := createNamespace(ctx)
+		npmrcSecret := generateSecret(ctx, k8sClient, "my-dynamic-plugins-npmrc", ns, map[string]string{".npmrc": "new-npmrc"}, nil, nil)
+
+		bsSpec := bsv1.BackstageSpec{
+			Application: &bsv1.Application{
+				ExtraFiles: &bsv1.ExtraFiles{
+					Secrets: []bsv1.FileObjectRef{
+						{
+							Name:      npmrcSecret,
+							MountPath: "/opt/app-root/src/.npmrc.dynamic-plugins",
+							Containers: []string{
+								"install-dynamic-plugins",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		backstageName := createAndReconcileBackstage(ctx, ns, bsSpec, "")
+
+		Eventually(func(g Gomega) {
+			By("getting the Deployment ")
+			deploy := &appsv1.Deployment{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			g.Expect(err).To(Not(HaveOccurred()))
+
+			g.Expect(len(deploy.Spec.Template.Spec.InitContainers)).To(Equal(1))
+			initCont := deploy.Spec.Template.Spec.InitContainers[0]
+			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
+			found := 0
+			for i := range initCont.VolumeMounts {
+				if initCont.VolumeMounts[i].MountPath == "/opt/app-root/src/.npmrc.dynamic-plugins" {
+					g.Expect(initCont.VolumeMounts[i].Name).To(Equal(npmrcSecret))
+					found++
+				}
+			}
+			g.Expect(found).To(Equal(1))
+
+		}, 10*time.Second, time.Second).Should(Succeed())
+
+	})
 })
