@@ -224,6 +224,10 @@ var _ = When("create default rhdh", func() {
 		//    rhdh.redhat.com/containers: install-dynamic-plugins
 		// and check if it replaced with one defined in spec.deployment
 
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
+		}
+
 		ctx := context.Background()
 		ns := createNamespace(ctx)
 		npmrcSecret := generateSecret(ctx, k8sClient, "my-dynamic-plugins-npmrc", ns, map[string]string{".npmrc": "new-npmrc"}, nil, nil)
