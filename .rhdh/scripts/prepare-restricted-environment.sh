@@ -949,7 +949,16 @@ function mirror_image_to_registry() {
   dest_image=$2
   
   echo "Mirroring $src_image to $dest_image..."
-  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image"
+  
+  # Handle OCI URLs with subpaths (e.g., oci://registry/image:tag!subpath)
+  if [[ "$src_image" == oci://* ]]; then
+    # Extract the Docker image reference (everything before the !)
+    local docker_ref="${src_image%!*}"
+    docker_ref="${docker_ref#oci://}"
+    skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false "docker://$docker_ref" "docker://$dest_image"
+  else
+    skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false "docker://$src_image" "docker://$dest_image"
+  fi
 }
 
 function mirror_image_to_archive() {
@@ -959,7 +968,16 @@ function mirror_image_to_archive() {
   archive_path="$2"
 
   debugf "Saving $src_image to $archive_path..."
-  skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
+  
+  # Handle OCI URLs with subpaths (e.g., oci://registry/image:tag!subpath)
+  if [[ "$src_image" == oci://* ]]; then
+    # Extract the Docker image reference (everything before the !)
+    local docker_ref="${src_image%!*}"
+    docker_ref="${docker_ref#oci://}"
+    skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false "docker://$docker_ref" "dir:$archive_path"
+  else
+    skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false "docker://$src_image" "dir:$archive_path"
+  fi
 }
 
 function push_image_from_archive() {
@@ -978,36 +996,103 @@ function resolve_plugin_index() {
     local registry="${BASH_REMATCH[1]}"
     local version="${BASH_REMATCH[2]}"
     
-    debugf "Querying registry $registry for all tags matching version $version"
+    debugf "Extracting plugin catalog index image: $registry:$version"
     
-    # Query the registry for all tags and filter by version
-    local all_tags
-    if ! all_tags=$(skopeo list-tags "docker://$registry" 2>/dev/null | jq -r '.Tags[]' 2>/dev/null); then
-      errorf "Failed to query tags from registry $registry"
+    # Create temporary directory for extracting the catalog index
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    trap "rm -rf '$temp_dir'" EXIT
+    
+    # Extract the catalog index image
+    if ! skopeo copy "docker://$registry:$version" "dir:$temp_dir/catalog-index" 2>/dev/null; then
+      errorf "Failed to extract catalog index image: $registry:$version"
       return 1
     fi
     
-    # Filter tags that match the version pattern
-    local matching_tags
-    matching_tags=$(echo "$all_tags" | grep -E ".*${version}(\.[0-9]+)?$" || echo "")
+    # Find the largest layer (likely contains the catalog data)
+    local catalog_layer
+    catalog_layer=$(find "$temp_dir/catalog-index" -type f -not -name "manifest.json" -not -name "version" -exec ls -la {} \; | sort -k5 -nr | head -1 | awk '{print $NF}')
     
-    if [[ -z "$matching_tags" ]]; then
-      warnf "No tags found matching version $version in registry $registry"
+    if [[ -z "$catalog_layer" ]]; then
+      errorf "No catalog data layer found in index image"
       return 1
     fi
     
-    # Convert to full OCI URLs
+    debugf "Using catalog layer: $(basename "$catalog_layer")"
+    
+    # Extract the catalog layer
+    local catalog_data_dir="$temp_dir/catalog-data"
+    mkdir -p "$catalog_data_dir"
+    
+    if ! tar -xf "$catalog_layer" -C "$catalog_data_dir" 2>/dev/null; then
+      errorf "Failed to extract catalog data from layer"
+      return 1
+    fi
+    
+    # Find all package YAML files
+    local package_files
+    package_files=$(find "$catalog_data_dir" -name "*.yaml" -path "*/packages/*" 2>/dev/null)
+    
+    if [[ -z "$package_files" ]]; then
+      warnf "No package files found in catalog index"
+      return 1
+    fi
+    
+    debugf "Found $(echo "$package_files" | wc -l) package files in catalog index"
+    
+    # Extract OCI plugin URLs from package files
     PLUGIN_IMAGES=()
-    while IFS= read -r tag; do
-      if [[ -n "$tag" ]]; then
-        PLUGIN_IMAGES+=("$registry:$tag")
-      fi
-    done <<< "$matching_tags"
+    local filtered_plugins=0
     
-    debugf "Found ${#PLUGIN_IMAGES[@]} plugins matching version $version"
+    while IFS= read -r package_file; do
+      if [[ -f "$package_file" ]]; then
+        # Extract dynamicArtifact field that contains OCI URLs
+        local oci_urls
+        oci_urls=$(grep -E "^\s*dynamicArtifact:\s*oci://" "$package_file" 2>/dev/null | sed 's/.*dynamicArtifact:\s*//' | tr -d ' ')
+        
+        if [[ -n "$oci_urls" ]]; then
+          # Filter by version if specified
+          if [[ "$version" != "next" && "$version" != "latest" ]]; then
+            # Check if the OCI URL contains the version
+            if echo "$oci_urls" | grep -q ":$version"; then
+              PLUGIN_IMAGES+=("$oci_urls")
+              ((filtered_plugins++))
+            fi
+          else
+            # For 'next' or 'latest', include all OCI URLs
+            PLUGIN_IMAGES+=("$oci_urls")
+            ((filtered_plugins++))
+          fi
+        fi
+      fi
+    done <<< "$package_files"
+    
+    # Remove duplicates
+    if [[ ${#PLUGIN_IMAGES[@]} -gt 0 ]]; then
+      local unique_plugins=()
+      for plugin in "${PLUGIN_IMAGES[@]}"; do
+        local found=false
+        for existing in "${unique_plugins[@]}"; do
+          if [[ "$existing" == "$plugin" ]]; then
+            found=true
+            break
+          fi
+        done
+        if [[ "$found" == "false" ]]; then
+          unique_plugins+=("$plugin")
+        fi
+      done
+      PLUGIN_IMAGES=("${unique_plugins[@]}")
+    fi
+    
+    debugf "Found ${#PLUGIN_IMAGES[@]} unique plugins from catalog index"
+    if [[ "$version" != "next" && "$version" != "latest" ]]; then
+      debugf "Filtered to ${#PLUGIN_IMAGES[@]} plugins matching version $version"
+    fi
+    
     return 0
   else
-    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry/org/image@sha256:digest"
+    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry/org/image:tag"
     return 1
   fi
 }
