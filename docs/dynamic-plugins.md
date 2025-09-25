@@ -14,7 +14,7 @@ The default RHDH configuration includes extra .npmrc settings in **secret-files.
 To use your own **.npmrc** configuration:
 
 * Create a Secret with a .npmrc key containing the content of your .npmrc file.
-````
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -23,19 +23,21 @@ type: Opaque
 stringData:
   .npmrc: |
     @my:registry=https://npm.my-registry.com
-````
+```
 * Mount the Secret to the install-dynamic-plugin container by adding the following to the Backstage CR:
 
-````
+```yaml 
+apiVersion: backstage.io/v1alpha4
+#...
 spec:
   application:
     extraFiles:
       secrets:
         - name: my-npmrc-secret
-          path: /opt/app-root/src/.npmrc.dynamic-plugins
+          mountPath: /opt/app-root/src/.npmrc.dynamic-plugins
           containers:
             - install-dynamic-plugins          
-````
+```
 
 ### Container registry
 

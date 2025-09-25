@@ -239,3 +239,26 @@ func TestSecretFilesWithNonExistedContainerFailed(t *testing.T) {
 	assert.ErrorContains(t, err, "not found")
 
 }
+
+func TestReplaceSecretFiles(t *testing.T) {
+
+	bs := *secretFilesTestBackstage.DeepCopy()
+	sf := &bs.Spec.Application.ExtraFiles.Secrets
+	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", MountPath: DefaultMountDir})
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
+
+	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(map[string]string{"dynamic-plugins321.yaml": "new"}, nil)}
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+
+	deployment := model.backstageDeployment
+	assert.NotNil(t, deployment)
+
+	// secret1 is replacing secret from default
+	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
+	//assert.Equal(t, DefaultMountDir+"/dynamic-plugins321.yaml", deployment.container().VolumeMounts[0].MountPath)
+
+}
