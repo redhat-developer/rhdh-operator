@@ -27,7 +27,7 @@ stringData:
 * Mount the Secret to the install-dynamic-plugin container by adding the following to the Backstage CR:
 
 ```yaml 
-apiVersion: backstage.io/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha4
 #...
 spec:
   application:
