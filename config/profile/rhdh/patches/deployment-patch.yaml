@@ -4,6 +4,7 @@ metadata:
   name: operator
   labels:
     app: rhdh-operator
+    app.kubernetes.io/part-of: rhdh
 spec:
   selector:
     matchLabels:
