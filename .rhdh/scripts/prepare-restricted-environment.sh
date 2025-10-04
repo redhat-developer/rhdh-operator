@@ -1,8 +1,9 @@
 #!/bin/bash
 #
 # Script to streamline installing the official RHDH Catalog Source in a disconnected OpenShift or Kubernetes cluster.
+# Can be instructed to use oc-mirror v2 for image mirroring (v1 is deprecated in OCP 4.18+).
 #
-# Requires: oc (OCP) or kubectl (K8s), jq, yq, umoci, base64, opm, skopeo
+# Requires: oc (OCP) or kubectl (K8s), jq, yq, umoci, base64, opm, skopeo, oc-mirror v2
 
 set -euo pipefail
 
@@ -99,10 +100,11 @@ Options:
                                             the images to your private registry.
   --install-operator <true|false>        : Install the RHDH operator right after creating the CatalogSource (default: true)
   --extra-images <list>                  : Comma-separated list of extra images to mirror
-  --use-oc-mirror <true|false>           : Whether to use the 'oc-mirror' tool (default: false).
+  --use-oc-mirror <true|false>           : Whether to use the 'oc-mirror' tool v2 (default: false).
                                             This is the recommended way for mirroring on regular OpenShift clusters.
-                                            Bear in mind however that this relies on resources like ImageContentSourcePolicy,
-                                            which don't seem to work well on ROSA clusters or clusters with hosted control
+                                            oc-mirror v2 generates ImageDigestMirrorSet and ImageTagMirrorSet resources
+                                            instead of ImageContentSourcePolicy. Bear in mind however that ImageDigestMirrorSet
+                                            and ImageTagMirrorSet don't seem to work well on ROSA clusters or clusters with hosted control
                                             planes (like HyperShift or Red Hat OpenShift on IBM Cloud).
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
@@ -381,50 +383,6 @@ else
   YQ=$(which yq)
 fi
 
-function merge_registry_auth() {
-  set -euo pipefail
-
-  currentRegistryAuthFile="${REGISTRY_AUTH_FILE:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json}"
-  debugf "currentRegistryAuthFile: $currentRegistryAuthFile"
-  if [ ! -f "${currentRegistryAuthFile}" ]; then
-    debugf "Missing registry auth file. Will proceed without any existing auth against the registry hosting the index image: $INDEX_IMAGE"
-    return
-  fi
-  # TODO(rm3l): Overriding XDG_RUNTIME_DIR so it can work with "oc-mirror v1", which does not work with REGISTRY_AUTH_FILE.
-  # Remove this when oc-mirror v2 is out of TP.
-  XDG_RUNTIME_DIR=$(mktemp -d)
-  export XDG_RUNTIME_DIR
-  mkdir -p "${XDG_RUNTIME_DIR}/containers"
-  # shellcheck disable=SC2064
-  trap "rm -fr $XDG_RUNTIME_DIR || true" EXIT
-  # Using the current working dir, otherwise tools like 'skopeo login' will attempt to write to /run, which
-  # might be restricted in CI environments.
-  # This also ensures that the credentials don't conflict with any existing creds for the same registry
-  export REGISTRY_AUTH_FILE="${XDG_RUNTIME_DIR}/containers/auth.json"
-  debugf "REGISTRY_AUTH_FILE: $REGISTRY_AUTH_FILE"
-
-  # Merge existing authentication from currentRegistryAuthFile into REGISTRY_AUTH_FILE
-  images=("${INDEX_IMAGE}")
-  if [[ -n "${TO_REGISTRY}" ]]; then
-    images+=("$(buildRegistryUrl)")
-  fi
-  registries=("registry.redhat.io" "quay.io")
-  for img in "${images[@]}"; do
-    reg=$(echo "$img" | cut -d'/' -f1)
-    [[ " ${registries[*]} " =~ " $reg " ]] || registries+=("$reg")
-  done
-  tmpFile=$(mktemp)
-  # shellcheck disable=SC2064
-  trap "rm -f $tmpFile || true" EXIT
-  echo '{"auths": {' >"$tmpFile"
-  for reg in "${registries[@]}"; do
-    echo "  \"$reg\": .auths.\"$reg\"," >>"$tmpFile"
-  done
-  sed -i '$ s/,$//' "$tmpFile"
-  echo '}}' >>"$tmpFile"
-  debugf "yq filter: $(cat "$tmpFile")"
-  "$YQ" -o=json "$(cat "$tmpFile")" "${currentRegistryAuthFile}" >"${REGISTRY_AUTH_FILE}"
-}
 
 function ocp_prepare_internal_registry() {
   set -euo pipefail
@@ -901,7 +859,6 @@ if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
   ocp_prepare_internal_registry
 fi
 
-merge_registry_auth
 
 manifestsTargetDir="${TMPDIR}"
 if [[ -n "${FROM_DIR}" ]]; then
@@ -909,27 +866,26 @@ if [[ -n "${FROM_DIR}" ]]; then
 fi
 
 if [[ "${USE_OC_MIRROR}" = "true" ]]; then
-  # TODO(rm3l): oc-mirror v1 always loads the docker creds first:
-  # https://github.com/openshift/oc-mirror/blob/main/pkg/image/credentials.go
-  # But we want to use our own credentials file, which is not possible until oc-mirror v2 (currently tech preview)
-  if [ -f ~/.docker/config.json ]; then
-    debugf "Temporarily moving ~/.docker/config.json to ~/.docker/config.json.bak, so as to work with oc-mirror v1"
-    mv -f ~/.docker/config.json ~/.docker/config.json.bak || true
-    trap "mv -f ~/.docker/config.json.bak ~/.docker/config.json || true" EXIT
-  fi
+  # oc-mirror v2 uses --authfile flag for authentication
 
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
+  
+  # Set up auth file flag
+  currentRegistryAuthFile="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json"
+  if [[ -f "${currentRegistryAuthFile}" ]]; then
+    AUTH_FLAG="--authfile"
+    AUTH_FILE_VALUE="${currentRegistryAuthFile}"
+  else
+    AUTH_FLAG=""
+    AUTH_FILE_VALUE=""
+  fi
+  
   if [[ -z "${FROM_DIR}" ]]; then
     # Direct to registry
     cat <<EOF >"${TMPDIR}/imageset-config.yaml"
-apiVersion: mirror.openshift.io/v1alpha2
+apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
-storageConfig:
-  local:
-    # Do not delete or modify metadata generated by the oc-mirror plugin,
-    # use the same storage backend every time run the oc-mirror plugin for the same mirror
-    path: ./metadata
 mirror:
   operators:
   - catalog: ${INDEX_IMAGE}
@@ -948,7 +904,6 @@ EOF
           - name: fast-${v}
 EOF
       done
-
     fi
     nbExtraImgs=${#EXTRA_IMAGES[@]}
     if [ "$nbExtraImgs" -ge 1 ]; then
@@ -966,11 +921,11 @@ EOF
       "${OC_MIRROR_PATH}" \
         --config="${TMPDIR}/imageset-config.yaml" \
         file://"${TO_DIR}" \
-        --skip-missing \
-        --dest-skip-tls \
-        --continue-on-error \
-        --max-nested-paths=1 \
-        "$OC_MIRROR_FLAGS" |
+        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
+        --dest-tls-verify=false \
+        --max-nested-paths=2 \
+        "$OC_MIRROR_FLAGS" \
+        --v2 |
         tee "${ocMirrorLogFile}"
       if [[ "${TO_DIR}" != "${TMPDIR}" ]]; then
         cp -f "${TMPDIR}/imageset-config.yaml" "${TO_DIR}/imageset-config.yaml"
@@ -993,12 +948,13 @@ EOF
 
       "${OC_MIRROR_PATH}" \
         --config="${TMPDIR}/imageset-config.yaml" \
+        --workspace file://"${TMPDIR}" \
+        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
-        --skip-missing \
-        --dest-skip-tls \
-        --continue-on-error \
+        --dest-tls-verify=false \
         --max-nested-paths=2 \
-        "$OC_MIRROR_FLAGS" |
+        "$OC_MIRROR_FLAGS" \
+        --v2 |
         tee "${ocMirrorLogFile}"
     fi
 
@@ -1024,38 +980,57 @@ EOF
       push_image_from_archive "${FROM_DIR}/rhdh-catalog" "${my_operator_index}-tmp"
 
       "${OC_MIRROR_PATH}" \
-        --config="${FROM_DIR}/imageset-config.yaml" \
-        --from "${FROM_DIR}" \
+        -c "${FROM_DIR}/imageset-config.yaml" \
+        --from file://"${FROM_DIR}" \
+        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
-        --skip-missing \
-        --dest-skip-tls \
-        --continue-on-error \
-        "$OC_MIRROR_FLAGS" |
+        --dest-tls-verify=false \
+        --max-nested-paths=2 \
+        "$OC_MIRROR_FLAGS" \
+        --v2 |
         tee "${ocMirrorLogFile}"
     fi
   fi
 
-  if [ -f "${ocMirrorLogFile}" ]; then
-    # The xargs here is to trim whitespaces
-    catalogSourceLocation=$(sed -n -e 's/^Writing CatalogSource manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" | xargs)
-    icspLocation=$(sed -n -e 's/^Writing ICSP manifests to \(.*\)$/\1/p' "${ocMirrorLogFile}" | xargs)
-    if [[ -n "${icspLocation}" ]]; then
-      debugf "ICSP parent location: ${TMPDIR}/${icspLocation}"
-      if [[ -n "${TO_REGISTRY}" ]]; then
-        invoke_cluster_cli apply -f "${TMPDIR}"/"${icspLocation}"/imageContentSourcePolicy.yaml
-      fi
+  # oc-mirror v2 generates manifests in working-dir/cluster-resources/
+  clusterResourcesDir="${TMPDIR}/working-dir/cluster-resources"
+  if [[ -n "${TO_DIR}" ]]; then
+    clusterResourcesDir="${TO_DIR}/working-dir/cluster-resources"
+  fi
+  
+  if [ -d "${clusterResourcesDir}" ]; then
+    debugf "Processing cluster resources from: ${clusterResourcesDir}"
+    
+    # Apply ImageDigestMirrorSet and ImageTagMirrorSet resources
+    if [[ -n "${TO_REGISTRY}" ]]; then
+      for manifest in "${clusterResourcesDir}"/imageDigestMirrorSet*.yaml; do
+        if [[ -f "${manifest}" ]]; then
+          debugf "Applying ImageDigestMirrorSet: ${manifest}"
+          invoke_cluster_cli apply -f "${manifest}"
+        fi
+      done
+      
+      for manifest in "${clusterResourcesDir}"/imageTagMirrorSet*.yaml; do
+        if [[ -f "${manifest}" ]]; then
+          debugf "Applying ImageTagMirrorSet: ${manifest}"
+          invoke_cluster_cli apply -f "${manifest}"
+        fi
+      done
     fi
-    if [[ -n "${catalogSourceLocation}" ]]; then
-      # Replace some metadata and add the default list of secrets
-      debugf "catalogSource parent location: ${TMPDIR}/${catalogSourceLocation}"
-      "$YQ" -i '.metadata.name = "rhdh-catalog"' -i "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
-      "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
-      "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' \
-        "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
-      if [[ -n "${TO_REGISTRY}" ]]; then
-        invoke_cluster_cli apply -f "${TMPDIR}"/"${catalogSourceLocation}"/catalogSource-*.yaml
+    
+    # Process CatalogSource resources
+    for manifest in "${clusterResourcesDir}"/catalogSource*.yaml; do
+      if [[ -f "${manifest}" ]]; then
+        debugf "Processing CatalogSource: ${manifest}"
+        # Replace some metadata and add the default list of secrets
+        "$YQ" -i '.metadata.name = "rhdh-catalog"' -i "${manifest}"
+        "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i "${manifest}"
+        "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' -i "${manifest}"
+        if [[ -n "${TO_REGISTRY}" ]]; then
+          invoke_cluster_cli apply -f "${manifest}"
+        fi
       fi
-    fi
+    done
   fi
 else
   if [[ -z "${FROM_DIR}" ]]; then
