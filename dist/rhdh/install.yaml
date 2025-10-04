@@ -3162,6 +3162,8 @@ kind: Deployment
 metadata:
   labels:
     app: rhdh-operator
+    app.kubernetes.io/component: backstage-controller
+    app.kubernetes.io/part-of: rhdh
     control-plane: controller-manager
   name: rhdh-operator
   namespace: rhdh-operator

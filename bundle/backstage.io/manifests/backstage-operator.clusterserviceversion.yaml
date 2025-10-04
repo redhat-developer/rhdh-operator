@@ -45,7 +45,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-09-18T10:27:35Z"
+    createdAt: "2025-10-03T13:20:41Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -215,6 +215,8 @@ spec:
       deployments:
       - label:
           app: operator
+          app.kubernetes.io/component: backstage-controller
+          app.kubernetes.io/part-of: backstage
           control-plane: controller-manager
         name: backstage-operator
         spec:

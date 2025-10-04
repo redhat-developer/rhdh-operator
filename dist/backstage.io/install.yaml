@@ -2286,6 +2286,8 @@ kind: Deployment
 metadata:
   labels:
     app: operator
+    app.kubernetes.io/component: backstage-controller
+    app.kubernetes.io/part-of: backstage
     control-plane: controller-manager
   name: backstage-operator
   namespace: backstage-system

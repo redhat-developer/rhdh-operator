@@ -5,6 +5,9 @@ metadata:
   labels:
     app: operator
     control-plane: controller-manager
+    app.kubernetes.io/part-of: backstage
+    # do not change this label, it should be unique for discovery purposes
+    app.kubernetes.io/component: backstage-controller
 spec:
   replicas: 1
   selector:
