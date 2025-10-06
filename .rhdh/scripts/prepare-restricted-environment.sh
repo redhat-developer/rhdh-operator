@@ -866,20 +866,10 @@ if [[ -n "${FROM_DIR}" ]]; then
 fi
 
 if [[ "${USE_OC_MIRROR}" = "true" ]]; then
-  # oc-mirror v2 uses --authfile flag for authentication
+  # oc-mirror v2 uses ${XDG_RUNTIME_DIR}/containers/auth.json by default for authentication
 
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
   ocMirrorLogFile="${TMPDIR}/oc-mirror.log.txt"
-  
-  # Set up auth file flag
-  currentRegistryAuthFile="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json"
-  if [[ -f "${currentRegistryAuthFile}" ]]; then
-    AUTH_FLAG="--authfile"
-    AUTH_FILE_VALUE="${currentRegistryAuthFile}"
-  else
-    AUTH_FLAG=""
-    AUTH_FILE_VALUE=""
-  fi
   
   if [[ -z "${FROM_DIR}" ]]; then
     # Direct to registry
@@ -921,7 +911,6 @@ EOF
       "${OC_MIRROR_PATH}" \
         --config="${TMPDIR}/imageset-config.yaml" \
         file://"${TO_DIR}" \
-        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         --dest-tls-verify=false \
         --max-nested-paths=2 \
         "$OC_MIRROR_FLAGS" \
@@ -949,7 +938,6 @@ EOF
       "${OC_MIRROR_PATH}" \
         --config="${TMPDIR}/imageset-config.yaml" \
         --workspace file://"${TMPDIR}" \
-        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         --max-nested-paths=2 \
@@ -982,7 +970,6 @@ EOF
       "${OC_MIRROR_PATH}" \
         -c "${FROM_DIR}/imageset-config.yaml" \
         --from file://"${FROM_DIR}" \
-        "${AUTH_FLAG}" "${AUTH_FILE_VALUE}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
         --max-nested-paths=2 \
