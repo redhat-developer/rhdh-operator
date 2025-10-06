@@ -2,7 +2,7 @@
 
 ### Prerequisites for Orchestrator Plugin Installation on OpenShift
 
-To install the Orchestrator plugin on OpenShift, the following components are required:
+To install the Orchestrator plugin on OpenShift, the following components are required to be pre-installed:
 
 - **OpenShift Serverless Operator**
 - **Knative Serving**
@@ -13,7 +13,7 @@ Optionally:
 - **OpenShift GitOps Operator (ArgoCD)**
 
 
-### Methods to Install required infrastructure
+### Methods to Install required infrastructural components
 
 There are three methods to install the required components for the Orchestrator plugin on OpenShift:
 - [Manual Installation](#manual-installation)
@@ -33,6 +33,7 @@ Go to the [OpenShift Serverless documentation](https://docs.redhat.com/en/docume
 3. Installing Knative Serving.
 4. Installing Knative Eventing.
 5. Installing the OpenShift Serverless Logic Operator.
+
 Optionally:
 6. Installing the [OpenShift Pipelines Operator](https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines) (Tekton)
 7. Installing the [OpenShift GitOps Operator](https://docs.redhat.com/en/documentation/red_hat_openshift_gitops) (ArgoCD)
@@ -63,7 +64,7 @@ The script is checking if the directory where plugin-infra.sh is located contain
 This method has similar usage and cautions as the RHDH Helper Utility.
 
 ##### Steps
-1. Install the required components using the Orchestrator Infra Helm chart.*(TODO: Replace with downstream chart if applicable.)*
+1. Install the required components using the Orchestrator Infra Helm chart as described in the [README](https://github.com/redhat-developer/rhdh-chart/blob/release-1.7/charts/orchestrator-infra/README.md)
 
 ### Installing the Orchestrator Plugin
 
@@ -94,6 +95,9 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
 See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin. 
 Ensure to add a secret with the BACKEND_SECRET key/value and update
 the secret name in the `Backstage` CR under the `extraEnvs` field.
+
+For more information about configuring dynamic plugins, please refer to the [Configuration documentation](configuration.md).
+For more information about dynamic plugins dependencies, please refer to the [Dynamic Plugins Dependencies documentation](dynamic-plugins.md#dynamic-plugins-dependency-management).
 
 #### Plugin registry
 
