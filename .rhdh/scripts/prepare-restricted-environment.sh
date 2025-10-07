@@ -987,7 +987,7 @@ EOF
       push_image_from_archive "${FROM_DIR}/rhdh-catalog" "${my_operator_index}-tmp"
 
       "${OC_MIRROR_PATH}" \
-        -c "${FROM_DIR}/imageset-config.yaml" \
+        --config="${FROM_DIR}/imageset-config.yaml" \
         --from file://"${FROM_DIR}" \
         "docker://${registryUrl}" \
         --dest-tls-verify=false \
