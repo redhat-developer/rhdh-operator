@@ -106,6 +106,11 @@ Options:
                                             instead of ImageContentSourcePolicy. Bear in mind however that ImageDigestMirrorSet
                                             and ImageTagMirrorSet don't seem to work well on ROSA clusters or clusters with hosted control
                                             planes (like HyperShift or Red Hat OpenShift on IBM Cloud).
+                                            
+                                            IMPORTANT: When using --to-dir (mirrorToDisk phase), oc-mirror v2 only copies images
+                                            to disk and does NOT create cluster resources (CatalogSource, IDMS, ITMS). These resources
+                                            are only generated when pushing to a registry (diskToMirror phase) using --from-dir and
+                                            --to-registry together.
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
@@ -136,6 +141,20 @@ Examples:
   $0 \\
     --ci-index true \\
     --filter-versions '1.4,1.5'
+
+  # TWO-PHASE WORKFLOW with oc-mirror v2 for fully disconnected environments:
+  # Phase 1 (on connected host): Export images to disk
+  $0 \\
+    --use-oc-mirror true \\
+    --to-dir /path/to/export
+  
+  # Transfer /path/to/export to your disconnected environment
+  
+  # Phase 2 (on disconnected bastion): Push images to registry and create cluster resources
+  $0 \\
+    --use-oc-mirror true \\
+    --from-dir /path/to/export \\
+    --to-registry registry.example.com
 "
 }
 
@@ -980,44 +999,64 @@ EOF
   fi
 
   # oc-mirror v2 generates manifests in working-dir/cluster-resources/
-  clusterResourcesDir="${TMPDIR}/working-dir/cluster-resources"
-  if [[ -n "${TO_DIR}" ]]; then
-    clusterResourcesDir="${TO_DIR}/working-dir/cluster-resources"
-  fi
-  
-  if [ -d "${clusterResourcesDir}" ]; then
-    debugf "Processing cluster resources from: ${clusterResourcesDir}"
+  # These are only generated during diskToMirror operations (when TO_REGISTRY is set)
+  if [[ -n "${TO_REGISTRY}" ]]; then
+    clusterResourcesDir="${TMPDIR}/working-dir/cluster-resources"
+    if [[ -n "${FROM_DIR}" ]]; then
+      clusterResourcesDir="${FROM_DIR}/working-dir/cluster-resources"
+    fi
     
-    # Apply ImageDigestMirrorSet and ImageTagMirrorSet resources
-    if [[ -n "${TO_REGISTRY}" ]]; then
-      for manifest in "${clusterResourcesDir}"/imageDigestMirrorSet*.yaml; do
+    if [ -d "${clusterResourcesDir}" ]; then
+      debugf "Processing cluster resources from: ${clusterResourcesDir}"
+      
+      # Apply ImageDigestMirrorSet and ImageTagMirrorSet resources
+      foundResources=false
+      # oc-mirror v2 generates files with patterns: idms-*.yaml, itms-*.yaml
+      
+      # Skip IDMS/ITMS on Hosted Control Plane clusters (ROSA HCP, HyperShift, etc.)
+      # as they don't support direct IDMS/ITMS creation
+      if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
+        warnf "Hosted Control Plane cluster detected. Skipping ImageDigestMirrorSet/ImageTagMirrorSet application."
+        warnf "On HCP clusters, image mirrors must be configured in the HostedCluster resource."
+        warnf "Since images are already in the internal registry, the CatalogSource will reference them directly."
+      else
+        for manifest in "${clusterResourcesDir}"/idms-*.yaml "${clusterResourcesDir}"/imageDigestMirrorSet*.yaml; do
+          if [[ -f "${manifest}" ]]; then
+            debugf "Applying ImageDigestMirrorSet: ${manifest}"
+            invoke_cluster_cli apply -f "${manifest}"
+            foundResources=true
+          fi
+        done
+        
+        for manifest in "${clusterResourcesDir}"/itms-*.yaml "${clusterResourcesDir}"/imageTagMirrorSet*.yaml; do
+          if [[ -f "${manifest}" ]]; then
+            debugf "Applying ImageTagMirrorSet: ${manifest}"
+            invoke_cluster_cli apply -f "${manifest}"
+            foundResources=true
+          fi
+        done
+      fi
+      
+      # Process CatalogSource resources
+      # oc-mirror v2 generates files with pattern: cs-*.yaml
+      for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
         if [[ -f "${manifest}" ]]; then
-          debugf "Applying ImageDigestMirrorSet: ${manifest}"
+          debugf "Processing CatalogSource: ${manifest}"
+          # Replace some metadata and add the default list of secrets
+          "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
+          "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
+          "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' "${manifest}"
           invoke_cluster_cli apply -f "${manifest}"
+          foundResources=true
         fi
       done
       
-      for manifest in "${clusterResourcesDir}"/imageTagMirrorSet*.yaml; do
-        if [[ -f "${manifest}" ]]; then
-          debugf "Applying ImageTagMirrorSet: ${manifest}"
-          invoke_cluster_cli apply -f "${manifest}"
-        fi
-      done
-    fi
-    
-    # Process CatalogSource resources
-    for manifest in "${clusterResourcesDir}"/catalogSource*.yaml; do
-      if [[ -f "${manifest}" ]]; then
-        debugf "Processing CatalogSource: ${manifest}"
-        # Replace some metadata and add the default list of secrets
-        "$YQ" -i '.metadata.name = "rhdh-catalog"' -i "${manifest}"
-        "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' -i "${manifest}"
-        "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' -i "${manifest}"
-        if [[ -n "${TO_REGISTRY}" ]]; then
-          invoke_cluster_cli apply -f "${manifest}"
-        fi
+      if [[ "${foundResources}" != "true" ]]; then
+        warnf "No cluster resources found in ${clusterResourcesDir}. This may indicate that oc-mirror v2 did not generate them."
       fi
-    done
+    else
+      warnf "Cluster resources directory not found: ${clusterResourcesDir}. This may indicate that oc-mirror v2 did not generate cluster resources."
+    fi
   fi
 else
   if [[ -z "${FROM_DIR}" ]]; then
