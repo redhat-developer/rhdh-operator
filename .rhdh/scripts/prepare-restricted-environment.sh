@@ -106,10 +106,9 @@ Options:
                                             instead of ImageContentSourcePolicy. Bear in mind however that ImageDigestMirrorSet
                                             and ImageTagMirrorSet don't seem to work well on ROSA clusters or clusters with hosted control
                                             planes (like HyperShift or Red Hat OpenShift on IBM Cloud).
-                                            
-                                            IMPORTANT: When using --to-dir (mirrorToDisk phase), oc-mirror v2 only copies images
+                                            IMPORTANT: When using --to-dir (mirrorToDisk workflow), oc-mirror v2 only copies images
                                             to disk and does NOT create cluster resources (CatalogSource, IDMS, ITMS). These resources
-                                            are only generated when pushing to a registry (diskToMirror phase) using --from-dir and
+                                            are only generated when pushing to a registry (mirrorToMirror workflow or diskToMirror workflow) using --from-dir and
                                             --to-registry together.
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
@@ -1013,29 +1012,26 @@ EOF
       foundResources=false
       # oc-mirror v2 generates files with patterns: idms-*.yaml, itms-*.yaml
       
-      # Skip IDMS/ITMS on Hosted Control Plane clusters (ROSA HCP, HyperShift, etc.)
-      # as they don't support direct IDMS/ITMS creation
+      # Warn about Hosted Control Plane clusters (ROSA HCP, HyperShift, etc.) as they may require additional configuration
       if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
-        warnf "Hosted Control Plane cluster detected. Skipping ImageDigestMirrorSet/ImageTagMirrorSet application."
-        warnf "On HCP clusters, image mirrors must be configured in the HostedCluster resource."
-        warnf "Since images are already in the internal registry, the CatalogSource will reference them directly."
-      else
-        for manifest in "${clusterResourcesDir}"/idms-*.yaml "${clusterResourcesDir}"/imageDigestMirrorSet*.yaml; do
-          if [[ -f "${manifest}" ]]; then
-            debugf "Applying ImageDigestMirrorSet: ${manifest}"
-            invoke_cluster_cli apply -f "${manifest}"
-            foundResources=true
-          fi
-        done
-        
-        for manifest in "${clusterResourcesDir}"/itms-*.yaml "${clusterResourcesDir}"/imageTagMirrorSet*.yaml; do
-          if [[ -f "${manifest}" ]]; then
-            debugf "Applying ImageTagMirrorSet: ${manifest}"
-            invoke_cluster_cli apply -f "${manifest}"
-            foundResources=true
-          fi
-        done
+        warnf "Hosted Control Plane cluster detected. On HCP clusters, image mirrors must be configured in the HostedCluster resource."
       fi
+      
+      for manifest in "${clusterResourcesDir}"/idms-*.yaml "${clusterResourcesDir}"/imageDigestMirrorSet*.yaml; do
+        if [[ -f "${manifest}" ]]; then
+          debugf "Applying ImageDigestMirrorSet: ${manifest}"
+          invoke_cluster_cli apply -f "${manifest}"
+          foundResources=true
+        fi
+      done
+      
+      for manifest in "${clusterResourcesDir}"/itms-*.yaml "${clusterResourcesDir}"/imageTagMirrorSet*.yaml; do
+        if [[ -f "${manifest}" ]]; then
+          debugf "Applying ImageTagMirrorSet: ${manifest}"
+          invoke_cluster_cli apply -f "${manifest}"
+          foundResources=true
+        fi
+      done
       
       # Process CatalogSource resources
       # oc-mirror v2 generates files with pattern: cs-*.yaml
@@ -1045,7 +1041,8 @@ EOF
           # Replace some metadata and add the default list of secrets
           "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
           "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
-          "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh", "reg-pull-secret"]' "${manifest}"
+          "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
+          "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
           invoke_cluster_cli apply -f "${manifest}"
           foundResources=true
         fi
