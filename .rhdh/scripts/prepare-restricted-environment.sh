@@ -141,15 +141,13 @@ Examples:
     --ci-index true \\
     --filter-versions '1.4,1.5'
 
-  # TWO-PHASE WORKFLOW with oc-mirror v2 for fully disconnected environments:
-  # Phase 1 (on connected host): Export images to disk
+  # WORKFLOW with oc-mirror v2 for fully disconnected environments:
+  # (on connected host): Export images to disk
   $0 \\
     --use-oc-mirror true \\
     --to-dir /path/to/export
   
-  # Transfer /path/to/export to your disconnected environment
-  
-  # Phase 2 (on disconnected bastion): Push images to registry and create cluster resources
+  # (on disconnected bastion): Push images to registry and create cluster resources
   $0 \\
     --use-oc-mirror true \\
     --from-dir /path/to/export \\
