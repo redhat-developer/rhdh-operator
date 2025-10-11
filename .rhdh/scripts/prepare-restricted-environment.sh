@@ -1010,26 +1010,12 @@ EOF
       foundResources=false
       # oc-mirror v2 generates files with patterns: idms-*.yaml, itms-*.yaml
       
-      for manifest in "${clusterResourcesDir}"/idms-*.yaml "${clusterResourcesDir}"/imageDigestMirrorSet*.yaml; do
+      for manifest in "${clusterResourcesDir}"/idms-*.yaml "${clusterResourcesDir}"/imageDigestMirrorSet*.yaml \
+                      "${clusterResourcesDir}"/itms-*.yaml "${clusterResourcesDir}"/imageTagMirrorSet*.yaml; do
         if [[ -f "${manifest}" ]]; then
-          debugf "Applying ImageDigestMirrorSet: ${manifest}"
+          debugf "Applying manifest: ${manifest}"
           if ! invoke_cluster_cli apply -f "${manifest}" 2>&1; then
-            warnf "Failed to apply ImageDigestMirrorSet: ${manifest}"
-            if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
-              warnf "This is expected on Hosted Control Plane clusters (ROSA HCP, HyperShift, etc.)."
-              warnf "On HCP clusters, image mirrors must be configured in the HostedCluster resource on the management cluster."
-              warnf "Please work with your cluster administrator to configure image mirroring."
-            fi
-          fi
-          foundResources=true
-        fi
-      done
-
-      for manifest in "${clusterResourcesDir}"/itms-*.yaml "${clusterResourcesDir}"/imageTagMirrorSet*.yaml; do
-        if [[ -f "${manifest}" ]]; then
-          debugf "Applying ImageTagMirrorSet: ${manifest}"
-          if ! invoke_cluster_cli apply -f "${manifest}" 2>&1; then
-            warnf "Failed to apply ImageTagMirrorSet: ${manifest}"
+            warnf "Failed to apply manifest: ${manifest}"
             if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
               warnf "This is expected on Hosted Control Plane clusters (ROSA HCP, HyperShift, etc.)."
               warnf "On HCP clusters, image mirrors must be configured in the HostedCluster resource on the management cluster."
