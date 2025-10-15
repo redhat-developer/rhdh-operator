@@ -3162,6 +3162,8 @@ kind: Deployment
 metadata:
   labels:
     app: rhdh-operator
+    app.kubernetes.io/component: backstage-controller
+    app.kubernetes.io/part-of: rhdh
     control-plane: controller-manager
   name: rhdh-operator
   namespace: rhdh-operator
@@ -3214,7 +3216,7 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh/rhdh-hub-rhel9:next
-        image: quay.io/rhdh/rhdh-rhel9-operator:1.8
+        image: quay.io/rhdh/rhdh-rhel9-operator:1.9
         livenessProbe:
           httpGet:
             path: /healthz

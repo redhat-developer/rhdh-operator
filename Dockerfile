@@ -2,7 +2,7 @@
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.6-1758501173@sha256:84286c7555df503df0bd3acb86fe2ad50af82a07f35707918bb0fad312fdc193 AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:9.6-1760420453@sha256:7b1828de52c3bac600a71b81996bf748776a456181a45e2b329b39702cf6486f AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # hadolint ignore=DL3002
@@ -38,7 +38,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Install openssl for FIPS support
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
 # https://registry.access.redhat.com/ubi9/ubi-minimal
-FROM registry.access.redhat.com/ubi9-minimal:9.6-1758184547@sha256:870a2771409310a91a942898856c24a8b701aebaf5f16ab5a41e4b4215843554 AS runtime
+FROM registry.access.redhat.com/ubi9-minimal:9.6-1760515502@sha256:d1bad2a2790eac1651e57e78159a81b72ddfa7b836936b26cf51e09744bf1c2d AS runtime
 # Downstream uncomment
 # RUN cat /cachi2/cachi2.env
 #/ Downstream uncomment
