@@ -1,40 +1,24 @@
 #!/bin/bash
 #
-# Migration Script for Dynamic Plugins to OCI Artifacts
-# 
-# This script helps customers migrate from bundled plugin wrappers to OCI artifacts
-# from reg.rh.io. It detects the current RHDH installation, extracts the catalog index,
-# and provides migration suggestions for airgap environments.
+# This script is to help migrate from bundled plugin wrappers to OCI artifacts. It detects the current RHDH installation, extracts the catalog index, and provides migration suggestions for airgap environments.
 #
-# Usage: ./migrate-dynamic-plugins-to-oci.sh [OPTIONS]
-#
-# Options:
-#   --catalog-index <image>     : Catalog index image (default: quay.io/rhdh/plugin-catalog-index:1.8)
-#   --namespace <namespace>      : Namespace where RHDH is installed (auto-detected if not specified)
-#   --backstage-name <name>      : Name of the Backstage instance (auto-detected if not specified)
-#   --dry-run                    : Show what would be migrated without making changes
-#   --airgap                     : Generate airgap migration instructions
-#   --help                       : Show this help message
+# Requires: oc (OCP) or kubectl (K8s), jq, yq, umoci, base64, opm, skopeo
 
 set -euo pipefail
 
-# Default values
 CATALOG_INDEX="quay.io/rhdh/plugin-catalog-index:1.8"
 NAMESPACE=""
 BACKSTAGE_NAME=""
 DRY_RUN=false
 AIRGAP=false
 TMPDIR=$(mktemp -d)
-# SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"  # Not currently used
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Logging functions
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -59,7 +43,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Help function
 show_help() {
     cat << EOF
 Migration Script for Dynamic Plugins to OCI Artifacts
