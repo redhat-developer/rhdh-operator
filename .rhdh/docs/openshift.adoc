@@ -200,7 +200,7 @@ image::images/dynamic_plugins_in_cr.png[Adding dynamic plugins ConfigMap to RHDH
 
 *Verification*
 
-To check that the dynamic plugins configuration has been loaded, append the following to your Red Hat Developer Hub root URL: `/api/dynamic-plugins-info/loaded-plugins` and check the list of plugins:
+To check that the dynamic plugins configuration has been loaded, append the following to your Red Hat Developer Hub root URL: `/api/extensions/loaded-plugins` and check the list of plugins:
 
 image::images/checking_list_of_plugins.png[List of plugins from RHDH instance]
 
