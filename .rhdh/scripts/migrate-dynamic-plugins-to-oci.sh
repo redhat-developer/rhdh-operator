@@ -258,7 +258,7 @@ function analyze_current_plugins() {
     # Debug: Show what's in the current config
     log_info "Debug: Current dynamic-plugins.yaml content:"
     if [[ -f "$current_config" && -s "$current_config" ]]; then
-        cat "$current_config" | head -20
+        head -20 "$current_config"
         if [[ $(wc -l < "$current_config") -gt 20 ]]; then
             log_info "... (truncated, showing first 20 lines)"
         fi
@@ -406,11 +406,36 @@ function find_oci_equivalents() {
                 .value.registryReference' "$CATALOG_INDEX_JSON" 2>/dev/null || echo "")
         fi
         
+        # Strategy 6: Try reverse contains (plugin name contains catalog key)
+        if [[ -z "$oci_ref" ]]; then
+            oci_ref=$(jq -r --arg plugin "$plugin" '
+                to_entries[] | 
+                select($plugin | contains(.key)) | 
+                .value.registryReference' "$CATALOG_INDEX_JSON" 2>/dev/null || echo "")
+        fi
+        
+        # Strategy 7: Try fuzzy matching (remove common suffixes/prefixes)
+        if [[ -z "$oci_ref" ]]; then
+            local fuzzy_name="$plugin"
+            # Remove common suffixes
+            fuzzy_name="${fuzzy_name%-backend}"
+            fuzzy_name="${fuzzy_name%-frontend}"
+            fuzzy_name="${fuzzy_name%-module}"
+            fuzzy_name="${fuzzy_name%-contrib}"
+            
+            oci_ref=$(jq -r --arg plugin "$fuzzy_name" '
+                to_entries[] | 
+                select(.key | contains($plugin)) | 
+                .value.registryReference' "$CATALOG_INDEX_JSON" 2>/dev/null || echo "")
+        fi
+        
         log_info "  Final oci_ref value: '$oci_ref'"
         if [[ -n "$oci_ref" ]]; then
-            log_success "Found OCI equivalent: $oci_ref"
-            # Update mapping
-            jq --arg plugin "$plugin" --arg oci "$oci_ref" '.[$plugin] = $oci' "$oci_mapping" > "$oci_mapping.tmp" && mv "$oci_mapping.tmp" "$oci_mapping"
+            # Format the OCI reference properly: oci://registry-reference!plugin-name
+            local oci_formatted="oci://$oci_ref!$base_plugin_name"
+            log_success "Found OCI equivalent: $oci_formatted"
+            # Update mapping with formatted OCI reference
+            jq --arg plugin "$plugin" --arg oci "$oci_formatted" '.[$plugin] = $oci' "$oci_mapping" > "$oci_mapping.tmp" && mv "$oci_mapping.tmp" "$oci_mapping"
         else
             log_warn "No OCI equivalent found for: $plugin"
         fi
@@ -439,6 +464,18 @@ function display_results() {
             echo
             log_info "Migration mappings:"
             jq -r 'to_entries[] | "  " + .key + " -> " + .value' "$OCI_MAPPING"
+            
+            echo
+            log_info "=== Migration Instructions ==="
+            echo "To migrate from bundled plugins to OCI artifacts, update your dynamic-plugins.yaml:"
+            echo
+            echo "Before (bundled):"
+            jq -r 'to_entries[] | "  - package: \"./dynamic-plugins/dist/" + .key + "\""' "$OCI_MAPPING"
+            echo
+            echo "After (OCI artifacts):"
+            jq -r 'to_entries[] | "  - package: \"" + .value + "\""' "$OCI_MAPPING"
+            echo
+            log_info "Note: These are the latest plugin versions compatible with RHDH 1.8"
         fi
     fi
     
