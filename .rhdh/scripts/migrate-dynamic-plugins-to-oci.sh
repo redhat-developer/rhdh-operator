@@ -9,8 +9,6 @@ set -euo pipefail
 CATALOG_INDEX="quay.io/rhdh/plugin-catalog-index:1.8"
 NAMESPACE=""
 BACKSTAGE_NAME=""
-DRY_RUN=false
-AIRGAP=false
 TMPDIR=$(mktemp -d)
 
 RED='\033[0;31m'
@@ -19,19 +17,19 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-log_info() {
+function log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-log_success() {
+function log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
-log_warn() {
+function log_warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
-log_error() {
+function log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
@@ -43,13 +41,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-show_help() {
-    cat << EOF
-Migration Script for Dynamic Plugins to OCI Artifacts
+function usage() {
+    echo "Migration Script for Dynamic Plugins to OCI Artifacts
 
 This script helps customers migrate from bundled plugin wrappers to OCI artifacts
 from reg.rh.io. It detects the current RHDH installation, extracts the catalog index,
-and provides migration suggestions for airgap environments.
+and provides migration suggestions.
 
 Usage: $0 [OPTIONS]
 
@@ -57,8 +54,6 @@ Options:
   --catalog-index <image>     : Catalog index image (default: $CATALOG_INDEX)
   --namespace <namespace>     : Namespace where RHDH is installed (auto-detected if not specified)
   --backstage-name <name>     : Name of the Backstage instance (auto-detected if not specified)
-  --dry-run                   : Show what would be migrated without making changes
-  --airgap                    : Generate airgap migration instructions
   --help                      : Show this help message
 
 Examples:
@@ -66,16 +61,11 @@ Examples:
   $0
 
   # Analyze specific installation
-  $0 --namespace rhdh-operator --backstage-name developer-hub
-
-  # Generate airgap migration plan
-  $0 --airgap --dry-run
-
-EOF
+  $0 --namespace rhdh-operator --backstage-name developer-hub"
 }
 
 # Parse command line arguments
-parse_args() {
+function parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             --catalog-index)
@@ -90,21 +80,13 @@ parse_args() {
                 BACKSTAGE_NAME="$2"
                 shift 2
                 ;;
-            --dry-run)
-                DRY_RUN=true
-                shift
-                ;;
-            --airgap)
-                AIRGAP=true
-                shift
-                ;;
             --help)
-                show_help
+                usage
                 exit 0
                 ;;
             *)
                 log_error "Unknown option: $1"
-                show_help
+                usage
                 exit 1
                 ;;
         esac
@@ -112,7 +94,7 @@ parse_args() {
 }
 
 # Check required tools
-check_dependencies() {
+function check_dependencies() {
     local missing_tools=()
     
     for tool in oc skopeo umoci jq yq; do
@@ -129,7 +111,7 @@ check_dependencies() {
 }
 
 # Detect cluster type and connection
-detect_cluster() {
+function detect_cluster() {
     log_info "Detecting cluster environment..."
     
     if ! oc cluster-info &> /dev/null; then
@@ -154,7 +136,7 @@ detect_cluster() {
 }
 
 # Auto-detect RHDH installation
-detect_rhdh_installation() {
+function detect_rhdh_installation() {
     log_info "Auto-detecting RHDH installation..."
     
     if [[ -z "$NAMESPACE" ]]; then
@@ -191,7 +173,7 @@ detect_rhdh_installation() {
 }
 
 # Extract catalog index
-extract_catalog_index() {
+function extract_catalog_index() {
     log_info "Extracting catalog index: $CATALOG_INDEX"
     
     local catalog_dir="$TMPDIR/catalog-index"
@@ -234,7 +216,7 @@ extract_catalog_index() {
 }
 
 # Analyze current plugin configuration
-analyze_current_plugins() {
+function analyze_current_plugins() {
     log_info "Analyzing current plugin configuration..."
     
     local configmap_name="backstage-dynamic-plugins-$BACKSTAGE_NAME"
@@ -323,7 +305,7 @@ analyze_current_plugins() {
 }
 
 # Find OCI equivalents for bundled plugins
-find_oci_equivalents() {
+function find_oci_equivalents() {
     log_info "Finding OCI equivalents for bundled plugins..."
     
     local bundled_plugins="${ALL_BUNDLED_PLUGINS:-$TMPDIR/bundled-plugins.txt}"
@@ -404,7 +386,7 @@ find_oci_equivalents() {
 }
 
 # Generate migration plan
-generate_migration_plan() {
+function generate_migration_plan() {
     log_info "Generating migration plan..."
     
     local migration_plan
@@ -469,13 +451,6 @@ EOF
 
 EOF
 
-    if [[ "$AIRGAP" == "true" ]]; then
-        cat >> "$migration_plan" << EOF
-  airgap_steps:
-    6. "Mirror OCI artifacts to airgap registry"
-    7. "Update registry references for airgap environment"
-EOF
-    fi
 
     log_success "Migration plan generated: $migration_plan"
     MIGRATION_PLAN="$migration_plan"
@@ -487,70 +462,9 @@ EOF
     echo
 }
 
-# Generate airgap instructions
-generate_airgap_instructions() {
-    if [[ "$AIRGAP" != "true" ]]; then
-        return 0
-    fi
-    
-    log_info "Generating airgap migration instructions..."
-    
-    local airgap_script="$TMPDIR/airgap-migration.sh"
-    
-    cat > "$airgap_script" << 'EOF'
-#!/bin/bash
-# Airgap Migration Script for Dynamic Plugins to OCI Artifacts
-# This script helps migrate plugins in an airgap environment
-
-set -euo pipefail
-
-# Configuration
-CATALOG_INDEX="${CATALOG_INDEX:-quay.io/rhdh/plugin-catalog-index:1.8}"
-AIRGAP_REGISTRY="${AIRGAP_REGISTRY:-}"
-MIRROR_DIR="${MIRROR_DIR:-./mirror}"
-
-echo "=== Airgap Migration for Dynamic Plugins ==="
-echo "Catalog Index: $CATALOG_INDEX"
-echo "Airgap Registry: $AIRGAP_REGISTRY"
-echo "Mirror Directory: $MIRROR_DIR"
-echo
-
-# Step 1: Mirror catalog index
-echo "Step 1: Mirroring catalog index..."
-mkdir -p "$MIRROR_DIR"
-skopeo copy "docker://$CATALOG_INDEX" "oci:$MIRROR_DIR/catalog-index:latest"
-
-# Step 2: Extract catalog index
-echo "Step 2: Extracting catalog index..."
-umoci unpack --image "$MIRROR_DIR/catalog-index:latest" "$MIRROR_DIR/catalog-unpacked" --rootless
-
-# Step 3: Extract OCI artifact references
-echo "Step 3: Extracting OCI artifact references..."
-OCI_ARTIFACTS=$(jq -r '.[] | .registryReference' "$MIRROR_DIR/catalog-unpacked/rootfs/index.json")
-
-# Step 4: Mirror OCI artifacts
-echo "Step 4: Mirroring OCI artifacts..."
-for artifact in $OCI_ARTIFACTS; do
-    echo "Mirroring: $artifact"
-    if [[ -n "$AIRGAP_REGISTRY" ]]; then
-        # Mirror to airgap registry
-        skopeo copy "docker://$artifact" "docker://$AIRGAP_REGISTRY/$(basename $artifact)"
-    else
-        # Mirror to local directory
-        skopeo copy "docker://$artifact" "oci:$MIRROR_DIR/$(basename $artifact):latest"
-    fi
-done
-
-echo "Airgap migration completed!"
-EOF
-
-    chmod +x "$airgap_script"
-    log_success "Airgap migration script generated: $airgap_script"
-    AIRGAP_SCRIPT="$airgap_script"
-}
 
 # Display results
-display_results() {
+function display_results() {
     log_success "=== Migration Analysis Complete ==="
     echo
     
@@ -575,19 +489,11 @@ display_results() {
     echo
     log_info "Generated files:"
     echo "  - Migration Plan: $MIGRATION_PLAN"
-    if [[ -n "${AIRGAP_SCRIPT:-}" ]]; then
-        echo "  - Airgap Script: $AIRGAP_SCRIPT"
-    fi
     
-    if [[ "$DRY_RUN" == "true" ]]; then
-        echo
-        log_warn "DRY RUN MODE - No changes were made to the cluster"
-        log_info "To apply changes, run without --dry-run flag"
-    fi
 }
 
 # Main function
-main() {
+function main() {
     log_info "Starting Dynamic Plugins to OCI Artifacts Migration Analysis"
     echo
     
@@ -599,7 +505,6 @@ main() {
     analyze_current_plugins
     find_oci_equivalents
     generate_migration_plan
-    generate_airgap_instructions
     display_results
     
     log_success "Migration analysis completed successfully!"
