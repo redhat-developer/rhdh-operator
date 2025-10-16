@@ -33,7 +33,6 @@ function log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Cleanup function
 cleanup() {
     if [[ -d "$TMPDIR" ]]; then
         rm -rf "$TMPDIR"
@@ -44,9 +43,9 @@ trap cleanup EXIT
 function usage() {
     echo "Migration Script for Dynamic Plugins to OCI Artifacts
 
-This script helps customers migrate from bundled plugin wrappers to OCI artifacts
-from reg.rh.io. It detects the current RHDH installation, extracts the catalog index,
-and provides migration suggestions.
+This script is to help migrate from bundled plugin wrappers to OCI artifacts.
+It detects the current RHDH installation, extracts the catalog index,
+ and provides migration suggestions for airgap environments.
 
 Usage: $0 [OPTIONS]
 
@@ -64,7 +63,6 @@ Examples:
   $0 --namespace rhdh-operator --backstage-name developer-hub"
 }
 
-# Parse command line arguments
 function parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -93,16 +91,15 @@ function parse_args() {
     done
 }
 
-# Check required tools
 function check_dependencies() {
     local missing_tools=()
-    
+
     for tool in oc skopeo umoci jq yq; do
         if ! command -v "$tool" &> /dev/null; then
             missing_tools+=("$tool")
         fi
     done
-    
+
     if [[ ${#missing_tools[@]} -gt 0 ]]; then
         log_error "Missing required tools: ${missing_tools[*]}"
         log_error "Please install the missing tools and try again."
@@ -110,20 +107,19 @@ function check_dependencies() {
     fi
 }
 
-# Detect cluster type and connection
 function detect_cluster() {
     log_info "Detecting cluster environment..."
-    
+
     if ! oc cluster-info &> /dev/null; then
         log_error "Not connected to a Kubernetes/OpenShift cluster"
         log_error "Please ensure you're logged in with 'oc login' or 'kubectl'"
         exit 1
     fi
-    
+
     local cluster_info
     cluster_info=$(oc cluster-info | head -1)
     log_success "Connected to cluster: $cluster_info"
-    
+
     # Detect if it's OpenShift
     if oc get clusterversion &> /dev/null; then
         log_info "Detected OpenShift cluster"
@@ -135,150 +131,189 @@ function detect_cluster() {
     fi
 }
 
-# Auto-detect RHDH installation
 function detect_rhdh_installation() {
     log_info "Auto-detecting RHDH installation..."
-    
+
     if [[ -z "$NAMESPACE" ]]; then
         # Find namespaces with Backstage instances
         local namespaces
         namespaces=$(oc get backstage --all-namespaces -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}' | sort -u)
-        
+
         if [[ -z "$namespaces" ]]; then
             log_error "No Backstage instances found in the cluster"
             exit 1
         fi
-        
+
         # Use the first namespace found
         NAMESPACE=$(echo "$namespaces" | head -1)
         log_info "Auto-detected namespace: $NAMESPACE"
     fi
-    
+
     if [[ -z "$BACKSTAGE_NAME" ]]; then
         # Find Backstage instances in the namespace
         local backstage_instances
         backstage_instances=$(oc get backstage -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
-        
+
         if [[ -z "$backstage_instances" ]]; then
             log_error "No Backstage instances found in namespace: $NAMESPACE"
             exit 1
         fi
-        
+
         # Use the first instance found
         BACKSTAGE_NAME=$(echo "$backstage_instances" | head -1)
         log_info "Auto-detected Backstage instance: $BACKSTAGE_NAME"
     fi
-    
+
     log_success "Target installation: $BACKSTAGE_NAME in namespace $NAMESPACE"
 }
 
-# Extract catalog index
 function extract_catalog_index() {
     log_info "Extracting catalog index: $CATALOG_INDEX"
-    
+
     local catalog_dir="$TMPDIR/catalog-index"
     mkdir -p "$catalog_dir"
-    
+
     # Copy the catalog index image
     log_info "Downloading catalog index image..."
     if ! skopeo copy "docker://$CATALOG_INDEX" "oci:$catalog_dir:latest"; then
         log_error "Failed to download catalog index image"
         exit 1
     fi
-    
+
     # Unpack the image
     log_info "Unpacking catalog index..."
     if ! umoci unpack --image "$catalog_dir:latest" "$catalog_dir/unpacked" --rootless; then
         log_error "Failed to unpack catalog index"
         exit 1
     fi
-    
+
     log_success "Catalog index extracted successfully"
-    
+
     # Store paths for later use
-    # CATALOG_DYNAMIC_PLUGINS="$catalog_dir/unpacked/rootfs/dynamic-plugins.default.yaml"  # Not currently used
     CATALOG_INDEX_JSON="$catalog_dir/unpacked/rootfs/index.json"
-    # CATALOG_ENTITIES_DIR="$catalog_dir/unpacked/rootfs/catalog-entities"  # Not currently used
-    
+    CATALOG_DYNAMIC_PLUGINS="$catalog_dir/unpacked/rootfs/dynamic-plugins.default.yaml"
     # Debug: Check file structure and copy catalog index
     log_info "Debug: Checking catalog index file structure..."
     log_info "Debug: Catalog index file: $CATALOG_INDEX_JSON"
     log_info "Debug: File exists: $(test -f "$CATALOG_INDEX_JSON" && echo "YES" || echo "NO")"
     log_info "Debug: File size: $(test -f "$CATALOG_INDEX_JSON" && wc -c < "$CATALOG_INDEX_JSON" || echo "N/A")"
     log_info "Debug: Directory contents: $(ls -la "$(dirname "$CATALOG_INDEX_JSON")" 2>/dev/null || echo "N/A")"
-    
+
     if [[ -f "$CATALOG_INDEX_JSON" ]]; then
         cp "$CATALOG_INDEX_JSON" "/tmp/debug-catalog-index.json"
         log_info "Debug: Catalog index copied to /tmp/debug-catalog-index.json"
+        
+        # Debug: Show what's in the catalog index
+        log_info "Debug: Catalog index contains $(jq 'length' "$CATALOG_INDEX_JSON") plugins:"
+        jq -r 'keys[]' "$CATALOG_INDEX_JSON" | head -10 | while read -r plugin; do
+            log_info "  - $plugin"
+        done
+        if [[ $(jq 'length' "$CATALOG_INDEX_JSON") -gt 10 ]]; then
+            log_info "  ... and $(($(jq 'length' "$CATALOG_INDEX_JSON") - 10)) more plugins"
+        fi
     else
         log_error "Debug: Catalog index file not found!"
     fi
+    
+    # Extract bundled plugins from the catalog's dynamic-plugins.default.yaml
+    if [[ -f "$CATALOG_DYNAMIC_PLUGINS" ]]; then
+        log_info "Debug: Found dynamic-plugins.default.yaml in catalog index"
+        local catalog_bundled_plugins="$TMPDIR/catalog-bundled-plugins.txt"
+        grep "\./dynamic-plugins/dist/" "$CATALOG_DYNAMIC_PLUGINS" | sed 's/.*package: *\.\/dynamic-plugins\/dist\///' | sed 's/-dynamic$//' > "$catalog_bundled_plugins" 2>/dev/null || true
+        
+        if [[ -f "$catalog_bundled_plugins" && -s "$catalog_bundled_plugins" ]]; then
+            local catalog_bundled_count
+            catalog_bundled_count=$(wc -l < "$catalog_bundled_plugins")
+            log_info "Debug: Found $catalog_bundled_count bundled plugins in catalog index"
+            
+            log_info "Debug: Bundled plugins in catalog index:"
+            while IFS= read -r plugin; do
+                log_info "  - $plugin"
+            done < "$catalog_bundled_plugins"
+        else
+            log_info "Debug: No bundled plugins found in catalog index"
+        fi
+    else
+        log_warn "Debug: dynamic-plugins.default.yaml not found in catalog index"
+    fi
 }
 
-# Analyze current plugin configuration
 function analyze_current_plugins() {
     log_info "Analyzing current plugin configuration..."
-    
+
     local configmap_name="backstage-dynamic-plugins-$BACKSTAGE_NAME"
-    
+
     # Check if the configmap exists
     if ! oc get configmap "$configmap_name" -n "$NAMESPACE" &> /dev/null; then
         log_error "Dynamic plugins configmap not found: $configmap_name"
         exit 1
     fi
-    
+
     # Extract current configuration
     local current_config="$TMPDIR/current-dynamic-plugins.yaml"
     oc get configmap "$configmap_name" -n "$NAMESPACE" -o jsonpath='{.data.dynamic-plugins\.yaml}' > "$current_config"
     
     log_success "Current plugin configuration extracted"
     
+    # Debug: Show what's in the current config
+    log_info "Debug: Current dynamic-plugins.yaml content:"
+    if [[ -f "$current_config" && -s "$current_config" ]]; then
+        cat "$current_config" | head -20
+        if [[ $(wc -l < "$current_config") -gt 20 ]]; then
+            log_info "... (truncated, showing first 20 lines)"
+        fi
+    else
+        log_warn "Current config file is empty or doesn't exist"
+    fi
+
         # Check if dynamic-plugins.default.yaml is included
         if grep -q "dynamic-plugins.default.yaml" "$current_config"; then
         log_info "Configuration includes dynamic-plugins.default.yaml"
         
-        # Get the RHDH container image to extract the default config
-        local rhdh_image
-        rhdh_image=$(oc get deployment "backstage-$BACKSTAGE_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.template.spec.containers[0].image}')
-        log_info "Extracting bundled plugins from RHDH container: $rhdh_image"
-        
-        # Extract bundled plugins from the container
-        local container_bundled_plugins="$TMPDIR/container-bundled-plugins.txt"
-        oc run temp-extract-bundled --image="$rhdh_image" --rm -it --restart=Never --command -- grep "\./dynamic-plugins/dist/" /opt/app-root/src/dynamic-plugins.default.yaml | sed 's/.*package: *\.\/dynamic-plugins\/dist\///' | sed 's/-dynamic$//' | tr -d '\r' > "$container_bundled_plugins" 2>/dev/null || true
-        
-        if [[ -f "$container_bundled_plugins" && -s "$container_bundled_plugins" ]]; then
-            local bundled_count
-            bundled_count=$(wc -l < "$container_bundled_plugins")
-            log_warn "Found $bundled_count bundled plugins in RHDH container that could be migrated"
+        # Use bundled plugins from catalog index instead of container extraction
+        local catalog_bundled_plugins="$TMPDIR/catalog-bundled-plugins.txt"
+        if [[ -f "$CATALOG_DYNAMIC_PLUGINS" ]]; then
+            log_info "Extracting bundled plugins from catalog index..."
+            grep "\./dynamic-plugins/dist/" "$CATALOG_DYNAMIC_PLUGINS" | sed 's/.*package: *\.\/dynamic-plugins\/dist\///' | sed 's/-dynamic$//' > "$catalog_bundled_plugins" 2>/dev/null || true
             
-            log_info "Bundled plugins in container:"
-            while IFS= read -r plugin; do
-                log_info "  - $plugin"
-            done < "$container_bundled_plugins"
+            if [[ -f "$catalog_bundled_plugins" && -s "$catalog_bundled_plugins" ]]; then
+                local bundled_count
+                bundled_count=$(wc -l < "$catalog_bundled_plugins")
+                log_warn "Found $bundled_count bundled plugins in catalog index that could be migrated"
+                
+                log_info "Bundled plugins available for migration:"
+                while IFS= read -r plugin; do
+                    log_info "  - $plugin"
+                done < "$catalog_bundled_plugins"
+            else
+                log_info "No bundled plugins found in catalog index"
+            fi
+        else
+            log_warn "Catalog dynamic-plugins.default.yaml not found"
         fi
     fi
-    
+
     # Analyze custom bundled plugins in the configmap
     local custom_bundled_plugins
     custom_bundled_plugins=$(grep -c "\./dynamic-plugins/dist/" "$current_config" || true)
-    
+
     if [[ "$custom_bundled_plugins" -gt 0 ]]; then
         log_warn "Found $custom_bundled_plugins custom bundled plugin references that need migration"
-        
+
         # Extract bundled plugin names
         local bundled_plugin_names="$TMPDIR/bundled-plugins.txt"
         grep "\./dynamic-plugins/dist/" "$current_config" | sed 's/.*package: *\.\/dynamic-plugins\/dist\///' | sed 's/-dynamic$//' > "$bundled_plugin_names"
-        
+
         log_info "Custom bundled plugins found:"
         while IFS= read -r plugin; do
             log_info "  - $plugin"
         done < "$bundled_plugin_names"
     fi
-    
+
     # Combine all bundled plugins for analysis
     local all_bundled_plugins="$TMPDIR/all-bundled-plugins.txt"
-    if [[ -f "${container_bundled_plugins:-}" ]]; then
-        cp "$container_bundled_plugins" "$all_bundled_plugins"
+    if [[ -f "${catalog_bundled_plugins:-}" ]]; then
+        cp "$catalog_bundled_plugins" "$all_bundled_plugins"
     else
         touch "$all_bundled_plugins"
     fi
@@ -286,7 +321,7 @@ function analyze_current_plugins() {
     if [[ -f "${bundled_plugin_names:-}" ]]; then
         cat "$bundled_plugin_names" >> "$all_bundled_plugins"
     fi
-    
+
     # Remove duplicates
     sort -u "$all_bundled_plugins" > "$all_bundled_plugins.tmp" && mv "$all_bundled_plugins.tmp" "$all_bundled_plugins"
     
@@ -304,7 +339,6 @@ function analyze_current_plugins() {
     ALL_BUNDLED_PLUGINS="$all_bundled_plugins"
 }
 
-# Find OCI equivalents for bundled plugins
 function find_oci_equivalents() {
     log_info "Finding OCI equivalents for bundled plugins..."
     
@@ -385,85 +419,7 @@ function find_oci_equivalents() {
     OCI_MAPPING="$oci_mapping"
 }
 
-# Generate migration plan
-function generate_migration_plan() {
-    log_info "Generating migration plan..."
-    
-    local migration_plan
-    migration_plan="/tmp/migration-plan-$(date +%Y%m%d-%H%M%S).yaml"
-    
-    cat > "$migration_plan" << EOF
-# Migration Plan for Dynamic Plugins to OCI Artifacts
-# Generated on: $(date)
-# Source: $BACKSTAGE_NAME in namespace $NAMESPACE
-# Catalog Index: $CATALOG_INDEX
 
-migration:
-  source:
-    namespace: $NAMESPACE
-    backstage_instance: $BACKSTAGE_NAME
-    configmap: backstage-dynamic-plugins-$BACKSTAGE_NAME
-  
-  target:
-    catalog_index: $CATALOG_INDEX
-    registry: quay.io/rhdh-plugin-catalog
-  
-  plugins_to_migrate:
-EOF
-
-    # Add plugin mappings with proper OCI format
-    if [[ -n "${OCI_MAPPING:-}" && -f "$OCI_MAPPING" ]]; then
-        jq -r 'to_entries[] | "    - original_package: \"./dynamic-plugins/dist/" + .key + "\"\n      plugin_name: \"" + (.key | sub("-dynamic$"; "")) + "\"\n      oci_package: \"oci://" + .value + "!" + (.key | sub("-dynamic$"; "")) + "\"\n      disabled: false\n      migration_required: true"' "$OCI_MAPPING" >> "$migration_plan"
-    fi
-    
-    cat >> "$migration_plan" << EOF
-
-  what_to_do_next:
-    step_1: "Copy the plugin mappings above"
-    step_2: "Open your dynamic-plugins.yaml file"
-    step_3: "Replace the old plugin lines with the new OCI lines"
-    step_4: "Save the file"
-    step_5: "Apply the changes to your cluster"
-    
-  example_before_and_after:
-    before: "package: ./dynamic-plugins/dist/backstage-community-plugin-acr"
-    after: "package: oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-acr:1.8.0--1.15.2!backstage-community-plugin-acr"
-    
-  important_notes:
-    - "Keep a backup of your original file!"
-    - "Test in a development environment first"
-    - "Each plugin has a specific version - don't change the version numbers"
-    
-  copy_paste_ready_config:
-    description: "Replace your current dynamic-plugins.yaml with this:"
-    config: |
-      dynamicPlugins:
-        packages:
-EOF
-
-    # Add the actual config that users can copy-paste
-    if [[ -n "${OCI_MAPPING:-}" && -f "$OCI_MAPPING" ]]; then
-        echo "          # Migrated plugins:" >> "$migration_plan"
-        jq -r 'to_entries[] | "          - package: \"oci://" + .value + "!" + (.key | sub("-dynamic$"; "")) + "\""' "$OCI_MAPPING" >> "$migration_plan"
-    fi
-    
-    cat >> "$migration_plan" << EOF
-
-EOF
-
-
-    log_success "Migration plan generated: $migration_plan"
-    MIGRATION_PLAN="$migration_plan"
-    
-    # Display the migration plan content
-    echo
-    log_info "=== Migration Plan Content ==="
-    cat "$migration_plan"
-    echo
-}
-
-
-# Display results
 function display_results() {
     log_success "=== Migration Analysis Complete ==="
     echo
@@ -486,13 +442,9 @@ function display_results() {
         fi
     fi
     
-    echo
-    log_info "Generated files:"
-    echo "  - Migration Plan: $MIGRATION_PLAN"
     
 }
 
-# Main function
 function main() {
     log_info "Starting Dynamic Plugins to OCI Artifacts Migration Analysis"
     echo
@@ -504,11 +456,8 @@ function main() {
     extract_catalog_index
     analyze_current_plugins
     find_oci_equivalents
-    generate_migration_plan
     display_results
     
     log_success "Migration analysis completed successfully!"
 }
-
-# Run main function
 main "$@"
