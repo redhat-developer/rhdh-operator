@@ -61,7 +61,7 @@ func (m MockClient) List(_ context.Context, _ client.ObjectList, _ ...client.Lis
 
 func (m MockClient) Create(_ context.Context, obj client.Object, _ ...client.CreateOption) error {
 	if obj.GetName() == "" {
-		return fmt.Errorf("update: object Name should not be empty")
+		return fmt.Errorf("create: object Name should not be empty")
 	}
 	uobj := m.objects[NameKind{Name: obj.GetName(), Kind: kind(obj)}]
 	if uobj != nil {
