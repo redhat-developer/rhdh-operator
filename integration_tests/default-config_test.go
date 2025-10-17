@@ -191,7 +191,7 @@ var _ = When("create default backstage", func() {
 		})
 		Expect(err).To(Not(HaveOccurred()))
 
-		// Patching StatefulSets is done by the reconciler in two passes: first deleting the StatefulSet, then recreating it in the next reconcilation.
+		// Patching StatefulSets is done by the reconciler in two passes: first deleting the StatefulSet, then recreating it in the next reconciliation.
 		// to make next reconciliation happen (forcing ReconcileAny is not working on a real cluster)
 		Expect(update.GetAnnotations()["name"]).To(BeEmpty())
 		update.SetAnnotations(map[string]string{"name": "value"})
