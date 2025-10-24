@@ -53,7 +53,7 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 			stdin, err := cmd.StdinPipe()
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 			go func() {
-				defer stdin.Close()
+				defer func() { _ = stdin.Close() }()
 				_, _ = io.WriteString(stdin, fmt.Sprintf(`
 apiVersion: rhdh.redhat.com/v1alpha1
 kind: Backstage
