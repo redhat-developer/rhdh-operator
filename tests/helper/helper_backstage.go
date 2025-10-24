@@ -1,5 +1,6 @@
 package helper
 
+//nolint:staticcheck // Dot import more readable in test files
 import (
 	"context"
 	"crypto/tls"
@@ -12,8 +13,8 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck // Dot import more readable in test files
-	. "github.com/onsi/gomega"    //nolint:staticcheck // Dot import more readable in test files
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 )
 
