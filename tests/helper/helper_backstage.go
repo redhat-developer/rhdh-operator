@@ -1,5 +1,6 @@
 package helper
 
+//nolint:staticcheck // Dot import more readable in test files
 import (
 	"context"
 	"crypto/tls"
@@ -70,7 +71,11 @@ func GuestAuth(baseUrl string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error while trying to GET %q: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			_, _ = fmt.Fprintf(GinkgoWriter, "failed to close response body: %v\n", err)
+		}
+	}()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("error while trying to read response body from 'GET %q': %w", url, err)
@@ -93,7 +98,7 @@ func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus
 		"-n", ns,
 	) // #nosec G204
 	status, err := Run(cmd)
-	fmt.Fprintln(GinkgoWriter, string(status))
+	_, _ = fmt.Fprintln(GinkgoWriter, string(status))
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(string(status)).Should(ContainSubstring(fmt.Sprintf(`"phase":%q`, expectedStatus)),
 		fmt.Sprintf("backstage pod in %s status", status))
@@ -102,7 +107,7 @@ func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus
 func VerifyBackstageCRStatus(g Gomega, ns string, crName string, statusMatcher types.GomegaMatcher) {
 	cmd := exec.Command(GetPlatformTool(), "get", "backstage", crName, "-o", "jsonpath={.status.conditions}", "-n", ns) // #nosec G204
 	status, err := Run(cmd)
-	fmt.Fprintln(GinkgoWriter, string(status))
+	_, _ = fmt.Fprintln(GinkgoWriter, string(status))
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(string(status)).Should(statusMatcher)
 }
@@ -173,7 +178,7 @@ var defaultApiEndpointTests = []ApiEndpointTest{
 
 func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpointTest) {
 	host, err := GetBackstageRouteHost(ns, crName)
-	fmt.Fprintln(GinkgoWriter, host)
+	_, _ = fmt.Fprintln(GinkgoWriter, host)
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(host).ShouldNot(BeEmpty())
 
@@ -212,10 +217,14 @@ func VerifyBackstageAppAccess(g Gomega, baseUrl string, tests []ApiEndpointTest)
 			}
 		}
 
-		fmt.Fprintf(GinkgoWriter, "--> GET %q\n", url)
+		_, _ = fmt.Fprintf(GinkgoWriter, "--> GET %q\n", url)
 		resp, rErr := httpClient.Do(req)
 		g.Expect(rErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while trying to GET %q", url))
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				_, _ = fmt.Fprintf(GinkgoWriter, "failed to close response body: %v\n", err)
+			}
+		}()
 		body, rErr := io.ReadAll(resp.Body)
 		g.Expect(rErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while trying to read response body from 'GET %q'", url))
 		bodyStr := string(body)
