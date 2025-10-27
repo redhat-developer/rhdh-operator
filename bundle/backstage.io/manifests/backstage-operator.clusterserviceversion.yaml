@@ -45,13 +45,13 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-10-03T13:20:41Z"
+    createdAt: "2025-10-14T17:57:09Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   labels:
     operatorframework.io/arch.amd64: supported
-  name: backstage-operator.v0.8.0
+  name: backstage-operator.v0.9.0
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -256,7 +256,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/rhdh-community/operator:0.8.0
+                image: quay.io/rhdh-community/operator:0.9.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -358,8 +358,6 @@ spec:
   maintainers:
   - email: asoro@redhat.com
     name: Armel Soro
-  - email: cdaley@redhat.com
-    name: Corey Daley
   - email: gazarenk@redhat.com
     name: Gennady Azarenkov
   - email: nboldt@redhat.com
@@ -369,4 +367,4 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 0.8.0
+  version: 0.9.0

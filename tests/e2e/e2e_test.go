@@ -80,7 +80,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 				crName:     "bs-app-config",
 				additionalApiEndpointTests: []helper.ApiEndpointTest{
 					{
-						Endpoint:               "/api/dynamic-plugins-info/loaded-plugins",
+						Endpoint:               "/api/extensions/loaded-plugins",
 						BearerTokenRetrievalFn: helper.GuestAuth,
 						ExpectedHttpStatusCode: 200,
 						BodyMatcher: gcustom.MakeMatcher(func(respBody string) (bool, error) {
@@ -88,7 +88,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 								return false, fmt.Errorf("invalid json: %q", respBody)
 							}
 							return gjson.Get(respBody, "#").Int() > 0, nil
-						}).WithMessage("be a valid and non-empty JSON array. This is the response from the 'GET /api/dynamic-plugins-info/loaded-plugins' endpoint, using the guest user."),
+						}).WithMessage("be a valid and non-empty JSON array. This is the response from the 'GET /api/extensions/loaded-plugins' endpoint, using the guest user."),
 					},
 				},
 			},
