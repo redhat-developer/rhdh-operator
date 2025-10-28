@@ -46,31 +46,9 @@ func installRhdhOperatorManifest(operatorManifest string) {
 	}()
 	_, _ = fmt.Fprintf(GinkgoWriter, "Installing RHDH Operator Manifest: %q\n", p)
 
-	withSL := os.Getenv("SEALIGHTS_ENABLED") == "true"
-	if withSL {
-		data, err := os.ReadFile(p)
-		Expect(err).ShouldNot(HaveOccurred())
-		updated := strings.ReplaceAll(string(data), "quay.io/rhdh/rhdh-rhel9-operator", "quay.io/rhdh/rhdh-rhel9-operator-sealights")
-		err = os.WriteFile(p, []byte(updated), 0644)
-		Expect(err).ShouldNot(HaveOccurred())
-	}
-
 	cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
 	_, err := helper.Run(cmd)
 	Expect(err).ShouldNot(HaveOccurred())
-
-	if withSL {
-		// Sealights image is private => user is expected to create a pull secret in the rhdh-operator namespace
-		Eventually(func(g Gomega) {
-			cmd := exec.Command(helper.GetPlatformTool(), "-n", _namespace, "get", "deployment", "rhdh-operator")
-			_, rErr := helper.Run(cmd)
-			g.Expect(rErr).ShouldNot(HaveOccurred())
-		}, time.Minute, 3*time.Second).Should(Succeed())
-
-		// Patch Deployment
-		err = helper.AddPullSecretToDeployment(_namespace, "rhdh-operator", "rhdh-pull-secret")
-		Expect(err).ShouldNot(HaveOccurred())
-	}
 }
 
 func installRhdhOperator(flavor string) (podLabel string) {
