@@ -42,7 +42,7 @@ spec:
 
 When `monitoring.enabled` is set to `true`, the operator will automatically:
 
-1. **Create a ServiceMonitor resource** named `<backstage-name>-metrics` in the same namespace as your Backstage instance
+1. **Create a ServiceMonitor resource** named `metrics-<backstage-name>` in the same namespace as your Backstage instance
 2. **Configure the ServiceMonitor** to scrape metrics from the `/metrics` endpoint on port `9464`
 3. **Set appropriate labels** for Prometheus discovery (`app.kubernetes.io/instance` and `app.kubernetes.io/name`)
 4. **Manage the lifecycle** of the ServiceMonitor (create, update, delete) along with your Backstage instance
@@ -57,7 +57,7 @@ The automatically created ServiceMonitor will have the following configuration:
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: <backstage-name>-metrics
+  name: metrics-<backstage-name>
   namespace: <backstage-namespace>
   labels:
     app.kubernetes.io/instance: <backstage-name>
@@ -147,10 +147,10 @@ You can verify that the ServiceMonitor has been created successfully using the f
 # Check if the ServiceMonitor was created
 $ oc get servicemonitor -n <namespace>
 NAME                           AGE
-<backstage-name>-metrics      1m
+metrics-<backstage-name>      1m
 
 # View the ServiceMonitor details
-$ oc describe servicemonitor <backstage-name>-metrics -n <namespace>
+$ oc describe servicemonitor metrics-<backstage-name> -n <namespace>
 ```
 
 You can then verify metrics are being captured by navigating to the OpenShift Console:
@@ -176,7 +176,7 @@ $ cat <<EOF > /tmp/${CR_NAME}.ServiceMonitor.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: ${CR_NAME}-metrics
+  name: metrics-${CR_NAME}
   namespace: ${MY_PROJECT}
   labels:
     app.kubernetes.io/instance: ${CR_NAME}
@@ -253,7 +253,7 @@ If metrics are not appearing in Prometheus:
 
 1. **Verify the ServiceMonitor is targeting the correct service**:
    ```bash
-   $ oc get servicemonitor <backstage-name>-metrics -o yaml
+   $ oc get servicemonitor metrics-<backstage-name> -o yaml
    $ oc get service -l app.kubernetes.io/instance=<backstage-name>
    ```
 
@@ -281,6 +281,6 @@ If you previously created ServiceMonitor resources manually and want to migrate 
        enabled: true
    ```
 
-3. **Verify the new ServiceMonitor is created** by the operator with the naming convention `<backstage-name>-metrics`.
+3. **Verify the new ServiceMonitor is created** by the operator with the naming convention `metrics-<backstage-name>`.
 
 The operator-managed ServiceMonitor will have the same functionality as your manually created one, but will be automatically managed throughout the lifecycle of your Backstage instance.
