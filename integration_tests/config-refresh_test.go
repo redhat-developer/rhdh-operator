@@ -94,7 +94,7 @@ organization:
 			podName := podList.Items[0].Name
 			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "cat /my/mount/path/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
-			out = strings.Replace(out, "\r", "", -1)
+			out = strings.ReplaceAll(out, "\r", "")
 			g.Expect(out).To(Equal(conf))
 
 			out, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainerName(deploy), "echo $sec11")
