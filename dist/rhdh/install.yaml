@@ -2336,7 +2336,7 @@ data:
                 - ./install-dynamic-plugins.sh
                 - /dynamic-plugins-root
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-              image: quay.io/rhdh/rhdh-hub-rhel9:next
+              image: quay.io/rhdh-community/rhdh:next
               imagePullPolicy: IfNotPresent
               securityContext:
                 readOnlyRootFilesystem: true
@@ -2375,7 +2375,7 @@ data:
           containers:
             - name: backstage-backend
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-              image: quay.io/rhdh/rhdh-hub-rhel9:next
+              image: quay.io/rhdh-community/rhdh:next
               imagePullPolicy: IfNotPresent
               args:
                 - "--config"
@@ -3216,7 +3216,7 @@ spec:
         - name: RELATED_IMAGE_postgresql
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
-          value: quay.io/rhdh/rhdh-hub-rhel9:next
+          value: quay.io/rhdh-community/rhdh:next
         image: quay.io/rhdh/rhdh-rhel9-operator:1.9
         livenessProbe:
           httpGet:
