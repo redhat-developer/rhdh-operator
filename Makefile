@@ -62,11 +62,8 @@ else
 endif
 
 # SED_I is used for in-place sed command compatibility between GNU and BSD (macOS) sed versions
-ifeq ($(shell uname -s),Darwin)
-SED_I := -i ''
-else
-SED_I := -i
-endif
+# Check is based on the fact that GNU sed supports --version; BSD/macOS sed does not.
+SED_I := $(shell if sed --version >/dev/null 2>&1; then printf '%s' "-i"; else printf '%s' "-i ''"; fi)
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
