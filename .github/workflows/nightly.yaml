@@ -84,7 +84,7 @@ jobs:
         run: make test
 
       - name: Delete unit test cluster
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ matrix.branch == 'release-1.6' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           kind delete cluster --name unit-test-cluster || true
 
