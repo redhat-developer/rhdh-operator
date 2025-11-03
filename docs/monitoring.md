@@ -12,7 +12,7 @@ When deploying RHDH using the [RHDH Operator](https://github.com/redhat-develope
 - **Prometheus Operator** (required when enabling `spec.monitoring.enabled: true`)
   - Provides the `ServiceMonitor` Custom Resource Definition (CRD)
   - On **OpenShift**: Prometheus Operator is pre-installed
-  - On **vanilla Kubernetes** (e.g., kind, minikube, EKS, AKS): You must install it manually
+  - On **vanilla Kubernetes** (e.g., kind, minikube): You must install it manually
   - Installation guide: [Prometheus Operator Getting Started](https://prometheus-operator.dev/docs/getting-started/installation/)
 
 ## Metrics Monitoring
@@ -27,12 +27,7 @@ The operator can automatically create and manage ServiceMonitor resources for yo
 
 **Important**: Before enabling monitoring on vanilla Kubernetes clusters, you must first install the Prometheus Operator. Without the Prometheus Operator installed, the ServiceMonitor CRD will not be available and reconciliation will fail with an error: `no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`.
 
-To install Prometheus Operator on vanilla Kubernetes:
-
-```bash
-# Install Prometheus Operator CRDs and components
-kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml
-```
+To install Prometheus Operator, follow the [official installation guide](https://prometheus-operator.dev/docs/getting-started/installation/).
 
 Once Prometheus Operator is installed, enable automatic ServiceMonitor creation by configuring your Backstage Custom Resource as follows:
 
@@ -248,12 +243,8 @@ If you encounter the error `failed to apply ServiceMonitor: no matches for kind 
 
 **Solution:**
 
-1. **For vanilla Kubernetes clusters** (kind, minikube, EKS, AKS, GKE):
+1. **For vanilla Kubernetes clusters** (kind, minikube): Install the Prometheus Operator by following the [official installation guide](https://prometheus-operator.dev/docs/getting-started/installation/). After installation, verify the ServiceMonitor CRD is installed:
    ```bash
-   # Install Prometheus Operator
-   kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/bundle.yaml
-   
-   # Verify the ServiceMonitor CRD is installed
    kubectl get crd servicemonitors.monitoring.coreos.com
    ```
 
