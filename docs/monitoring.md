@@ -13,7 +13,7 @@ When deploying RHDH using the [RHDH Operator](https://github.com/redhat-develope
   - Provides the `ServiceMonitor` Custom Resource Definition (CRD)
   - On **OpenShift**: Prometheus Operator is pre-installed
   - On **vanilla Kubernetes** (e.g., kind, minikube, EKS, AKS): You must install it manually
-  - Installation guide: [Prometheus Operator Getting Started](https://prometheus-operator.dev/docs/user-guides/getting-started/)
+  - Installation guide: [Prometheus Operator Getting Started](https://prometheus-operator.dev/docs/getting-started/installation/)
 
 ## Metrics Monitoring
 
