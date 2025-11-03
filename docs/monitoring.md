@@ -9,6 +9,11 @@ When deploying RHDH using the [RHDH Operator](https://github.com/redhat-develope
 - Kubernetes 1.19+
 - PV provisioner support in the underlying infrastructure
 - RHDH Operator deployed in your cluster
+- **Prometheus Operator** (required when enabling `spec.monitoring.enabled: true`)
+  - Provides the `ServiceMonitor` Custom Resource Definition (CRD)
+  - On **OpenShift**: Prometheus Operator is pre-installed
+  - On **vanilla Kubernetes** (e.g., kind, minikube): You must install it manually
+  - Installation guide: [Prometheus Operator Getting Started](https://prometheus-operator.dev/docs/getting-started/installation/)
 
 ## Metrics Monitoring
 
@@ -20,7 +25,11 @@ The operator can automatically create and manage ServiceMonitor resources for yo
 
 #### Enabling Automatic Monitoring
 
-To enable automatic ServiceMonitor creation, configure your Backstage Custom Resource as follows:
+**Important**: Before enabling monitoring on vanilla Kubernetes clusters, you must first install the Prometheus Operator. Without the Prometheus Operator installed, the ServiceMonitor CRD will not be available and reconciliation will fail with an error: `no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`.
+
+To install Prometheus Operator, follow the [official installation guide](https://prometheus-operator.dev/docs/getting-started/installation/).
+
+Once Prometheus Operator is installed, enable automatic ServiceMonitor creation by configuring your Backstage Custom Resource as follows:
 
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha4
@@ -227,6 +236,19 @@ spec:
 ```
 
 ## Troubleshooting
+
+### Error: "no matches for kind ServiceMonitor"
+
+If you encounter the error `failed to apply ServiceMonitor: no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`, this means the Prometheus Operator is not installed in your cluster.
+
+**Solution:**
+
+1. **For vanilla Kubernetes clusters** (kind, minikube): Install the Prometheus Operator by following the [official installation guide](https://prometheus-operator.dev/docs/getting-started/installation/). After installation, verify the ServiceMonitor CRD is installed:
+   ```bash
+   kubectl get crd servicemonitors.monitoring.coreos.com
+   ```
+
+2. **For OpenShift clusters**: The Prometheus Operator is pre-installed. Ensure [monitoring for user-defined projects](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/monitoring/configuring-user-workload-monitoring#preparing-to-configure-the-monitoring-stack-uwm) is enabled.
 
 ### ServiceMonitor Not Created
 
