@@ -5,26 +5,6 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "rhdh.redhat.com/v1alpha1",
-          "kind": "Backstage",
-          "metadata": {
-            "labels": {
-              "app.kubernetes.io/name": "backstage"
-            },
-            "name": "developer-hub"
-          }
-        },
-        {
-          "apiVersion": "rhdh.redhat.com/v1alpha2",
-          "kind": "Backstage",
-          "metadata": {
-            "labels": {
-              "app.kubernetes.io/name": "backstage"
-            },
-            "name": "developer-hub"
-          }
-        },
-        {
           "apiVersion": "rhdh.redhat.com/v1alpha3",
           "kind": "Backstage",
           "metadata": {
@@ -49,7 +29,7 @@ metadata:
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.9
-    createdAt: "2025-10-14T17:57:10Z"
+    createdAt: "2025-11-04T13:51:16Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -73,28 +53,12 @@ metadata:
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
-  name: rhdh-operator.v1.9.0
+  name: backstage-operator.v1.9.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Backstage is the Schema for the Red Hat Developer Hub backstages
-        API. It comes with pre-built plug-ins, configuration settings, and deployment
-        mechanisms, which can help streamline the process of setting up a self-managed
-        internal developer portal for adopters who are just starting out.
-      displayName: Red Hat Developer Hub
-      kind: Backstage
-      name: backstages.rhdh.redhat.com
-      version: v1alpha1
-    - description: Backstage is the Schema for the Red Hat Developer Hub backstages
-        API. It comes with pre-built plug-ins, configuration settings, and deployment
-        mechanisms, which can help streamline the process of setting up a self-managed
-        internal developer portal for adopters who are just starting out.
-      displayName: Red Hat Developer Hub
-      kind: Backstage
-      name: backstages.rhdh.redhat.com
-      version: v1alpha2
     - description: |-
         Backstage is the Schema for the Red Hat Developer Hub backstages API.
         It comes with pre-built plug-ins, configuration settings, and deployment mechanisms,
