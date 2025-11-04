@@ -52,20 +52,20 @@ data:
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
-        disabled: false
-        pluginConfig:
-          catalog:
-            providers:
-              github:
-                myorg:
-                  organization: '${GH_ORG}'
-                  schedule:
-                    # supports cron, ISO duration, "human duration" (used below)
-                    frequency: { minutes: 30}
-                    # supports ISO duration, "human duration (used below)
-                    timeout: { minutes: 3}
-                    initialDelay: { seconds: 15}
+#      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
+#        disabled: false
+#        pluginConfig:
+#          catalog:
+#            providers:
+#              github:
+#                myorg:
+#                  organization: '${GH_ORG}'
+#                  schedule:
+#                    # supports cron, ISO duration, "human duration" (used below)
+#                    frequency: { minutes: 30}
+#                    # supports ISO duration, "human duration (used below)
+#                    timeout: { minutes: 3}
+#                    initialDelay: { seconds: 15}
 
 ---
 apiVersion: rhdh.redhat.com/v1alpha4
@@ -83,7 +83,7 @@ spec:
           spec:
             containers:
               - name: backstage-backend
-                image: quay.io/rhdh/rhdh-hub-rhel9:latest
+                image: quay.io/rhdh-community/rhdh:next
   application:
     appConfig:
       configMaps:
