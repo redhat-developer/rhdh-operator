@@ -130,8 +130,7 @@ Examples:
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6
-    'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-dynatrace:1.8.0--10.6.0!backstage-community-plugin-dynatrace'
-    'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-analytics-provider-segment:1.8.0--1.16.0'
+    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-dynatrace:1.8.0--10.6.0!backstage-community-plugin-dynatrace
 "
 }
 
