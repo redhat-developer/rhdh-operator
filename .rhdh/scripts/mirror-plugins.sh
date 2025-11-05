@@ -431,22 +431,9 @@ function resolve_plugin_index() {
       fi
     done <<< "$package_files"
     
-    # Remove duplicates
+    # Remove duplicates and sort
     if [[ ${#temp_plugin_images[@]} -gt 0 ]]; then
-      local unique_plugins=()
-      for plugin in "${temp_plugin_images[@]}"; do
-        local found=false
-        for existing in "${unique_plugins[@]}"; do
-          if [[ "$existing" == "$plugin" ]]; then
-            found=true
-            break
-          fi
-        done
-        if [[ "$found" == "false" ]]; then
-          unique_plugins+=("$plugin")
-        fi
-      done
-      PLUGIN_IMAGES=("${unique_plugins[@]}")
+      mapfile -t PLUGIN_IMAGES < <(printf "%s\n" "${temp_plugin_images[@]}" | sort -u)
     fi
     
     infof "Found ${#PLUGIN_IMAGES[@]} unique plugins from catalog index"
