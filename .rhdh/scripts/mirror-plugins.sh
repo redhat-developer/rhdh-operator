@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script to mirror Red Hat Developer Hub dynamic plugin OCI artifacts for airgapped deployments.
+# Script to mirror Red Hat Developer Hub dynamic plugin OCI artifacts for deployments in restricted environments.
 # This script is installation-method agnostic and works with both operator and helm deployments
 # on both OpenShift and Kubernetes platforms.
 #
@@ -68,7 +68,7 @@ function usage() {
   echo "
 Red Hat Developer Hub - Dynamic Plugin OCI Artifact Mirroring Script
 
-This script mirrors dynamic plugin OCI artifacts for airgapped RHDH deployments.
+This script mirrors dynamic plugin OCI artifacts for RHDH deployments in restricted environments.
 It is installation-method agnostic and works with both operator and helm deployments.
 
 Usage:
@@ -336,17 +336,20 @@ function push_image_from_archive() {
   return 0
 }
 
-# Plugin resolution functions
+# Download the catalog index, extract package YAML files,
+# filter by version, and return a unique list of plugin OCI URLs
 function resolve_plugin_index() {
   local index_url="$1"
   infof "Resolving plugins from catalog index: $index_url"
   
-  # Extract registry and version from OCI URL
-  if [[ "$index_url" =~ oci://([^:]+):(.+) ]]; then
+  # Extract registry and version/digest from OCI URL
+  # Support both :tag and @sha256:digest formats
+  if [[ "$index_url" =~ oci://([^:@]+)(:|@)(.+) ]]; then
     local registry="${BASH_REMATCH[1]}"
-    local version="${BASH_REMATCH[2]}"
+    local separator="${BASH_REMATCH[2]}"
+    local version="${BASH_REMATCH[3]}"
     
-    debugf "Extracting plugin catalog index image: $registry:$version"
+    debugf "Extracting plugin catalog index image: $registry$separator$version"
     
     # Create temporary directory for extracting the catalog index
     local temp_dir
@@ -357,8 +360,8 @@ function resolve_plugin_index() {
     trap "rm -rf '$temp_dir'" RETURN
     
     # Extract the catalog index image
-    if ! skopeo copy "docker://$registry:$version" "dir:$temp_dir/catalog-index" 2>/dev/null; then
-      errorf "Failed to extract catalog index image: $registry:$version"
+    if ! skopeo copy "docker://$registry$separator$version" "dir:$temp_dir/catalog-index" 2>/dev/null; then
+      errorf "Failed to extract catalog index image: $registry$separator$version"
       return 1
     fi
     
@@ -404,15 +407,16 @@ function resolve_plugin_index() {
         oci_urls=$(grep -E "^\s*dynamicArtifact:\s*oci://" "$package_file" 2>/dev/null | sed 's/.*dynamicArtifact:\s*//' | tr -d ' ')
         
         if [[ -n "$oci_urls" ]]; then
-          # Filter by version if specified (not 'next' or 'latest')
-          if [[ "$version" != "next" && "$version" != "latest" ]]; then
+          # Filter by version if specified (not 'next', 'latest', or sha256 digest)
+          # When using @sha256:digest for catalog index, don't filter plugins by digest
+          if [[ "$version" != "next" && "$version" != "latest" && ! "$version" =~ ^sha256: ]]; then
             # Check if the OCI URL contains the version
             if echo "$oci_urls" | grep -q ":$version"; then
               temp_plugin_images+=("$oci_urls")
               ((filtered_plugins++))
             fi
           else
-            # For 'next' or 'latest', include all OCI URLs
+            # For 'next', 'latest', or digest-based catalog index, include all OCI URLs
             temp_plugin_images+=("$oci_urls")
             ((filtered_plugins++))
           fi
@@ -439,17 +443,19 @@ function resolve_plugin_index() {
     fi
     
     infof "Found ${#PLUGIN_IMAGES[@]} unique plugins from catalog index"
-    if [[ "$version" != "next" && "$version" != "latest" ]]; then
+    if [[ "$version" != "next" && "$version" != "latest" && ! "$version" =~ ^sha256: ]]; then
       debugf "Filtered to ${#PLUGIN_IMAGES[@]} plugins matching version $version"
     fi
     
     return 0
   else
-    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry/org/image:tag"
+    errorf "Invalid OCI URL format: $index_url. Expected format: oci://registry/org/image:tag or oci://registry/org/image@sha256:digest"
     return 1
   fi
 }
 
+# Process a file containing one OCI URL per line,
+# ignoring comments and blank lines, and return a list of valid plugin URLs
 function load_plugin_list_from_file() {
   local file_path="$1"
   infof "Loading plugin list from file: $file_path"
