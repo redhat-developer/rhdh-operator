@@ -342,14 +342,21 @@ function resolve_plugin_index() {
   local index_url="$1"
   infof "Resolving plugins from catalog index: $index_url"
   
-  # Extract registry and version/digest from OCI URL
-  # Support both :tag and @sha256:digest formats
-  if [[ "$index_url" =~ oci://([^:@]+)(:|@)(.+) ]]; then
-    local registry="${BASH_REMATCH[1]}"
-    local separator="${BASH_REMATCH[2]}"
-    local version="${BASH_REMATCH[3]}"
+  # Strip oci:// prefix and extract version for filtering
+  if [[ "$index_url" =~ ^oci://(.+) ]]; then
+    local registry_ref="${BASH_REMATCH[1]}"
     
-    debugf "Extracting plugin catalog index image: $registry$separator$version"
+    # Extract version/digest for plugin filtering logic
+    local version
+    if [[ "$registry_ref" =~ @(.+)$ ]]; then
+      # Digest format: capture everything after @
+      version="${BASH_REMATCH[1]}"
+    elif [[ "$registry_ref" =~ :([^:@]+)$ ]]; then
+      # Tag format: capture everything after last :
+      version="${BASH_REMATCH[1]}"
+    fi
+    
+    debugf "Extracting plugin catalog index image: $registry_ref"
     
     # Create temporary directory for extracting the catalog index
     local temp_dir
@@ -360,8 +367,8 @@ function resolve_plugin_index() {
     trap "rm -rf '$temp_dir'" RETURN
     
     # Extract the catalog index image
-    if ! skopeo copy "docker://$registry$separator$version" "dir:$temp_dir/catalog-index" 2>/dev/null; then
-      errorf "Failed to extract catalog index image: $registry$separator$version"
+    if ! skopeo copy "docker://$registry_ref" "dir:$temp_dir/catalog-index" 2>/dev/null; then
+      errorf "Failed to extract catalog index image: $registry_ref"
       return 1
     fi
     
