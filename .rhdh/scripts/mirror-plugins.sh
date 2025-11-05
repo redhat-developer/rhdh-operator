@@ -10,6 +10,8 @@ set -euo pipefail
 
 NC='\033[0m'
 
+DEBUG=0
+
 PLUGIN_INDEX=""
 PLUGIN_LIST_FILE=""
 PLUGIN_URLS=()
@@ -45,7 +47,7 @@ function warnf() {
 }
 
 function debugf() {
-  logf "DEBUG" "\033[0;90m" "$1"
+  if [[ $DEBUG -eq 1 ]]; then logf "DEBUG" "\033[0;90m" "$1"; fi
 }
 
 function errorf() {
@@ -88,12 +90,6 @@ Options:
   --from-dir </absolute/path/to/dir>     : Load plugins from the specified directory and push to registry
                                            (for use in disconnected environments after transferring the directory)
   -h, --help                             : Show this help message
-
-Important Notes:
-  - When using --plugins on the command line, URLs containing '!' must be quoted with single quotes
-    Example: 'oci://registry/image:tag!subpath'
-  - When using --plugin-list with a text file, do NOT use quotes around URLs
-    The file should contain raw URLs, one per line
 
 Examples:
 
@@ -290,40 +286,26 @@ function extract_last_two_elements() {
   fi
 }
 
-# Copy OCI images to registry, save to directory, or push from directory using skopeo
-function mirror_image_to_registry() {
+# Copy OCI image using skopeo
+# Supports both registry (docker://) and directory (dir://) destinations
+function mirror_image() {
   local src_image="$1"
-  local dest_image="$2"
+  local dest="$2"
   
-  infof "Mirroring $src_image to $dest_image..."
+  # Strip OCI subpath (!suffix) if present, then strip oci:// prefix if present
+  local docker_ref="${src_image%!*}"
+  docker_ref="${docker_ref#oci://}"
   
-  # Handle OCI URLs (remove oci:// prefix and handle subpaths)
-  if [[ "$src_image" == oci://* ]]; then
-    # Extract the Docker image reference (everything before the ! for subpaths)
-    local docker_ref="${src_image%!*}"
-    docker_ref="${docker_ref#oci://}"
-    skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false "docker://$docker_ref" "docker://$dest_image" || return 1
+  # Add appropriate flags based on destination type
+  local dest_flags=""
+  if [[ "$dest" == docker://* ]]; then
+    dest_flags="--dest-tls-verify=false"
+    infof "Mirroring $src_image to ${dest#docker://}..."
   else
-    skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false "docker://$src_image" "docker://$dest_image" || return 1
+    debugf "Saving $src_image to ${dest#dir:}..."
   fi
-  return 0
-}
-
-function mirror_image_to_archive() {
-  local src_image="$1"
-  local archive_path="$2"
-
-  debugf "Saving $src_image to $archive_path..."
   
-  # Handle OCI URLs (remove oci:// prefix and handle subpaths)
-  if [[ "$src_image" == oci://* ]]; then
-    # Extract the Docker image reference (everything before the ! for subpaths)
-    local docker_ref="${src_image%!*}"
-    docker_ref="${docker_ref#oci://}"
-    skopeo copy --preserve-digests --remove-signatures --all "docker://$docker_ref" "dir:$archive_path" || return 1
-  else
-    skopeo copy --preserve-digests --remove-signatures --all "docker://$src_image" "dir:$archive_path" || return 1
-  fi
+  skopeo copy --preserve-digests --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" || return 1
   return 0
 }
 
@@ -596,7 +578,7 @@ function mirror_plugins() {
     # Mirror to registry or directory
     if [[ -n "$TO_REGISTRY" ]]; then
       set +e
-      mirror_image_to_registry "$img" "$targetImg"
+      mirror_image "$img" "docker://$targetImg"
       ret=$?
       set -e
       if [ $ret -eq 0 ]; then
@@ -609,7 +591,7 @@ function mirror_plugins() {
       if [ ! -d "$imgDir" ]; then
         mkdir -p "${imgDir}"
         set +e
-        mirror_image_to_archive "$img" "$imgDir"
+        mirror_image "$img" "dir:$imgDir"
         ret=$?
         set -e
         if [ $ret -eq 0 ]; then
