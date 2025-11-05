@@ -679,7 +679,7 @@ if [[ -n "${TO_DIR}" ]]; then
   infof "Next steps for fully disconnected environments:"
   infof "1. Transfer ${TO_DIR} to your disconnected network"
   infof "2. Run this script again with --from-dir and --to-registry:"
-  infof "   $0 --from-dir ${TO_DIR} --to-registry <your-registry>"
+  infof "   $0 --from-dir ${TO_DIR} --to-registry YOUR_REGISTRY"
   infof ""
 elif [[ -n "${TO_REGISTRY}" ]]; then
   infof ""
