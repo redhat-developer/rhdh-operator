@@ -98,11 +98,6 @@ Examples:
     --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
     --to-registry registry.example.com
 
-  # Mirror specific plugins from a file list
-  $0 \\
-    --plugin-list /path/to/plugins.txt \\
-    --to-registry registry.example.com
-
   # Mirror specific plugins by direct OCI reference (use quotes for URLs with '!')
   $0 \\
     --plugins 'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8.0--1.22.1!backstage-community-plugin-quay' \\
@@ -125,8 +120,11 @@ Examples:
     --from-dir /path/to/export \\
     --to-registry registry.example.com
 
-Plugin List File Format:
-  Create a .txt file with one plugin OCI URL per line. Lines starting with '#' are treated as comments.
+  # Mirror specific plugins from a file list
+  $0 \\
+    --plugin-list /path/to/plugins.txt \\
+    --to-registry registry.example.com
+
   Example plugins.txt content:
     # Red Hat Developer Hub Plugin List
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
@@ -193,14 +191,14 @@ fi
 
 # Validate plugin index format
 if [[ -n "$PLUGIN_INDEX" && ! "$PLUGIN_INDEX" =~ ^oci:// ]]; then
-  errorf "Plugin index must be in OCI format: oci://registry/org/image:tag"
+  errorf "Plugin index must be in OCI format: oci://registry/org/image:tag or oci://registry/org/image@sha256:digest"
   exit 1
 fi
 
 # Validate plugin URLs format
 for url in "${PLUGIN_URLS[@]}"; do
   if [[ ! "$url" =~ ^oci:// ]]; then
-    errorf "Plugin URL must be in OCI format: oci://registry/org/image:tag. Got: $url"
+    errorf "Plugin URL must be in OCI format: oci://registry/org/image:tag or oci://registry/org/image@sha256:digest. Got: $url"
     exit 1
   fi
 done
