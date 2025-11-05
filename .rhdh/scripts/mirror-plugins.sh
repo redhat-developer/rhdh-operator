@@ -4,7 +4,7 @@
 # This script is installation-method agnostic and works with both operator and helm deployments
 # on both OpenShift and Kubernetes platforms.
 #
-# Requires: skopeo, jq, tar, base64
+# Requires: skopeo, tar
 
 set -euo pipefail
 
@@ -62,9 +62,7 @@ function check_tool() {
 }
 
 check_tool "skopeo"
-check_tool "jq"
 check_tool "tar"
-check_tool "base64"
 
 function usage() {
   echo "
