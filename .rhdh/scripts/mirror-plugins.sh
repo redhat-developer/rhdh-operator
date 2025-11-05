@@ -353,6 +353,7 @@ function resolve_plugin_index() {
     temp_dir=$(mktemp -d)
     
     # Cleanup temp directory when function returns
+    # shellcheck disable=SC2064
     trap "rm -rf '$temp_dir'" RETURN
     
     # Extract the catalog index image
@@ -655,7 +656,8 @@ function mirror_plugins_from_dir() {
     
     local relative_path=${sha256_dir#"$BASE_DIR/"}
     local sha256_hash=${sha256_dir##*/sha256_}
-    local parent_path=$(dirname "$relative_path")
+    local parent_path
+    parent_path=$(dirname "$relative_path")
     
     debugf "Processing plugin with SHA256: $parent_path@sha256:$sha256_hash"
     
@@ -679,7 +681,8 @@ function mirror_plugins_from_dir() {
     
     local relative_path=${tag_dir#"$BASE_DIR/"}
     local tag_value=${tag_dir##*/tag_}
-    local parent_path=$(dirname "$relative_path")
+    local parent_path
+    parent_path=$(dirname "$relative_path")
     
     debugf "Processing plugin with tag: $parent_path:$tag_value"
     
