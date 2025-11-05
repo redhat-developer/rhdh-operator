@@ -21,8 +21,6 @@ TO_REGISTRY=""
 TO_DIR=""
 FROM_DIR=""
 
-REGISTRY_AUTH_FILE="${REGISTRY_AUTH_FILE:-}"
-
 function logf() {
   set -euo pipefail
 
@@ -237,34 +235,6 @@ fi
 
 pushd "${TMPDIR}" >/dev/null
 debugf "Working directory: $TMPDIR"
-
-# Registry authentication
-function merge_registry_auth() {
-  set -euo pipefail
-
-  currentRegistryAuthFile="${REGISTRY_AUTH_FILE:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/containers/auth.json}"
-  debugf "Current registry auth file: $currentRegistryAuthFile"
-  
-  if [ ! -f "${currentRegistryAuthFile}" ]; then
-    debugf "No existing registry auth file found. Proceeding without pre-existing authentication."
-    return
-  fi
-
-  # Create a temporary XDG_RUNTIME_DIR for isolated authentication
-  XDG_RUNTIME_DIR=$(mktemp -d)
-  export XDG_RUNTIME_DIR
-  mkdir -p "${XDG_RUNTIME_DIR}/containers"
-  # shellcheck disable=SC2064
-  trap "rm -fr $XDG_RUNTIME_DIR || true" EXIT
-  
-  export REGISTRY_AUTH_FILE="${XDG_RUNTIME_DIR}/containers/auth.json"
-  debugf "Using registry auth file: $REGISTRY_AUTH_FILE"
-
-  # Copy existing auth to the new location
-  cp "${currentRegistryAuthFile}" "${REGISTRY_AUTH_FILE}"
-}
-
-merge_registry_auth
 
 # Extract the last two path elements from an image URL (e.g., org/image from registry.io/org/image)
 function extract_last_two_elements() {
