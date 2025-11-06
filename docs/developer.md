@@ -33,7 +33,7 @@ It only takes a few seconds to run, but covers quite a lot of functionality. For
 
 For testing, you will need a Kubernetes cluster, either remote (with sufficient admin rights) or local, such as [minikube](https://kubernetes.io/docs/tasks/tools/#minikube) or [kind](https://kubernetes.io/docs/tasks/tools/#kind)
 
-- Build and push your image to the location specified by `IMG`, if your laptop arcitecture is not default (linux/amd64) you may need to specify [PLATFORM](#tested-platforms) as well:
+- Build and push your image to the location specified by `IMG`. If your laptop architecture is not the default (linux/amd64), you may need to specify [PLATFORM](#tested-platforms) as well:
 ```sh
 make [PLATFORM=<platform>] image-build image-push IMG=<your-registry>/backstage-operator:tag
 ```
