@@ -27,6 +27,7 @@ metadata:
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.arm64: supported
   name: backstage-operator.v0.0.0
   namespace: placeholder
 spec:

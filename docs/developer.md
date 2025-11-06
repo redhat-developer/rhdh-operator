@@ -33,9 +33,9 @@ It only takes a few seconds to run, but covers quite a lot of functionality. For
 
 For testing, you will need a Kubernetes cluster, either remote (with sufficient admin rights) or local, such as [minikube](https://kubernetes.io/docs/tasks/tools/#minikube) or [kind](https://kubernetes.io/docs/tasks/tools/#kind)
 
-- Build and push your image to the location specified by `IMG`:
+- Build and push your image to the location specified by `IMG`. If your laptop architecture is not the default (linux/amd64), you may need to specify [PLATFORM](#tested-platforms) as well:
 ```sh
-make image-build image-push IMG=<your-registry>/backstage-operator:tag
+make [PLATFORM=<platform>] image-build image-push IMG=<your-registry>/backstage-operator:tag
 ```
 
 **NOTE:** This image ought to be published in the personal registry you specified.
@@ -52,6 +52,10 @@ make install
 ```sh
 make uninstall
 ```
+
+#### Tested platforms:
+- linux/amd64 - default
+- linux/arm64
 
 ### Run the controller standalone
 
@@ -126,9 +130,9 @@ Also note that the [`pr-bundle-diff-checks.yaml`](https://github.com/redhat-deve
 #### Build and push images
 
 There are a bunch of commands to build and push to the registry necessary images.
-For development purpose, most probably, you will need to specify the image you build and push with IMAGE_TAG_BASE env variable: 
+For development purpose, you might need to specify the image you build and push with IMAGE_TAG_BASE env variable, if you test on a laptop with non default **linux/amd64** architecture you may need to specify **[PLATFORM](#tested-platforms)** as well: 
 
-* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make image-build` builds operator manager image (**backstage-operator**)
+* `[PLATFORM=<platform>] [IMAGE_TAG_BASE=<your-registry>/backstage-operator] make image-build` builds operator manager image (**backstage-operator**)
 * `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make image-push` pushes operator manager image to **your-registry**
 * `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make bundle-build` builds operator manager image (**backstage-operator-bundle**)
 * `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make bundle-push` pushes bundle image to **your-registry**
@@ -148,7 +152,7 @@ You can do it all together using:
 You can point the namespace where OLM installed. By default, in a vanilla Kubernetes, OLM os deployed on 'olm' namespace. In Openshift you have to explicitly point it to **openshift-marketplace** namespace.
 
 #### Deploy the Operator with OLM 
-Default namespace to deploy the Operator is called **backstage-system** , this name fits one defined in [kustomization.yaml](../config/default/kustomization.yaml). So, if you consider changing it you have to change it in this file and define **OPERATOR_NAMESPACE** environment variable.
+Default namespace to deploy the Operator is called **rhdh-operator** for RHDH profile and **backstage-system** otherwise, if you, by some reason, consider changing it you have to change it in this file and define **OPERATOR_NAMESPACE** environment variable.
 Following command creates OperatorGroup and Subscription on Operator namespace
 ```sh
 [OPERATOR_NAMESPACE=<operator-namespace>] make deploy-olm
