@@ -45,7 +45,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2025-11-06T11:31:13Z"
+    createdAt: "2025-11-06T13:20:41Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -239,11 +239,6 @@ spec:
                   requiredDuringSchedulingIgnoredDuringExecution:
                     nodeSelectorTerms:
                     - matchExpressions:
-                      - key: kubernetes.io/arch
-                        operator: In
-                        values:
-                        - amd64
-                        - arm64
                       - key: kubernetes.io/os
                         operator: In
                         values:
