@@ -8,14 +8,14 @@ data:
       - dynamic-plugins.default.yaml
     plugins:
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator@1.7.1"
+        package: "@redhat/backstage-plugin-orchestrator@1.8.2"
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.7.1"
+        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.8.2"
         dependencies:
           - ref: sonataflow
-      - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.7.1"
+      - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.8.2"
         disabled: false
-      - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.7.1"
+      - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.8.2"
         disabled: false
       - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
         disabled: false
