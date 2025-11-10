@@ -3,8 +3,8 @@ package integration_tests
 import (
 	"fmt"
 
-	"github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega" //nolint:staticcheck // Dot import more readable in test files
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gcustom"
 	"github.com/onsi/gomega/types"
@@ -187,7 +187,7 @@ type AppConfigData struct {
 
 func HaveAppConfigBaseUrl(expected any) types.GomegaMatcher {
 	return gcustom.MakeMatcher(func(actual corev1.ConfigMap) (bool, error) {
-		_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "actual: %v\n", actual)
+		GinkgoWriter.Printf("actual: %v\n", actual)
 		for k, v := range actual.Data {
 			var appConfig AppConfigData
 			err := ReadYaml([]byte(v), &appConfig)

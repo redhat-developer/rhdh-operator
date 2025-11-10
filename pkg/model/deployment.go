@@ -332,14 +332,15 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 
 	volName := utils.GenerateVolumeNameFromCmOrSecret(objectName)
 	volSrc := corev1.VolumeSource{}
-	//nolint:staticcheck // ignore QF1003 for better readability
-	if kind == ConfigMapObjectKind {
+	
+	switch kind {
+	case ConfigMapObjectKind:
 		volSrc.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: objectName},
 			DefaultMode:          ptr.To(int32(420)),
 			Optional:             ptr.To(false),
 		}
-	} else if kind == SecretObjectKind {
+	case SecretObjectKind:
 		volSrc.Secret = &corev1.SecretVolumeSource{
 			SecretName:  objectName,
 			DefaultMode: ptr.To(int32(420)),
@@ -399,7 +400,7 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 // objectName - name of source object
 // varName - name of env variable
 
-//nolint:staticcheck // ignore QF1003 ln 410 and 420 for better readability
+
 func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, kind ObjectKind, objectName, varName string) error {
 
 	containers, err := containersFilter.getContainers(b)
@@ -410,24 +411,26 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 	for _, container := range containers {
 		if varName == "" {
 			envFromSrc := corev1.EnvFromSource{}
-			if kind == ConfigMapObjectKind {
+			switch kind {
+			case ConfigMapObjectKind:
 				envFromSrc.ConfigMapRef = &corev1.ConfigMapEnvSource{
 					LocalObjectReference: corev1.LocalObjectReference{Name: objectName}}
-			} else if kind == SecretObjectKind {
+			case SecretObjectKind:
 				envFromSrc.SecretRef = &corev1.SecretEnvSource{
 					LocalObjectReference: corev1.LocalObjectReference{Name: objectName}}
 			}
 			container.EnvFrom = append(container.EnvFrom, envFromSrc)
 		} else {
 			envVarSrc := &corev1.EnvVarSource{}
-			if kind == ConfigMapObjectKind {
+			switch kind {
+			case ConfigMapObjectKind:
 				envVarSrc.ConfigMapKeyRef = &corev1.ConfigMapKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: objectName,
 					},
 					Key: varName,
 				}
-			} else if kind == SecretObjectKind {
+			case SecretObjectKind:
 				envVarSrc.SecretKeyRef = &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: objectName,

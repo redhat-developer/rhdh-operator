@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck // Dot import more readable in test files
-	. "github.com/onsi/gomega"    //nolint:staticcheck // Dot import more readable in test files
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -178,7 +178,7 @@ func DownloadFile(url string) (string, error) {
 	}
 	defer func() {
 		if err := in.Close(); err != nil {
-			_, _ = fmt.Fprintf(GinkgoWriter, "failed to close input stream: %v\n", err)
+			GinkgoWriter.Printf("failed to close input stream: %v\n", err)
 		}
 	}()
 
@@ -217,16 +217,16 @@ func AddPullSecretToDeployment(ns string, deploy string, pullSecret string) erro
 func Run(cmd *exec.Cmd) ([]byte, error) {
 	dir, _ := GetProjectDir()
 	cmd.Dir = dir
-	_, _ = fmt.Fprintf(GinkgoWriter, "running dir: %s\n", cmd.Dir)
+	GinkgoWriter.Printf("running dir: %s\n", cmd.Dir)
 
 	cmd.Env = append(cmd.Env, os.Environ()...)
 
 	if err := os.Chdir(cmd.Dir); err != nil {
-		_, _ = fmt.Fprintf(GinkgoWriter, "chdir dir: %s\n", err)
+		GinkgoWriter.Printf("chdir dir: %s\n", err)
 	}
 
 	command := strings.Join(cmd.Args, " ")
-	_, _ = fmt.Fprintf(GinkgoWriter, "running: %s\n", command)
+	GinkgoWriter.Printf("running: %s\n", command)
 
 	var stdBuffer bytes.Buffer
 	mw := io.MultiWriter(GinkgoWriter, &stdBuffer)
@@ -303,7 +303,7 @@ func StartPortForward(ctx context.Context, svc string, ns string, svcPort int) (
 	stderr, err := cmd.StderrPipe()
 	Expect(err).ShouldNot(HaveOccurred())
 
-	_, _ = fmt.Fprintf(GinkgoWriter, "starting port-forwarding on service %s/%s\n", ns, svc)
+	GinkgoWriter.Printf("starting port-forwarding on service %s/%s\n", ns, svc)
 	err = cmd.Start()
 	Expect(err).ShouldNot(HaveOccurred())
 
@@ -318,7 +318,7 @@ func StartPortForward(ctx context.Context, svc string, ns string, svcPort int) (
 			line := scanner.Text()
 			if matches := re.FindStringSubmatch(line); len(matches) == 2 {
 				port := matches[1]
-				_, _ = fmt.Fprintf(GinkgoWriter, "Detected port-forward: %s\n", line)
+				GinkgoWriter.Printf("Detected port-forward: %s\n", line)
 				var p int
 				_, _ = fmt.Sscanf(port, "%d", &p)
 				portChan <- p
@@ -334,7 +334,7 @@ func StartPortForward(ctx context.Context, svc string, ns string, svcPort int) (
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			line := scanner.Text()
-			_, _ = fmt.Fprintf(GinkgoWriter, "kubectl stderr: %s\n", line)
+			GinkgoWriter.Printf("kubectl stderr: %s\n", line)
 			if strings.Contains(line, "error") {
 				errChan <- fmt.Errorf("stderr: %s", line)
 				return

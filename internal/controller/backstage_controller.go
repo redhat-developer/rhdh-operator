@@ -245,10 +245,10 @@ func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage
 	} else {
 		msg := "Deployment status:"
 		for _, c := range deploy.Status.Conditions {
-			//nolint:staticcheck // ignore QF1003 for better readability
-			if c.Type == appsv1.DeploymentAvailable {
+			switch c.Type {
+			case appsv1.DeploymentAvailable:
 				msg += " Available: " + c.Message
-			} else if c.Type == appsv1.DeploymentProgressing {
+			case appsv1.DeploymentProgressing:
 				msg += " Progressing: " + c.Message
 			}
 		}

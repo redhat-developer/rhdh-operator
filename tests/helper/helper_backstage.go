@@ -1,6 +1,5 @@
 package helper
 
-//nolint:staticcheck // Dot import more readable in test files
 import (
 	"context"
 	"crypto/tls"
@@ -73,7 +72,7 @@ func GuestAuth(baseUrl string) (string, error) {
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			_, _ = fmt.Fprintf(GinkgoWriter, "failed to close response body: %v\n", err)
+			GinkgoWriter.Printf("failed to close response body: %v\n", err)
 		}
 	}()
 	body, err := io.ReadAll(resp.Body)
@@ -98,7 +97,7 @@ func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus
 		"-n", ns,
 	) // #nosec G204
 	status, err := Run(cmd)
-	_, _ = fmt.Fprintln(GinkgoWriter, string(status))
+	GinkgoWriter.Println(string(status))
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(string(status)).Should(ContainSubstring(fmt.Sprintf(`"phase":%q`, expectedStatus)),
 		fmt.Sprintf("backstage pod in %s status", status))
@@ -107,7 +106,7 @@ func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus
 func VerifyBackstageCRStatus(g Gomega, ns string, crName string, statusMatcher types.GomegaMatcher) {
 	cmd := exec.Command(GetPlatformTool(), "get", "backstage", crName, "-o", "jsonpath={.status.conditions}", "-n", ns) // #nosec G204
 	status, err := Run(cmd)
-	_, _ = fmt.Fprintln(GinkgoWriter, string(status))
+	GinkgoWriter.Println(string(status))
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(string(status)).Should(statusMatcher)
 }
@@ -178,7 +177,7 @@ var defaultApiEndpointTests = []ApiEndpointTest{
 
 func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpointTest) {
 	host, err := GetBackstageRouteHost(ns, crName)
-	_, _ = fmt.Fprintln(GinkgoWriter, host)
+	GinkgoWriter.Println(host)
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(host).ShouldNot(BeEmpty())
 
@@ -217,12 +216,12 @@ func VerifyBackstageAppAccess(g Gomega, baseUrl string, tests []ApiEndpointTest)
 			}
 		}
 
-		_, _ = fmt.Fprintf(GinkgoWriter, "--> GET %q\n", url)
+		GinkgoWriter.Printf("--> GET %q\n", url)
 		resp, rErr := httpClient.Do(req)
 		g.Expect(rErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while trying to GET %q", url))
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				_, _ = fmt.Fprintf(GinkgoWriter, "failed to close response body: %v\n", err)
+				GinkgoWriter.Printf("failed to close response body: %v\n", err)
 			}
 		}()
 		body, rErr := io.ReadAll(resp.Body)
