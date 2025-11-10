@@ -41,7 +41,7 @@ spec:
 
 ### Container registry
 
-TODO
+TODO: Dynamic plugins can be configured to use container registries for authentication and image pulling. This section should cover the configuration options available for container registry integration with dynamic plugins.
 
 ## Dynamic plugins dependency management
 

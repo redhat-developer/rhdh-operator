@@ -68,7 +68,7 @@ This method has similar usage and cautions as the RHDH Helper Utility.
 
 ### Installing the Orchestrator Plugin
 
-The orchestrator plugin (as of v1.7.0) consists of four dynamic plugins:
+The orchestrator plugin (as of v1.8.2) consists of four dynamic plugins:
 - orchestrator-backend
 - orchestrator-frontend
 - orchestrator-scaffolder-backend-module
@@ -80,15 +80,15 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-       - package: "@redhat/backstage-plugin-orchestrator@1.7.1"
+       - package: "@redhat/backstage-plugin-orchestrator@1.8.2"
          disabled: false
-       - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.7.1"
+       - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.8.2"
          disabled: false
          dependencies:
             - ref: sonataflow
-       - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.7.1"
+       - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.8.2"
          disabled: false
-       - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.7.1"
+       - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.8.2"
          disabled: false  
 ```
 
@@ -142,6 +142,21 @@ However, to enable and configure the deployment of workflows in a separated name
 
 To enable the Backstage operator to work with the SonataFlow platform, its ServiceAccount must be granted the appropriate permissions. 
 This is done by the Backstage operator automatically when the SonataFlowPlatform CR is created in the namespace of the Backstage CR by the appropriate Role and RoleBinding resource in the [profile/rhdh/plugin-rbac directory](../config/profile/rhdh/plugin-rbac).
+
+
+#### Troubleshooting database migration issues
+
+After installing and configuring the Orchestrator plugin, you can deploy Serverless Workflows to RHDH and run them through the plugin.  
+For more information, see the [OpenShift Serverless Logic documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/serverless_logic/getting-started#serverless-logic-creating-managing-workflows).
+
+If your workflow uses persistence, database migration issues might occur when building or running new workflows.  
+To resolve this, ensure the following property is set in the workflow’s SonataFlow custom resource (CR) or in the `application.properties` file associated with the workflow:
+
+```bash
+kie.flyway.enabled=true
+```
+
+For more details, refer to the Flyway configuration section in the [Openshift Serverless Logic documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/serverless_logic/serverless-logic-managing-persistence#serverless-logic-flyway-config-workflow-configmap_serverless-logic-managing-persistence).
 
 ## Optional: Enable GitOps/Pipelines for Orchestrator Workflows
 To enable CI/CD for RHDH Orchestrator workflows, please follow this [guide](orchestrator-cicd.md).
@@ -220,6 +235,8 @@ two network policies need to be added.
                kubernetes.io/metadata.name: knative-serving
    EOF
    ```
+
+
 
 
 

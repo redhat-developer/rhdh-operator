@@ -9,6 +9,11 @@ When deploying RHDH using the [RHDH Operator](https://github.com/redhat-develope
 - Kubernetes 1.19+
 - PV provisioner support in the underlying infrastructure
 - RHDH Operator deployed in your cluster
+- **Prometheus Operator** (required when enabling `spec.monitoring.enabled: true`)
+  - Provides the `ServiceMonitor` Custom Resource Definition (CRD)
+  - On **OpenShift**: Prometheus Operator is pre-installed
+  - On **vanilla Kubernetes** (e.g., kind, minikube): You must install it manually
+  - Installation guide: [Prometheus Operator Getting Started](https://prometheus-operator.dev/docs/getting-started/installation/)
 
 ## Metrics Monitoring
 
@@ -20,7 +25,11 @@ The operator can automatically create and manage ServiceMonitor resources for yo
 
 #### Enabling Automatic Monitoring
 
-To enable automatic ServiceMonitor creation, configure your Backstage Custom Resource as follows:
+**Important**: Before enabling monitoring on vanilla Kubernetes clusters, you must first install the Prometheus Operator. Without the Prometheus Operator installed, the ServiceMonitor CRD will not be available and reconciliation will fail with an error: `no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`.
+
+To install Prometheus Operator, follow the [official installation guide](https://prometheus-operator.dev/docs/getting-started/installation/).
+
+Once Prometheus Operator is installed, enable automatic ServiceMonitor creation by configuring your Backstage Custom Resource as follows:
 
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha4
@@ -42,7 +51,7 @@ spec:
 
 When `monitoring.enabled` is set to `true`, the operator will automatically:
 
-1. **Create a ServiceMonitor resource** named `<backstage-name>-metrics` in the same namespace as your Backstage instance
+1. **Create a ServiceMonitor resource** named `metrics-<backstage-name>` in the same namespace as your Backstage instance
 2. **Configure the ServiceMonitor** to scrape metrics from the `/metrics` endpoint on port `9464`
 3. **Set appropriate labels** for Prometheus discovery (`app.kubernetes.io/instance` and `app.kubernetes.io/name`)
 4. **Manage the lifecycle** of the ServiceMonitor (create, update, delete) along with your Backstage instance
@@ -57,7 +66,7 @@ The automatically created ServiceMonitor will have the following configuration:
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: <backstage-name>-metrics
+  name: metrics-<backstage-name>
   namespace: <backstage-namespace>
   labels:
     app.kubernetes.io/instance: <backstage-name>
@@ -147,10 +156,10 @@ You can verify that the ServiceMonitor has been created successfully using the f
 # Check if the ServiceMonitor was created
 $ oc get servicemonitor -n <namespace>
 NAME                           AGE
-<backstage-name>-metrics      1m
+metrics-<backstage-name>      1m
 
 # View the ServiceMonitor details
-$ oc describe servicemonitor <backstage-name>-metrics -n <namespace>
+$ oc describe servicemonitor metrics-<backstage-name> -n <namespace>
 ```
 
 You can then verify metrics are being captured by navigating to the OpenShift Console:
@@ -176,7 +185,7 @@ $ cat <<EOF > /tmp/${CR_NAME}.ServiceMonitor.yaml
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: ${CR_NAME}-metrics
+  name: metrics-${CR_NAME}
   namespace: ${MY_PROJECT}
   labels:
     app.kubernetes.io/instance: ${CR_NAME}
@@ -228,6 +237,19 @@ spec:
 
 ## Troubleshooting
 
+### Error: "no matches for kind ServiceMonitor"
+
+If you encounter the error `failed to apply ServiceMonitor: no matches for kind "ServiceMonitor" in version "monitoring.coreos.com/v1"`, this means the Prometheus Operator is not installed in your cluster.
+
+**Solution:**
+
+1. **For vanilla Kubernetes clusters** (kind, minikube): Install the Prometheus Operator by following the [official installation guide](https://prometheus-operator.dev/docs/getting-started/installation/). After installation, verify the ServiceMonitor CRD is installed:
+   ```bash
+   kubectl get crd servicemonitors.monitoring.coreos.com
+   ```
+
+2. **For OpenShift clusters**: The Prometheus Operator is pre-installed. Ensure [monitoring for user-defined projects](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/monitoring/configuring-user-workload-monitoring#preparing-to-configure-the-monitoring-stack-uwm) is enabled.
+
 ### ServiceMonitor Not Created
 
 If the ServiceMonitor is not being created automatically:
@@ -253,7 +275,7 @@ If metrics are not appearing in Prometheus:
 
 1. **Verify the ServiceMonitor is targeting the correct service**:
    ```bash
-   $ oc get servicemonitor <backstage-name>-metrics -o yaml
+   $ oc get servicemonitor metrics-<backstage-name> -o yaml
    $ oc get service -l app.kubernetes.io/instance=<backstage-name>
    ```
 
@@ -281,6 +303,6 @@ If you previously created ServiceMonitor resources manually and want to migrate 
        enabled: true
    ```
 
-3. **Verify the new ServiceMonitor is created** by the operator with the naming convention `<backstage-name>-metrics`.
+3. **Verify the new ServiceMonitor is created** by the operator with the naming convention `metrics-<backstage-name>`.
 
 The operator-managed ServiceMonitor will have the same functionality as your manually created one, but will be automatically managed throughout the lifecycle of your Backstage instance.
