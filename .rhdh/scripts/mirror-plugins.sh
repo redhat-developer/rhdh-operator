@@ -1036,6 +1036,92 @@ EOF
   return 0
 }
 
+# Generate a mapping file with mirrored plugin references
+# Similar to oc-mirror's mapping output for improved user experience
+function generate_mapping_file() {
+  local output_file="$1"
+  local mode="$2"  # "registry" or "directory"
+  
+  # Simple clean header
+  echo "# This file contains a mapping of all mirrored plugins and their locations." > "$output_file"
+  echo "# Total plugins mirrored: ${#PLUGIN_IMAGES[@]}" >> "$output_file"
+  echo "" >> "$output_file"
+  
+  # Add catalog index mapping if present
+  if [[ -n "$PLUGIN_INDEX" ]]; then
+    if [[ "$mode" == "registry" ]]; then
+      # Parse catalog index URL for registry mode
+      if [[ "$PLUGIN_INDEX" =~ ^oci://(.+) ]]; then
+        local registry_ref="${BASH_REMATCH[1]}"
+        local catalog_name catalog_tag
+        
+        if [[ "$registry_ref" =~ ^[^/]+/(.+):([^:@]+)$ ]]; then
+          catalog_name="${BASH_REMATCH[1]}"
+          catalog_tag="${BASH_REMATCH[2]}"
+        elif [[ "$registry_ref" =~ ^[^/]+/(.+)@(.+)$ ]]; then
+          catalog_name="${BASH_REMATCH[1]}"
+          catalog_tag="${BASH_REMATCH[2]}"
+        else
+          catalog_name="rhdh/plugin-catalog-index"
+          catalog_tag="latest"
+        fi
+        
+        echo "$PLUGIN_INDEX → oci://${TO_REGISTRY}/${catalog_name}:${catalog_tag}" >> "$output_file"
+      fi
+    elif [[ "$mode" == "directory" ]] && [[ -d "${TO_DIR}/catalog-index" ]]; then
+      echo "$PLUGIN_INDEX → ${TO_DIR}/catalog-index/" >> "$output_file"
+    fi
+    echo "" >> "$output_file"
+  fi
+  
+  # Add all plugin mappings
+  if [[ "$mode" == "registry" ]]; then
+    # Registry mode: show original → mirrored registry reference
+    for img in "${PLUGIN_IMAGES[@]}"; do
+      local img_no_prefix="${img#oci://}"
+      local lastTwo
+      local targetImg
+      
+      if [[ "$img_no_prefix" == *"@sha256:"* ]]; then
+        local imgDigest="${img_no_prefix##*@sha256:}"
+        lastTwo=$(extract_last_two_elements "${img_no_prefix%@*}")
+        targetImg="${TO_REGISTRY}/${lastTwo}@sha256:${imgDigest}"
+      elif [[ "$img_no_prefix" == *":"* ]]; then
+        local imgTag="${img_no_prefix##*:}"
+        lastTwo=$(extract_last_two_elements "${img_no_prefix%:*}")
+        local clean_tag="${imgTag%%!*}"
+        targetImg="${TO_REGISTRY}/${lastTwo}:$clean_tag"
+      else
+        lastTwo=$(extract_last_two_elements "${img_no_prefix}")
+        targetImg="${TO_REGISTRY}/${lastTwo}:latest"
+      fi
+      
+      echo "$img → oci://$targetImg" >> "$output_file"
+    done
+    
+  elif [[ "$mode" == "directory" ]]; then
+    # Directory mode: show original → local directory path
+    for img in "${PLUGIN_IMAGES[@]}"; do
+      local img_no_prefix="${img#oci://}"
+      local imgDir
+      
+      if [[ "$img_no_prefix" == *"@sha256:"* ]]; then
+        local imgDigest="${img_no_prefix##*@sha256:}"
+        imgDir="${TO_DIR}/plugins/${img_no_prefix%@*}/sha256_$imgDigest"
+      elif [[ "$img_no_prefix" == *":"* ]]; then
+        local imgTag="${img_no_prefix##*:}"
+        imgDir="${TO_DIR}/plugins/${img_no_prefix%:*}/tag_$imgTag"
+      else
+        imgDir="${TO_DIR}/plugins/${img_no_prefix}/tag_latest"
+      fi
+      
+      echo "$img → $imgDir" >> "$output_file"
+    done
+  fi
+  
+  echo "" >> "$output_file"
+}
+
 
 # Main execution
 infof "Red Hat Developer Hub - Dynamic Plugin OCI Artifact Mirroring Script"
@@ -1049,6 +1135,21 @@ else
   mirror_plugins
 fi
 
+# Generate mapping file for user reference
+if [[ ${#PLUGIN_IMAGES[@]} -gt 0 ]]; then
+  if [[ -n "${TO_DIR}" ]]; then
+    generate_mapping_file "${TO_DIR}/mirroring-summary.txt" "directory"
+  elif [[ -n "${TO_REGISTRY}" ]]; then
+    if [[ -n "${FROM_DIR}" ]]; then
+      # When pushing from directory, save mapping in current directory
+      generate_mapping_file "./mirroring-summary-to-${TO_REGISTRY//\//-}.txt" "registry"
+    else
+      # When mirroring directly to registry, save in working directory
+      generate_mapping_file "./mirroring-summary.txt" "registry"
+    fi
+  fi
+fi
+
 # Summary
 if [[ -n "${TO_DIR}" ]]; then
   infof ""
@@ -1057,6 +1158,7 @@ if [[ -n "${TO_DIR}" ]]; then
   if [[ -n "${PLUGIN_INDEX}" ]] && [[ -d "${TO_DIR}/catalog-index" ]]; then
     infof "Catalog index has been saved to: ${TO_DIR}/catalog-index"
   fi
+  infof "Plugin mapping: ${TO_DIR}/mirroring-summary.txt"
   infof ""
   infof "Next steps for fully disconnected environments:"
   infof "1. Transfer ${TO_DIR} to your disconnected network"
@@ -1074,6 +1176,11 @@ elif [[ -n "${TO_REGISTRY}" ]]; then
   infof "Plugins have been pushed to registry: ${TO_REGISTRY}"
   if [[ -n "${PLUGIN_INDEX}" ]]; then
     infof "Catalog index has been pushed with updated plugin references"
+  fi
+  if [[ -n "${FROM_DIR}" ]]; then
+    infof "Plugin mapping: ./mirroring-summary-to-${TO_REGISTRY//\//-}.txt"
+  else
+    infof "Plugin mapping: ./mirroring-summary.txt"
   fi
   infof ""
   infof "You can now configure your RHDH deployment to use these mirrored plugins."
