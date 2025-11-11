@@ -319,64 +319,64 @@ function resolve_plugin_index() {
       return 1
     fi
     
-    # Find the largest layer (likely contains the catalog data)
-    local catalog_layer
-    catalog_layer=$(find "$temp_dir/catalog-index" -type f -not -name "manifest.json" -not -name "version" -exec ls -la {} \; | sort -k5 -nr | head -1 | awk '{print $NF}')
-    
-    if [[ -z "$catalog_layer" ]]; then
-      errorf "No catalog data layer found in index image"
-      return 1
-    fi
-    
-    debugf "Using catalog layer: $(basename "$catalog_layer")"
-    
-    # Extract the catalog layer
+    # Extract all layers to find index.json
     local catalog_data_dir="$temp_dir/catalog-data"
     mkdir -p "$catalog_data_dir"
     
-    if ! tar -xf "$catalog_layer" -C "$catalog_data_dir" 2>/dev/null; then
-      errorf "Failed to extract catalog data from layer"
-      return 1
-    fi
-    
-    # Find all package YAML files
-    local package_files
-    package_files=$(find "$catalog_data_dir" -name "*.yaml" -path "*/packages/*" 2>/dev/null)
-    
-    if [[ -z "$package_files" ]]; then
-      warnf "No package files found in catalog index"
-      return 1
-    fi
-    
-    debugf "Found $(echo "$package_files" | wc -l) package files in catalog index"
-    
-    # Extract OCI plugin URLs from package files
-    local temp_plugin_images=()
-    local filtered_plugins=0
-    
-    while IFS= read -r package_file; do
-      if [[ -f "$package_file" ]]; then
-        # Extract dynamicArtifact field that contains OCI URLs
-        local oci_urls
-        oci_urls=$(grep -E "^\s*dynamicArtifact:\s*oci://" "$package_file" 2>/dev/null | sed 's/.*dynamicArtifact:\s*//' | tr -d ' ')
-        
-        if [[ -n "$oci_urls" ]]; then
-          # Filter by version if specified (not 'next', 'latest', or sha256 digest)
-          # When using @sha256:digest for catalog index, don't filter plugins by digest
-          if [[ "$version" != "next" && "$version" != "latest" && ! "$version" =~ ^sha256: ]]; then
-            # Check if the OCI URL contains the version
-            if echo "$oci_urls" | grep -q ":$version"; then
-              temp_plugin_images+=("$oci_urls")
-              ((filtered_plugins++))
-            fi
-          else
-            # For 'next', 'latest', or digest-based catalog index, include all OCI URLs
-            temp_plugin_images+=("$oci_urls")
-            ((filtered_plugins++))
+    # Extract each layer until we find index.json
+    local found_index=false
+    for layer in "$temp_dir/catalog-index"/*; do
+      if [[ -f "$layer" ]] && [[ ! "$layer" =~ (manifest\.json|version)$ ]]; then
+        debugf "Extracting layer: $(basename "$layer")"
+        if tar -xf "$layer" -C "$catalog_data_dir" 2>/dev/null; then
+          # Check if index.json exists after extracting this layer
+          if [[ -f "$catalog_data_dir/index.json" ]]; then
+            found_index=true
+            debugf "Found index.json in layer: $(basename "$layer")"
+            break
           fi
         fi
       fi
-    done <<< "$package_files"
+    done
+    
+    if [[ "$found_index" != "true" ]]; then
+      errorf "No index.json found in catalog index image"
+      return 1
+    fi
+    
+    # Parse index.json to extract plugin references
+    local index_file="$catalog_data_dir/index.json"
+    debugf "Parsing index.json for plugin references"
+    
+    # Check if jq is available
+    if ! command -v jq &> /dev/null; then
+      errorf "jq is required to parse index.json but is not installed"
+      return 1
+    fi
+    
+    # Extract registryReference values from index.json and convert to oci:// format
+    local temp_plugin_images=()
+    local filtered_plugins=0
+    
+    while IFS= read -r registry_ref; do
+      if [[ -n "$registry_ref" ]]; then
+        local oci_url="oci://$registry_ref"
+        
+        # Filter by version if specified (not 'next', 'latest', or sha256 digest)
+        # When using @sha256:digest for catalog index, don't filter plugins by digest
+        if [[ "$version" != "next" && "$version" != "latest" && ! "$version" =~ ^sha256: ]]; then
+          # Check if the OCI URL contains the version
+          if echo "$oci_url" | grep -q ":$version"; then
+            temp_plugin_images+=("$oci_url")
+            ((filtered_plugins++))
+          fi
+        else
+          # For 'next', 'latest', or digest-based catalog index, include all OCI URLs
+          temp_plugin_images+=("$oci_url")
+          ((filtered_plugins++))
+        fi
+      fi
+    done < <(jq -r '.[] | .registryReference // empty' "$index_file" 2>/dev/null)
     
     # Remove duplicates and sort
     if [[ ${#temp_plugin_images[@]} -gt 0 ]]; then
