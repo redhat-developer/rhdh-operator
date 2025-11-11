@@ -492,7 +492,7 @@ function mirror_catalog_index() {
     
     # Use jq to update all registryReference values
     # Extract the registry from each reference and replace with target_registry
-    jq --arg target_reg "$target_registry" '
+    if ! jq --arg target_reg "$target_registry" '
       . | with_entries(
         .value.registryReference |= (
           if . then
@@ -505,9 +505,7 @@ function mirror_catalog_index() {
           end
         )
       )
-    ' "$index_file" > "$updated_index" 2>/dev/null
-    
-    if [[ $? -ne 0 ]] || [[ ! -s "$updated_index" ]]; then
+    ' "$index_file" > "$updated_index" 2>/dev/null || [[ ! -s "$updated_index" ]]; then
       errorf "Failed to update index.json with new registry references"
       return 1
     fi
@@ -946,7 +944,7 @@ function mirror_plugins_from_dir() {
     local updated_index="$catalog_dir/index-updated.json"
     infof "Updating plugin registry references in index.json..."
     
-    jq --arg target_reg "$TO_REGISTRY" '
+    if ! jq --arg target_reg "$TO_REGISTRY" '
       . | with_entries(
         .value.registryReference |= (
           if . then
@@ -957,9 +955,7 @@ function mirror_plugins_from_dir() {
           end
         )
       )
-    ' "$catalog_dir/data/index.json" > "$updated_index" 2>/dev/null
-    
-    if [[ $? -ne 0 ]] || [[ ! -s "$updated_index" ]]; then
+    ' "$catalog_dir/data/index.json" > "$updated_index" 2>/dev/null || [[ ! -s "$updated_index" ]]; then
       warnf "Failed to update index.json with new registry references"
       return 0
     fi
