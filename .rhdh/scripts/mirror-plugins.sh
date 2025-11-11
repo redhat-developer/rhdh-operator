@@ -61,6 +61,7 @@ function check_tool() {
 
 check_tool "skopeo"
 check_tool "tar"
+check_tool "jq"
 
 function usage() {
   echo "
@@ -395,6 +396,230 @@ function resolve_plugin_index() {
   fi
 }
 
+# Rebuild and mirror the catalog index with updated registry references
+# This ensures the catalog index works in disconnected environments
+function mirror_catalog_index() {
+  local index_url="$1"
+  local target_registry="$2"
+  local target_dir="$3"
+  
+  infof "Preparing catalog index for mirroring: $index_url"
+  
+  # Strip oci:// prefix
+  if [[ ! "$index_url" =~ ^oci://(.+) ]]; then
+    errorf "Invalid catalog index URL format: $index_url"
+    return 1
+  fi
+  
+  local registry_ref="${BASH_REMATCH[1]}"
+  local original_registry
+  local catalog_name
+  local catalog_tag
+  
+  # Parse the registry reference
+  if [[ "$registry_ref" =~ ^([^/]+)/(.+):([^:@]+)$ ]]; then
+    original_registry="${BASH_REMATCH[1]}"
+    catalog_name="${BASH_REMATCH[2]}"
+    catalog_tag="${BASH_REMATCH[3]}"
+  elif [[ "$registry_ref" =~ ^([^/]+)/(.+)@(.+)$ ]]; then
+    original_registry="${BASH_REMATCH[1]}"
+    catalog_name="${BASH_REMATCH[2]}"
+    catalog_tag="${BASH_REMATCH[3]}"
+  else
+    warnf "Could not parse catalog index reference, will mirror as-is: $registry_ref"
+    catalog_tag="latest"
+  fi
+  
+  debugf "Original registry: $original_registry, Catalog: $catalog_name, Tag: $catalog_tag"
+  
+  # Create temporary directory for catalog index work
+  local temp_dir
+  temp_dir=$(mktemp -d)
+  # shellcheck disable=SC2064
+  trap "rm -rf '$temp_dir'" RETURN
+  
+  # Extract the catalog index image
+  infof "Extracting catalog index image..."
+  if ! skopeo copy "docker://$registry_ref" "dir:$temp_dir/catalog-index" 2>/dev/null; then
+    errorf "Failed to extract catalog index image: $registry_ref"
+    return 1
+  fi
+  
+  # Extract layers to find and modify index.json
+  local catalog_data_dir="$temp_dir/catalog-data"
+  mkdir -p "$catalog_data_dir"
+  
+  local found_index=false
+  local index_layer=""
+  
+  for layer in "$temp_dir/catalog-index"/*; do
+    if [[ -f "$layer" ]] && [[ ! "$layer" =~ (manifest\.json|version)$ ]]; then
+      if tar -xf "$layer" -C "$catalog_data_dir" 2>/dev/null; then
+        if [[ -f "$catalog_data_dir/index.json" ]]; then
+          found_index=true
+          index_layer=$(basename "$layer")
+          debugf "Found index.json in layer: $index_layer"
+          break
+        fi
+      fi
+    fi
+  done
+  
+  if [[ "$found_index" != "true" ]]; then
+    warnf "No index.json found in catalog index, mirroring as-is without modifications"
+    # Mirror the original catalog index without modifications
+    if [[ -n "$target_registry" ]]; then
+      local target_image="$target_registry/$catalog_name:$catalog_tag"
+      infof "Mirroring catalog index to: $target_image"
+      skopeo copy --all "docker://$registry_ref" "docker://$target_image" || return 1
+    elif [[ -n "$target_dir" ]]; then
+      local catalog_dir="$target_dir/catalog-index"
+      mkdir -p "$catalog_dir"
+      infof "Saving catalog index to: $catalog_dir"
+      skopeo copy --all "docker://$registry_ref" "dir:$catalog_dir" || return 1
+      # Save metadata for later use
+      echo "$index_url" > "$catalog_dir/original-url.txt"
+    fi
+    return 0
+  fi
+  
+  # Update index.json with new registry references
+  local index_file="$catalog_data_dir/index.json"
+  local updated_index="$temp_dir/index-updated.json"
+  
+  if [[ -n "$target_registry" ]]; then
+    infof "Updating plugin registry references in index.json..."
+    
+    # Use jq to update all registryReference values
+    # Extract the registry from each reference and replace with target_registry
+    jq --arg target_reg "$target_registry" '
+      . | with_entries(
+        .value.registryReference |= (
+          if . then
+            # Split on / to get registry and path
+            . | split("/") | 
+            # Replace first element (registry) with target, keep rest
+            ([$target_reg] + .[1:]) | join("/")
+          else
+            .
+          end
+        )
+      )
+    ' "$index_file" > "$updated_index" 2>/dev/null
+    
+    if [[ $? -ne 0 ]] || [[ ! -s "$updated_index" ]]; then
+      errorf "Failed to update index.json with new registry references"
+      return 1
+    fi
+    
+    debugf "Updated $(jq '. | length' "$updated_index") plugin references in index.json"
+    
+    # Replace the original index.json with updated version
+    cp "$updated_index" "$catalog_data_dir/index.json"
+    
+    # Rebuild the layer with updated index.json
+    infof "Rebuilding catalog index image with updated references..."
+    local new_layer="$temp_dir/new-layer.tar"
+    tar -cf "$new_layer" -C "$catalog_data_dir" . 2>/dev/null
+    
+    # Create a Dockerfile to rebuild the image
+    local build_dir="$temp_dir/build"
+    mkdir -p "$build_dir"
+    
+    # Copy all files from catalog_data_dir to build context
+    cp -r "$catalog_data_dir"/* "$build_dir/"
+    
+    cat > "$build_dir/Dockerfile" << 'EOF'
+FROM scratch
+COPY . /
+EOF
+    
+    # Check if podman or buildah is available
+    local builder=""
+    if command -v podman &> /dev/null; then
+      builder="podman"
+    elif command -v buildah &> /dev/null; then
+      builder="buildah"
+    else
+      errorf "Neither podman nor buildah found. Required to rebuild catalog index image."
+      errorf "Please install podman or buildah, or use a simple mirror without index modifications."
+      return 1
+    fi
+    
+    debugf "Using $builder to rebuild catalog index image"
+    
+    local temp_image_tag="localhost/temp-catalog-index:$catalog_tag"
+    local target_image="$target_registry/$catalog_name:$catalog_tag"
+    
+    if [[ "$builder" == "podman" ]]; then
+      if ! podman build -t "$temp_image_tag" "$build_dir" 2>/dev/null; then
+        errorf "Failed to rebuild catalog index image with podman"
+        return 1
+      fi
+      
+      infof "Pushing rebuilt catalog index to: $target_image"
+      if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
+        errorf "Failed to push catalog index to registry"
+        return 1
+      fi
+      
+      # Clean up local image
+      podman rmi "$temp_image_tag" 2>/dev/null || true
+      
+    elif [[ "$builder" == "buildah" ]]; then
+      local container
+      container=$(buildah from scratch)
+      buildah copy "$container" "$catalog_data_dir" /
+      buildah commit "$container" "$temp_image_tag" 2>/dev/null || {
+        errorf "Failed to rebuild catalog index image with buildah"
+        buildah rm "$container" 2>/dev/null || true
+        return 1
+      }
+      buildah rm "$container" 2>/dev/null || true
+      
+      infof "Pushing rebuilt catalog index to: $target_image"
+      if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
+        errorf "Failed to push catalog index to registry"
+        buildah rmi "$temp_image_tag" 2>/dev/null || true
+        return 1
+      fi
+      
+      buildah rmi "$temp_image_tag" 2>/dev/null || true
+    fi
+    
+    infof "Successfully mirrored catalog index with updated plugin references"
+    
+  elif [[ -n "$target_dir" ]]; then
+    # Save catalog index and metadata for later rebuilding
+    local catalog_dir="$target_dir/catalog-index"
+    mkdir -p "$catalog_dir"
+    
+    infof "Saving catalog index data to: $catalog_dir"
+    
+    # Save the original catalog index layers
+    cp -r "$temp_dir/catalog-index"/* "$catalog_dir/"
+    
+    # Save the extracted data including index.json
+    mkdir -p "$catalog_dir/data"
+    cp -r "$catalog_data_dir"/* "$catalog_dir/data/"
+    
+    # Save metadata
+    cat > "$catalog_dir/metadata.json" << EOF
+{
+  "originalUrl": "$index_url",
+  "originalRegistry": "$original_registry",
+  "catalogName": "$catalog_name",
+  "catalogTag": "$catalog_tag",
+  "indexLayer": "$index_layer"
+}
+EOF
+    
+    infof "Catalog index saved for offline transfer"
+  fi
+  
+  return 0
+}
+
 # Process a file containing one OCI URL per line,
 # ignoring comments and blank lines, and return a list of valid plugin URLs
 function load_plugin_list_from_file() {
@@ -566,8 +791,24 @@ function mirror_plugins() {
           warnf "Failed to save plugin: $img"
         fi
       else
-        debugf "Plugin already exists in directory: $imgDir"
-        ((success_count++)) || true
+        # Validate that the existing directory is complete
+        if [[ -f "$imgDir/manifest.json" ]]; then
+          debugf "Plugin already exists in directory: $imgDir"
+          ((success_count++)) || true
+        else
+          warnf "Existing plugin directory is incomplete (missing manifest.json): $imgDir"
+          warnf "Re-downloading plugin: $img"
+          set +e
+          mirror_image "$img" "dir:$imgDir"
+          ret=$?
+          set -e
+          if [ $ret -eq 0 ]; then
+            ((success_count++)) || true
+          else
+            ((failure_count++)) || true
+            warnf "Failed to save plugin: $img"
+          fi
+        fi
       fi
     fi
   done
@@ -576,6 +817,22 @@ function mirror_plugins() {
   
   if [[ $failure_count -gt 0 ]]; then
     return 1
+  fi
+  
+  # Mirror the catalog index if one was specified
+  if [[ -n "$PLUGIN_INDEX" ]]; then
+    infof ""
+    infof "Mirroring catalog index..."
+    if [[ -n "$TO_REGISTRY" ]]; then
+      if ! mirror_catalog_index "$PLUGIN_INDEX" "$TO_REGISTRY" ""; then
+        warnf "Failed to mirror catalog index, but plugins were mirrored successfully"
+        warnf "You may need to manually configure the catalog index in your deployment"
+      fi
+    elif [[ -n "$TO_DIR" ]]; then
+      if ! mirror_catalog_index "$PLUGIN_INDEX" "" "$TO_DIR"; then
+        warnf "Failed to save catalog index, but plugins were saved successfully"
+      fi
+    fi
   fi
   
   return 0
@@ -654,6 +911,128 @@ function mirror_plugins_from_dir() {
     return 1
   fi
   
+  # Push the catalog index if it was saved
+  local catalog_dir="${FROM_DIR}/catalog-index"
+  if [[ -d "$catalog_dir" ]] && [[ -n "$TO_REGISTRY" ]]; then
+    infof ""
+    infof "Rebuilding and pushing catalog index from saved data..."
+    
+    # Check if metadata exists
+    if [[ ! -f "$catalog_dir/metadata.json" ]]; then
+      warnf "No catalog index metadata found in ${FROM_DIR}"
+      warnf "Catalog index was not included in the original export"
+      return 0
+    fi
+    
+    # Read metadata
+    local catalog_name catalog_tag
+    catalog_name=$(jq -r '.catalogName' "$catalog_dir/metadata.json" 2>/dev/null)
+    catalog_tag=$(jq -r '.catalogTag' "$catalog_dir/metadata.json" 2>/dev/null)
+    
+    if [[ -z "$catalog_name" ]] || [[ -z "$catalog_tag" ]]; then
+      warnf "Invalid catalog index metadata in ${FROM_DIR}"
+      return 0
+    fi
+    
+    debugf "Rebuilding catalog index: $catalog_name:$catalog_tag"
+    
+    # Check for saved index.json
+    if [[ ! -f "$catalog_dir/data/index.json" ]]; then
+      warnf "No index.json found in saved catalog index data"
+      return 0
+    fi
+    
+    # Update index.json with new registry
+    local updated_index="$catalog_dir/index-updated.json"
+    infof "Updating plugin registry references in index.json..."
+    
+    jq --arg target_reg "$TO_REGISTRY" '
+      . | with_entries(
+        .value.registryReference |= (
+          if . then
+            . | split("/") | 
+            ([$target_reg] + .[1:]) | join("/")
+          else
+            .
+          end
+        )
+      )
+    ' "$catalog_dir/data/index.json" > "$updated_index" 2>/dev/null
+    
+    if [[ $? -ne 0 ]] || [[ ! -s "$updated_index" ]]; then
+      warnf "Failed to update index.json with new registry references"
+      return 0
+    fi
+    
+    # Replace index.json with updated version
+    cp "$updated_index" "$catalog_dir/data/index.json"
+    
+    # Check if podman or buildah is available
+    local builder=""
+    if command -v podman &> /dev/null; then
+      builder="podman"
+    elif command -v buildah &> /dev/null; then
+      builder="buildah"
+    else
+      warnf "Neither podman nor buildah found. Cannot rebuild catalog index."
+      warnf "Please install podman or buildah to enable catalog index mirroring."
+      return 0
+    fi
+    
+    debugf "Using $builder to rebuild catalog index"
+    
+    # Create Dockerfile
+    local build_dir="$catalog_dir/build"
+    mkdir -p "$build_dir"
+    cp -r "$catalog_dir/data"/* "$build_dir/"
+    
+    cat > "$build_dir/Dockerfile" << 'EOF'
+FROM scratch
+COPY . /
+EOF
+    
+    local temp_image_tag="localhost/temp-catalog-index:$catalog_tag"
+    local target_image="$TO_REGISTRY/$catalog_name:$catalog_tag"
+    
+    if [[ "$builder" == "podman" ]]; then
+      if ! podman build -t "$temp_image_tag" "$build_dir" 2>/dev/null; then
+        warnf "Failed to rebuild catalog index image with podman"
+        return 0
+      fi
+      
+      infof "Pushing rebuilt catalog index to: $target_image"
+      if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
+        warnf "Failed to push catalog index to registry"
+        podman rmi "$temp_image_tag" 2>/dev/null || true
+        return 0
+      fi
+      
+      podman rmi "$temp_image_tag" 2>/dev/null || true
+      infof "Successfully pushed catalog index"
+      
+    elif [[ "$builder" == "buildah" ]]; then
+      local container
+      container=$(buildah from scratch)
+      buildah copy "$container" "$catalog_dir/data" /
+      buildah commit "$container" "$temp_image_tag" 2>/dev/null || {
+        warnf "Failed to rebuild catalog index image with buildah"
+        buildah rm "$container" 2>/dev/null || true
+        return 0
+      }
+      buildah rm "$container" 2>/dev/null || true
+      
+      infof "Pushing rebuilt catalog index to: $target_image"
+      if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
+        warnf "Failed to push catalog index to registry"
+        buildah rmi "$temp_image_tag" 2>/dev/null || true
+        return 0
+      fi
+      
+      buildah rmi "$temp_image_tag" 2>/dev/null || true
+      infof "Successfully pushed catalog index"
+    fi
+  fi
+  
   return 0
 }
 
@@ -674,19 +1053,33 @@ fi
 if [[ -n "${TO_DIR}" ]]; then
   infof ""
   infof "Export completed successfully!"
-  infof "Plugins have been saved to: ${TO_DIR}"
+  infof "Plugins have been saved to: ${TO_DIR}/plugins"
+  if [[ -n "${PLUGIN_INDEX}" ]] && [[ -d "${TO_DIR}/catalog-index" ]]; then
+    infof "Catalog index has been saved to: ${TO_DIR}/catalog-index"
+  fi
   infof ""
   infof "Next steps for fully disconnected environments:"
   infof "1. Transfer ${TO_DIR} to your disconnected network"
   infof "2. Run this script again with --from-dir and --to-registry:"
   infof "   $0 --from-dir ${TO_DIR} --to-registry YOUR_REGISTRY"
+  if [[ -n "${PLUGIN_INDEX}" ]]; then
+    infof ""
+    infof "Note: The catalog index will be automatically rebuilt with updated"
+    infof "      registry references when you run the --from-dir command."
+  fi
   infof ""
 elif [[ -n "${TO_REGISTRY}" ]]; then
   infof ""
   infof "Mirroring completed successfully!"
   infof "Plugins have been pushed to registry: ${TO_REGISTRY}"
+  if [[ -n "${PLUGIN_INDEX}" ]]; then
+    infof "Catalog index has been pushed with updated plugin references"
+  fi
   infof ""
   infof "You can now configure your RHDH deployment to use these mirrored plugins."
+  if [[ -n "${PLUGIN_INDEX}" ]]; then
+    infof "The catalog index is available at: ${TO_REGISTRY}/rhdh/plugin-catalog-index"
+  fi
   infof "Refer to the RHDH documentation for instructions on configuring dynamic plugins"
   infof "in airgapped environments for both operator and helm deployments."
   infof ""
