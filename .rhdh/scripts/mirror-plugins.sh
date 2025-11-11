@@ -1131,18 +1131,12 @@ else
   mirror_plugins
 fi
 
-# Generate mapping file for user reference
-if [[ ${#PLUGIN_IMAGES[@]} -gt 0 ]]; then
+# Generate mapping file for user reference (only during initial mirroring, not --from-dir)
+if [[ ${#PLUGIN_IMAGES[@]} -gt 0 ]] && [[ -z "${FROM_DIR}" ]]; then
   if [[ -n "${TO_DIR}" ]]; then
     generate_mapping_file "${TO_DIR}/mirroring-summary.txt" "directory"
   elif [[ -n "${TO_REGISTRY}" ]]; then
-    if [[ -n "${FROM_DIR}" ]]; then
-      # When pushing from directory, save mapping in current directory
-      generate_mapping_file "./mirroring-summary-to-${TO_REGISTRY//\//-}.txt" "registry"
-    else
-      # When mirroring directly to registry, save in working directory
-      generate_mapping_file "./mirroring-summary.txt" "registry"
-    fi
+    generate_mapping_file "./mirroring-summary.txt" "registry"
   fi
 fi
 
@@ -1173,9 +1167,8 @@ elif [[ -n "${TO_REGISTRY}" ]]; then
   if [[ -n "${PLUGIN_INDEX}" ]]; then
     infof "Catalog index has been pushed with updated plugin references"
   fi
-  if [[ -n "${FROM_DIR}" ]]; then
-    infof "Plugin mapping: ./mirroring-summary-to-${TO_REGISTRY//\//-}.txt"
-  else
+  # Only show mapping file location for direct mirroring (not --from-dir)
+  if [[ -z "${FROM_DIR}" ]]; then
     infof "Plugin mapping: ./mirroring-summary.txt"
   fi
   infof ""
