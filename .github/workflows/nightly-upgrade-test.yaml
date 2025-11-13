@@ -65,40 +65,14 @@ jobs:
         run: |
           distLocation="dist/rhdh/install.yaml"
 
-          from_branch=${{ matrix.from_branch }}
-          FROM_OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
-          proto="file://"
-          if [[ "${from_branch}" != "main" ]]; then
-            version="${from_branch#release-}"
-            major=$(echo $version | cut -d. -f1)
-            minor=$(echo $version | cut -d. -f2)
-            FROM_OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
-            # TODO(rm3l): remove this once 1.6 is the minimal supported version
-            if [[ $major -ge 1 && $minor -ge 6 ]]; then
-              FROM_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${from_branch}/${distLocation}"
-              proto=""
-            fi
-          fi
+          FROM_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${{ matrix.from_branch }}/${distLocation}"
           echo "FROM_OPERATOR_MANIFEST=${FROM_OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          FROM_OPERATOR_IMAGE=$(curl -s "${proto}${FROM_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          FROM_OPERATOR_IMAGE=$(curl -s "${FROM_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "FROM_OPERATOR_IMAGE=${FROM_OPERATOR_IMAGE}" >> $GITHUB_ENV
 
-          to_branch=${{ matrix.to_branch }}
-          TO_OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
-          proto="file://"
-          if [[ "${to_branch}" != "main" ]]; then
-            version="${to_branch#release-}"
-            major=$(echo $version | cut -d. -f1)
-            minor=$(echo $version | cut -d. -f2)
-            TO_OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
-            # TODO(rm3l): remove this once 1.6 is the minimal supported version
-            if [[ $major -ge 1 && $minor -ge 6 ]]; then
-              TO_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${to_branch}/${distLocation}"
-              proto=""
-            fi
-          fi
+          TO_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${{ matrix.to_branch }}/${distLocation}"
           echo "TO_OPERATOR_MANIFEST=${TO_OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          TO_OPERATOR_IMAGE=$(curl -s "${proto}${TO_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          TO_OPERATOR_IMAGE=$(curl -s "${TO_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "TO_OPERATOR_IMAGE=${TO_OPERATOR_IMAGE}" >> $GITHUB_ENV
 
       - name: Check if operator images exist in remote registry
