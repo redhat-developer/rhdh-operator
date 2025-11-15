@@ -20,8 +20,6 @@ import (
 
 	"k8s.io/client-go/util/retry"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -216,7 +214,7 @@ func (r *BackstageReconciler) addExtConfig(ctx context.Context, obj client.Objec
 
 func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj client.Object, objectName, ns string) error {
 	if err := r.Get(ctx, types.NamespacedName{Name: objectName, Namespace: ns}, obj); err != nil {
-		if _, ok := obj.(*corev1.Secret); ok && errors.IsForbidden(err) {
+		if _, ok := obj.(*corev1.Secret); ok && k8serrors.IsForbidden(err) {
 			return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
 		}
 		return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
@@ -281,7 +279,7 @@ func (r *BackstageReconciler) getOCPIngressDomain() (string, error) {
 		Version: "v1",
 	})
 
-	err := r.Client.Get(context.Background(), client.ObjectKey{
+	err := r.Get(context.Background(), client.ObjectKey{
 		Name:      "cluster",
 		Namespace: "",
 	}, &u)
