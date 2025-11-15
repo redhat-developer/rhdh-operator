@@ -2,6 +2,4 @@
 resources:
 - _v1alpha4_backstage.yaml
 - _v1alpha3_backstage.yaml
-- _v1alpha2_backstage.yaml
-- _v1alpha1_backstage.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
