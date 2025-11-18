@@ -524,13 +524,14 @@ function mirror_catalog_index() {
     # Create a Dockerfile to rebuild the image
     local build_dir="$temp_dir/build"
     mkdir -p "$build_dir"
+    mkdir -p "$build_dir/content"
     
     # Copy all files from catalog_data_dir to build context
-    cp -r "$catalog_data_dir"/* "$build_dir/"
+    cp -r "$catalog_data_dir"/* "$build_dir/content/"
     
     cat > "$build_dir/Dockerfile" << 'EOF'
 FROM scratch
-COPY . /
+COPY content/ /
 EOF
     
     debugf "Using podman to rebuild catalog index image"
@@ -935,11 +936,12 @@ function mirror_plugins_from_dir() {
     # Create Dockerfile
     local build_dir="$catalog_dir/build"
     mkdir -p "$build_dir"
-    cp -r "$catalog_dir/data"/* "$build_dir/"
+    mkdir -p "$build_dir/content"
+    cp -r "$catalog_dir/data"/* "$build_dir/content/"
     
     cat > "$build_dir/Dockerfile" << 'EOF'
 FROM scratch
-COPY . /
+COPY content/ /
 EOF
     
     local temp_image_tag="localhost/temp-catalog-index:$catalog_tag"
