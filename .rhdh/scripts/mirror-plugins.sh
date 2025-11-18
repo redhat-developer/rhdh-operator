@@ -550,27 +550,12 @@ EOF
     infof "Successfully mirrored catalog index with updated plugin references"
     
   elif [[ -n "$target_dir" ]]; then
-    # Save catalog index and metadata for later rebuilding
+    # Save catalog index content for later rebuilding
     local catalog_dir="$target_dir/catalog-index"
     mkdir -p "$catalog_dir"
     
-    # Save the original catalog index layers
-    cp -r "$temp_dir/catalog-index"/* "$catalog_dir/"
-    
-    # Save the extracted data including index.json
-    mkdir -p "$catalog_dir/data"
-    cp -r "$catalog_data_dir"/* "$catalog_dir/data/"
-    
-    # Save metadata
-    cat > "$catalog_dir/metadata.json" << EOF
-{
-  "originalUrl": "$index_url",
-  "originalRegistry": "$original_registry",
-  "catalogName": "$catalog_name",
-  "catalogTag": "$catalog_tag",
-  "indexLayer": "$index_layer"
-}
-EOF
+    # Save the extracted content (index.json, dynamic-plugins, catalog-entities, etc.)
+    cp -r "$catalog_data_dir"/* "$catalog_dir/"
   fi
   
   return 0
@@ -826,12 +811,13 @@ function mirror_plugins_from_dir() {
     debugf "No existing summary found, will generate basic mapping from directory structure"
   fi
   
-  # Check if there's a catalog index to restore
-  local catalog_metadata="${FROM_DIR}/catalog-index/metadata.json"
-  if [[ -f "$catalog_metadata" ]]; then
+  # Check if there's a catalog index by looking at the summary file
+  # The catalog index mapping is in the summary file (if present)
+  if [[ -f "$existing_summary" ]] && [[ -d "${FROM_DIR}/catalog-index" ]]; then
+    # Look for catalog index mapping in summary (format: "oci://...plugin-catalog-index:... → ...")
     local original_url
-    original_url=$(jq -r '.originalUrl' "$catalog_metadata" 2>/dev/null)
-    if [[ -n "$original_url" && "$original_url" != "null" ]]; then
+    original_url=$(grep "plugin-catalog-index" "$existing_summary" | head -n1 | sed -E 's/^(oci:[^ ]+).*/\1/')
+    if [[ -n "$original_url" ]]; then
       PLUGIN_INDEX="$original_url"
       debugf "Restored original catalog index URL: $PLUGIN_INDEX"
     fi
@@ -907,28 +893,34 @@ function mirror_plugins_from_dir() {
     infof ""
     infof "Rebuilding and pushing catalog index from saved data..."
     
-    # Check if metadata exists
-    if [[ ! -f "$catalog_dir/metadata.json" ]]; then
-      warnf "No catalog index metadata found in ${FROM_DIR}"
+    # Check if we have the catalog index information
+    if [[ -z "$PLUGIN_INDEX" ]]; then
+      warnf "No catalog index information found in mirroring summary"
       warnf "Catalog index was not included in the original export"
       return 0
     fi
     
-    # Read metadata
+    # Parse catalog name and tag from PLUGIN_INDEX
+    # Format: oci://registry/org/image:tag or oci://registry/org/image@digest
     local catalog_name catalog_tag
-    catalog_name=$(jq -r '.catalogName' "$catalog_dir/metadata.json" 2>/dev/null)
-    catalog_tag=$(jq -r '.catalogTag' "$catalog_dir/metadata.json" 2>/dev/null)
+    local registry_ref="${PLUGIN_INDEX#oci://}"
     
-    if [[ -z "$catalog_name" ]] || [[ -z "$catalog_tag" ]]; then
-      warnf "Invalid catalog index metadata in ${FROM_DIR}"
-      return 0
+    if [[ "$registry_ref" =~ ^[^/]+/(.+):([^:@]+)$ ]]; then
+      catalog_name="${BASH_REMATCH[1]}"
+      catalog_tag="${BASH_REMATCH[2]}"
+    elif [[ "$registry_ref" =~ ^[^/]+/(.+)@(.+)$ ]]; then
+      catalog_name="${BASH_REMATCH[1]}"
+      catalog_tag="${BASH_REMATCH[2]}"
+    else
+      catalog_name="rhdh/plugin-catalog-index"
+      catalog_tag="latest"
     fi
     
     debugf "Rebuilding catalog index: $catalog_name:$catalog_tag"
     
     # Check for saved index.json
-    if [[ ! -f "$catalog_dir/data/index.json" ]]; then
-      warnf "No index.json found in saved catalog index data"
+    if [[ ! -f "$catalog_dir/index.json" ]]; then
+      warnf "No index.json found in saved catalog index"
       return 0
     fi
     
@@ -947,18 +939,18 @@ function mirror_plugins_from_dir() {
           end
         )
       )
-    ' "$catalog_dir/data/index.json" > "$updated_index" 2>/dev/null || [[ ! -s "$updated_index" ]]; then
+    ' "$catalog_dir/index.json" > "$updated_index" 2>/dev/null || [[ ! -s "$updated_index" ]]; then
       warnf "Failed to update index.json with new registry references"
       return 0
     fi
     
     # Replace index.json with updated version
-    cp "$updated_index" "$catalog_dir/data/index.json"
+    cp "$updated_index" "$catalog_dir/index.json"
     
     # Update OCI references in dynamic-plugins.default.yaml
     infof "Updating OCI references in dynamic-plugins.default.yaml..."
-    if [[ -f "$catalog_dir/data/dynamic-plugins.default.yaml" ]]; then
-      sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$catalog_dir/data/dynamic-plugins.default.yaml"
+    if [[ -f "$catalog_dir/dynamic-plugins.default.yaml" ]]; then
+      sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$catalog_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
     fi
     
@@ -970,7 +962,7 @@ function mirror_plugins_from_dir() {
         sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$yaml_file"
         ((yaml_count++)) || true
       fi
-    done < <(find "$catalog_dir/data/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
+    done < <(find "$catalog_dir/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
     
     if [[ $yaml_count -gt 0 ]]; then
       debugf "Updated OCI references in $yaml_count catalog-entity YAML files"
@@ -978,11 +970,19 @@ function mirror_plugins_from_dir() {
     
     debugf "Using podman to rebuild catalog index"
     
-    # Create Dockerfile
+    # Create Dockerfile in a temporary build directory
     local build_dir="$catalog_dir/build"
-    mkdir -p "$build_dir"
     mkdir -p "$build_dir/content"
-    cp -r "$catalog_dir/data"/* "$build_dir/content/"
+    
+    # Copy catalog content (index.json, dynamic-plugins, catalog-entities, etc.)
+    # Exclude build/ and index-updated.json (temporary files)
+    for item in "$catalog_dir"/*; do
+      local basename_item
+      basename_item=$(basename "$item")
+      if [[ "$basename_item" != "build" && "$basename_item" != "index-updated.json" ]]; then
+        cp -r "$item" "$build_dir/content/"
+      fi
+    done
     
     cat > "$build_dir/Dockerfile" << 'EOF'
 FROM scratch
@@ -994,6 +994,8 @@ EOF
     
     if ! podman build -t "$temp_image_tag" "$build_dir" &>/dev/null; then
       warnf "Failed to rebuild catalog index image with podman"
+      rm -rf "$build_dir" || true
+      rm -f "$updated_index" || true
       return 0
     fi
     
@@ -1001,13 +1003,16 @@ EOF
     if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
       warnf "Failed to push catalog index to registry"
       podman rmi "$temp_image_tag" &>/dev/null || true
+      rm -rf "$build_dir" || true
+      rm -f "$updated_index" || true
       return 0
     fi
     
     podman rmi "$temp_image_tag" &>/dev/null || true
     
-    # Clean up the build directory
+    # Clean up temporary files and directories
     rm -rf "$build_dir" || true
+    rm -f "$updated_index" || true
     
     infof "Successfully pushed catalog index"
   fi
