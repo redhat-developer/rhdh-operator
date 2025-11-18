@@ -285,25 +285,15 @@ function push_image_from_archive() {
   return 0
 }
 
-# Download the catalog index, extract package YAML files,
-# filter by version, and return a unique list of plugin OCI URLs
+# Download the catalog index, extract the index.json file,
+# and return the list of plugin OCI URLs it contains
 function resolve_plugin_index() {
   local index_url="$1"
   infof "Resolving plugins from catalog index: $index_url"
   
-  # Strip oci:// prefix and extract version for filtering
+  # Strip oci:// prefix
   if [[ "$index_url" =~ ^oci://(.+) ]]; then
     local registry_ref="${BASH_REMATCH[1]}"
-    
-    # Extract version/digest for plugin filtering logic
-    local version
-    if [[ "$registry_ref" =~ @(.+)$ ]]; then
-      # Digest format: capture everything after @
-      version="${BASH_REMATCH[1]}"
-    elif [[ "$registry_ref" =~ :([^:@]+)$ ]]; then
-      # Tag format: capture everything after last :
-      version="${BASH_REMATCH[1]}"
-    fi
     
     debugf "Extracting plugin catalog index image: $registry_ref"
     
@@ -358,25 +348,11 @@ function resolve_plugin_index() {
     
     # Extract registryReference values from index.json and convert to oci:// format
     local temp_plugin_images=()
-    local filtered_plugins=0
     
     while IFS= read -r registry_ref; do
       if [[ -n "$registry_ref" ]]; then
         local oci_url="oci://$registry_ref"
-        
-        # Filter by version if specified (not 'next', 'latest', or sha256 digest)
-        # When using @sha256:digest for catalog index, don't filter plugins by digest
-        if [[ "$version" != "next" && "$version" != "latest" && ! "$version" =~ ^sha256: ]]; then
-          # Check if the OCI URL contains the version
-          if echo "$oci_url" | grep -q ":$version"; then
-            temp_plugin_images+=("$oci_url")
-            ((filtered_plugins++))
-          fi
-        else
-          # For 'next', 'latest', or digest-based catalog index, include all OCI URLs
-          temp_plugin_images+=("$oci_url")
-          ((filtered_plugins++))
-        fi
+        temp_plugin_images+=("$oci_url")
       fi
     done < <(jq -r '.[] | .registryReference // empty' "$index_file" 2>/dev/null)
     
@@ -386,9 +362,6 @@ function resolve_plugin_index() {
     fi
     
     infof "Found ${#PLUGIN_IMAGES[@]} unique plugins from catalog index"
-    if [[ "$version" != "next" && "$version" != "latest" && ! "$version" =~ ^sha256: ]]; then
-      debugf "Filtered to ${#PLUGIN_IMAGES[@]} plugins matching version $version"
-    fi
     
     return 0
   else
@@ -492,15 +465,13 @@ function mirror_catalog_index() {
     infof "Updating plugin registry references in index.json..."
     
     # Use jq to update all registryReference values
-    # Extract the registry from each reference and replace with target_registry
+    # Replace the registry domain (first component before /) with target registry
     if ! jq --arg target_reg "$target_registry" '
       . | with_entries(
         .value.registryReference |= (
           if . then
-            # Split on / to get registry and path
-            . | split("/") | 
-            # Replace first element (registry) with target, keep rest
-            ([$target_reg] + .[1:]) | join("/")
+            # Remove everything up to and including first slash, then prepend target registry
+            . | sub("^[^/]+/"; $target_reg + "/")
           else
             .
           end
@@ -562,7 +533,7 @@ EOF
     local temp_image_tag="localhost/temp-catalog-index:$catalog_tag"
     local target_image="$target_registry/$catalog_name:$catalog_tag"
     
-    if ! podman build -t "$temp_image_tag" "$build_dir" 2>/dev/null; then
+    if ! podman build -t "$temp_image_tag" "$build_dir" &>/dev/null; then
       errorf "Failed to rebuild catalog index image with podman"
       return 1
     fi
@@ -574,7 +545,7 @@ EOF
     fi
     
     # Clean up local image
-    podman rmi "$temp_image_tag" 2>/dev/null || true
+    podman rmi "$temp_image_tag" &>/dev/null || true
     
     infof "Successfully mirrored catalog index with updated plugin references"
     
@@ -582,8 +553,6 @@ EOF
     # Save catalog index and metadata for later rebuilding
     local catalog_dir="$target_dir/catalog-index"
     mkdir -p "$catalog_dir"
-    
-    infof "Saving catalog index data to: $catalog_dir"
     
     # Save the original catalog index layers
     cp -r "$temp_dir/catalog-index"/* "$catalog_dir/"
@@ -602,8 +571,6 @@ EOF
   "indexLayer": "$index_layer"
 }
 EOF
-    
-    infof "Catalog index saved for offline transfer"
   fi
   
   return 0
@@ -836,6 +803,40 @@ function mirror_plugins_from_dir() {
     return 1
   fi
   
+  # Parse original sources from existing summary file if available
+  local existing_summary="${FROM_DIR}/mirroring-summary.txt"
+  if [[ -f "$existing_summary" ]]; then
+    infof "Reading original plugin sources from existing summary..."
+    parse_original_sources "$existing_summary"
+    
+    # Populate PLUGIN_IMAGES array with original sources (exclude catalog index)
+    PLUGIN_IMAGES=()
+    for original in "${!ORIGINAL_SOURCES[@]}"; do
+      # Check if this is a catalog index or a plugin
+      if [[ ! "$original" =~ plugin-catalog-index ]]; then
+        PLUGIN_IMAGES+=("$original")
+      fi
+    done
+    
+    # Sort for consistent output
+    if [[ ${#PLUGIN_IMAGES[@]} -gt 0 ]]; then
+      mapfile -t PLUGIN_IMAGES < <(printf "%s\n" "${PLUGIN_IMAGES[@]}" | sort -u)
+    fi
+  else
+    debugf "No existing summary found, will generate basic mapping from directory structure"
+  fi
+  
+  # Check if there's a catalog index to restore
+  local catalog_metadata="${FROM_DIR}/catalog-index/metadata.json"
+  if [[ -f "$catalog_metadata" ]]; then
+    local original_url
+    original_url=$(jq -r '.originalUrl' "$catalog_metadata" 2>/dev/null)
+    if [[ -n "$original_url" && "$original_url" != "null" ]]; then
+      PLUGIN_INDEX="$original_url"
+      debugf "Restored original catalog index URL: $PLUGIN_INDEX"
+    fi
+  fi
+  
   debugf "Processing plugins from ${BASE_DIR}..."
   
   local success_count=0
@@ -939,8 +940,8 @@ function mirror_plugins_from_dir() {
       . | with_entries(
         .value.registryReference |= (
           if . then
-            . | split("/") | 
-            ([$target_reg] + .[1:]) | join("/")
+            # Remove everything up to and including first slash, then prepend target registry
+            . | sub("^[^/]+/"; $target_reg + "/")
           else
             .
           end
@@ -991,7 +992,7 @@ EOF
     local temp_image_tag="localhost/temp-catalog-index:$catalog_tag"
     local target_image="$TO_REGISTRY/$catalog_name:$catalog_tag"
     
-    if ! podman build -t "$temp_image_tag" "$build_dir" 2>/dev/null; then
+    if ! podman build -t "$temp_image_tag" "$build_dir" &>/dev/null; then
       warnf "Failed to rebuild catalog index image with podman"
       return 0
     fi
@@ -999,13 +1000,46 @@ EOF
     infof "Pushing rebuilt catalog index to: $target_image"
     if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
       warnf "Failed to push catalog index to registry"
-      podman rmi "$temp_image_tag" 2>/dev/null || true
+      podman rmi "$temp_image_tag" &>/dev/null || true
       return 0
     fi
     
-    podman rmi "$temp_image_tag" 2>/dev/null || true
+    podman rmi "$temp_image_tag" &>/dev/null || true
+    
+    # Clean up the build directory
+    rm -rf "$build_dir" || true
+    
     infof "Successfully pushed catalog index"
   fi
+  
+  return 0
+}
+
+# Parse original plugin sources from an existing mirroring summary file
+function parse_original_sources() {
+  local summary_file="$1"
+  
+  if [[ ! -f "$summary_file" ]]; then
+    debugf "No existing summary file found: $summary_file"
+    return 1
+  fi
+  
+  # Read original sources from the summary file
+  # Format: "oci://original → destination"
+  declare -gA ORIGINAL_SOURCES
+  
+  while IFS= read -r line; do
+    # Skip comments and empty lines
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    
+    # Parse mapping line: "source → destination"
+    if [[ "$line" =~ ^(oci://[^[:space:]]+)[[:space:]]*→ ]]; then
+      local original="${BASH_REMATCH[1]}"
+      ORIGINAL_SOURCES["$original"]=1
+      debugf "Found original source: $original"
+    fi
+  done < "$summary_file"
   
   return 0
 }
@@ -1015,10 +1049,17 @@ EOF
 function generate_mapping_file() {
   local output_file="$1"
   local mode="$2"  # "registry" or "directory"
+  local update_note="${3:-}"  # Optional update note (default to empty string)
   
   # Simple clean header
   echo "# This file contains a mapping of all mirrored plugins and their locations." > "$output_file"
   echo "# Total plugins mirrored: ${#PLUGIN_IMAGES[@]}" >> "$output_file"
+  
+  # Add update note if provided
+  if [[ -n "$update_note" ]]; then
+    echo "# $update_note" >> "$output_file"
+  fi
+  
   echo "" >> "$output_file"
   
   # Add catalog index mapping if present
@@ -1109,11 +1150,17 @@ else
   mirror_plugins
 fi
 
-# Generate mapping file for user reference (only during initial mirroring, not --from-dir)
-if [[ ${#PLUGIN_IMAGES[@]} -gt 0 ]] && [[ -z "${FROM_DIR}" ]]; then
-  if [[ -n "${TO_DIR}" ]]; then
+# Generate mapping file for user reference
+if [ ${#PLUGIN_IMAGES[@]} -gt 0 ]; then
+  if [[ -n "${FROM_DIR}" ]] && [[ -n "${TO_REGISTRY}" ]]; then
+    # Update mode: migrating from directory to registry - update the file in place
+    update_note="Updated from ${FROM_DIR} to ${TO_REGISTRY}"
+    generate_mapping_file "${FROM_DIR}/mirroring-summary.txt" "registry" "$update_note"
+  elif [[ -n "${TO_DIR}" ]]; then
+    # Export mode: mirroring to directory
     generate_mapping_file "${TO_DIR}/mirroring-summary.txt" "directory"
   elif [[ -n "${TO_REGISTRY}" ]]; then
+    # Direct mirror mode: mirroring to registry
     generate_mapping_file "./mirroring-summary.txt" "registry"
   fi
 fi
@@ -1132,11 +1179,6 @@ if [[ -n "${TO_DIR}" ]]; then
   infof "1. Transfer ${TO_DIR} to your disconnected network"
   infof "2. Run this script again with --from-dir and --to-registry:"
   infof "   $0 --from-dir ${TO_DIR} --to-registry YOUR_REGISTRY"
-  if [[ -n "${PLUGIN_INDEX}" ]]; then
-    infof ""
-    infof "Note: The catalog index will be automatically rebuilt with updated"
-    infof "      registry references when you run the --from-dir command."
-  fi
   infof ""
 elif [[ -n "${TO_REGISTRY}" ]]; then
   infof ""
@@ -1145,9 +1187,11 @@ elif [[ -n "${TO_REGISTRY}" ]]; then
   if [[ -n "${PLUGIN_INDEX}" ]]; then
     infof "Catalog index has been pushed with updated plugin references"
   fi
-  # Only show mapping file location for direct mirroring (not --from-dir)
-  if [[ -z "${FROM_DIR}" ]]; then
-    infof "Plugin mapping: ./mirroring-summary.txt"
+  # Show the mapping file location
+  if [[ -n "${FROM_DIR}" ]]; then
+    infof "Plugin mapping: ${FROM_DIR}/mirroring-summary.txt"
+  else
+    infof "Plugin mapping: $(pwd)/mirroring-summary.txt"
   fi
   infof ""
   infof "You can now configure your RHDH deployment to use these mirrored plugins."
