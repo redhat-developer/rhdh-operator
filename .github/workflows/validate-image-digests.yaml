@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/validate-image-digests.yaml'
+      - 'Makefile'
       - 'hack/validate-image-digests.sh'
       - 'Dockerfile'
       - '**/*bundle.Dockerfile'
