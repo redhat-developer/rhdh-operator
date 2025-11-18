@@ -516,6 +516,29 @@ function mirror_catalog_index() {
     # Replace the original index.json with updated version
     cp "$updated_index" "$catalog_data_dir/index.json"
     
+    # Update OCI references in dynamic-plugins.default.yaml
+    infof "Updating OCI references in dynamic-plugins.default.yaml..."
+    if [[ -f "$catalog_data_dir/dynamic-plugins.default.yaml" ]]; then
+      # Replace OCI registry references (preserves path and tag)
+      # Pattern: oci://REGISTRY/PATH:TAG -> oci://NEW_REGISTRY/PATH:TAG
+      sed -i -E "s|oci://[^/]+/|oci://$target_registry/|g" "$catalog_data_dir/dynamic-plugins.default.yaml"
+      debugf "Updated OCI references in dynamic-plugins.default.yaml"
+    fi
+    
+    # Update OCI references in all catalog-entities YAML files
+    infof "Updating OCI references in catalog-entities..."
+    local yaml_count=0
+    while IFS= read -r yaml_file; do
+      if [[ -n "$yaml_file" && -f "$yaml_file" ]]; then
+        sed -i -E "s|oci://[^/]+/|oci://$target_registry/|g" "$yaml_file"
+        ((yaml_count++)) || true
+      fi
+    done < <(find "$catalog_data_dir/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
+    
+    if [[ $yaml_count -gt 0 ]]; then
+      debugf "Updated OCI references in $yaml_count catalog-entity YAML files"
+    fi
+    
     # Rebuild the layer with updated index.json
     infof "Rebuilding catalog index image with updated references..."
     local new_layer="$temp_dir/new-layer.tar"
@@ -930,6 +953,27 @@ function mirror_plugins_from_dir() {
     
     # Replace index.json with updated version
     cp "$updated_index" "$catalog_dir/data/index.json"
+    
+    # Update OCI references in dynamic-plugins.default.yaml
+    infof "Updating OCI references in dynamic-plugins.default.yaml..."
+    if [[ -f "$catalog_dir/data/dynamic-plugins.default.yaml" ]]; then
+      sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$catalog_dir/data/dynamic-plugins.default.yaml"
+      debugf "Updated OCI references in dynamic-plugins.default.yaml"
+    fi
+    
+    # Update OCI references in all catalog-entities YAML files
+    infof "Updating OCI references in catalog-entities..."
+    local yaml_count=0
+    while IFS= read -r yaml_file; do
+      if [[ -n "$yaml_file" && -f "$yaml_file" ]]; then
+        sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$yaml_file"
+        ((yaml_count++)) || true
+      fi
+    done < <(find "$catalog_dir/data/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
+    
+    if [[ $yaml_count -gt 0 ]]; then
+      debugf "Updated OCI references in $yaml_count catalog-entity YAML files"
+    fi
     
     debugf "Using podman to rebuild catalog index"
     
