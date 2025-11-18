@@ -62,6 +62,7 @@ function check_tool() {
 check_tool "skopeo"
 check_tool "tar"
 check_tool "jq"
+check_tool "podman"
 
 function usage() {
   echo "
@@ -532,58 +533,24 @@ FROM scratch
 COPY . /
 EOF
     
-    # Check if podman or buildah is available
-    local builder=""
-    if command -v podman &> /dev/null; then
-      builder="podman"
-    elif command -v buildah &> /dev/null; then
-      builder="buildah"
-    else
-      errorf "Neither podman nor buildah found. Required to rebuild catalog index image."
-      errorf "Please install podman or buildah, or use a simple mirror without index modifications."
-      return 1
-    fi
-    
-    debugf "Using $builder to rebuild catalog index image"
+    debugf "Using podman to rebuild catalog index image"
     
     local temp_image_tag="localhost/temp-catalog-index:$catalog_tag"
     local target_image="$target_registry/$catalog_name:$catalog_tag"
     
-    if [[ "$builder" == "podman" ]]; then
-      if ! podman build -t "$temp_image_tag" "$build_dir" 2>/dev/null; then
-        errorf "Failed to rebuild catalog index image with podman"
-        return 1
-      fi
-      
-      infof "Pushing rebuilt catalog index to: $target_image"
-      if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
-        errorf "Failed to push catalog index to registry"
-        return 1
-      fi
-      
-      # Clean up local image
-      podman rmi "$temp_image_tag" 2>/dev/null || true
-      
-    elif [[ "$builder" == "buildah" ]]; then
-      local container
-      container=$(buildah from scratch)
-      buildah copy "$container" "$catalog_data_dir" /
-      buildah commit "$container" "$temp_image_tag" 2>/dev/null || {
-        errorf "Failed to rebuild catalog index image with buildah"
-        buildah rm "$container" 2>/dev/null || true
-        return 1
-      }
-      buildah rm "$container" 2>/dev/null || true
-      
-      infof "Pushing rebuilt catalog index to: $target_image"
-      if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
-        errorf "Failed to push catalog index to registry"
-        buildah rmi "$temp_image_tag" 2>/dev/null || true
-        return 1
-      fi
-      
-      buildah rmi "$temp_image_tag" 2>/dev/null || true
+    if ! podman build -t "$temp_image_tag" "$build_dir" 2>/dev/null; then
+      errorf "Failed to rebuild catalog index image with podman"
+      return 1
     fi
+    
+    infof "Pushing rebuilt catalog index to: $target_image"
+    if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
+      errorf "Failed to push catalog index to registry"
+      return 1
+    fi
+    
+    # Clean up local image
+    podman rmi "$temp_image_tag" 2>/dev/null || true
     
     infof "Successfully mirrored catalog index with updated plugin references"
     
@@ -963,19 +930,7 @@ function mirror_plugins_from_dir() {
     # Replace index.json with updated version
     cp "$updated_index" "$catalog_dir/data/index.json"
     
-    # Check if podman or buildah is available
-    local builder=""
-    if command -v podman &> /dev/null; then
-      builder="podman"
-    elif command -v buildah &> /dev/null; then
-      builder="buildah"
-    else
-      warnf "Neither podman nor buildah found. Cannot rebuild catalog index."
-      warnf "Please install podman or buildah to enable catalog index mirroring."
-      return 0
-    fi
-    
-    debugf "Using $builder to rebuild catalog index"
+    debugf "Using podman to rebuild catalog index"
     
     # Create Dockerfile
     local build_dir="$catalog_dir/build"
@@ -990,43 +945,20 @@ EOF
     local temp_image_tag="localhost/temp-catalog-index:$catalog_tag"
     local target_image="$TO_REGISTRY/$catalog_name:$catalog_tag"
     
-    if [[ "$builder" == "podman" ]]; then
-      if ! podman build -t "$temp_image_tag" "$build_dir" 2>/dev/null; then
-        warnf "Failed to rebuild catalog index image with podman"
-        return 0
-      fi
-      
-      infof "Pushing rebuilt catalog index to: $target_image"
-      if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
-        warnf "Failed to push catalog index to registry"
-        podman rmi "$temp_image_tag" 2>/dev/null || true
-        return 0
-      fi
-      
-      podman rmi "$temp_image_tag" 2>/dev/null || true
-      infof "Successfully pushed catalog index"
-      
-    elif [[ "$builder" == "buildah" ]]; then
-      local container
-      container=$(buildah from scratch)
-      buildah copy "$container" "$catalog_dir/data" /
-      buildah commit "$container" "$temp_image_tag" 2>/dev/null || {
-        warnf "Failed to rebuild catalog index image with buildah"
-        buildah rm "$container" 2>/dev/null || true
-        return 0
-      }
-      buildah rm "$container" 2>/dev/null || true
-      
-      infof "Pushing rebuilt catalog index to: $target_image"
-      if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
-        warnf "Failed to push catalog index to registry"
-        buildah rmi "$temp_image_tag" 2>/dev/null || true
-        return 0
-      fi
-      
-      buildah rmi "$temp_image_tag" 2>/dev/null || true
-      infof "Successfully pushed catalog index"
+    if ! podman build -t "$temp_image_tag" "$build_dir" 2>/dev/null; then
+      warnf "Failed to rebuild catalog index image with podman"
+      return 0
     fi
+    
+    infof "Pushing rebuilt catalog index to: $target_image"
+    if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
+      warnf "Failed to push catalog index to registry"
+      podman rmi "$temp_image_tag" 2>/dev/null || true
+      return 0
+    fi
+    
+    podman rmi "$temp_image_tag" 2>/dev/null || true
+    infof "Successfully pushed catalog index"
   fi
   
   return 0
