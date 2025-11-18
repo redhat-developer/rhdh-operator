@@ -4,7 +4,7 @@
 # This script is installation-method agnostic and works with both operator and helm deployments
 # on both OpenShift and Kubernetes platforms.
 #
-# Requires: skopeo, tar
+# Requires: skopeo, tar, jq, podman
 
 set -euo pipefail
 
