@@ -76,7 +76,7 @@ Usage:
 
 Options:
   --plugin-index <oci-url>               : Plugin catalog index to query for version-specific plugins
-                                           (e.g., oci://quay.io/rhdh/plugin-catalog-index:1.8)
+                                           (e.g., oci://quay.io/rhdh/plugin-catalog-index:1.9)
   --plugin-list <file>                   : Local .txt file with plugin OCI references (oci:// URL per line,
                                            comments with '#' are ignored, no quotes needed in file)
   --plugins <oci-url> [<oci-url> ...]    : Space-separated list of plugin OCI URLs to mirror
@@ -93,7 +93,7 @@ Examples:
 
   # Mirror all plugins from a catalog index to a registry
   $0 \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \\
     --to-registry registry.example.com
 
   # Mirror specific plugins by direct OCI reference (use quotes for URLs with '!')
@@ -104,13 +104,13 @@ Examples:
 
   # Combined mode: catalog index + custom plugins
   $0 \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \\
     --plugins 'oci://custom-registry.example.com/my-plugin:1.0!my-plugin' \\
     --to-registry registry.example.com
 
   # Export plugins to directory (for fully disconnected environments)
   $0 \\
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.8 \\
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \\
     --to-dir /path/to/export
 
   # Import plugins from directory and push to registry (in disconnected environment)
