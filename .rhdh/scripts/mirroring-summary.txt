@@ -1,7 +1,0 @@
-# This file contains a mapping of all mirrored plugins and their locations.
-# Total plugins mirrored: 3
-
-oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8 → oci://quay.io/fndlovu/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
-oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7 → oci://quay.io/fndlovu/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
-oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.8 → oci://quay.io/fndlovu/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.8
-
