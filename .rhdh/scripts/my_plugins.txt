@@ -1,0 +1,5 @@
+# Red Hat Developer Hub Plugin List
+oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
+oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
+oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.8
+oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-dynatrace:1.8.0--10.6.0!backstage-community-plugin-dynatrace

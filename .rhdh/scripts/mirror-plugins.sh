@@ -127,7 +127,7 @@ Examples:
     # Red Hat Developer Hub Plugin List
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
-    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.6
+    oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.8
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-dynatrace:1.8.0--10.6.0!backstage-community-plugin-dynatrace
 "
 }
@@ -226,6 +226,9 @@ if [[ -n "${FROM_DIR}" && ! -d "${FROM_DIR}" ]]; then
 fi
 
 # Setup working directory
+# Capture original directory for saving user-facing files
+ORIGINAL_DIR="$(pwd)"
+
 if [[ -n "${TO_DIR}" ]]; then
   mkdir -p "${TO_DIR}"
   TMPDIR="${TO_DIR}"
@@ -1165,8 +1168,8 @@ if [ ${#PLUGIN_IMAGES[@]} -gt 0 ]; then
     # Export mode: mirroring to directory
     generate_mapping_file "${TO_DIR}/mirroring-summary.txt" "directory"
   elif [[ -n "${TO_REGISTRY}" ]]; then
-    # Direct mirror mode: mirroring to registry
-    generate_mapping_file "./mirroring-summary.txt" "registry"
+    # Direct mirror mode: mirroring to registry - save in original directory
+    generate_mapping_file "${ORIGINAL_DIR}/mirroring-summary.txt" "registry"
   fi
 fi
 
@@ -1196,7 +1199,7 @@ elif [[ -n "${TO_REGISTRY}" ]]; then
   if [[ -n "${FROM_DIR}" ]]; then
     infof "Plugin mapping: ${FROM_DIR}/mirroring-summary.txt"
   else
-    infof "Plugin mapping: $(pwd)/mirroring-summary.txt"
+    infof "Plugin mapping: ${ORIGINAL_DIR}/mirroring-summary.txt"
   fi
   infof ""
   infof "You can now configure your RHDH deployment to use these mirrored plugins."
