@@ -52,11 +52,11 @@ function errorf() {
   logf "ERROR" "\033[0;31m" "$1"
 }
 
-# Required tools and minimum versions:
-#   skopeo >= 1.0    (for multi-arch image operations)
-#   tar >= 1.27      (GNU tar)
-#   jq >= 1.5        (for JSON parsing)
-#   podman >= 3.0    (for building catalog index)
+# Required tools and minimum versions (tested with):
+#   skopeo >= 1.20    (for multi-arch image operations and manifest conversion)
+#   tar >= 1.35       (GNU tar)
+#   jq >= 1.7         (for JSON parsing and manipulation)
+#   podman >= 5.6     (for building catalog index)
 function check_tool() {
   if ! command -v "$1" >/dev/null; then
     echo "Error: Required tool '$1' is not installed." >&2
@@ -75,6 +75,9 @@ Red Hat Developer Hub - Dynamic Plugin OCI Artifact Mirroring Script
 
 This script mirrors dynamic plugin OCI artifacts for RHDH deployments in restricted environments.
 It is installation-method agnostic and works with both operator and helm deployments.
+
+Requirements:
+  skopeo >= 1.20, tar >= 1.35, jq >= 1.7, podman >= 5.6
 
 Usage:
   $0 [OPTIONS]
