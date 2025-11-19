@@ -52,6 +52,11 @@ function errorf() {
   logf "ERROR" "\033[0;31m" "$1"
 }
 
+# Required tools and minimum versions:
+#   skopeo >= 1.0    (for multi-arch image operations)
+#   tar >= 1.27      (GNU tar)
+#   jq >= 1.5        (for JSON parsing)
+#   podman >= 3.0    (for building catalog index)
 function check_tool() {
   if ! command -v "$1" >/dev/null; then
     echo "Error: Required tool '$1' is not installed." >&2
