@@ -16,7 +16,6 @@ jobs:
           - main
           - release-1.8
           - release-1.7
-          - release-1.6
     name: 'Nightly Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
@@ -24,7 +23,7 @@ jobs:
     env:
       CONTAINER_TOOL: podman
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ matrix.branch }}
           fetch-depth: 0
