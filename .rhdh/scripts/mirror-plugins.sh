@@ -92,6 +92,10 @@ Options:
 Examples:
 
   # Mirror all plugins from a catalog index to a registry
+  # Substitute with your registry, e.g.:
+  #   --to-registry localhost:5000
+  #   --to-registry quay.io/myorg
+  #   --to-registry default-route-openshift-image-registry.apps.<cluster-domain>
   $0 \\
     --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \\
     --to-registry registry.example.com
@@ -268,14 +272,22 @@ function mirror_image() {
   
   # Add appropriate flags based on destination type
   local dest_flags=""
+  local preserve_digests_flag=""
+  
   if [[ "$dest" == docker://* ]]; then
     dest_flags="--dest-tls-verify=false"
+    # Don't preserve digests for registry destinations to allow format conversion
+    # This ensures compatibility with registries that require manifest format conversion
+    # (e.g., OpenShift internal registry requiring OCI format)
+    preserve_digests_flag=""
     infof "Mirroring $src_image to ${dest#docker://}..."
   else
+    # Preserve digests for directory destinations (offline transfer integrity)
+    preserve_digests_flag="--preserve-digests"
     debugf "Saving $src_image to ${dest#dir:}..."
   fi
   
-  skopeo copy --preserve-digests --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" || return 1
+  skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" || return 1
   return 0
 }
 
@@ -284,7 +296,9 @@ function push_image_from_archive() {
   local dest_image="$2"
   
   infof "Pushing $archive_path to $dest_image..."
-  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false "dir:$archive_path" "docker://$dest_image" || return 1
+  # Don't preserve digests when pushing to registry to allow format conversion
+  # This ensures compatibility with registries that require manifest format conversion
+  skopeo copy --remove-signatures --all --dest-tls-verify=false "dir:$archive_path" "docker://$dest_image" || return 1
   return 0
 }
 
@@ -448,7 +462,7 @@ function mirror_catalog_index() {
     if [[ -n "$target_registry" ]]; then
       local target_image="$target_registry/$catalog_name:$catalog_tag"
       infof "Mirroring catalog index to: $target_image"
-      skopeo copy --all "docker://$registry_ref" "docker://$target_image" || return 1
+      skopeo copy --all --dest-tls-verify=false "docker://$registry_ref" "docker://$target_image" || return 1
     elif [[ -n "$target_dir" ]]; then
       local catalog_dir="$target_dir/catalog-index"
       mkdir -p "$catalog_dir"
@@ -542,7 +556,7 @@ EOF
     fi
     
     infof "Pushing rebuilt catalog index to: $target_image"
-    if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
+    if ! skopeo copy --all --dest-tls-verify=false "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
       errorf "Failed to push catalog index to registry"
       return 1
     fi
@@ -1003,7 +1017,7 @@ EOF
     fi
     
     infof "Pushing rebuilt catalog index to: $target_image"
-    if ! skopeo copy --all "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
+    if ! skopeo copy --all --dest-tls-verify=false "containers-storage:$temp_image_tag" "docker://$target_image" 2>&1; then
       warnf "Failed to push catalog index to registry"
       podman rmi "$temp_image_tag" &>/dev/null || true
       rm -rf "$build_dir" || true
