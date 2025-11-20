@@ -3,8 +3,6 @@ package model
 import (
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -31,7 +29,7 @@ type RuntimeObject interface {
 	// setObject sets object
 	setObject(object runtime.Object)
 	// EmptyObject an empty object: the same type as Object if Object is client.Object or Item type of Multiobject
-	EmptyObject() client.Object
+	// EmptyObject() client.Object
 	// adds runtime object to the model
 	// returns false if the object was not added to the model (not configured)
 	addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error)

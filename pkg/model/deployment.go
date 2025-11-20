@@ -85,9 +85,9 @@ func (b *BackstageDeployment) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) EmptyObject() client.Object {
-	return &appsv1.Deployment{}
-}
+//func (b *BackstageDeployment) EmptyObject() client.Object {
+//	return &appsv1.Deployment{}
+//}
 
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {

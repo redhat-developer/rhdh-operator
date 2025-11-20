@@ -8,7 +8,6 @@ import (
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,9 +90,9 @@ func (b *BackstageRoute) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) EmptyObject() client.Object {
-	return &openshift.Route{}
-}
+//func (b *BackstageRoute) EmptyObject() client.Object {
+//	return &openshift.Route{}
+//}
 
 // implementation of RuntimeObject interface
 func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {

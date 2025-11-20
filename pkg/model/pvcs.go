@@ -8,8 +8,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -64,9 +62,9 @@ func (b *BackstagePvcs) setObject(object runtime.Object) {
 	b.pvcs = object.(*multiobject.MultiObject)
 }
 
-func (b *BackstagePvcs) EmptyObject() client.Object {
-	return &corev1.PersistentVolumeClaim{}
-}
+//func (b *BackstagePvcs) EmptyObject() client.Object {
+//	return &corev1.PersistentVolumeClaim{}
+//}
 
 func (b *BackstagePvcs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	b.model = model

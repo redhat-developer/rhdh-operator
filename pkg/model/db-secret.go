@@ -3,8 +3,6 @@ package model
 import (
 	"strconv"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
@@ -64,9 +62,9 @@ func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) EmptyObject() client.Object {
-	return &corev1.Secret{}
-}
+//func (b *DbSecret) EmptyObject() client.Object {
+//	return &corev1.Secret{}
+//}
 
 // implementation of RuntimeObject interface
 func (b *DbSecret) updateAndValidate(_ bsv1.Backstage) error {

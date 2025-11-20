@@ -3,8 +3,6 @@ package model
 import (
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
@@ -58,9 +56,9 @@ func (b *BackstageService) addToModel(model *BackstageModel, _ bsv1.Backstage) (
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) EmptyObject() client.Object {
-	return &corev1.Service{}
-}
+//func (b *BackstageService) EmptyObject() client.Object {
+//	return &corev1.Service{}
+//}
 
 // implementation of RuntimeObject interface
 func (b *BackstageService) updateAndValidate(_ bsv1.Backstage) error {

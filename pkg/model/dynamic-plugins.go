@@ -83,9 +83,9 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (p *DynamicPlugins) EmptyObject() client.Object {
-	return &corev1.ConfigMap{}
-}
+//func (p *DynamicPlugins) EmptyObject() client.Object {
+//	return &corev1.ConfigMap{}
+//}
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
