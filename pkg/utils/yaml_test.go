@@ -12,7 +12,11 @@ func TestReadYamlFile(t *testing.T) {
 	// Create a temporary directory
 	dir, err := os.MkdirTemp("", "test-yaml")
 	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Logf("failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create a sample YAML file
 	yamlContent := `
@@ -41,7 +45,11 @@ func TestReadYamlFilesFromDir(t *testing.T) {
 	// Create a temporary directory
 	dir, err := os.MkdirTemp("", "test-yaml-dir")
 	assert.NoError(t, err)
-	defer os.RemoveAll(dir)
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Logf("failed to remove temp dir: %v", err)
+		}
+	}()
 
 	// Create sample YAML files
 	yamlContent1 := `

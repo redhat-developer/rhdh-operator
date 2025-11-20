@@ -186,7 +186,11 @@ var _ = Describe("Backstage Operator E2E", func() {
 								stdin, err := cmd.StdinPipe()
 								ExpectWithOffset(1, err).NotTo(HaveOccurred())
 								go func() {
-									defer stdin.Close()
+									defer func() { 
+										if err := stdin.Close(); err != nil {
+											GinkgoWriter.Println("Warning: failed to close stdin pipe:", err)
+										}
+									}()
 									_, _ = io.WriteString(stdin, fmt.Sprintf(`
 apiVersion: networking.k8s.io/v1
 kind: Ingress
