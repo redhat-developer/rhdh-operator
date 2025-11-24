@@ -13,22 +13,10 @@ The following tools are required to run the mirroring script:
 * `jq >= 1.7` - For JSON parsing and manipulation. See link:https://jqlang.github.io/jq/download/[Download jq].
 * `podman >= 5.6` - For building catalog index images. See link:https://podman.io/docs/installation[Podman Installation Instructions].
 
-=== Plugin Source Options
-
-The script supports multiple ways to specify which plugins to mirror:
-
-* *Plugin Catalog Index* (`--plugin-index`) - A catalog index (e.g., `oci://quay.io/rhdh/plugin-catalog-index:1.9`) that contains references to all available plugins for a specific RHDH version.
-* *Plugin List File* (`--plugin-list`) - A text file containing OCI URLs, one per line. Comments starting with `#` are ignored.
-* *Direct Plugin URLs* (`--plugins`) - Space-separated list of plugin OCI URLs specified directly on the command line.
-
-You can combine multiple sources in a single mirroring operation. The script will automatically deduplicate plugins.
-
 === Procedures
 
 [#_mirroring_all_plugins_from_catalog_index]
 ==== Mirroring all plugins from a catalog index (Connected Environment)
-
-Use this procedure when you have network access to both the source registry (quay.io) and your target mirror registry from the same host.
 
 . Authenticate to both the source registry (`podman login quay.io`) and your target registry. For more information, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
 
@@ -41,36 +29,12 @@ bash mirror-plugins.sh \
     --to-registry registry.example.com
 ----
 
-The script will:
-
-* Download and parse the catalog index
-* Extract all plugin references
-* Mirror each plugin to your registry
-* Rebuild the catalog index with updated registry references
-* Generate a summary file: `rhdh-plugin-mirroring-summary.txt`
-
 [#_fully_disconnected_workflow]
 ==== Mirroring to a disconnected or restricted network environment
 
-Use this procedure for OpenShift clusters in disconnected or restricted network environments where direct access to external registries is not available. This two-phase process involves exporting plugins on a connected host and importing them in the restricted network.
-
-*Prerequisites*
-
-* A connected host with internet access and sufficient disk space for plugin artifacts
-* A method to transfer files to the restricted network (removable media, approved transfer process, etc.)
-* A bastion host or workstation within the restricted network with access to the internal container registry
-* Valid credentials for quay.io (on the connected host) and your internal registry (on the restricted network host)
-
-*Procedure*
+Two-phase process: export plugins on a connected host, transfer to restricted network, then import. Authenticate to registries as needed (`podman login quay.io` for export, `podman login <your-registry>` for import). For more information, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
 
 *Phase 1: Export plugins (Connected Host)*
-
-. On a host with internet access, authenticate to the source registry:
-+
-[source,console]
-----
-podman login quay.io
-----
 
 . Export all plugins to a local directory:
 +
@@ -80,23 +44,8 @@ bash mirror-plugins.sh \
     --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
     --to-dir /tmp/rhdh-plugins
 ----
-+
-The export directory will contain:
-+
-* `plugins/` - All plugin OCI artifacts organized by registry path
-* `catalog-index/` - Extracted catalog index content
-* `rhdh-plugin-mirroring-summary.txt` - Mapping of all mirrored plugins
-
-. Transfer the entire `/tmp/rhdh-plugins` directory to your restricted network environment using your organization's approved transfer process.
 
 *Phase 2: Import plugins (Restricted Network Environment)*
-
-. On a bastion host or workstation within the restricted network that has access to your internal registry, authenticate to the registry:
-+
-[source,console]
-----
-podman login internal-registry.example.com
-----
 
 . Import and push the plugins to your internal registry:
 +
@@ -106,10 +55,4 @@ bash mirror-plugins.sh \
     --from-dir /tmp/rhdh-plugins \
     --to-registry internal-registry.example.com
 ----
-+
-The script will:
-+
-* Read the original plugin mappings from the summary file
-* Push all plugins to your internal registry
-* Rebuild and push the catalog index with updated registry references
 
