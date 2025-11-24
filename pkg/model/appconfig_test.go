@@ -77,7 +77,7 @@ func TestDefaultAppConfig(t *testing.T) {
 	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath, deployment.defaultMountPath())
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.container().VolumeMounts[0].Name)
 	assert.Equal(t, 2, len(deployment.container().Args))
-	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 1, len(deployment.deploymentWrapper.PodSpec().Volumes))
 
 }
 
@@ -113,7 +113,7 @@ func TestSpecifiedAppConfig(t *testing.T) {
 	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath,
 		bs.Spec.Application.AppConfig.MountPath)
 	assert.Equal(t, 8, len(deployment.container().Args))
-	assert.Equal(t, 3, len(deployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 3, len(deployment.deploymentWrapper.PodSpec().Volumes))
 
 	assert.Equal(t, "/app/src/conf.yaml", deployment.container().VolumeMounts[0].MountPath)
 	assert.Equal(t, "/my/appconfig", deployment.container().VolumeMounts[1].MountPath)
@@ -141,9 +141,9 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 4, len(deployment.container().Args))
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 2, len(deployment.deploymentWrapper.PodSpec().Volumes))
 
-	assert.Equal(t, deployment.deployment.Spec.Template.Spec.Volumes[0].Name,
+	assert.Equal(t, deployment.deploymentWrapper.PodSpec().Volumes[0].Name,
 		deployment.container().VolumeMounts[0].Name)
 
 }

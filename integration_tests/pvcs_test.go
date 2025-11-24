@@ -102,25 +102,30 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(pv.Status.Phase).To(Equal(corev1.VolumeBound))
 
 			// check if added to deployment
-			depl := &appsv1.Deployment{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
+			//depl := &appsv1.Deployment{}
+			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
+			bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1")))
-			g.Expect(path).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[model.BackstageContainerIndex(depl)]))
+			//g.Expect(path).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[model.BackstageContainerIndex(&depl.Spec.Template.Spec)]))
+			g.Expect(path).To(BeMountedToContainer(backstageContainer2(bpod.Spec)))
+
 			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1"))).
-				To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
+				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
 
 			path = filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim2")))
-			g.Expect(path).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[model.BackstageContainerIndex(depl)]))
-			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim2"))).
-				To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
+			//g.Expect(path).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[model.BackstageContainerIndex(&depl.Spec.Template.Spec)]))
+			g.Expect(path).To(BeMountedToContainer(backstageContainer2(bpod.Spec)))
 
-			pod, err := getBackstagePod(ctx, ns, backstageName)
-			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim2"))).
+				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
+
+			//pod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
+			//g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainerName(depl), fmt.Sprintf("test -d %s", path))
+			_, _, err = executeRemoteCommand(ctx, ns, bpod.Name, backstageContainer2(bpod.Spec).Name, fmt.Sprintf("test -d %s", path))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
@@ -194,16 +199,16 @@ var _ = When("create backstage PVCs configured", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1")))
-			g.Expect(path).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[model.BackstageContainerIndex(depl)]))
+			g.Expect(path).To(BeMountedToContainer(backstageContainer(*depl)))
 			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1"))).
 				To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
 
-			pod, err := getBackstagePod(ctx, ns, backstageName)
+			pod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			//g.Expect(pod.Spec.Containers[model.BackstageContainerIndex(depl)].Name).To(Equal("backstage-backend"))
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainerName(depl), fmt.Sprintf("test -d %s", path))
+			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainer(*depl).Name, fmt.Sprintf("test -d %s", path))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
@@ -294,20 +299,20 @@ var _ = When("create backstage PVCs configured", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			path := filepath.Join(model.DefaultMountDir, "my-pvc1")
-			g.Expect(path).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[model.BackstageContainerIndex(depl)]))
+			g.Expect(path).To(BeMountedToContainer(backstageContainer(*depl)))
 			g.Expect("my-pvc1").To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
 
 			path2 := "/my/pvc2/path"
-			g.Expect(path2).To(BeMountedToContainer(depl.Spec.Template.Spec.Containers[model.BackstageContainerIndex(depl)]))
+			g.Expect(path2).To(BeMountedToContainer(backstageContainer(*depl)))
 			g.Expect("my-pvc2").To(BeAddedAsVolumeToPodSpec(depl.Spec.Template.Spec))
 
-			pod, err := getBackstagePod(ctx, ns, backstageName)
+			pod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainerName(depl), fmt.Sprintf("test -d %s", path))
+			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainer(*depl).Name, fmt.Sprintf("test -d %s", path))
 			g.Expect(err).ShouldNot(HaveOccurred())
-			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainerName(depl), fmt.Sprintf("test -d %s", path2))
+			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainer(*depl).Name, fmt.Sprintf("test -d %s", path2))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())

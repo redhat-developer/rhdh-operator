@@ -107,8 +107,8 @@ func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string, filter
 			ClaimName: pvcName,
 		},
 	}
-	bsd.deployment.Spec.Template.Spec.Volumes =
-		append(bsd.deployment.Spec.Template.Spec.Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
+	bsd.podSpec().Volumes =
+		append(bsd.podSpec().Volumes, corev1.Volume{Name: volName, VolumeSource: volSrc})
 	affectedContainers, err := filter.getContainers(bsd)
 	if err != nil {
 		return fmt.Errorf("failed to mount files for pvc %s: %w", pvcName, err)

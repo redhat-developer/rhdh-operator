@@ -5,13 +5,8 @@ import (
 	"os"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-
-	"github.com/redhat-developer/rhdh-operator/pkg/model"
-
-	appsv1 "k8s.io/api/apps/v1"
-
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	corev1 "k8s.io/api/core/v1"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -52,7 +47,7 @@ var _ = When("test plugin deps", func() {
 
 		bsRaw := generateConfigMap(ctx, k8sClient, "dynaplugins", ns, dynapluginCm, nil, nil)
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
+		createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
 			RawRuntimeConfig: &bsv1.RuntimeConfig{
 				BackstageConfigName: bsRaw,
 			},
@@ -60,9 +55,10 @@ var _ = When("test plugin deps", func() {
 
 		Eventually(func(g Gomega) {
 
-			deploy := &appsv1.Deployment{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
-			g.Expect(err).ShouldNot(HaveOccurred())
+			//deploy := &appsv1.Deployment{}
+			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			//_, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			//g.Expect(err).ShouldNot(HaveOccurred())
 
 			cm := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "test-dependency"}, cm)

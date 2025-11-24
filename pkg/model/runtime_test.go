@@ -21,9 +21,9 @@ import (
 //func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
 //	for _, cfg := range runtimeConfig {
 //		cfg.ObjectFactory.newBackstageObject()
-//		//assert.NotNil(t, obj.EmptyObject())
+//		//assert.NotNil(t, Obj.EmptyObject())
 //		// TODO uncomment when Kind is available
-//		//assert.NotEmpty(t, obj.EmptyObject().GetObjectKind().GroupVersionKind().Kind)
+//		//assert.NotEmpty(t, Obj.EmptyObject().GetObjectKind().GroupVersionKind().Kind)
 //	}
 //}
 
@@ -50,9 +50,9 @@ func TestInitDefaultDeploy(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
-	assert.Equal(t, DeploymentName(bs.Name), bsDeployment.deployment.GetName())
-	assert.Equal(t, "ns123", bsDeployment.deployment.GetNamespace())
-	assert.Equal(t, 2, len(bsDeployment.deployment.GetLabels()))
+	assert.Equal(t, DeploymentName(bs.Name), bsDeployment.deploymentWrapper.Obj.GetName())
+	assert.Equal(t, "ns123", bsDeployment.deploymentWrapper.Obj.GetNamespace())
+	assert.Equal(t, 2, len(bsDeployment.deploymentWrapper.Obj.GetLabels()))
 
 	assert.NotNil(t, bsDeployment.container())
 
@@ -60,7 +60,7 @@ func TestInitDefaultDeploy(t *testing.T) {
 	assert.Equal(t, ServiceName(bs.Name), bsService.service.Name)
 	assert.True(t, len(bsService.service.Spec.Ports) > 0)
 
-	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsDeployment.deployment.Spec.Template.ObjectMeta.Labels[BackstageAppLabel])
+	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsDeployment.deploymentWrapper.podObjectMeta().Labels[BackstageAppLabel])
 	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsService.service.Spec.Selector[BackstageAppLabel])
 
 }
@@ -218,7 +218,5 @@ func TestInvalidObjectKind(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "invalid-service-type.yaml")
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
-	// TODO make it more precise?
-	assert.Error(t, err)
-	//	assert.EqualError(t, err, "failed to read default value for the key service.yaml, reason: GroupVersionKind not match, found: /v1, Kind=Deployment, expected: [/v1, Kind=Service]")
+	assert.ErrorContains(t, err, "failed to read default value for the key service.yaml")
 }

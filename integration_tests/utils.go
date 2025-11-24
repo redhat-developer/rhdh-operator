@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
-
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"k8s.io/client-go/kubernetes"
@@ -105,7 +106,7 @@ func executeRemoteCommand(ctx context.Context, podNamespace, podName, container,
 	return buf.String(), errBuf.String(), nil
 }
 
-func ReadYaml(manifest []byte, object interface{}) error {
+func readYaml(manifest []byte, object interface{}) error {
 	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
 	if err := dec.Decode(object); err != nil {
 		return fmt.Errorf("failed to decode YAML: %w", err)
@@ -113,7 +114,7 @@ func ReadYaml(manifest []byte, object interface{}) error {
 	return nil
 }
 
-func ReadYamlFile(path string, object interface{}) error {
+func readYamlFile(path string, object interface{}) error {
 	fpath := filepath.Clean(path)
 	if _, err := os.Stat(fpath); err != nil {
 		return err
@@ -122,11 +123,51 @@ func ReadYamlFile(path string, object interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to read YAML file: %w", err)
 	}
-	return ReadYaml(b, object)
+	return readYaml(b, object)
 }
 
-func backstageContainerName(deploy *appsv1.Deployment) string {
+func backstageContainer(deploy appsv1.Deployment) corev1.Container {
 	// backstage-backend
-	cIndex := model.BackstageContainerIndex(deploy)
-	return deploy.Spec.Template.Spec.Containers[cIndex].Name
+	cIndex := model.BackstageContainerIndex(&deploy.Spec.Template.Spec)
+	return deploy.Spec.Template.Spec.Containers[cIndex]
+}
+
+func backstageContainer2(pod corev1.PodSpec) corev1.Container {
+	// backstage-backend
+	cIndex := model.BackstageContainerIndex(&pod)
+	return pod.Containers[cIndex]
+}
+
+func getBackstagePod(ctx context.Context, k8sClient client.Client, ns, backstageName string) (*corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	err := k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+	if err != nil {
+		return nil, err
+	}
+	if len(podList.Items) != 1 {
+		return nil, fmt.Errorf("expected only one Pod, but have %v", podList.Items)
+	}
+
+	return &podList.Items[0], nil
+}
+
+func backstageDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (model.DeploymentObj, error) {
+
+	//func getBackstageDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (client.Object, error) {
+	nn := client.ObjectKey{Namespace: namespace, Name: model.DeploymentName(backstageName)}
+	deploy := &appsv1.Deployment{}
+	err := k8sClient.Get(ctx, nn, deploy)
+	if err == nil {
+		return model.DeploymentObj{Obj: deploy}, nil
+	} else if errors.IsNotFound(err) {
+		ss := &appsv1.StatefulSet{}
+		err = k8sClient.Get(ctx, nn, ss)
+		if err == nil {
+			return model.DeploymentObj{Obj: ss}, nil
+		}
+	}
+	if errors.IsNotFound(err) {
+		return model.DeploymentObj{}, fmt.Errorf("neither Deployment nor StatefulSet found for Backstage %s in namespace %s", backstageName, namespace)
+	}
+	return model.DeploymentObj{}, err
 }

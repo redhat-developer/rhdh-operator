@@ -272,7 +272,7 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 	return string(mergedData), nil
 }
 func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
-	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.podSpec().InitContainers)
 
 	// override image with env var
 	if os.Getenv(BackstageImageEnvVar) != "" {

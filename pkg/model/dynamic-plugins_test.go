@@ -86,7 +86,7 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	//dynamic-plugins-npmrc
 	//dynamic-plugins-auth
 	//vol-default-dynamic-plugins
-	assert.Equal(t, 4, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
@@ -239,7 +239,7 @@ plugins:
 }
 
 func initContainer(model *BackstageModel) *corev1.Container {
-	for _, v := range model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers {
+	for _, v := range model.backstageDeployment.podSpec().InitContainers {
 		if v.Name == dynamicPluginInitContainerName {
 			return &v
 		}

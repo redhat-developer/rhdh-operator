@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -23,8 +23,6 @@ import (
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
-	appsv1 "k8s.io/api/apps/v1"
 )
 
 const (
@@ -45,8 +43,9 @@ func (f BackstageDeploymentFactory) newBackstageObject() RuntimeObject {
 }
 
 type BackstageDeployment struct {
-	deployment *appsv1.Deployment
-	model      *BackstageModel
+	deploymentWrapper DeploymentObj
+	//deployment *appsv1.Deployment
+	model *BackstageModel
 }
 
 func init() {
@@ -58,8 +57,8 @@ func DeploymentName(backstageName string) string {
 }
 
 // BackstageContainerIndex returns the index of backstage container in from deployment.spec.template.spec.containers array
-func BackstageContainerIndex(bsd *appsv1.Deployment) int {
-	for i, c := range bsd.Spec.Template.Spec.Containers {
+func BackstageContainerIndex(bsdPod *corev1.PodSpec) int {
+	for i, c := range bsdPod.Containers {
 		if c.Name == BackstageContainerName() {
 			return i
 		}
@@ -73,36 +72,33 @@ func BackstageContainerName() string {
 
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) Object() runtime.Object {
-	return b.deployment
+	return b.deploymentWrapper.Obj
 }
 
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) setObject(obj runtime.Object) {
-	b.deployment = nil
+
+	b.deploymentWrapper = DeploymentObj{}
+
 	if obj != nil {
-		b.deployment = obj.(*appsv1.Deployment)
+		b.deploymentWrapper.setObject(obj)
 	}
 }
 
 // implementation of RuntimeObject interface
-//func (b *BackstageDeployment) EmptyObject() client.Object {
-//	return &appsv1.Deployment{}
-//}
-
-// implementation of RuntimeObject interface
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
-	if b.deployment == nil {
+	if b.deploymentWrapper.Obj == nil {
 		return false, fmt.Errorf("Backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
 	}
 
-	if BackstageContainerIndex(b.deployment) < 0 {
+	if BackstageContainerIndex(b.podSpec()) < 0 {
 		return false, fmt.Errorf("Backstage Deployment is not initialized, Backstage Container is not identified")
 	}
 
-	if b.deployment.Spec.Template.ObjectMeta.Annotations == nil {
-		b.deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+	if b.deploymentWrapper.podObjectMeta().Annotations == nil {
+		b.deploymentWrapper.podObjectMeta().Annotations = map[string]string{}
 	}
-	b.deployment.Spec.Template.ObjectMeta.Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
+	b.deploymentWrapper.podObjectMeta().Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
 
 	model.backstageDeployment = b
 	model.setRuntimeObject(b)
@@ -139,28 +135,27 @@ func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error 
 }
 
 func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
-	b.deployment.SetName(DeploymentName(backstage.Name))
-	utils.GenerateLabel(&b.deployment.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
-	if b.deployment.Spec.Selector == nil {
-		b.deployment.Spec.Selector = &metav1.LabelSelector{}
-	}
-	utils.GenerateLabel(&b.deployment.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
-	setMetaInfo(b.deployment, backstage, scheme)
+	b.deploymentWrapper.Obj.SetName(DeploymentName(backstage.Name))
+	utils.GenerateLabel(&b.deploymentWrapper.podObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+
+	b.deploymentWrapper.specSelector().MatchLabels[BackstageAppLabel] = utils.BackstageAppLabelValue(backstage.Name)
+	setMetaInfo(b.deploymentWrapper.Obj, backstage, scheme)
+
 }
 
 func (b *BackstageDeployment) container() *corev1.Container {
-	return &b.deployment.Spec.Template.Spec.Containers[BackstageContainerIndex(b.deployment)]
+	return &b.podSpec().Containers[BackstageContainerIndex(b.podSpec())]
 }
 
 func (b *BackstageDeployment) containerByName(name string) *corev1.Container {
-	for i, c := range b.deployment.Spec.Template.Spec.Containers {
+	for i, c := range b.podSpec().Containers {
 		if c.Name == name {
-			return &b.deployment.Spec.Template.Spec.Containers[i]
+			return &b.podSpec().Containers[i]
 		}
 	}
-	for i, c := range b.deployment.Spec.Template.Spec.InitContainers {
+	for i, c := range b.podSpec().InitContainers {
 		if c.Name == name {
-			return &b.deployment.Spec.Template.Spec.InitContainers[i]
+			return &b.podSpec().InitContainers[i]
 		}
 	}
 	return nil
@@ -168,7 +163,7 @@ func (b *BackstageDeployment) containerByName(name string) *corev1.Container {
 
 func (b *BackstageDeployment) allContainers() []string {
 	containers := []string{}
-	spec := b.deployment.Spec.Template.Spec
+	spec := b.podSpec()
 	for _, c := range spec.Containers {
 		containers = append(containers, c.Name)
 	}
@@ -179,7 +174,7 @@ func (b *BackstageDeployment) allContainers() []string {
 }
 
 func (b *BackstageDeployment) podSpec() *corev1.PodSpec {
-	return &b.deployment.Spec.Template.Spec
+	return b.deploymentWrapper.PodSpec()
 }
 
 func (b *BackstageDeployment) defaultMountPath() string {
@@ -219,7 +214,7 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 
 	// set from backstage.Spec.Application
 	if backstage.Spec.Application != nil {
-		b.setReplicas(backstage.Spec.Application.Replicas)
+		//b.setReplicas(backstage.Spec.Application.Replicas)
 		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
 		b.setImage(backstage.Spec.Application.Image)
 	}
@@ -228,7 +223,7 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 	if backstage.Spec.Deployment != nil {
 		if conf := backstage.Spec.Deployment.Patch; conf != nil {
 
-			deplStr, err := yaml.Marshal(b.deployment)
+			deplStr, err := yaml.Marshal(b.deploymentWrapper.Obj)
 			if err != nil {
 				return fmt.Errorf("can not marshal deployment object: %w", err)
 			}
@@ -238,8 +233,8 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 				return fmt.Errorf("can not merge spec.deployment: %w", err)
 			}
 
-			b.deployment = &appsv1.Deployment{}
-			err = yaml.Unmarshal([]byte(merged), b.deployment)
+			b.deploymentWrapper.setEmpty()
+			err = yaml.Unmarshal([]byte(merged), b.deploymentWrapper.Obj)
 			if err != nil {
 				return fmt.Errorf("can not unmarshal merged deployment: %w", err)
 			}
@@ -269,11 +264,11 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 }
 
 // sets the amount of replicas (used by CR config)
-func (b *BackstageDeployment) setReplicas(replicas *int32) {
-	if replicas != nil {
-		b.deployment.Spec.Replicas = replicas
-	}
-}
+//func (b *BackstageDeployment) setReplicas(replicas *int32) {
+//	if replicas != nil {
+//		b.deployment.Spec.Replicas = replicas
+//	}
+//}
 
 // sets container image name of Backstage Container
 func (b *BackstageDeployment) setImage(image *string) {

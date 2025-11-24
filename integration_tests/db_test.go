@@ -105,7 +105,8 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(errors.IsNotFound(err))
 
 			By("Checking if Deployment was successfully created in the reconciliation")
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, &appsv1.Deployment{})
+			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, &appsv1.Deployment{})
+			_, err = backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).Should(Not(HaveOccurred()))
 		}, time.Minute, time.Second).Should(Succeed())
 	})

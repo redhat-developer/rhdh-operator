@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dynamic-plugins-root
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dynamic-plugins
+data:
+  dynamic-plugins.yaml: |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins:
+      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
+        disabled: true
+        pluginConfig:
+          catalog:
+            providers:
+              github:
+                myorg:
+                  organization: 'MyOrg'
+                  schedule:
+                    # supports cron, ISO duration, "human duration" (used below)
+                    frequency: { minutes: 30}
+                    # supports ISO duration, "human duration (used below)
+                    timeout: { minutes: 3}
+                    initialDelay: { seconds: 15}
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
+        disabled: true
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-module-addons-contrib
+        disabled: true
+      # Group: Marketplace
+      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-catalog-backend-module-marketplace-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-marketplace-backend-dynamic
+        disabled: false
+      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-marketplace
+        disabled: false
+      
+      # Homepage
+      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-dynamic-home-page
+        disabled: false
+---
+apiVersion: rhdh.redhat.com/v1alpha4
+kind: Backstage
+metadata:
+  name: bs1
+spec:
+  deployment:
+    patch:
+      spec:
+        replicas: 2
+        template:
+          spec:
+            initContainers:
+              - name: install-dynamic-plugins
+                image: quay.io/rhdh-community/rhdh:pr-3676
+            containers:
+              - name: backstage-backend
+                image: quay.io/rhdh-community/rhdh:pr-3676
+            # uncomment the following nodeAffinity section to schedule pods on a specific node
+            # and make sure to replace the value with the desired node name (ip-10-0-1-128.ec2.internal in this example)
+            # to be able to test the ReadWriteOnce PVC on a multi node cluster
+            affinity:
+              nodeAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  nodeSelectorTerms:
+                    - matchExpressions:
+                        - key: kubernetes.io/hostname
+                          operator: In
+                          values:
+                            - ip-10-0-1-12.ec2.internal
+            volumes:
+              - $patch: replace
+                name: dynamic-plugins-root
+                persistentVolumeClaim:
+                  claimName: dynamic-plugins-root
+        updateStrategy:
+          type: RollingUpdate
+        volumeClaimTemplates:
+          - apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: dynamic-plugins-root
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+  application:
+    dynamicPluginsConfigMapName: dynamic-plugins
+
+#  extraFiles:
+#    pvcs:
+#      - name: dynamic-plugins-root
+#        mountPath: /opt/app-root/src/dynamic-plugins-root
+#      - name: dynamic-plugins-root
+#        mountPath: /dynamic-plugins-root
+#        containers:
+#          - name: install-dynamic-plugins
+
+
+
