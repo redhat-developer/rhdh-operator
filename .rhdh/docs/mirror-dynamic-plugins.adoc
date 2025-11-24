@@ -36,8 +36,8 @@ Two-phase process: export plugins on a connected host, transfer to restricted ne
 
 *Phase 1: Export plugins (Connected Host)*
 
-. Export all plugins to a local directory:
-+
+Export all plugins to a local directory:
+
 [source,console]
 ----
 bash mirror-plugins.sh \
@@ -47,8 +47,8 @@ bash mirror-plugins.sh \
 
 *Phase 2: Import plugins (Restricted Network Environment)*
 
-. Import and push the plugins to your internal registry:
-+
+Import and push the plugins to your internal registry:
+
 [source,console]
 ----
 bash mirror-plugins.sh \
