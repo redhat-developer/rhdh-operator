@@ -30,23 +30,7 @@ You can combine multiple sources in a single mirroring operation. The script wil
 
 Use this procedure when you have network access to both the source registry (quay.io) and your target mirror registry from the same host.
 
-*Prerequisites*
-
-* Network access to both quay.io and your target registry
-* Valid credentials for both registries
-
-*Procedure*
-
-. Ensure you are authenticated to both the source registry and your target registry. For more information about registry authentication, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
-+
-[source,console]
-----
-# Login to source registry
-podman login quay.io
-
-# Login to target registry
-podman login registry.example.com
-----
+. Authenticate to both the source registry (`podman login quay.io`) and your target registry. For more information, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
 
 . Run the mirroring script with the catalog index (replace `1.9` with your desired RHDH version):
 +
@@ -64,61 +48,6 @@ The script will:
 * Mirror each plugin to your registry
 * Rebuild the catalog index with updated registry references
 * Generate a summary file: `rhdh-plugin-mirroring-summary.txt`
-
-[#_mirroring_specific_plugins]
-==== Mirroring specific plugins
-
-If you only need specific plugins, you can provide them directly or via a file.
-
-*Procedure using direct URLs*
-
-[source,console]
-----
-bash mirror-plugins.sh \
-    --plugins \
-        oci://quay.io/rhdh/backstage-community-plugin-quay:1.9.0--1.24.0 \
-        oci://quay.io/rhdh/backstage-community-plugin-tekton:1.9.0--3.29.0 \
-    --to-registry registry.example.com
-----
-
-NOTE: If a plugin URL contains `!` (OCI subpath), you must quote it: `'oci://registry/image:tag!subpath'`
-
-*Procedure using a plugin list file*
-
-. Create a file (e.g., `my-plugins.txt`) with one OCI URL per line:
-+
-[source,text]
-----
-# Required RHDH Plugins
-oci://quay.io/rhdh/backstage-community-plugin-quay:1.9.0--1.24.0
-oci://quay.io/rhdh/backstage-community-plugin-tekton:1.9.0--3.29.0
-oci://quay.io/rhdh/backstage-plugin-kubernetes:1.9.0--0.12.10
-
-# Optional plugins
-oci://quay.io/rhdh/backstage-community-plugin-sonarqube:1.9.0--0.18.1
-----
-
-. Run the mirroring script:
-+
-[source,console]
-----
-bash mirror-plugins.sh \
-    --plugin-list my-plugins.txt \
-    --to-registry registry.example.com
-----
-
-[#_combined_mode]
-==== Combined mode: Catalog index plus custom plugins
-
-You can combine the catalog index with additional custom plugins:
-
-[source,console]
-----
-bash mirror-plugins.sh \
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
-    --plugins oci://custom-registry.example.com/my-custom-plugin:1.0 \
-    --to-registry registry.example.com
-----
 
 [#_fully_disconnected_workflow]
 ==== Mirroring to a disconnected or restricted network environment
