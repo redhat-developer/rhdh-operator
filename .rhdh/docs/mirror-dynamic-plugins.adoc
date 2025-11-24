@@ -1,0 +1,186 @@
+== Mirroring Red Hat Developer Hub Dynamic Plugins for Disconnected Environments
+
+Red Hat Developer Hub (RHDH) uses dynamic plugins that are distributed as OCI (Open Container Initiative) artifacts. In disconnected or restricted environments, these plugin artifacts must be mirrored to a registry accessible by your cluster.
+
+This guide explains how to use the link:./../scripts/mirror-plugins.sh[mirror-plugins.sh] script to mirror dynamic plugin OCI artifacts for deployments in restricted environments.
+
+=== Prerequisites
+
+The following tools are required to run the mirroring script:
+
+* `skopeo >= 1.20` - For multi-arch image operations and manifest conversion. See link:https://github.com/containers/skopeo/blob/main/install.md[Installing Skopeo].
+* `tar >= 1.35` - GNU tar for extracting image layers.
+* `jq >= 1.7` - For JSON parsing and manipulation. See link:https://jqlang.github.io/jq/download/[Download jq].
+* `podman >= 5.6` - For building catalog index images. See link:https://podman.io/docs/installation[Podman Installation Instructions].
+
+=== Plugin Source Options
+
+The script supports multiple ways to specify which plugins to mirror:
+
+* *Plugin Catalog Index* (`--plugin-index`) - A catalog index (e.g., `oci://quay.io/rhdh/plugin-catalog-index:1.9`) that contains references to all available plugins for a specific RHDH version.
+* *Plugin List File* (`--plugin-list`) - A text file containing OCI URLs, one per line. Comments starting with `#` are ignored.
+* *Direct Plugin URLs* (`--plugins`) - Space-separated list of plugin OCI URLs specified directly on the command line.
+
+You can combine multiple sources in a single mirroring operation. The script will automatically deduplicate plugins.
+
+=== Procedures
+
+[#_mirroring_all_plugins_from_catalog_index]
+==== Mirroring all plugins from a catalog index (Connected Environment)
+
+Use this procedure when you have network access to both the source registry (quay.io) and your target mirror registry from the same host.
+
+*Prerequisites*
+
+* Network access to both quay.io and your target registry
+* Valid credentials for both registries
+
+*Procedure*
+
+. Ensure you are authenticated to both the source registry and your target registry. For more information about registry authentication, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
++
+[source,console]
+----
+# Login to source registry
+podman login quay.io
+
+# Login to target registry
+podman login registry.example.com
+----
+
+. Run the mirroring script with the catalog index (replace `1.9` with your desired RHDH version):
++
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --to-registry registry.example.com
+----
+
+The script will:
+
+* Download and parse the catalog index
+* Extract all plugin references
+* Mirror each plugin to your registry
+* Rebuild the catalog index with updated registry references
+* Generate a summary file: `rhdh-plugin-mirroring-summary.txt`
+
+[#_mirroring_specific_plugins]
+==== Mirroring specific plugins
+
+If you only need specific plugins, you can provide them directly or via a file.
+
+*Procedure using direct URLs*
+
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugins \
+        oci://quay.io/rhdh/backstage-community-plugin-quay:1.9.0--1.24.0 \
+        oci://quay.io/rhdh/backstage-community-plugin-tekton:1.9.0--3.29.0 \
+    --to-registry registry.example.com
+----
+
+NOTE: If a plugin URL contains `!` (OCI subpath), you must quote it: `'oci://registry/image:tag!subpath'`
+
+*Procedure using a plugin list file*
+
+. Create a file (e.g., `my-plugins.txt`) with one OCI URL per line:
++
+[source,text]
+----
+# Required RHDH Plugins
+oci://quay.io/rhdh/backstage-community-plugin-quay:1.9.0--1.24.0
+oci://quay.io/rhdh/backstage-community-plugin-tekton:1.9.0--3.29.0
+oci://quay.io/rhdh/backstage-plugin-kubernetes:1.9.0--0.12.10
+
+# Optional plugins
+oci://quay.io/rhdh/backstage-community-plugin-sonarqube:1.9.0--0.18.1
+----
+
+. Run the mirroring script:
++
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugin-list my-plugins.txt \
+    --to-registry registry.example.com
+----
+
+[#_combined_mode]
+==== Combined mode: Catalog index plus custom plugins
+
+You can combine the catalog index with additional custom plugins:
+
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --plugins oci://custom-registry.example.com/my-custom-plugin:1.0 \
+    --to-registry registry.example.com
+----
+
+[#_fully_disconnected_workflow]
+==== Mirroring to a disconnected or restricted network environment
+
+Use this procedure for OpenShift clusters in disconnected or restricted network environments where direct access to external registries is not available. This two-phase process involves exporting plugins on a connected host and importing them in the restricted network.
+
+*Prerequisites*
+
+* A connected host with internet access and sufficient disk space for plugin artifacts
+* A method to transfer files to the restricted network (removable media, approved transfer process, etc.)
+* A bastion host or workstation within the restricted network with access to the internal container registry
+* Valid credentials for quay.io (on the connected host) and your internal registry (on the restricted network host)
+
+*Procedure*
+
+*Phase 1: Export plugins (Connected Host)*
+
+. On a host with internet access, authenticate to the source registry:
++
+[source,console]
+----
+podman login quay.io
+----
+
+. Export all plugins to a local directory:
++
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --to-dir /tmp/rhdh-plugins
+----
++
+The export directory will contain:
++
+* `plugins/` - All plugin OCI artifacts organized by registry path
+* `catalog-index/` - Extracted catalog index content
+* `rhdh-plugin-mirroring-summary.txt` - Mapping of all mirrored plugins
+
+. Transfer the entire `/tmp/rhdh-plugins` directory to your restricted network environment using your organization's approved transfer process.
+
+*Phase 2: Import plugins (Restricted Network Environment)*
+
+. On a bastion host or workstation within the restricted network that has access to your internal registry, authenticate to the registry:
++
+[source,console]
+----
+podman login internal-registry.example.com
+----
+
+. Import and push the plugins to your internal registry:
++
+[source,console]
+----
+bash mirror-plugins.sh \
+    --from-dir /tmp/rhdh-plugins \
+    --to-registry internal-registry.example.com
+----
++
+The script will:
++
+* Read the original plugin mappings from the summary file
+* Push all plugins to your internal registry
+* Rebuild and push the catalog index with updated registry references
+

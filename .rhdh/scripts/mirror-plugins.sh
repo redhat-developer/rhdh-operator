@@ -814,7 +814,7 @@ function mirror_plugins_from_dir() {
   fi
   
   # Parse original sources from existing summary file if available
-  local existing_summary="${FROM_DIR}/mirroring-summary.txt"
+  local existing_summary="${FROM_DIR}/rhdh-plugin-mirroring-summary.txt"
   if [[ -f "$existing_summary" ]]; then
     infof "Reading original plugin sources from existing summary..."
     parse_original_sources "$existing_summary"
@@ -1185,13 +1185,13 @@ if [ ${#PLUGIN_IMAGES[@]} -gt 0 ]; then
   if [[ -n "${FROM_DIR}" ]] && [[ -n "${TO_REGISTRY}" ]]; then
     # Update mode: migrating from directory to registry - update the file in place
     update_note="Updated from ${FROM_DIR} to ${TO_REGISTRY}"
-    generate_mapping_file "${FROM_DIR}/mirroring-summary.txt" "registry" "$update_note"
+    generate_mapping_file "${FROM_DIR}/rhdh-plugin-mirroring-summary.txt" "registry" "$update_note"
   elif [[ -n "${TO_DIR}" ]]; then
     # Export mode: mirroring to directory
-    generate_mapping_file "${TO_DIR}/mirroring-summary.txt" "directory"
+    generate_mapping_file "${TO_DIR}/rhdh-plugin-mirroring-summary.txt" "directory"
   elif [[ -n "${TO_REGISTRY}" ]]; then
     # Direct mirror mode: mirroring to registry - save in original directory
-    generate_mapping_file "${ORIGINAL_DIR}/mirroring-summary.txt" "registry"
+    generate_mapping_file "${ORIGINAL_DIR}/rhdh-plugin-mirroring-summary.txt" "registry"
   fi
 fi
 
@@ -1203,7 +1203,7 @@ if [[ -n "${TO_DIR}" ]]; then
   if [[ -n "${PLUGIN_INDEX}" ]] && [[ -d "${TO_DIR}/catalog-index" ]]; then
     infof "Catalog index has been saved to: ${TO_DIR}/catalog-index"
   fi
-  infof "Plugin mapping: ${TO_DIR}/mirroring-summary.txt"
+  infof "Plugin mapping: ${TO_DIR}/rhdh-plugin-mirroring-summary.txt"
   infof ""
   infof "Next steps for fully disconnected environments:"
   infof "1. Transfer ${TO_DIR} to your disconnected network"
@@ -1219,9 +1219,9 @@ elif [[ -n "${TO_REGISTRY}" ]]; then
   fi
   # Show the mapping file location
   if [[ -n "${FROM_DIR}" ]]; then
-    infof "Plugin mapping: ${FROM_DIR}/mirroring-summary.txt"
+    infof "Plugin mapping: ${FROM_DIR}/rhdh-plugin-mirroring-summary.txt"
   else
-    infof "Plugin mapping: ${ORIGINAL_DIR}/mirroring-summary.txt"
+    infof "Plugin mapping: ${ORIGINAL_DIR}/rhdh-plugin-mirroring-summary.txt"
   fi
   infof ""
   infof "You can now configure your RHDH deployment to use these mirrored plugins."
