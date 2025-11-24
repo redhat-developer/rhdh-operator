@@ -13,14 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         from_branch:
-          - release-1.6
           - release-1.7
           - release-1.8
         to_branch:
           - main
           - release-1.8
           - release-1.7
-          - release-1.6
 
     name: 'E2E Upgrade: ${{ matrix.from_branch }} => ${{ matrix.to_branch }}'
     concurrency:
@@ -51,14 +49,14 @@ jobs:
           fi
           echo "SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE=${SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE}" >> $GITHUB_OUTPUT
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5 # default branch will be checked out by default on scheduled workflows
+      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6 # default branch will be checked out by default on scheduled workflows
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         with:
           fetch-depth: 0
 
       - name: Setup Go
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
         with:
           go-version-file: 'go.mod'
 
@@ -67,40 +65,14 @@ jobs:
         run: |
           distLocation="dist/rhdh/install.yaml"
 
-          from_branch=${{ matrix.from_branch }}
-          FROM_OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
-          proto="file://"
-          if [[ "${from_branch}" != "main" ]]; then
-            version="${from_branch#release-}"
-            major=$(echo $version | cut -d. -f1)
-            minor=$(echo $version | cut -d. -f2)
-            FROM_OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
-            # TODO(rm3l): remove this once 1.6 is the minimal supported version
-            if [[ $major -ge 1 && $minor -ge 6 ]]; then
-              FROM_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${from_branch}/${distLocation}"
-              proto=""
-            fi
-          fi
+          FROM_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${{ matrix.from_branch }}/${distLocation}"
           echo "FROM_OPERATOR_MANIFEST=${FROM_OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          FROM_OPERATOR_IMAGE=$(curl -s "${proto}${FROM_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          FROM_OPERATOR_IMAGE=$(curl -s "${FROM_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "FROM_OPERATOR_IMAGE=${FROM_OPERATOR_IMAGE}" >> $GITHUB_ENV
 
-          to_branch=${{ matrix.to_branch }}
-          TO_OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
-          proto="file://"
-          if [[ "${to_branch}" != "main" ]]; then
-            version="${to_branch#release-}"
-            major=$(echo $version | cut -d. -f1)
-            minor=$(echo $version | cut -d. -f2)
-            TO_OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
-            # TODO(rm3l): remove this once 1.6 is the minimal supported version
-            if [[ $major -ge 1 && $minor -ge 6 ]]; then
-              TO_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${to_branch}/${distLocation}"
-              proto=""
-            fi
-          fi
+          TO_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${{ matrix.to_branch }}/${distLocation}"
           echo "TO_OPERATOR_MANIFEST=${TO_OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          TO_OPERATOR_IMAGE=$(curl -s "${proto}${TO_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          TO_OPERATOR_IMAGE=$(curl -s "${TO_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "TO_OPERATOR_IMAGE=${TO_OPERATOR_IMAGE}" >> $GITHUB_ENV
 
       - name: Check if operator images exist in remote registry

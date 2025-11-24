@@ -1,0 +1,23 @@
+name: Validate Image Digests
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/validate-image-digests.yaml'
+      - 'Makefile'
+      - 'hack/validate-image-digests.sh'
+      - 'Dockerfile'
+      - '**/*bundle.Dockerfile'
+      - '.rhdh/docker/Dockerfile'
+
+jobs:
+  validate-image-digests:
+    name: Validate Image Digests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+
+      - name: Run validation script
+        run: make validate-image-digests

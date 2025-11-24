@@ -59,7 +59,7 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 					}
 				}()
 				_, _ = io.WriteString(stdin, fmt.Sprintf(`
-apiVersion: rhdh.redhat.com/v1alpha1
+apiVersion: rhdh.redhat.com/v1alpha3
 kind: Backstage
 metadata:
   name: my-backstage-app
