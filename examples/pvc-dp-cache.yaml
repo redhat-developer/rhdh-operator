@@ -78,7 +78,7 @@ spec:
                         - key: kubernetes.io/hostname
                           operator: In
                           values:
-                            - ip-10-0-1-12.ec2.internal
+                            - ip-10-0-1-5.ec2.internal
             volumes:
               - $patch: replace
                 name: dynamic-plugins-root

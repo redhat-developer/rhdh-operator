@@ -89,23 +89,40 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 		return fmt.Errorf("failed to construct the predicate for backstage deployment. This should not happen: %w", err)
 	}
 
+	commonPreds := builder.WithPredicates(labelPred, predicate.Funcs{
+		DeleteFunc: func(e event.DeleteEvent) bool { return true },
+		UpdateFunc: func(e event.UpdateEvent) bool { return true },
+		CreateFunc: func(e event.CreateEvent) bool { return true },
+	})
+
+	metaFor := func(kind string) *metav1.PartialObjectMetadata {
+		m := &metav1.PartialObjectMetadata{}
+		m.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "apps",
+			Version: "v1",
+			Kind:    kind,
+		})
+		return m
+	}
+
+	// Deployment
 	b.WatchesMetadata(
-		&metav1.PartialObjectMetadata{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "apps/v1",
-				Kind:       "Deployment",
-			},
-		},
+		metaFor("Deployment"),
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 			return r.requestByAppLabels(ctx, o)
 		}),
-		builder.WithPredicates(labelPred,
-			predicate.Funcs{
-				DeleteFunc: func(e event.DeleteEvent) bool { return true },
-				UpdateFunc: func(e event.UpdateEvent) bool { return true },
-				CreateFunc: func(e event.CreateEvent) bool { return true },
-			}),
+		commonPreds,
 	)
+
+	// StatefulSet
+	b.WatchesMetadata(
+		metaFor("StatefulSet"),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+			return r.requestByAppLabels(ctx, o)
+		}),
+		commonPreds,
+	)
+
 	return nil
 }
 

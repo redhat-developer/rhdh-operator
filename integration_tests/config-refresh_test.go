@@ -80,8 +80,6 @@ organization:
 		createAndReconcileBackstage(ctx, ns, bs, backstageName)
 
 		Eventually(func(g Gomega) {
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -91,12 +89,12 @@ organization:
 
 			g.Expect(len(podList.Items)).To(Equal(1))
 			podName := podList.Items[0].Name
-			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer2(*deploy.PodSpec()).Name, "cat /my/mount/path/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/mount/path/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			out = strings.Replace(out, "\r", "", -1)
 			g.Expect(out).To(Equal(conf))
 
-			out, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainer2(*deploy.PodSpec()).Name, "echo $sec11")
+			out, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "echo $sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect("val11\r\n").To(Equal(out))
 
@@ -128,8 +126,6 @@ organization:
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(cm.Data["appconfig11"]).To(Equal(newData))
 
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -139,7 +135,7 @@ organization:
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			podName := podList.Items[0].Name
-			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer2(*deploy.PodSpec()).Name, "cat /my/mount/path/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/mount/path/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// TODO nicer method to compare file content with added '\r'
 			// NOTE: it does not work well on envtest, real controller needed
@@ -148,7 +144,7 @@ organization:
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			out2, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer2(*deploy.PodSpec()).Name, "echo $sec11")
+			out2, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "echo $sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// NOTE: it does not work well on envtest, real controller needed
 			g.Expect(fmt.Sprintf("%s%s", newEnv, "\r\n")).To(Equal(out2))
@@ -200,8 +196,6 @@ organization:
 
 		var podName string
 		Eventually(func(g Gomega) {
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -212,11 +206,11 @@ organization:
 			g.Expect(len(podList.Items)).To(Equal(1))
 			podName = podList.Items[0].Name
 
-			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer2(*deploy.PodSpec()).Name, "cat /my/appconfig/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/appconfig/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(conf))
 
-			_, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainer2(*deploy.PodSpec()).Name, "cat /my/secret/sec11")
+			_, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/secret/sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 4*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
@@ -235,13 +229,11 @@ organization:
 
 		Eventually(func(g Gomega) {
 
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// no need to re-ask pod name, it is not recreated, just use what we've got
-			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer2(*deploy.PodSpec()).Name, "cat /my/appconfig/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/appconfig/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// let's check, just in case (it is k8s job to refresh it :)
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))

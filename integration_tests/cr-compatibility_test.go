@@ -80,11 +80,6 @@ var _ = When("testing API version compatibility", func() {
 
 		By("verifying v1alpha3 deployment is created")
 		Eventually(func(g Gomega) {
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{
-			//	Namespace: ns,
-			//	Name:      model.DeploymentName(backstageNameV3),
-			//}, deploy)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageNameV3)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(deploy.SpecReplicas()).ToNot(BeNil())
@@ -131,11 +126,6 @@ var _ = When("testing API version compatibility", func() {
 
 		By("verifying v1alpha4 deployment is created")
 		Eventually(func(g Gomega) {
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{
-			//	Namespace: ns,
-			//	Name:      model.DeploymentName(backstageNameV4),
-			//}, deploy)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageNameV4)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(deploy.SpecReplicas()).ToNot(BeNil())
@@ -145,21 +135,11 @@ var _ = When("testing API version compatibility", func() {
 		By("verifying both v1alpha3 and v1alpha4 resources coexist")
 		// verify both deployments exist and have correct specs
 		Eventually(func(g Gomega) {
-			//deployV3 := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{
-			//	Namespace: ns,
-			//	Name:      model.DeploymentName(backstageNameV3),
-			//}, deployV3)
 			deployV3, err := backstageDeployment(ctx, k8sClient, ns, backstageNameV3)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(deployV3.SpecReplicas()).ToNot(BeNil())
 			g.Expect(*deployV3.SpecReplicas()).To(Equal(int32(1)))
 
-			//deployV4 := &appsv1.Deployment{}
-			//err = k8sClient.Get(ctx, types.NamespacedName{
-			//	Namespace: ns,
-			//	Name:      model.DeploymentName(backstageNameV4),
-			//}, deployV4)
 			deployV4, err := backstageDeployment(ctx, k8sClient, ns, backstageNameV4)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(deployV4.SpecReplicas()).ToNot(BeNil())

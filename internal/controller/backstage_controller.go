@@ -12,8 +12,6 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	openshift "github.com/openshift/api/route/v1"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -129,7 +127,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to clean backstage objects ", err)
 	}
 
-	r.setDeploymentStatus(ctx, &backstage)
+	r.setDeploymentStatus(ctx, &backstage, *bsModel)
 	return ctrl.Result{}, nil
 }
 
@@ -231,38 +229,6 @@ func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object
 		return fmt.Errorf("failed to delete %s: %w", name, err)
 	}
 	return nil
-}
-
-func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *bs.Backstage) {
-	deploy := &appsv1.Deployment{}
-	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: backstage.GetNamespace()}, deploy); err != nil {
-		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, err.Error())
-		return
-	}
-
-	if deploy.Status.ReadyReplicas == deploy.Status.Replicas {
-		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionTrue, bs.BackstageConditionReasonDeployed, "")
-	} else {
-		msg := "Deployment status:"
-		for _, c := range deploy.Status.Conditions {
-			if c.Type == appsv1.DeploymentAvailable {
-				msg += " Available: " + c.Message
-			} else if c.Type == appsv1.DeploymentProgressing {
-				msg += " Progressing: " + c.Message
-			}
-		}
-		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonInProgress, msg)
-	}
-}
-
-func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionType, status metav1.ConditionStatus, reason bs.BackstageConditionReason, msg string) {
-	meta.SetStatusCondition(&backstage.Status.Conditions, metav1.Condition{
-		Type:               string(condType),
-		Status:             status,
-		LastTransitionTime: metav1.Time{},
-		Reason:             string(reason),
-		Message:            msg,
-	})
 }
 
 // SetupWithManager sets up the controller with the Manager.

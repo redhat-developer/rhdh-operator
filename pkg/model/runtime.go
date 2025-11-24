@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
@@ -85,6 +86,10 @@ func (m *BackstageModel) sortRuntimeObjects() {
 			}
 			return 1
 		})
+}
+
+func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
+	return m.backstageDeployment.deploymentWrapper.Obj.GetObjectKind().GroupVersionKind()
 }
 
 // Registers config object

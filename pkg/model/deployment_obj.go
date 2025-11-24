@@ -5,9 +5,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const unsupportedType = "unsupported type for DeploymentObj "
 
 type DeploymentObj struct {
 	Obj client.Object
@@ -19,6 +20,8 @@ func (d *DeploymentObj) setObject(obj runtime.Object) {
 		d.Obj = obj.(*appv1.StatefulSet)
 	case *appv1.Deployment:
 		d.Obj = obj.(*appv1.Deployment)
+	default:
+		panic(unsupportedType + obj.GetObjectKind().GroupVersionKind().Kind)
 	}
 }
 
@@ -28,6 +31,8 @@ func (d *DeploymentObj) setEmpty() {
 		d.Obj = &appv1.StatefulSet{}
 	case *appv1.Deployment:
 		d.Obj = &appv1.Deployment{}
+	default:
+		panic(unsupportedType + d.Obj.GetObjectKind().GroupVersionKind().Kind)
 	}
 }
 
@@ -39,7 +44,7 @@ func (d *DeploymentObj) PodSpec() *corev1.PodSpec {
 	case *appv1.Deployment:
 		return &obj.Spec.Template.Spec
 	default:
-		return nil
+		panic(unsupportedType + obj.GetObjectKind().GroupVersionKind().Kind)
 	}
 }
 
@@ -51,7 +56,7 @@ func (d *DeploymentObj) podObjectMeta() *metav1.ObjectMeta {
 	case *appv1.Deployment:
 		return &obj.Spec.Template.ObjectMeta
 	default:
-		return nil
+		panic(unsupportedType + obj.GetObjectKind().GroupVersionKind().Kind)
 	}
 }
 
@@ -74,8 +79,7 @@ func (d *DeploymentObj) specSelector() *metav1.LabelSelector {
 		}
 		return obj.Spec.Selector
 	default:
-		panic("unsupported type for DeploymentObj " + obj.GetObjectKind().GroupVersionKind().Kind)
-		//return nil
+		panic(unsupportedType + obj.GetObjectKind().GroupVersionKind().Kind)
 	}
 
 }
@@ -99,7 +103,3 @@ func (d *DeploymentObj) StatusConditions() []appv1.DeploymentCondition {
 		panic("unsupported type for DeploymentObj " + obj.GetObjectKind().GroupVersionKind().Kind)
 	}
 }
-
-//func (d *DeploymentObj) GetKind() string {
-//	return d.Obj.GetObjectKind().GroupVersionKind().Kind
-//}

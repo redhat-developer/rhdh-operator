@@ -126,13 +126,7 @@ func readYamlFile(path string, object interface{}) error {
 	return readYaml(b, object)
 }
 
-func backstageContainer(deploy appsv1.Deployment) corev1.Container {
-	// backstage-backend
-	cIndex := model.BackstageContainerIndex(&deploy.Spec.Template.Spec)
-	return deploy.Spec.Template.Spec.Containers[cIndex]
-}
-
-func backstageContainer2(pod corev1.PodSpec) corev1.Container {
+func backstageContainer(pod corev1.PodSpec) corev1.Container {
 	// backstage-backend
 	cIndex := model.BackstageContainerIndex(&pod)
 	return pod.Containers[cIndex]
@@ -152,8 +146,6 @@ func getBackstagePod(ctx context.Context, k8sClient client.Client, ns, backstage
 }
 
 func backstageDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (model.DeploymentObj, error) {
-
-	//func getBackstageDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (client.Object, error) {
 	nn := client.ObjectKey{Namespace: namespace, Name: model.DeploymentName(backstageName)}
 	deploy := &appsv1.Deployment{}
 	err := k8sClient.Get(ctx, nn, deploy)

@@ -55,11 +55,6 @@ var _ = When("test plugin deps", func() {
 
 		Eventually(func(g Gomega) {
 
-			//deploy := &appsv1.Deployment{}
-			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
-			//_, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
-			//g.Expect(err).ShouldNot(HaveOccurred())
-
 			cm := &corev1.ConfigMap{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "test-dependency"}, cm)
 			g.Expect(err).ShouldNot(HaveOccurred())

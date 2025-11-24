@@ -63,8 +63,6 @@ var _ = When("create default backstage", func() {
 			g.Expect(err).To(Not(HaveOccurred()))
 
 			By("creating Deployment")
-			//deploy := &appsv1.Deployment{}
-			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(1)))
@@ -93,20 +91,30 @@ var _ = When("create default backstage", func() {
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
 				g.Expect(err).ShouldNot(HaveOccurred())
 
-				deploy := &appsv1.Deployment{}
-				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
-				//deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+				depl, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 				g.Expect(err).ShouldNot(HaveOccurred())
 
 				// TODO better matcher for Conditions
 				g.Expect(bs.Status.Conditions[0].Reason).To(Equal("Deployed"))
 
-				for _, cond := range deploy.Status.Conditions {
-					if cond.Type == "Available" {
-						g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+				g.Expect(depl).NotTo(BeNil())
+
+				switch depl.Obj.(type) {
+				case *appsv1.StatefulSet:
+					deploy := depl.Obj.(*appsv1.StatefulSet)
+					for _, cond := range deploy.Status.Conditions {
+						if cond.Type == appsv1.StatefulSetConditionType("Ready") {
+							g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+						}
+					}
+				case *appsv1.Deployment:
+					deploy := depl.Obj.(*appsv1.Deployment)
+					for _, cond := range deploy.Status.Conditions {
+						if cond.Type == appsv1.DeploymentAvailable {
+							g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
+						}
 					}
 				}
-
 			}, 5*time.Minute, time.Second).Should(Succeed())
 		}
 	})
@@ -128,14 +136,12 @@ var _ = When("create default backstage", func() {
 
 		Eventually(func(g Gomega) {
 			By("creating Deployment")
-			deploy := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
-			g.Expect(deploy.Spec.Template.Spec.Containers).To(HaveLen(1))
-			//g.Expect(deploy.Spec.Template.Spec.Containers[model.BackstageContainerIndex(&deploy.Spec.Template.Spec)].Image).To(Equal("busybox"))
+			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(1)))
+			g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
 
-			g.Expect(backstageContainer(*deploy).Image).To(Equal("busybox"))
+			g.Expect(backstageContainer(*deploy.PodSpec()).Image).To(Equal("busybox"))
 
 			By("creating StatefulSet")
 			ss := &appsv1.StatefulSet{}
@@ -147,76 +153,6 @@ var _ = When("create default backstage", func() {
 		}, time.Minute, time.Second).Should(Succeed())
 
 	})
-
-	//It("creates runtime object using raw configuration then updates StatefulSet to replace some immutable fields", func() {
-	//	if !*testEnv.UseExistingCluster {
-	//		Skip("Real cluster required to assert actual deletion and replacement of resources")
-	//	}
-	//
-	//	rawStatefulSetYamlContent := readTestYamlFile("raw-statefulset.yaml")
-	//	dbConf := map[string]string{"db-statefulset.yaml": rawStatefulSetYamlContent}
-	//
-	//	dbRaw := generateConfigMap(ctx, k8sClient, "dbraw", ns, dbConf, nil, nil)
-	//
-	//	backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-	//		RawRuntimeConfig: &bsv1.RuntimeConfig{
-	//			LocalDbConfigName: dbRaw,
-	//		},
-	//	}, "")
-	//
-	//	Eventually(func(g Gomega) {
-	//		By("creating Deployment")
-	//		deploy := &appsv1.Deployment{}
-	//		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
-	//		g.Expect(err).ShouldNot(HaveOccurred())
-	//
-	//		By("creating StatefulSet")
-	//		dbStatefulSet := &appsv1.StatefulSet{}
-	//		name := fmt.Sprintf("backstage-psql-%s", backstageName)
-	//		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, dbStatefulSet)
-	//		g.Expect(err).ShouldNot(HaveOccurred())
-	//		g.Expect(dbStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(1))
-	//		g.Expect(dbStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal("busybox"))
-	//		g.Expect(dbStatefulSet.Spec.PodManagementPolicy).To(Equal(appsv1.ParallelPodManagement))
-	//	}, time.Minute, time.Second).Should(Succeed())
-	//
-	//	By("updating CR to default config")
-	//	update := &bsv1.Backstage{}
-	//	err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, update)
-	//	Expect(err).To(Not(HaveOccurred()))
-	//	update.Spec.RawRuntimeConfig = nil
-	//	err = k8sClient.Update(ctx, update)
-	//	Expect(err).To(Not(HaveOccurred()))
-	//
-	//	_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
-	//		NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
-	//	})
-	//	Expect(err).To(Not(HaveOccurred()))
-	//
-	//	// Patching StatefulSets is done by the reconciler in two passes: first deleting the StatefulSet, then recreating it in the next reconciliation.
-	//	// to make next reconciliation happen (forcing ReconcileAny is not working on a real cluster)
-	//	Expect(update.GetAnnotations()["name"]).To(BeEmpty())
-	//	update.SetAnnotations(map[string]string{"name": "value"})
-	//	err = k8sClient.Update(ctx, update)
-	//	Expect(err).To(Not(HaveOccurred()))
-	//	Expect(update.GetAnnotations()["name"]).NotTo(BeEmpty())
-	//
-	//	_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
-	//		NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
-	//	})
-	//	Expect(err).To(Not(HaveOccurred()))
-	//
-	//	// TODO: Temporarily comment this section out, more investigations needed
-	//	// By some reason it fails ONLY HERE with "Message: "statefulsets.apps \"backstage-psql-test-backstage-jr9h7\" not found","
-	//	// Works mostly well locally, but not all the time still
-	//	//Eventually(func(g Gomega) {
-	//	//	By("replacing StatefulSet")
-	//	//	dbStatefulSet := &appsv1.StatefulSet{}
-	//	//	err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, dbStatefulSet)
-	//	//	g.Expect(err).ShouldNot(HaveOccurred())
-	//	//	g.Expect(dbStatefulSet.Spec.PodManagementPolicy).To(Equal(appsv1.OrderedReadyPodManagement))
-	//	//}, time.Minute, time.Second).Should(Succeed())
-	//})
 
 	It("creates backstage and checks the status", func() {
 		if !*testEnv.UseExistingCluster {

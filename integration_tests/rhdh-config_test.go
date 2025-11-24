@@ -33,9 +33,6 @@ var _ = When("create default rhdh", func() {
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
-			//bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
 
@@ -111,7 +108,7 @@ var _ = When("create default rhdh", func() {
 
 			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(7))
 			g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
-			mainCont := backstageContainer2(*deploy.PodSpec())
+			mainCont := backstageContainer(*deploy.PodSpec())
 			g.Expect(mainCont.Args).To(HaveLen(4))
 			g.Expect(mainCont.Args[0]).To(Equal("--config"))
 			g.Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
@@ -196,8 +193,6 @@ var _ = When("create default rhdh", func() {
 
 		Eventually(func(g Gomega) {
 			By("getting the Pod ")
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			//bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
@@ -256,9 +251,6 @@ var _ = When("create default rhdh", func() {
 
 		Eventually(func(g Gomega) {
 			By("getting the Deployment ")
-			//deploy := &appsv1.Deployment{}
-			//err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
-			//bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
