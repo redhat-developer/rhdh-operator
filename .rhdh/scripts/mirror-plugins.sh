@@ -416,11 +416,12 @@ function mirror_catalog_index() {
   local catalog_tag
   
   # Parse the registry reference
-  if [[ "$registry_ref" =~ ^([^/]+)/(.+):([^:@]+)$ ]]; then
+  if [[ "$registry_ref" =~ ^([^/]+)/(.+)@sha256:(.+)$ ]]; then
     original_registry="${BASH_REMATCH[1]}"
     catalog_name="${BASH_REMATCH[2]}"
-    catalog_tag="${BASH_REMATCH[3]}"
-  elif [[ "$registry_ref" =~ ^([^/]+)/(.+)@(.+)$ ]]; then
+    local original_digest="${BASH_REMATCH[3]}"
+    catalog_tag="sha256-${original_digest}"
+  elif [[ "$registry_ref" =~ ^([^/]+)/(.+):([^:@]+)$ ]]; then
     original_registry="${BASH_REMATCH[1]}"
     catalog_name="${BASH_REMATCH[2]}"
     catalog_tag="${BASH_REMATCH[3]}"
@@ -930,10 +931,11 @@ function mirror_plugins_from_dir() {
     local catalog_name catalog_tag
     local registry_ref="${PLUGIN_INDEX#oci://}"
     
-    if [[ "$registry_ref" =~ ^[^/]+/(.+):([^:@]+)$ ]]; then
+    if [[ "$registry_ref" =~ ^[^/]+/(.+)@sha256:(.+)$ ]]; then
       catalog_name="${BASH_REMATCH[1]}"
-      catalog_tag="${BASH_REMATCH[2]}"
-    elif [[ "$registry_ref" =~ ^[^/]+/(.+)@(.+)$ ]]; then
+      local original_digest="${BASH_REMATCH[2]}"
+      catalog_tag="sha256-${original_digest}"
+    elif [[ "$registry_ref" =~ ^[^/]+/(.+):([^:@]+)$ ]]; then
       catalog_name="${BASH_REMATCH[1]}"
       catalog_tag="${BASH_REMATCH[2]}"
     else
@@ -1100,10 +1102,11 @@ function generate_mapping_file() {
         local registry_ref="${BASH_REMATCH[1]}"
         local catalog_name catalog_tag
         
-        if [[ "$registry_ref" =~ ^[^/]+/(.+):([^:@]+)$ ]]; then
+        if [[ "$registry_ref" =~ ^[^/]+/(.+)@sha256:(.+)$ ]]; then
           catalog_name="${BASH_REMATCH[1]}"
-          catalog_tag="${BASH_REMATCH[2]}"
-        elif [[ "$registry_ref" =~ ^[^/]+/(.+)@(.+)$ ]]; then
+          local original_digest="${BASH_REMATCH[2]}"
+          catalog_tag="sha256-${original_digest}"
+        elif [[ "$registry_ref" =~ ^[^/]+/(.+):([^:@]+)$ ]]; then
           catalog_name="${BASH_REMATCH[1]}"
           catalog_tag="${BASH_REMATCH[2]}"
         else
