@@ -45,3 +45,6 @@ rhdh-disconnected-install/
 rhdh-disconnected-install.Dockerfile
 
 .oc-mirror.log
+
+# from mirror-plugins.sh script
+rhdh-plugin-mirroring-summary.txt
