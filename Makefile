@@ -214,6 +214,12 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 vet: ## Run go vet against code.
 	go vet ./...
 
+.PHONY: validate-image-digests
+validate-image-digests: ## Validate that Dockerfile digests are manifest lists (multi-arch)
+	@echo "Validating manifest list digests in Dockerfiles..."
+	@echo
+	@hack/validate-image-digests.sh
+
 ##@ Build
 
 .PHONY: build
