@@ -16,7 +16,7 @@ The following tools are required to run the mirroring script:
 === Procedures
 
 [#_mirroring_all_plugins_from_catalog_index]
-==== Mirroring all plugins from a catalog index (Connected Environment)
+==== Mirroring all plugins from a catalog index (Partially disconnected environment)
 
 . Authenticate to both the source registry (`podman login quay.io`) and your target registry. For more information, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
 
@@ -30,9 +30,9 @@ bash mirror-plugins.sh \
 ----
 
 [#_fully_disconnected_workflow]
-==== Mirroring to a disconnected or restricted network environment
+==== Mirroring to a fully disconnected environment
 
-Two-phase process: export plugins on a connected host, transfer to restricted network, then import. Authenticate to registries as needed (`podman login quay.io` for export, `podman login <your-registry>` for import). For more information, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
+Two-phase process: export plugins to disk from a connected host, transfer to restricted network, then import. Authenticate to registries as needed (`podman login quay.io` for export, `podman login <your-registry>` for import). For more information, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
 
 *Phase 1: Export plugins (Connected Host)*
 
