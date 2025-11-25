@@ -429,7 +429,7 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1alpha4
+  - name: v1alpha5
     schema:
       openAPIV3Schema:
         description: |-

@@ -10,7 +10,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -86,9 +86,9 @@ func (b *DbStatefulSet) updateAndValidate(backstage bsv1.Backstage) error {
 	// point ServiceName to localDb
 	b.statefulSet.Spec.ServiceName = b.model.LocalDbService.service.Name
 
-	if backstage.Spec.Application != nil && backstage.Spec.Application.ImagePullSecrets != nil {
-		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-	}
+	//if backstage.Spec.Application != nil && backstage.Spec.Application.ImagePullSecrets != nil {
+	//	utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
+	//}
 
 	if backstage.Spec.IsAuthSecretSpecified() {
 		b.setDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)

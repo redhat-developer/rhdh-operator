@@ -9,7 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 
 	bsv1alpha3 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,7 +34,7 @@ var _ = When("testing API version compatibility", func() {
 		deleteNamespace(ctx, ns)
 	})
 
-	It("verifies v1alpha3 and v1alpha4 API compatibility", func() {
+	It("verifies v1alpha3 and v1alpha5 API compatibility", func() {
 
 		if !*testEnv.UseExistingCluster {
 			Skip("Skipped for not real cluster")
@@ -94,19 +94,19 @@ var _ = When("testing API version compatibility", func() {
 			g.Expect(*deploy.Spec.Replicas).To(Equal(int32(1)))
 		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
-		// test v1alpha4 compatibility
-		By("creating a Backstage resource using v1alpha4 API")
-		backstageNameV4 := generateRandName("bs-v1alpha4")
+		// test v1alpha5 compatibility
+		By("creating a Backstage resource using v1alpha5 API")
+		backstageNameV4 := generateRandName("bs-v1alpha5")
 
-		// create ConfigMap for v1alpha4 test
+		// create ConfigMap for v1alpha5 test
 		generateConfigMap(ctx, k8sClient, "default-app-config-v4", ns,
 			map[string]string{
 				"app-config.yaml": `app:
-					title: Test App v1alpha4
+					title: Test App v1alpha5
 					baseUrl: http://localhost:3000`,
 			}, nil, nil)
 
-		bsV1Alpha4 := &bsv1.Backstage{
+		bsV1Alpha5 := &bsv1.Backstage{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      backstageNameV4,
 				Namespace: ns,
@@ -122,17 +122,17 @@ var _ = When("testing API version compatibility", func() {
 			},
 		}
 
-		err = k8sClient.Create(ctx, bsV1Alpha4)
+		err = k8sClient.Create(ctx, bsV1Alpha5)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		By("verifying the operator reconciles the v1alpha4 resource")
+		By("verifying the operator reconciles the v1alpha5 resource")
 		Eventually(func(g Gomega) {
 			fetched := &bsv1.Backstage{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageNameV4, Namespace: ns}, fetched)
 			g.Expect(err).ShouldNot(HaveOccurred())
 		}, 2*time.Minute, 10*time.Second).Should(Succeed())
 
-		By("verifying v1alpha4 deployment is created")
+		By("verifying v1alpha5 deployment is created")
 		Eventually(func(g Gomega) {
 			deploy := &appsv1.Deployment{}
 			err := k8sClient.Get(ctx, types.NamespacedName{
@@ -144,7 +144,7 @@ var _ = When("testing API version compatibility", func() {
 			g.Expect(*deploy.Spec.Replicas).To(Equal(int32(1)))
 		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
-		By("verifying both v1alpha3 and v1alpha4 resources coexist")
+		By("verifying both v1alpha3 and v1alpha5 resources coexist")
 		// verify both deployments exist and have correct specs
 		Eventually(func(g Gomega) {
 			deployV3 := &appsv1.Deployment{}
@@ -171,8 +171,8 @@ var _ = When("testing API version compatibility", func() {
 		err = k8sClient.Delete(ctx, bsV1Alpha3)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		By("cleaning up v1alpha4 test resource")
-		err = k8sClient.Delete(ctx, bsV1Alpha4)
+		By("cleaning up v1alpha5 test resource")
+		err = k8sClient.Delete(ctx, bsV1Alpha5)
 		Expect(err).ShouldNot(HaveOccurred())
 	})
 })

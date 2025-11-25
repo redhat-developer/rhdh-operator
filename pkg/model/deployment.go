@@ -20,7 +20,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
@@ -218,11 +218,11 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 
 	// set from backstage.Spec.Application
-	if backstage.Spec.Application != nil {
-		b.setReplicas(backstage.Spec.Application.Replicas)
-		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-		b.setImage(backstage.Spec.Application.Image)
-	}
+	//if backstage.Spec.Application != nil {
+	//	b.setReplicas(backstage.Spec.Application.Replicas)
+	//	utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
+	//	b.setImage(backstage.Spec.Application.Image)
+	//}
 
 	// set from backstage.Spec.Deployment
 	if backstage.Spec.Deployment != nil {

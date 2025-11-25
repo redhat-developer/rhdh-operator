@@ -196,7 +196,7 @@ stringData:
       SomeRsaPrivateKey
 
 ---
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: bs-app-config

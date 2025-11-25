@@ -26,7 +26,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 

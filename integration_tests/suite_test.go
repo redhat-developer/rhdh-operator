@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	bsv1alpha3 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
