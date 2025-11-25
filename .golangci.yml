@@ -7,6 +7,10 @@ linters:
     - staticcheck
   exclusions:
     rules:
-      - linters:
+      - paths: 
+          - "^tests/"
+          - "^integration_tests/"
+          - "_test\\.go$"
+        linters:
           - staticcheck
-        text: "ST1001"
+        text: "ST1001:"
