@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,50 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-//func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *bs.Backstage) {
-//	deploy := &appsv1.Deployment{}
-//	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: backstage.GetNamespace()}, deploy); err != nil {
-//		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, err.Error())
-//		return
-//	}
-//
-//	if deploy.Status.ReadyReplicas == deploy.Status.Replicas {
-//		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionTrue, bs.BackstageConditionReasonDeployed, "")
-//	} else {
-//		msg := "Deployment status:"
-//		for _, c := range deploy.Status.Conditions {
-//			if c.Type == appsv1.DeploymentAvailable {
-//				msg += " Available: " + c.Message
-//			} else if c.Type == appsv1.DeploymentProgressing {
-//				msg += " Progressing: " + c.Message
-//			}
-//		}
-//		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonInProgress, msg)
-//	}
-//}
-
-//func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *bs.Backstage, backstageModel model.BackstageModel) {
-//
-//	if backstageModel.GetDeploymentGVK() == appsv1.SchemeGroupVersion.WithKind("Deployment") {
-//		deploy := &appsv1.Deployment{}
-//		if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: backstage.GetNamespace()}, deploy); err != nil {
-//			setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, err.Error())
-//		} else {
-//			state, msg := deploymentState(deploy)
-//			setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, state, msg)
-//		}
-//	} else {
-//		deploy := &appsv1.StatefulSet{}
-//		if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: backstage.GetNamespace()}, deploy); err != nil {
-//			setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, err.Error())
-//		} else {
-//			state, msg := statefulSetState(deploy)
-//			setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, state, msg)
-//		}
-//	}
-//
-//}
 
 func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *bs.Backstage, backstageModel model.BackstageModel) {
 	var obj client.Object

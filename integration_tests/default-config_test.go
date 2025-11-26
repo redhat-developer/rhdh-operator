@@ -10,7 +10,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 

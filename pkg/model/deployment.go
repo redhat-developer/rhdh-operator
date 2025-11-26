@@ -42,8 +42,7 @@ func (f BackstageDeploymentFactory) newBackstageObject() RuntimeObject {
 
 type BackstageDeployment struct {
 	deploymentWrapper DeploymentObj
-	//deployment *appsv1.Deployment
-	model *BackstageModel
+	model             *BackstageModel
 }
 
 func init() {
@@ -261,29 +260,22 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 	return
 }
 
-// sets the amount of replicas (used by CR config)
-//func (b *BackstageDeployment) setReplicas(replicas *int32) {
-//	if replicas != nil {
-//		b.deployment.Spec.Replicas = replicas
-//	}
-//}
-
 // sets container image name of Backstage Container
-//func (b *BackstageDeployment) setImage(image *string) {
-//	if image != nil {
-//		b.container().Image = *image
-//		// this is a workaround for RHDH/Janus configuration
-//		// it is not a fact that all the containers should be updated
-//		// in general case need something smarter
-//		// to mark/recognize containers for update
-//		if len(b.podSpec().InitContainers) > 0 {
-//			i, ic := DynamicPluginsInitContainer(b.podSpec().InitContainers)
-//			if ic != nil {
-//				b.podSpec().InitContainers[i].Image = *image
-//			}
-//		}
-//	}
-//}
+func (b *BackstageDeployment) setImage(image *string) {
+	if image != nil {
+		b.container().Image = *image
+		// this is a workaround for RHDH/Janus configuration
+		// it is not a fact that all the containers should be updated
+		// in general case need something smarter
+		// to mark/recognize containers for update
+		if len(b.podSpec().InitContainers) > 0 {
+			i, ic := DynamicPluginsInitContainer(b.podSpec().InitContainers)
+			if ic != nil {
+				b.podSpec().InitContainers[i].Image = *image
+			}
+		}
+	}
+}
 
 // adds environment from source to the Backstage Container
 func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
