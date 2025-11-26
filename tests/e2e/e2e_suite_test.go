@@ -91,7 +91,7 @@ func installRhdhOperatorAirgapped() (podLabel string) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	go func() {
-		defer func() { 
+		defer func() {
 			if err := stdin.Close(); err != nil {
 				GinkgoWriter.Printf("Warning: failed to close stdin pipe:", err)
 			}
