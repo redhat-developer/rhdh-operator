@@ -83,7 +83,7 @@ spec:
           spec:
             containers:
               - name: backstage-backend
-                image: quay.io/rhdh/rhdh-hub-rhel9:latest
+                image: quay.io/rhdh-community/rhdh:next
   application:
     appConfig:
       configMaps:

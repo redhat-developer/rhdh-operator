@@ -61,6 +61,10 @@ else
 	BUNDLE_METADATA_PACKAGE_NAME ?= backstage-operator
 endif
 
+# SED_I is used for in-place sed command compatibility between GNU and BSD (macOS) sed versions
+# Check is based on the fact that GNU sed supports --version; BSD/macOS sed does not.
+SED_I := $(shell if sed --version >/dev/null 2>&1; then printf '%s' "-i"; else printf '%s' "-i ''"; fi)
+
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
 # To re-generate a bundle for other specific channels without changing the standard setup, you can:
@@ -307,9 +311,9 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
-	@sed -i 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
-	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
-	@sed -i 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/bundle.Dockerfile
+	@sed $(SED_I) 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
+	@sed $(SED_I) 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
+	@sed $(SED_I) 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/bundle.Dockerfile
 	$(OPERATOR_SDK) bundle validate ./bundle/$(PROFILE)
 
 ## to update the CSV with a new tagged version of the operator:
