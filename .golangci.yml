@@ -1,0 +1,14 @@
+# Configuration for the golangci-lint tool - ensuring that dot imports do not trigger an ST1001 warning.
+
+version: "2"
+
+linters:
+  enable:
+    - staticcheck
+  exclusions:
+    rules:
+      - path: '^integration_tests/|^tests/|[^/]+_test\.go'
+        linters:
+          - staticcheck
+        # exclude dot-imports checks on test-related files
+        text: "ST1001:"
