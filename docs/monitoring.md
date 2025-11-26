@@ -32,7 +32,7 @@ To install Prometheus Operator, follow the [official installation guide](https:/
 Once Prometheus Operator is installed, enable automatic ServiceMonitor creation by configuring your Backstage Custom Resource as follows:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-rhdh
@@ -90,7 +90,7 @@ To disable monitoring and remove the ServiceMonitor, either:
 
 1. **Set `monitoring.enabled` to `false`**:
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-rhdh
@@ -101,7 +101,7 @@ spec:
 
 2. **Remove the monitoring section entirely** (defaults to disabled):
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-rhdh
@@ -122,7 +122,7 @@ To enable metrics monitoring on OpenShift, ensure you have enabled [monitoring f
 Here's a complete example of a Backstage Custom Resource with monitoring enabled:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: developer-hub
@@ -213,7 +213,7 @@ To enable metrics monitoring for RHDH on Azure Kubernetes Service (AKS), you can
 For AKS deployments, you may need to add pod annotations for metrics scraping. You can configure this through the Backstage Custom Resource using the `deployment.patch` field:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-rhdh

@@ -1,4 +1,4 @@
-package v1alpha4
+package v1alpha5
 
 import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -107,21 +107,6 @@ type Application struct {
 	// Extra environment variables
 	// +optional
 	ExtraEnvs *ExtraEnvs `json:"extraEnvs,omitempty"`
-
-	// Number of desired replicas to set in the Backstage Deployment.
-	// Defaults to 1.
-	// +optional
-	//+kubebuilder:default=1
-	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Custom image to use in all containers (including Init Containers).
-	// It is your responsibility to make sure the image is from trusted sources and has been validated for security compliance
-	// +optional
-	Image *string `json:"image,omitempty"`
-
-	// Image Pull Secrets to use in all containers (including Init Containers)
-	// +optional
-	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
 
 	// Route configuration. Used for OpenShift only.
 	Route *Route `json:"route,omitempty"`
@@ -267,6 +252,7 @@ type BackstageStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"
 
 // Backstage is the Schema for the Red Hat Developer Hub backstages API.

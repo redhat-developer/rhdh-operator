@@ -15,7 +15,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
+
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"k8s.io/apimachinery/pkg/types"
 

@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 

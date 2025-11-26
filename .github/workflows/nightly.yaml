@@ -120,7 +120,7 @@ jobs:
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           cat <<EOF > /tmp/kind-config.yaml
-          apiVersion: kind.x-k8s.io/v1alpha4
+          apiVersion: kind.x-k8s.io/v1alpha5
           kind: Cluster
           nodes:
             - role: control-plane

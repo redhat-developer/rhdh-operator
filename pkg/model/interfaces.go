@@ -1,7 +1,7 @@
 package model
 
 import (
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )

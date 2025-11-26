@@ -18,7 +18,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
@@ -211,11 +211,11 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 
 	// set from backstage.Spec.Application
-	if backstage.Spec.Application != nil {
-		//b.setReplicas(backstage.Spec.Application.Replicas)
-		utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-		b.setImage(backstage.Spec.Application.Image)
-	}
+	//if backstage.Spec.Application != nil {
+	//	//b.setReplicas(backstage.Spec.Application.Replicas)
+	//	utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
+	//	b.setImage(backstage.Spec.Application.Image)
+	//}
 
 	// set from backstage.Spec.Deployment
 	if backstage.Spec.Deployment != nil {
@@ -269,21 +269,21 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 //}
 
 // sets container image name of Backstage Container
-func (b *BackstageDeployment) setImage(image *string) {
-	if image != nil {
-		b.container().Image = *image
-		// this is a workaround for RHDH/Janus configuration
-		// it is not a fact that all the containers should be updated
-		// in general case need something smarter
-		// to mark/recognize containers for update
-		if len(b.podSpec().InitContainers) > 0 {
-			i, ic := DynamicPluginsInitContainer(b.podSpec().InitContainers)
-			if ic != nil {
-				b.podSpec().InitContainers[i].Image = *image
-			}
-		}
-	}
-}
+//func (b *BackstageDeployment) setImage(image *string) {
+//	if image != nil {
+//		b.container().Image = *image
+//		// this is a workaround for RHDH/Janus configuration
+//		// it is not a fact that all the containers should be updated
+//		// in general case need something smarter
+//		// to mark/recognize containers for update
+//		if len(b.podSpec().InitContainers) > 0 {
+//			i, ic := DynamicPluginsInitContainer(b.podSpec().InitContainers)
+//			if ic != nil {
+//				b.podSpec().InitContainers[i].Image = *image
+//			}
+//		}
+//	}
+//}
 
 // adds environment from source to the Backstage Container
 func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
@@ -392,6 +392,7 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // varName - name of env variable
+
 func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, kind ObjectKind, objectName, varName string) error {
 
 	containers, err := containersFilter.getContainers(b)
