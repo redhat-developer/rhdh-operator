@@ -60,7 +60,7 @@ func TestInitDefaultDeploy(t *testing.T) {
 	assert.Equal(t, ServiceName(bs.Name), bsService.service.Name)
 	assert.True(t, len(bsService.service.Spec.Ports) > 0)
 
-	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsDeployment.deployment.Spec.Template.ObjectMeta.Labels[BackstageAppLabel])
+	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsDeployment.deployment.Spec.Template.Labels[BackstageAppLabel])
 	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsService.service.Spec.Selector[BackstageAppLabel])
 
 }

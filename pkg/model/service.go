@@ -48,7 +48,7 @@ func (b *BackstageService) setObject(obj runtime.Object) {
 func (b *BackstageService) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	b.model = model
 	if b.service == nil {
-		return false, fmt.Errorf("Backstage Service is not initialized, make sure there is service.yaml in default or raw configuration")
+		return false, fmt.Errorf("backstage Service is not initialized, make sure there is service.yaml in default or raw configuration")
 	}
 	model.backstageService = b
 	model.setRuntimeObject(b)

@@ -92,17 +92,17 @@ func (b *BackstageDeployment) EmptyObject() client.Object {
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 	if b.deployment == nil {
-		return false, fmt.Errorf("Backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
+		return false, fmt.Errorf("backstage deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
 	}
 
 	if BackstageContainerIndex(b.deployment) < 0 {
-		return false, fmt.Errorf("Backstage Deployment is not initialized, Backstage Container is not identified")
+		return false, fmt.Errorf("backstage deployment is not initialized, Backstage Container is not identified")
 	}
 
-	if b.deployment.Spec.Template.ObjectMeta.Annotations == nil {
-		b.deployment.Spec.Template.ObjectMeta.Annotations = map[string]string{}
+	if b.deployment.Spec.Template.Annotations == nil {
+		b.deployment.Spec.Template.Annotations = map[string]string{}
 	}
-	b.deployment.Spec.Template.ObjectMeta.Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
+	b.deployment.Spec.Template.Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
 
 	model.backstageDeployment = b
 	model.setRuntimeObject(b)
@@ -140,7 +140,7 @@ func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error 
 
 func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	b.deployment.SetName(DeploymentName(backstage.Name))
-	utils.GenerateLabel(&b.deployment.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+	utils.GenerateLabel(&b.deployment.Spec.Template.Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
 	if b.deployment.Spec.Selector == nil {
 		b.deployment.Spec.Selector = &metav1.LabelSelector{}
 	}
@@ -332,13 +332,15 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 
 	volName := utils.GenerateVolumeNameFromCmOrSecret(objectName)
 	volSrc := corev1.VolumeSource{}
-	if kind == ConfigMapObjectKind {
+	
+	switch kind {
+	case ConfigMapObjectKind:
 		volSrc.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: objectName},
 			DefaultMode:          ptr.To(int32(420)),
 			Optional:             ptr.To(false),
 		}
-	} else if kind == SecretObjectKind {
+	case SecretObjectKind:
 		volSrc.Secret = &corev1.SecretVolumeSource{
 			SecretName:  objectName,
 			DefaultMode: ptr.To(int32(420)),
@@ -397,6 +399,8 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // varName - name of env variable
+
+
 func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, kind ObjectKind, objectName, varName string) error {
 
 	containers, err := containersFilter.getContainers(b)
@@ -407,24 +411,26 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 	for _, container := range containers {
 		if varName == "" {
 			envFromSrc := corev1.EnvFromSource{}
-			if kind == ConfigMapObjectKind {
+			switch kind {
+			case ConfigMapObjectKind:
 				envFromSrc.ConfigMapRef = &corev1.ConfigMapEnvSource{
 					LocalObjectReference: corev1.LocalObjectReference{Name: objectName}}
-			} else if kind == SecretObjectKind {
+			case SecretObjectKind:
 				envFromSrc.SecretRef = &corev1.SecretEnvSource{
 					LocalObjectReference: corev1.LocalObjectReference{Name: objectName}}
 			}
 			container.EnvFrom = append(container.EnvFrom, envFromSrc)
 		} else {
 			envVarSrc := &corev1.EnvVarSource{}
-			if kind == ConfigMapObjectKind {
+			switch kind {
+			case ConfigMapObjectKind:
 				envVarSrc.ConfigMapKeyRef = &corev1.ConfigMapKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: objectName,
 					},
 					Key: varName,
 				}
-			} else if kind == SecretObjectKind {
+			case SecretObjectKind:
 				envVarSrc.SecretKeyRef = &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: objectName,
