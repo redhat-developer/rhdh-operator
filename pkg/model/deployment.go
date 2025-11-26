@@ -332,7 +332,7 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 
 	volName := utils.GenerateVolumeNameFromCmOrSecret(objectName)
 	volSrc := corev1.VolumeSource{}
-	
+
 	switch kind {
 	case ConfigMapObjectKind:
 		volSrc.ConfigMap = &corev1.ConfigMapVolumeSource{
@@ -399,7 +399,6 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // varName - name of env variable
-
 
 func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, kind ObjectKind, objectName, varName string) error {
 

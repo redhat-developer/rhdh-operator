@@ -221,51 +221,6 @@ spec:
 
 	})
 
-	//It("creates default Backstage and then update this CR", func() {
-	//
-	//	backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
-	//
-	//	Eventually(func(g Gomega) {
-	//		By("creating Deployment with replicas=1 by default")
-	//		deploy := &appsv1.Deployment{}
-	//		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
-	//		g.Expect(err).To(Not(HaveOccurred()))
-	//		g.Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
-	//		g.Expect(deploy.Spec.Template.Spec.ImagePullSecrets).To(HaveLen(0))
-	//
-	//	}, time.Minute, time.Second).Should(Succeed())
-	//
-	//	By("updating Backstage")
-	//	imageName := "quay.io/my-org/my-awesome-image:1.2.3"
-	//	ips := []string{"some-image-pull-secret-1", "some-image-pull-secret-2"}
-	//	update := &bsv1.Backstage{}
-	//	err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, update)
-	//	Expect(err).To(Not(HaveOccurred()))
-	//	update.Spec.Application = &bsv1.Application{}
-	//	update.Spec.Application.Replicas = ptr.To(int32(2))
-	//	update.Spec.Application.Image = ptr.To(imageName)
-	//	update.Spec.Application.ImagePullSecrets = ips
-	//
-	//	err = k8sClient.Update(ctx, update)
-	//	Expect(err).To(Not(HaveOccurred()))
-	//	_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
-	//		NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
-	//	})
-	//	Expect(err).To(Not(HaveOccurred()))
-	//
-	//	Eventually(func(g Gomega) {
-	//
-	//		deploy := &appsv1.Deployment{}
-	//		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
-	//		g.Expect(err).To(Not(HaveOccurred()))
-	//		g.Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(2)))
-	//		g.Expect(deploy.Spec.Template.Spec.ImagePullSecrets).To(HaveLen(2))
-	//		g.Expect(deploy.Spec.Template.Spec.Containers[model.BackstageContainerIndex(deploy)].Image).To(HaveValue(BeEquivalentTo(imageName)))
-	//
-	//	}, time.Minute, time.Second).Should(Succeed())
-	//
-	//})
-
 	It("creates Backstage deployment with spec.deployment ", func() {
 
 		bs2 := &bsv1.Backstage{}
