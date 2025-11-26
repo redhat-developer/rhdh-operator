@@ -217,13 +217,6 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 // it merges the deployment object with the patch from the backstage configuration
 func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 
-	// set from backstage.Spec.Application
-	//if backstage.Spec.Application != nil {
-	//	b.setReplicas(backstage.Spec.Application.Replicas)
-	//	utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-	//	b.setImage(backstage.Spec.Application.Image)
-	//}
-
 	// set from backstage.Spec.Deployment
 	if backstage.Spec.Deployment != nil {
 		if conf := backstage.Spec.Deployment.Patch; conf != nil {
@@ -266,13 +259,6 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 		subPath = volName
 	}
 	return
-}
-
-// sets the amount of replicas (used by CR config)
-func (b *BackstageDeployment) setReplicas(replicas *int32) {
-	if replicas != nil {
-		b.deployment.Spec.Replicas = replicas
-	}
 }
 
 // sets container image name of Backstage Container
