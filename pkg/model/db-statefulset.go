@@ -98,7 +98,7 @@ func (b *DbStatefulSet) updateAndValidate(backstage bsv1.Backstage) error {
 
 func (b *DbStatefulSet) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	b.statefulSet.SetName(DbStatefulSetName(backstage.Name))
-	utils.GenerateLabel(&b.statefulSet.Spec.Template.ObjectMeta.Labels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
+	utils.GenerateLabel(&b.statefulSet.Spec.Template.Labels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
 	utils.GenerateLabel(&b.statefulSet.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
 	setMetaInfo(b.statefulSet, backstage, scheme)
 }

@@ -168,7 +168,7 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 	}
 
 	newHash := ec.WatchingHash
-	oldHash := deploy.Spec.Template.ObjectMeta.GetAnnotations()[model.ExtConfigHashAnnotation]
+	oldHash := deploy.Spec.Template.GetAnnotations()[model.ExtConfigHashAnnotation]
 	if newHash == oldHash {
 		lg.V(1).Info("request by label, hash are equal", "hash", newHash)
 		return []reconcile.Request{}

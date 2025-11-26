@@ -32,15 +32,19 @@ var managerPodLabel = "app=rhdh-operator"
 // Run E2E tests using the Ginkgo runner.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	fmt.Fprintln(GinkgoWriter, "Starting Backstage Operator suite")
+	GinkgoWriter.Println("Starting Backstage Operator suite")
 	RunSpecs(t, "Backstage E2E suite")
 }
 
 func installRhdhOperatorManifest(operatorManifest string) {
 	p, dErr := helper.DownloadFile(operatorManifest)
 	Expect(dErr).ShouldNot(HaveOccurred())
-	defer os.Remove(p)
-	fmt.Fprintf(GinkgoWriter, "Installing RHDH Operator Manifest: %q\n", p)
+	defer func() {
+		if err := os.Remove(p); err != nil {
+			GinkgoWriter.Printf("Warning: failed to remove temporary file %s: %v\n", p, err)
+		}
+	}()
+	GinkgoWriter.Printf("Installing RHDH Operator Manifest: %q\n", p)
 
 	cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
 	_, err := helper.Run(cmd)
@@ -87,7 +91,11 @@ func installRhdhOperatorAirgapped() (podLabel string) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	go func() {
-		defer stdin.Close()
+		defer func() {
+			if err := stdin.Close(); err != nil {
+				GinkgoWriter.Printf("Warning: failed to close stdin pipe:", err)
+			}
+		}()
 		_, _ = io.WriteString(stdin, fmt.Sprintf(`
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -164,7 +172,7 @@ func installOperatorWithMakeDeploy(withOlm bool) {
 var _ = SynchronizedBeforeSuite(func() []byte {
 	//runs *only* on process #1
 	_start = time.Now()
-	fmt.Fprintln(GinkgoWriter, "isOpenshift:", helper.IsOpenShift())
+	GinkgoWriter.Println("isOpenshift:", helper.IsOpenShift())
 
 	if operatorManifest := os.Getenv("OPERATOR_MANIFEST"); operatorManifest != "" {
 		installRhdhOperatorManifest(operatorManifest)

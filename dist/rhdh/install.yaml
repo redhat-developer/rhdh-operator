@@ -1574,7 +1574,7 @@ data:
                 - ./install-dynamic-plugins.sh
                 - /dynamic-plugins-root
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-              image: quay.io/rhdh/rhdh-hub-rhel9:next
+              image: quay.io/rhdh-community/rhdh:next
               imagePullPolicy: IfNotPresent
               securityContext:
                 readOnlyRootFilesystem: true
@@ -1613,7 +1613,7 @@ data:
           containers:
             - name: backstage-backend
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-              image: quay.io/rhdh/rhdh-hub-rhel9:next
+              image: quay.io/rhdh-community/rhdh:next
               imagePullPolicy: IfNotPresent
               args:
                 - "--config"
@@ -1970,7 +1970,7 @@ data:
         tekton.dev/categories: Git
         tekton.dev/tags: git
         tekton.dev/displayName: "git cli"
-        tekton.dev/platforms: "linux/amd64,linux/s390x,linux/ppc64le"
+        tekton.dev/platforms: "linux/amd64,linux/arm64,linux/s390x,linux/ppc64le"
     spec:
       description: >-
         This task can be used to perform git operations.
@@ -2426,10 +2426,6 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: kubernetes.io/arch
-                operator: In
-                values:
-                - amd64
               - key: kubernetes.io/os
                 operator: In
                 values:
@@ -2453,7 +2449,7 @@ spec:
         - name: RELATED_IMAGE_postgresql
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
-          value: quay.io/rhdh/rhdh-hub-rhel9:next
+          value: quay.io/rhdh-community/rhdh:next
         image: quay.io/rhdh/rhdh-rhel9-operator:1.9
         livenessProbe:
           httpGet:

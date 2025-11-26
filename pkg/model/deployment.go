@@ -325,13 +325,15 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 
 	volName := utils.GenerateVolumeNameFromCmOrSecret(objectName)
 	volSrc := corev1.VolumeSource{}
-	if kind == ConfigMapObjectKind {
+
+	switch kind {
+	case ConfigMapObjectKind:
 		volSrc.ConfigMap = &corev1.ConfigMapVolumeSource{
 			LocalObjectReference: corev1.LocalObjectReference{Name: objectName},
 			DefaultMode:          ptr.To(int32(420)),
 			Optional:             ptr.To(false),
 		}
-	} else if kind == SecretObjectKind {
+	case SecretObjectKind:
 		volSrc.Secret = &corev1.SecretVolumeSource{
 			SecretName:  objectName,
 			DefaultMode: ptr.To(int32(420)),
