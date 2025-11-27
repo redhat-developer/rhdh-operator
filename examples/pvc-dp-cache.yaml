@@ -56,17 +56,18 @@ metadata:
   name: bs1
 spec:
   deployment:
+    kind: StatefulSet
     patch:
       spec:
         replicas: 2
         template:
           spec:
-            initContainers:
-              - name: install-dynamic-plugins
-                image: quay.io/rhdh-community/rhdh:pr-3676
-            containers:
-              - name: backstage-backend
-                image: quay.io/rhdh-community/rhdh:pr-3676
+#            initContainers:
+#              - name: install-dynamic-plugins
+#                image: quay.io/rhdh-community/rhdh:pr-3676
+#            containers:
+#              - name: backstage-backend
+#                image: quay.io/rhdh-community/rhdh:pr-3676
             # uncomment the following nodeAffinity section to schedule pods on a specific node
             # and make sure to replace the value with the desired node name (ip-10-0-1-128.ec2.internal in this example)
             # to be able to test the ReadWriteOnce PVC on a multi node cluster
@@ -78,7 +79,7 @@ spec:
                         - key: kubernetes.io/hostname
                           operator: In
                           values:
-                            - ip-10-0-1-5.ec2.internal
+                            - ip-10-0-1-156.ec2.internal
             volumes:
               - $patch: replace
                 name: dynamic-plugins-root

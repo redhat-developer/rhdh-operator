@@ -268,3 +268,17 @@ spec:
 	assert.Equal(t, "VAR1", sidecar.Env[0].Name)
 
 }
+
+func TestDeploymentKind(t *testing.T) {
+
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Kind = "StatefulSet"
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "StatefulSet", model.backstageDeployment.deploymentWrapper.Obj.GetObjectKind().GroupVersionKind().Kind)
+}

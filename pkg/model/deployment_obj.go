@@ -8,10 +8,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const unsupportedType = "unsupported type for DeploymentObj "
+const unsupportedType = "unsupported type for Deployment object: "
 
 type DeploymentObj struct {
 	Obj client.Object
+}
+
+func (d *DeploymentObj) setKind(kind string) {
+	switch d.Obj.(type) {
+	case *appv1.StatefulSet:
+		d.Obj.(*appv1.StatefulSet).Kind = kind
+	case *appv1.Deployment:
+		d.Obj.(*appv1.Deployment).Kind = kind
+	default:
+		panic(unsupportedType + d.Obj.GetObjectKind().GroupVersionKind().Kind)
+	}
 }
 
 func (d *DeploymentObj) setObject(obj runtime.Object) {

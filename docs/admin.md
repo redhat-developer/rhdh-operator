@@ -64,7 +64,7 @@ When creating the Backstage CR, the Operator will try to create a Backstage Pod,
 - Backstage Container from the image, configured in *(deployment.yaml).spec.template.spec.Containers[].image*
 - Init Container (applied for RHDH configuration, usually the same as Backstage Container)
 
-Also, if Backstage CR configured with *EnabledLocalDb*,  it will create a PostgreSQL container pod, configured in *(db-deployment.yaml).spec.template.spec.Containers[].image*
+Also, if Backstage CR configured with *EnabledLocalDb*,  it will create a PostgreSQL container pod, configured in *(db-statefulset.yaml).spec.template.spec.Containers[].image*
 
 By default, the Backstage Operator is configured to use publicly available images.
 If you plan to deploy to a [restricted environment](https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html),

@@ -209,15 +209,13 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 // it merges the deployment object with the patch from the backstage configuration
 func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 
-	// set from backstage.Spec.Application
-	//if backstage.Spec.Application != nil {
-	//	//b.setReplicas(backstage.Spec.Application.Replicas)
-	//	utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-	//	b.setImage(backstage.Spec.Application.Image)
-	//}
-
 	// set from backstage.Spec.Deployment
 	if backstage.Spec.Deployment != nil {
+
+		if backstage.Spec.Deployment.Kind != "" {
+			b.deploymentWrapper.setKind(backstage.Spec.Deployment.Kind)
+		}
+
 		if conf := backstage.Spec.Deployment.Patch; conf != nil {
 
 			deplStr, err := yaml.Marshal(b.deploymentWrapper.Obj)
