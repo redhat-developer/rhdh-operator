@@ -50,7 +50,7 @@ stringData:
   # node -p 'require("crypto").randomBytes(24).toString("base64")'
   BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK" # notsecret
 ---
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: orchestrator

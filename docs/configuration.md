@@ -216,7 +216,7 @@ spec:
 The desired state of resources created by the Backstage Operator is defined in the Backstage Custom Resource Spec. Here’s an example of a simple Backstage CR:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: mybackstage
@@ -234,7 +234,7 @@ This Custom Resource defines a Backstage instance called **mybackstage** and als
 - Adds additional app-config stored in the **my-app-config** ConfigMap.
 - Adds some extra environment variables stored (as key-value pairs) in the Secret called **my-secrets**.
 
-Since API version **v1alpha2** (Operator version **0.3.x**), the Backstage CR Spec contains the following top-level elements:
+The Backstage CR Spec contains the following top-level elements:
 
 * [application](#application-configuration)
 * [deployment](#deployment-configuration)
@@ -373,7 +373,7 @@ spec:
 ```
 
 The Operator will either get all entries from the specified object (if no key is specified) or will pick the specified one, creating volumes per object and mounting the files to the Backstage container.
-Since **v1alpha3 (v0.4)** Backstage CRD introduced **mountPath** field which allows to mount ConfigMap or Secret to specified path. A combination of key/mountPath fields impacts on whether the Volume will be mounted with or without [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath) as following:
+Backstage CRD introduces **mountPath** field which allows to mount ConfigMap or Secret to specified path. A combination of key/mountPath fields impacts on whether the Volume will be mounted with or without [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath) as following:
 * If nothing specified: each key/values will be mounted as filename/content with **subPath**
 * If **key** specified, with or without **mountPath**: the specified key/value will be mounted with **subPath**
 * If only **mountPath** specified: a directory containing all the key/value will be mounted without **subPath**
@@ -407,7 +407,7 @@ In our example, the following files will be mounted:
 
 ##### PersistentVolumeClaims
 
-Since **v1alpha3** (Operator version **0.4.0**), it is also possible to mount directory from pre-created [PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) using **spec.application.extraFiles.pvcs** field. PersistentVolumeClaims are mounted as a directory to the container's path defined as following:
+It possible to mount directory from pre-created [PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) using **spec.application.extraFiles.pvcs** field. PersistentVolumeClaims are mounted as a directory to the container's path defined as following:
 * **spec.application.extraFiles.pvcs[].mountPath** if defined
 * Then **spec.application.extraFiles.mountPath**/<pvc-name> if defined
 * Then Backstage container's **WorkingDir** if defined
@@ -565,21 +565,6 @@ From version **0.8.0**, the Operator merges the default Dynamic Plugins configur
 
 Starting from version **0.7.0**, the Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
 
-
-
-#### Deployment Parameters
-
-**NOTE:** These fields are deprecated for versions **>= v0.3** and will be removed in **v0.9** in favor of the [spec.deployment](#deployment-configuration).
-  
-```yaml
-spec:
-  application:
-    image: 'Backstage container image: [tag], e.g., "quay.io/my/my-rhdh:latest"'
-    replicas: number of replicas, e.g., 2
-    imagePullSecrets: array of image pull secrets names, e.g.,
-      - my-secret-name
-```
-
 #### Route
 
 To support Backstage service routing on OpenShift, the Operator can create a `route.openshift.io` resource, as specified in the **spec.application.route** field. Here’s an example:
@@ -604,7 +589,7 @@ Also note that securing Routes with external certificates in TLS secrets (via th
 
 ### Deployment Configuration
   
-Since **v1alpha2** (Operator version **0.3.0**), the Backstage CRD contains **spec.deployment**, which allows for patching the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
+The Backstage CRD contains **spec.deployment** field, allowing to change the shape of the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
 
 For example, the following specification fragment will:
 - Set an additional volume named **my-volume** and mount it to **/my/path** of the Backstage container.

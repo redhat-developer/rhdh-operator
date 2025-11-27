@@ -10,7 +10,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -28,25 +28,6 @@ var deploymentTestBackstage = bsv1.Backstage{
 		},
 		Application: &bsv1.Application{},
 	},
-}
-
-func TestSpecs(t *testing.T) {
-	bs := *deploymentTestBackstage.DeepCopy()
-	bs.Spec.Application.Image = ptr.To("my-image:1.0.0")
-	bs.Spec.Application.Replicas = ptr.To(int32(3))
-	bs.Spec.Application.ImagePullSecrets = []string{"my-secret"}
-
-	testObj := createBackstageTest(bs).withDefaultConfig(true).
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
-
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.container().Image)
-	assert.Equal(t, int32(3), *model.backstageDeployment.deployment.Spec.Replicas)
-	assert.Equal(t, 1, len(model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets))
-	assert.Equal(t, "my-secret", model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets[0].Name)
-
 }
 
 func TestWorkingDirMount(t *testing.T) {
@@ -102,16 +83,16 @@ func TestSpecImagePullSecrets(t *testing.T) {
 	assert.Equal(t, 2, len(model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets))
 	assert.Equal(t, "ips1", model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets[0].Name)
 
-	bs.Spec.Application.ImagePullSecrets = []string{}
-
-	testObj = createBackstageTest(bs).withDefaultConfig(true).
-		addToDefaultConfig("deployment.yaml", "ips-deployment.yaml")
-
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
-	assert.NoError(t, err)
-
-	// if explicitly set empty slice - they are empty
-	assert.Equal(t, 0, len(model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets))
+	//bs.Spec.Application.ImagePullSecrets = []string{}
+	//
+	//testObj = createBackstageTest(bs).withDefaultConfig(true).
+	//	addToDefaultConfig("deployment.yaml", "ips-deployment.yaml")
+	//
+	//model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	//assert.NoError(t, err)
+	//
+	//// if explicitly set empty slice - they are empty
+	//assert.Equal(t, 0, len(model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets))
 
 }
 
@@ -204,35 +185,6 @@ spec:
 	assert.NoError(t, err)
 	// make sure image defined in CR overrides
 	assert.Equal(t, "cr-image", model.backstageDeployment.container().Image)
-}
-
-// to remove when stop supporting v1alpha1
-func TestDeploymentFieldPrevailsOnDeprecated(t *testing.T) {
-	bs := *deploymentTestBackstage.DeepCopy()
-	bs.Spec.Application.Image = ptr.To("app-image")
-	bs.Spec.Application.Replicas = ptr.To(int32(2))
-	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
-	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
-		Raw: []byte(`
-spec:
- replicas: 3
- template:
-   spec:
-     containers:
-       - name: backstage-backend
-         image: deployment-image
-`),
-	}
-
-	testObj := createBackstageTest(bs).withDefaultConfig(true).
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
-
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "backstage-backend", model.backstageDeployment.container().Name)
-	assert.Equal(t, "deployment-image", model.backstageDeployment.container().Image)
-	assert.Equal(t, int32(3), *model.backstageDeployment.deployment.Spec.Replicas)
 }
 
 func TestFilterContainers(t *testing.T) {

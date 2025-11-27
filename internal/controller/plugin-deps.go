@@ -8,7 +8,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 

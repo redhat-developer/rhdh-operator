@@ -53,7 +53,7 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 			stdin, err := cmd.StdinPipe()
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 			go func() {
-				defer func() { 
+				defer func() {
 					if err := stdin.Close(); err != nil {
 						GinkgoWriter.Println("Warning: failed to close stdin pipe:", err)
 					}

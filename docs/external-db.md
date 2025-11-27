@@ -64,7 +64,7 @@ stringData:
 
 ````yaml
 cat <<EOF | kubectl -n <your-namespace> create -f -
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
  name: <backstage-instance-name>

@@ -10,7 +10,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	corev1 "k8s.io/api/core/v1"
 

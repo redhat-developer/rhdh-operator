@@ -1309,7 +1309,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   fi
   CR_EXAMPLE="
   cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
-  apiVersion: rhdh.redhat.com/v1alpha4
+  apiVersion: rhdh.redhat.com/v1alpha5
   kind: Backstage
   metadata:
     name: developer-hub

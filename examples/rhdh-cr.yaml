@@ -68,7 +68,7 @@ data:
                     initialDelay: { seconds: 15}
 
 ---
-apiVersion: rhdh.redhat.com/v1alpha4
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-rhdh
