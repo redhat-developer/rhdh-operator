@@ -91,7 +91,7 @@ jobs:
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
           cat <<EOF > /tmp/kind-config.yaml
-          apiVersion: kind.x-k8s.io/v1alpha5
+          apiVersion: kind.x-k8s.io/v1alpha4
           kind: Cluster
           nodes:
             - role: control-plane
