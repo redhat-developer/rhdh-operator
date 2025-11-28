@@ -85,11 +85,11 @@ func (b *BackstageDeployment) setObject(obj runtime.Object) {
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 	if b.deploymentWrapper.Obj == nil {
-		return false, fmt.Errorf("Backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
+		return false, fmt.Errorf("backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
 	}
 
 	if BackstageContainerIndex(b.podSpec()) < 0 {
-		return false, fmt.Errorf("Backstage Deployment is not initialized, Backstage Container is not identified")
+		return false, fmt.Errorf("backstage Deployment is not initialized, Backstage Container is not identified")
 	}
 
 	if b.deploymentWrapper.podObjectMeta().Annotations == nil {
@@ -393,30 +393,34 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 	for _, container := range containers {
 		if varName == "" {
 			envFromSrc := corev1.EnvFromSource{}
-			if kind == ConfigMapObjectKind {
+			switch kind {
+			case ConfigMapObjectKind:
 				envFromSrc.ConfigMapRef = &corev1.ConfigMapEnvSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: objectName}}
-			} else if kind == SecretObjectKind {
+					LocalObjectReference: corev1.LocalObjectReference{Name: objectName},
+				}
+			case SecretObjectKind:
 				envFromSrc.SecretRef = &corev1.SecretEnvSource{
-					LocalObjectReference: corev1.LocalObjectReference{Name: objectName}}
+					LocalObjectReference: corev1.LocalObjectReference{Name: objectName},
+				}
+			default:
+				// unknown kind - no-op
 			}
 			container.EnvFrom = append(container.EnvFrom, envFromSrc)
 		} else {
 			envVarSrc := &corev1.EnvVarSource{}
-			if kind == ConfigMapObjectKind {
+			switch kind {
+			case ConfigMapObjectKind:
 				envVarSrc.ConfigMapKeyRef = &corev1.ConfigMapKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: objectName,
-					},
-					Key: varName,
+					LocalObjectReference: corev1.LocalObjectReference{Name: objectName},
+					Key:                  varName,
 				}
-			} else if kind == SecretObjectKind {
+			case SecretObjectKind:
 				envVarSrc.SecretKeyRef = &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: objectName,
-					},
-					Key: varName,
+					LocalObjectReference: corev1.LocalObjectReference{Name: objectName},
+					Key:                  varName,
 				}
+			default:
+				// unknown kind - leave envVarSrc nil
 			}
 			container.Env = append(container.Env, corev1.EnvVar{
 				Name:      varName,

@@ -26,11 +26,11 @@ func (d *DeploymentObj) setKind(kind string) {
 }
 
 func (d *DeploymentObj) setObject(obj runtime.Object) {
-	switch obj.(type) {
+	switch o := obj.(type) {
 	case *appv1.StatefulSet:
-		d.Obj = obj.(*appv1.StatefulSet)
+		d.Obj = o
 	case *appv1.Deployment:
-		d.Obj = obj.(*appv1.Deployment)
+		d.Obj = o
 	default:
 		panic(unsupportedType + obj.GetObjectKind().GroupVersionKind().Kind)
 	}

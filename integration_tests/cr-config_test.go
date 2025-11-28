@@ -2,7 +2,6 @@ package integration_tests
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"sigs.k8s.io/yaml"
