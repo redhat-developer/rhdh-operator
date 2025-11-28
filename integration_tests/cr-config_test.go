@@ -2,6 +2,7 @@ package integration_tests
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"sigs.k8s.io/yaml"
@@ -218,7 +219,7 @@ spec:
 
 	})
 
-	It("creates Backstage deployment with spec.deployment ", func() {
+	It("creates Backstage with spec.deployment.patch ", func() {
 
 		bs2 := &bsv1.Backstage{}
 
@@ -260,14 +261,42 @@ spec:
 
 	})
 
+	It("creates Backstage with spec.deployment.kind=StatefulSet ", func() {
+
+		bs2 := &bsv1.Backstage{
+			Spec: bsv1.BackstageSpec{
+				Deployment: &bsv1.BackstageDeployment{
+					Kind: "StatefulSet",
+				},
+			},
+		}
+
+		backstageName := createAndReconcileBackstage(ctx, ns, bs2.Spec, "")
+
+		Eventually(func(g Gomega) {
+			By("get StatefulSet ")
+			ss, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).To(Not(HaveOccurred()))
+			gvk := utils.GetObjectKind(ss.Obj, k8sClient.Scheme())
+			g.Expect("StatefulSet").To(Equal(gvk.Kind))
+		}, 10*time.Second, time.Second).Should(Succeed())
+
+	})
+
+	It("failed Backstage with unknown spec.deployment.kind ", func() {
+
+		bs2 := &bsv1.Backstage{
+			Spec: bsv1.BackstageSpec{
+				Deployment: &bsv1.BackstageDeployment{
+					Kind: "Unknown",
+				},
+			},
+		}
+		// should fail immediately
+		_, err := createBackstage(ctx, bs2.Spec, ns, "")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("spec.deployment.kind: Unsupported value"))
+
+	})
+
 })
-
-// Duplicated files in different CMs
-// Message: "Deployment.apps \"test-backstage-ro86g-deployment\" is invalid: spec.template.spec.containers[0].volumeMounts[4].mountPath: Invalid value: \"/my/mount/path/key12\": must be unique",
-
-// No CM configured
-//failed to preprocess backstage spec app-configs failed to get configMap app-config3: configmaps "app-config3" not found
-
-// If no such a key - no reaction, it is just not included
-
-// mounting/injecting secret by key only

@@ -153,7 +153,7 @@ func generateRandName(name string) string {
 	return "test-backstage-" + randString(5)
 }
 
-func createBackstage(ctx context.Context, spec bsv1.BackstageSpec, ns string, name string) string {
+func createBackstage(ctx context.Context, spec bsv1.BackstageSpec, ns string, name string) (string, error) {
 
 	backstageName := generateRandName(name)
 
@@ -164,19 +164,23 @@ func createBackstage(ctx context.Context, spec bsv1.BackstageSpec, ns string, na
 		},
 		Spec: spec,
 	})
-	Expect(err).To(Not(HaveOccurred()))
-	return backstageName
+	if err != nil {
+		return "", err
+	}
+
+	return backstageName, err
 }
 
 func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1.BackstageSpec, name string) string {
-	backstageName := createBackstage(ctx, spec, ns, name)
+	backstageName, err := createBackstage(ctx, spec, ns, name)
+	Expect(err).To(Not(HaveOccurred()))
 
 	Eventually(func() error {
 		found := &bsv1.Backstage{}
 		return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 	}, time.Minute, time.Second).Should(Succeed())
 
-	_, err := NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
+	_, err = NewTestBackstageReconciler(ns).ReconcileAny(ctx, reconcile.Request{
 		NamespacedName: types.NamespacedName{Name: backstageName, Namespace: ns},
 	})
 
