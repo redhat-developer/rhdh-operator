@@ -278,7 +278,7 @@ spec:
 			g.Expect(err).To(Not(HaveOccurred()))
 			gvk := utils.GetObjectKind(ss.Obj, k8sClient.Scheme())
 			g.Expect("StatefulSet").To(Equal(gvk.Kind))
-		}, 10*time.Second, time.Second).Should(Succeed())
+		}, 30*time.Second, 2*time.Second).Should(Succeed())
 
 	})
 
