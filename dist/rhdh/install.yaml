@@ -2027,7 +2027,7 @@ data:
             fsGroup: 1001
   deployment.yaml: |
     apiVersion: apps/v1
-    kind: StatefulSet
+    kind: Deployment
     metadata:
       name: backstage # placeholder for 'backstage-<cr-name>'
     spec:
