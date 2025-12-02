@@ -49,7 +49,7 @@ jobs:
           fi
           echo "SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE=${SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE}" >> $GITHUB_OUTPUT
 
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6 # default branch will be checked out by default on scheduled workflows
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6 # default branch will be checked out by default on scheduled workflows
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         with:
           fetch-depth: 0
