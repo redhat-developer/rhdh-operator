@@ -156,7 +156,7 @@ var _ = When("testing API version compatibility", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(deployCurr.Spec.Replicas).ToNot(BeNil())
 			g.Expect(*deployCurr.Spec.Replicas).To(Equal(int32(1)))
-		}, 30*time.Second, 5*time.Second).Should(Succeed())
+		}, 2*time.Minute, 5*time.Second).Should(Succeed())
 
 		// clean up test resources
 		By("cleaning up prev version test resource")

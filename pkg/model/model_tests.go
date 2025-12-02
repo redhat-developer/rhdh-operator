@@ -34,9 +34,6 @@ type testBackstageObject struct {
 func createBackstageTest(bs bsv1.Backstage) *testBackstageObject {
 	ec := ExternalConfig{
 		RawConfig: map[string]string{},
-		//AppConfigs:          map[string]corev1.ConfigMap{},
-		//ExtraFileConfigMaps: map[string]corev1.ConfigMap{},
-		//ExtraEnvConfigMaps: map[string]corev1.ConfigMap{},
 	}
 	b := &testBackstageObject{backstage: bs, externalConfig: ec, scheme: runtime.NewScheme()}
 	utilruntime.Must(bsv1.AddToScheme(b.scheme))

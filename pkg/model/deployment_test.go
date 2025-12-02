@@ -6,6 +6,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
+	appv1 "k8s.io/api/apps/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"k8s.io/utils/ptr"
@@ -273,12 +274,43 @@ func TestDeploymentKind(t *testing.T) {
 
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
-	bs.Spec.Deployment.Kind = "StatefulSet"
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
+	depPodSpec := model.backstageDeployment.podSpec()
+
+	bs.Spec.Deployment.Kind = "StatefulSet"
+	testObj = createBackstageTest(bs).withDefaultConfig(true)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
 	assert.Equal(t, "StatefulSet", model.backstageDeployment.deploymentWrapper.Obj.GetObjectKind().GroupVersionKind().Kind)
+
+	ssPodSpec := model.backstageDeployment.podSpec()
+	assert.Equal(t, depPodSpec, ssPodSpec)
+}
+
+func TestPatchedStatefulSet(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Kind = "StatefulSet"
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+ serviceName: my-service
+`),
+	}
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "StatefulSet", model.backstageDeployment.deploymentWrapper.Obj.GetObjectKind().GroupVersionKind().Kind)
+
+	ss, ok := model.backstageDeployment.deploymentWrapper.Obj.(*appv1.StatefulSet)
+	assert.True(t, ok)
+	assert.Equal(t, "my-service", ss.Spec.ServiceName)
 }
