@@ -51,7 +51,11 @@ func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionT
 }
 
 func deploymentState(deploy *appsv1.Deployment) (state bs.BackstageConditionReason, msg string) {
-	if deploy.Status.ReadyReplicas == *deploy.Spec.Replicas {
+	desired := int32(1)
+	if deploy.Spec.Replicas != nil {
+		desired = *deploy.Spec.Replicas
+	}
+	if deploy.Status.ReadyReplicas == desired {
 		return bs.BackstageConditionReasonDeployed, ""
 	}
 
@@ -86,13 +90,6 @@ func statefulSetState(deploy *appsv1.StatefulSet) (state bs.BackstageConditionRe
 
 	if len(deploy.Status.Conditions) == 0 {
 		return bs.BackstageConditionReasonInProgress, "no conditions reported yet"
-	}
-
-	// Prefer explicit failure indicators
-	for _, c := range deploy.Status.Conditions {
-		if string(c.Type) == "ReplicaFailure" && c.Status == corev1.ConditionTrue {
-			return bs.BackstageConditionReasonFailed, c.Message
-		}
 	}
 
 	// Fallback: aggregate condition info as in-progress

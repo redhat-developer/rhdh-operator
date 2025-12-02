@@ -403,7 +403,8 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 					LocalObjectReference: corev1.LocalObjectReference{Name: objectName},
 				}
 			default:
-				// unknown kind - no-op
+				// unknown kind
+				return fmt.Errorf("unknown object kind %s to add env vars from", kind)
 			}
 			container.EnvFrom = append(container.EnvFrom, envFromSrc)
 		} else {
@@ -420,7 +421,8 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 					Key:                  varName,
 				}
 			default:
-				// unknown kind - leave envVarSrc nil
+				// unknown kind
+				return fmt.Errorf("unknown object kind %s to add env vars from", kind)
 			}
 			container.Env = append(container.Env, corev1.EnvVar{
 				Name:      varName,
