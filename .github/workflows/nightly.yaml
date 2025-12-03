@@ -70,21 +70,13 @@ jobs:
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: make lint
 
-      - name: Create Kind cluster
-        # TODO(asoro): a cluster is needed on release-1.6 (and before) branches due to RHDHBUGS-461. Remove this step when 1.6 is EOL.
-        if: ${{ matrix.branch == 'release-1.6' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
-        with:
-          cluster_name: integration-test-cluster
-          ignore_failed_clean: true
-
       - name: Test
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         # run this stage only if there are changes that match the includes and not the excludes
         run: make test
 
       - name: Create Kind cluster (integration tests)
-        if: ${{ matrix.branch != 'release-1.6' && steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           cluster_name: integration-test-cluster
