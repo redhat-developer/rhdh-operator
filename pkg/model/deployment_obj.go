@@ -17,9 +17,10 @@ type DeploymentObj struct {
 }
 
 func (d *DeploymentObj) ConvertTo(kind string) (Deployable, error) {
-	if kind == "StatefulSet" {
+	switch kind {
+	case "StatefulSet":
 		return CreateDeployable(toStatefulSet(d.Obj))
-	} else if kind == "Deployment" {
+	case "Deployment":
 		return d, nil
 	}
 	return nil, errors.New(unsupportedType + kind)
