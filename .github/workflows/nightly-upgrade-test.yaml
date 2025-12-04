@@ -109,11 +109,13 @@ jobs:
                   protocol: TCP
           kubeadmConfigPatches:
             - |
+              apiVersion: kubelet.config.k8s.io/v1beta1
               kind: KubeletConfiguration
               # Configure image garbage collection to run more frequently to free up disk space,
               # because in the upgrade paths, we might be pulling different images.
               imageGCHighThresholdPercent: 70
-              imageMinimumGCAge: 1m
+              imageGCLowThresholdPercent: 50
+              imageMinimumGCAge: 2m
           EOF
 
       - name: Create Kind cluster
