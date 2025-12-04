@@ -50,7 +50,20 @@ jobs:
           echo "SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE=${SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE}" >> $GITHUB_OUTPUT
 
       - name: Display disk usage (troubleshooting)
+        if: ${{ (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
+        run: df -hT
+
+      - name: Remove unnecessary files to free up disk space
+        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
+        run: |
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf "/usr/local/share/boost" || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+
+      - name: Display disk usage (troubleshooting)
+        if: ${{ (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         run: df -hT
 
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6 # default branch will be checked out by default on scheduled workflows
@@ -95,11 +108,18 @@ jobs:
       - name: Generate Kind Config
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
+          # TODO(rm3l): not guaranteed to work on all runners, so disabled for now.
+          # sudo mkdir -p /mnt/kind/containerd
+          # sudo chmod 777 /mnt/kind
+
           cat <<EOF > /tmp/kind-config.yaml
           apiVersion: kind.x-k8s.io/v1alpha4
           kind: Cluster
           nodes:
             - role: control-plane
+              # extraMounts:
+              #   - hostPath: /mnt/kind
+              #     containerPath: /var/lib/containerd
               extraPortMappings:
                 - containerPort: 80
                   hostPort: 80
@@ -136,7 +156,7 @@ jobs:
             --timeout=90s
 
       - name: Display disk usage (troubleshooting)
-        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
+        if: ${{ (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         run: df -hT
 
       - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_branch }} => ${{ matrix.to_branch }})'
@@ -151,5 +171,5 @@ jobs:
         run: make test-e2e-upgrade
 
       - name: Display disk usage (troubleshooting)
-        if: ${{ always() && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
+        if: ${{ always() && (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         run: df -hT

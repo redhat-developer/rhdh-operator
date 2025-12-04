@@ -23,15 +23,14 @@ jobs:
     env:
       CONTAINER_TOOL: podman
     steps:
+      - name: Display disk usage (troubleshooting)
+        if: ${{ env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true' }}
+        run: df -hT
+
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           ref: ${{ matrix.branch }}
           fetch-depth: 0
-
-      - name: Setup Go
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
-        with:
-          go-version-file: 'go.mod'
 
       - name: Set env vars
         run: |
@@ -64,6 +63,21 @@ jobs:
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'false' }}
         run: |
           echo "::warning ::Operator Image ${{ env.OPERATOR_IMAGE }} not found for testing the ${{ matrix.branch }} branch. It might have expired. E2E tests will be skipped for ${{ matrix.branch }}."
+
+      - name: Remove unnecessary files to free up disk space
+        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf "/usr/local/share/boost" || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+
+      - name: Setup Go
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
+        with:
+          go-version-file: 'go.mod'
 
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: Build
@@ -153,3 +167,7 @@ jobs:
           OPERATOR_MANIFEST: ${{ env.OPERATOR_MANIFEST }}
           IMG: ${{ env.OPERATOR_IMAGE }}
         run: make test-e2e
+
+      - name: Display disk usage (troubleshooting)
+        if: ${{ always() && (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') }}
+        run: df -hT
