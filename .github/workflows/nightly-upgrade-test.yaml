@@ -49,6 +49,10 @@ jobs:
           fi
           echo "SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE=${SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE}" >> $GITHUB_OUTPUT
 
+      - name: Display disk usage (troubleshooting)
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
+        run: df -hT
+
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6 # default branch will be checked out by default on scheduled workflows
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         with:
@@ -130,6 +134,7 @@ jobs:
             --timeout=90s
 
       - name: Display disk usage (troubleshooting)
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         run: df -hT
 
       - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_branch }} => ${{ matrix.to_branch }})'
@@ -142,3 +147,7 @@ jobs:
           OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
           IMG: ${{ env.TO_OPERATOR_IMAGE }}
         run: make test-e2e-upgrade
+
+      - name: Display disk usage (troubleshooting)
+        if: ${{ always() && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
+        run: df -hT
