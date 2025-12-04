@@ -69,7 +69,7 @@ var _ = When("create default backstage", func() {
 			Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(1)))
 
 			By("creating OwnerReference to all the runtime objects")
-			or := deploy.Obj.GetOwnerReferences()
+			or := deploy.GetObject().GetOwnerReferences()
 			g.Expect(or).To(HaveLen(1))
 			g.Expect(or[0].Name).To(Equal(backstageName))
 
@@ -100,16 +100,16 @@ var _ = When("create default backstage", func() {
 
 				g.Expect(depl).NotTo(BeNil())
 
-				switch depl.Obj.(type) {
+				switch depl.GetObject().(type) {
 				case *appsv1.StatefulSet:
-					deploy := depl.Obj.(*appsv1.StatefulSet)
+					deploy := depl.GetObject().(*appsv1.StatefulSet)
 					for _, cond := range deploy.Status.Conditions {
 						if cond.Type == appsv1.StatefulSetConditionType("Ready") {
 							g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))
 						}
 					}
 				case *appsv1.Deployment:
-					deploy := depl.Obj.(*appsv1.Deployment)
+					deploy := depl.GetObject().(*appsv1.Deployment)
 					for _, cond := range deploy.Status.Conditions {
 						if cond.Type == appsv1.DeploymentAvailable {
 							g.Expect(cond.Status).To(Equal(corev1.ConditionTrue))

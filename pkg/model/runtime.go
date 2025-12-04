@@ -89,7 +89,7 @@ func (m *BackstageModel) sortRuntimeObjects() {
 }
 
 func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
-	return m.backstageDeployment.deploymentWrapper.Obj.GetObjectKind().GroupVersionKind()
+	return m.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind()
 }
 
 // Registers config object

@@ -145,21 +145,21 @@ func getBackstagePod(ctx context.Context, k8sClient client.Client, ns, backstage
 	return &podList.Items[0], nil
 }
 
-func backstageDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (model.DeploymentObj, error) {
+func backstageDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (model.Deployable, error) {
 	nn := client.ObjectKey{Namespace: namespace, Name: model.DeploymentName(backstageName)}
 	deploy := &appsv1.Deployment{}
 	err := k8sClient.Get(ctx, nn, deploy)
 	if err == nil {
-		return model.DeploymentObj{Obj: deploy}, nil
+		return model.CreateDeployable(deploy)
 	} else if errors.IsNotFound(err) {
 		ss := &appsv1.StatefulSet{}
 		err = k8sClient.Get(ctx, nn, ss)
 		if err == nil {
-			return model.DeploymentObj{Obj: ss}, nil
+			return model.CreateDeployable(ss)
 		}
 	}
 	if errors.IsNotFound(err) {
-		return model.DeploymentObj{}, fmt.Errorf("neither Deployment nor StatefulSet found for Backstage %s in namespace %s", backstageName, namespace)
+		return nil, fmt.Errorf("neither Deployment nor StatefulSet found for Backstage %s in namespace %s", backstageName, namespace)
 	}
-	return model.DeploymentObj{}, err
+	return nil, err
 }

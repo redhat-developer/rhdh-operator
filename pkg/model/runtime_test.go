@@ -50,9 +50,9 @@ func TestInitDefaultDeploy(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
-	assert.Equal(t, DeploymentName(bs.Name), bsDeployment.deploymentWrapper.Obj.GetName())
-	assert.Equal(t, "ns123", bsDeployment.deploymentWrapper.Obj.GetNamespace())
-	assert.Equal(t, 2, len(bsDeployment.deploymentWrapper.Obj.GetLabels()))
+	assert.Equal(t, DeploymentName(bs.Name), bsDeployment.deployable.GetObject().GetName())
+	assert.Equal(t, "ns123", bsDeployment.deployable.GetObject().GetNamespace())
+	assert.Equal(t, 2, len(bsDeployment.deployable.GetObject().GetLabels()))
 
 	assert.NotNil(t, bsDeployment.container())
 
@@ -60,7 +60,7 @@ func TestInitDefaultDeploy(t *testing.T) {
 	assert.Equal(t, ServiceName(bs.Name), bsService.service.Name)
 	assert.True(t, len(bsService.service.Spec.Ports) > 0)
 
-	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsDeployment.deploymentWrapper.podObjectMeta().Labels[BackstageAppLabel])
+	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsDeployment.deployable.PodObjectMeta().Labels[BackstageAppLabel])
 	assert.Equal(t, fmt.Sprintf("backstage-%s", "bs"), bsService.service.Spec.Selector[BackstageAppLabel])
 
 }

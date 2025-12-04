@@ -84,7 +84,8 @@ func statefulSetState(deploy *appsv1.StatefulSet) (state bs.BackstageConditionRe
 		desired = *deploy.Spec.Replicas
 	}
 
-	if deploy.Status.ReadyReplicas == desired {
+	//if deploy.Status.ReadyReplicas == desired {
+	if deploy.Status.ReadyReplicas == desired && deploy.Status.CurrentReplicas == deploy.Status.UpdatedReplicas {
 		return bs.BackstageConditionReasonDeployed, ""
 	}
 

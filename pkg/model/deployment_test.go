@@ -137,8 +137,8 @@ spec:
 	assert.NoError(t, err)
 
 	// label added
-	assert.Equal(t, "java", model.backstageDeployment.deploymentWrapper.Obj.GetLabels()["mylabel"])
-	assert.Equal(t, "backstage", model.backstageDeployment.deploymentWrapper.podObjectMeta().GetLabels()["pod"])
+	assert.Equal(t, "java", model.backstageDeployment.deployable.GetObject().GetLabels()["mylabel"])
+	assert.Equal(t, "backstage", model.backstageDeployment.deployable.PodObjectMeta().GetLabels()["pod"])
 
 	// sidecar added
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Containers))
@@ -287,7 +287,7 @@ func TestDeploymentKind(t *testing.T) {
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "StatefulSet", model.backstageDeployment.deploymentWrapper.Obj.GetObjectKind().GroupVersionKind().Kind)
+	assert.Equal(t, "StatefulSet", model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
 
 	ssPodSpec := model.backstageDeployment.podSpec()
 	assert.Equal(t, depPodSpec, ssPodSpec)
@@ -308,9 +308,9 @@ spec:
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "StatefulSet", model.backstageDeployment.deploymentWrapper.Obj.GetObjectKind().GroupVersionKind().Kind)
+	assert.Equal(t, "StatefulSet", model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
 
-	ss, ok := model.backstageDeployment.deploymentWrapper.Obj.(*appv1.StatefulSet)
+	ss, ok := model.backstageDeployment.deployable.GetObject().(*appv1.StatefulSet)
 	assert.True(t, ok)
 	assert.Equal(t, "my-service", ss.Spec.ServiceName)
 }

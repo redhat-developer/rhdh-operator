@@ -276,7 +276,7 @@ spec:
 			By("get StatefulSet ")
 			ss, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
-			gvk := utils.GetObjectKind(ss.Obj, k8sClient.Scheme())
+			gvk := utils.GetObjectKind(ss.GetObject(), k8sClient.Scheme())
 			g.Expect("StatefulSet").To(Equal(gvk.Kind))
 		}, 30*time.Second, 2*time.Second).Should(Succeed())
 

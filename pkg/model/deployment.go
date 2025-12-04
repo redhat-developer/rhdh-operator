@@ -41,8 +41,8 @@ func (f BackstageDeploymentFactory) newBackstageObject() RuntimeObject {
 }
 
 type BackstageDeployment struct {
-	deploymentWrapper DeploymentObj
-	model             *BackstageModel
+	deployable Deployable
+	model      *BackstageModel
 }
 
 func init() {
@@ -69,22 +69,27 @@ func BackstageContainerName() string {
 
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) Object() runtime.Object {
-	return b.deploymentWrapper.Obj
+	return b.deployable.GetObject()
 }
 
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) setObject(obj runtime.Object) {
 
-	b.deploymentWrapper = DeploymentObj{}
+	//b.deployable = DeploymentObj{}
 
-	if obj != nil {
-		b.deploymentWrapper.setObject(obj)
+	//if obj != nil {
+	//	b.deployable.setObject(obj)
+	//}
+	var err error
+	b.deployable, err = CreateDeployable(obj)
+	if err != nil {
+		panic(fmt.Sprintf("cannot set deployment object: %v", err))
 	}
 }
 
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
-	if b.deploymentWrapper.Obj == nil {
+	if b.deployable.GetObject() == nil {
 		return false, fmt.Errorf("backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
 	}
 
@@ -92,10 +97,10 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 		return false, fmt.Errorf("backstage Deployment is not initialized, Backstage Container is not identified")
 	}
 
-	if b.deploymentWrapper.podObjectMeta().Annotations == nil {
-		b.deploymentWrapper.podObjectMeta().Annotations = map[string]string{}
+	if b.deployable.PodObjectMeta().Annotations == nil {
+		b.deployable.PodObjectMeta().Annotations = map[string]string{}
 	}
-	b.deploymentWrapper.podObjectMeta().Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
+	b.deployable.PodObjectMeta().Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
 
 	model.backstageDeployment = b
 	model.setRuntimeObject(b)
@@ -132,11 +137,11 @@ func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error 
 }
 
 func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
-	b.deploymentWrapper.Obj.SetName(DeploymentName(backstage.Name))
-	utils.GenerateLabel(&b.deploymentWrapper.podObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+	b.deployable.GetObject().SetName(DeploymentName(backstage.Name))
+	utils.GenerateLabel(&b.deployable.PodObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
 
-	b.deploymentWrapper.specSelector().MatchLabels[BackstageAppLabel] = utils.BackstageAppLabelValue(backstage.Name)
-	setMetaInfo(b.deploymentWrapper.Obj, backstage, scheme)
+	b.deployable.SpecSelector().MatchLabels[BackstageAppLabel] = utils.BackstageAppLabelValue(backstage.Name)
+	setMetaInfo(b.deployable.GetObject(), backstage, scheme)
 
 }
 
@@ -171,7 +176,7 @@ func (b *BackstageDeployment) allContainers() []string {
 }
 
 func (b *BackstageDeployment) podSpec() *corev1.PodSpec {
-	return b.deploymentWrapper.PodSpec()
+	return b.deployable.PodSpec()
 }
 
 func (b *BackstageDeployment) defaultMountPath() string {
@@ -213,12 +218,16 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 	if backstage.Spec.Deployment != nil {
 
 		if backstage.Spec.Deployment.Kind != "" {
-			b.deploymentWrapper.setKind(backstage.Spec.Deployment.Kind)
+			dw, err := b.deployable.ConvertTo(backstage.Spec.Deployment.Kind)
+			if err != nil {
+				return fmt.Errorf("can not convert deployment to kind %s: %w", backstage.Spec.Deployment.Kind, err)
+			}
+			b.deployable = dw
 		}
 
 		if conf := backstage.Spec.Deployment.Patch; conf != nil {
 
-			deplStr, err := yaml.Marshal(b.deploymentWrapper.Obj)
+			deplStr, err := yaml.Marshal(b.deployable.GetObject())
 			if err != nil {
 				return fmt.Errorf("can not marshal deployment object: %w", err)
 			}
@@ -228,8 +237,8 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 				return fmt.Errorf("can not merge spec.deployment: %w", err)
 			}
 
-			b.deploymentWrapper.setEmpty()
-			err = yaml.Unmarshal([]byte(merged), b.deploymentWrapper.Obj)
+			b.deployable.SetEmpty()
+			err = yaml.Unmarshal([]byte(merged), b.deployable.GetObject())
 			if err != nil {
 				return fmt.Errorf("can not unmarshal merged deployment: %w", err)
 			}
