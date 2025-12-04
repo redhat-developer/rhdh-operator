@@ -103,6 +103,13 @@ jobs:
                 - containerPort: 443
                   hostPort: 443
                   protocol: TCP
+          kubeadmConfigPatches:
+            - |
+              kind: KubeletConfiguration
+              # Configure image garbage collection to run more frequently to free up disk space,
+              # because in the upgrade paths, we might be pulling different images.
+              imageGCHighThresholdPercent: 70
+              imageMinimumGCAge: 1m
           EOF
 
       - name: Create Kind cluster
