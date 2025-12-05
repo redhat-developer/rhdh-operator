@@ -49,9 +49,19 @@ jobs:
           fi
           echo "SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE=${SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE}" >> $GITHUB_OUTPUT
 
+      - name: Remove unnecessary files to free up disk space
+        if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
+        uses: endersonmenezes/free-disk-space@6c4664f43348c8c7011b53488d5ca65e9fc5cd1a # v3
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          rm_cmd: "rmz"
+
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6 # default branch will be checked out by default on scheduled workflows
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         with:
+          ref: ${{ matrix.to_branch }}
           fetch-depth: 0
 
       - name: Setup Go
@@ -90,11 +100,18 @@ jobs:
       - name: Generate Kind Config
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         run: |
+          # TODO(rm3l): not guaranteed to work on all runners, so disabled for now.
+          # sudo mkdir -p /mnt/kind/containerd
+          # sudo chmod 777 /mnt/kind
+
           cat <<EOF > /tmp/kind-config.yaml
           apiVersion: kind.x-k8s.io/v1alpha4
           kind: Cluster
           nodes:
             - role: control-plane
+              # extraMounts:
+              #   - hostPath: /mnt/kind
+              #     containerPath: /var/lib/containerd
               extraPortMappings:
                 - containerPort: 80
                   hostPort: 80
@@ -102,6 +119,15 @@ jobs:
                 - containerPort: 443
                   hostPort: 443
                   protocol: TCP
+              kubeadmConfigPatches:
+                - |
+                  apiVersion: kubelet.config.k8s.io/v1beta1
+                  kind: KubeletConfiguration
+                  # Configure image garbage collection to run more frequently to free up disk space,
+                  # because in the upgrade paths, we might be pulling different images.
+                  imageGCHighThresholdPercent: 70
+                  imageGCLowThresholdPercent: 50
+                  imageMinimumGCAge: 2m
           EOF
 
       - name: Create Kind cluster

@@ -124,9 +124,14 @@ metadata:
 
 			By("checking the status of the existing CR")
 			// [{"lastTransitionTime":"2025-04-09T09:02:06Z","message":"","reason":"Deployed","status":"True","type":"Deployed"}]
-			Eventually(helper.VerifyBackstageCRStatus, 10*time.Minute, 10*time.Second).
+			Eventually(helper.VerifyBackstageCRStatus, 15*time.Minute, 10*time.Second).
 				WithArguments(ns, crName, ContainSubstring(`"reason":"Deployed"`)).
-				Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+				Should(Succeed(), func() string {
+					return fmt.Sprintf("%s\n---\n%s",
+						fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+						describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+					)
+				})
 
 			By("checking the Backstage operand pod")
 			Eventually(func(g Gomega) {
@@ -141,7 +146,12 @@ metadata:
 				g.Expect(err).ShouldNot(HaveOccurred())
 				podNames := helper.GetNonEmptyLines(string(podOutput))
 				g.Expect(podNames).Should(HaveLen(1), fmt.Sprintf("expected 1 Backstage operand pod(s) running, but got %d", len(podNames)))
-			}, 10*time.Minute, 10*time.Second).Should(Succeed(), fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel))
+			}, 15*time.Minute, 10*time.Second).Should(Succeed(), func() string {
+				return fmt.Sprintf("%s\n---\n%s",
+					fetchOperatorAndOperandLogs(managerPodLabel, ns, crLabel),
+					describeOperatorAndOperatorPods(managerPodLabel, ns, crLabel),
+				)
+			})
 		})
 	})
 
