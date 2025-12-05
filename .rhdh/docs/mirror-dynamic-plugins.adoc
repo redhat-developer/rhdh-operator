@@ -56,3 +56,62 @@ bash mirror-plugins.sh \
     --to-registry internal-registry.example.com
 ----
 
+[#_mirroring_specific_plugins]
+==== Mirroring specific plugins by direct reference
+
+You can mirror individual plugins by specifying their OCI URLs directly:
+
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugins 'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8.0--1.22.1!backstage-community-plugin-quay' \
+              'oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.8.0--0.11.1!backstage-community-plugin-github-actions' \
+    --to-registry registry.example.com
+----
+
+NOTE: Plugin URLs containing `!` (OCI subpath) must be quoted to prevent shell interpretation.
+
+[#_mirroring_from_plugin_list_file]
+==== Mirroring plugins from a file
+
+For repeatable deployments or version control, create a text file listing the plugins to mirror (one per line):
+
+.Example plugins.txt
+[source,text]
+----
+# Production RHDH Plugins
+oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8.0--1.22.1!backstage-community-plugin-quay
+oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.8.0--0.11.1!backstage-community-plugin-github-actions
+oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.8.0--0.8.2!backstage-community-plugin-azure-devops
+----
+
+Mirror the plugins from the file:
+
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugin-list plugins.txt \
+    --to-registry registry.example.com
+----
+
+[#_mixed_mode_catalog_and_custom_plugins]
+==== Mixed mode: Catalog index and custom plugins
+
+You can combine a catalog index with additional custom or third-party plugins:
+
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --plugins 'oci://registry.internal.example.com/custom/my-plugin:1.0' \
+    --to-registry registry.example.com
+----
+
+=== Using mirrored plugins
+
+After mirroring completes, the script generates a `rhdh-plugin-mirroring-summary.txt` file containing mappings of all mirrored plugins. Use this file to reference the correct mirrored plugin URLs when configuring your RHDH deployment.
+
+For configuration details:
+
+* Operator deployments: Configure the `Backstage` Custom Resource with the mirrored plugin references. See link:https://access.redhat.com/documentation/en-us/red_hat_developer_hub[Red Hat Developer Hub Documentation].
+* Helm deployments: Update your `values.yaml` file with the mirrored plugin references. See link:https://access.redhat.com/documentation/en-us/red_hat_developer_hub[Red Hat Developer Hub Documentation].
