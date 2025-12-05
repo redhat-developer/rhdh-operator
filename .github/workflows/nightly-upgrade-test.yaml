@@ -54,13 +54,8 @@ jobs:
         run: df -hT
 
       - name: Remove unnecessary files to free up disk space
-        # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        run: |
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /opt/ghc || true
-          sudo rm -rf "/usr/local/share/boost" || true
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+        uses: ./.github/actions/free-disk-space
 
       - name: Display disk usage (troubleshooting)
         if: ${{ (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
