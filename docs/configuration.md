@@ -610,7 +610,7 @@ The motivation for this feature is to allow using StatefulSet-specific capabilit
 
 #### Deployment Patching
 
-`spec.deployment.patch` field contains a fragment of the `apps.Deployment` or `StatefulSet` resource. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
+`spec.deployment.patch` field contains a fragment of the `apps.Deployment` or `StatefulSet` resource. This patching is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
 
 For example, the following specification fragment will:
 - Set an additional volume named **my-volume** and mount it to **/my/path** of the Backstage container.
