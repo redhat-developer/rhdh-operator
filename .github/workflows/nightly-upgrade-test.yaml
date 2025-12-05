@@ -49,13 +49,14 @@ jobs:
           fi
           echo "SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE=${SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE}" >> $GITHUB_OUTPUT
 
-      - name: Display disk usage (troubleshooting)
-        if: ${{ (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        run: df -hT
-
       - name: Remove unnecessary files to free up disk space
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        uses: ./.github/actions/free-disk-space
+        uses: endersonmenezes/free-disk-space@6c4664f43348c8c7011b53488d5ca65e9fc5cd1a # v3
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          rm_cmd: "rmz"
 
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6 # default branch will be checked out by default on scheduled workflows
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
@@ -156,7 +157,3 @@ jobs:
           OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
           IMG: ${{ env.TO_OPERATOR_IMAGE }}
         run: make test-e2e-upgrade
-
-      - name: Display disk usage (troubleshooting)
-        if: ${{ always() && (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        run: df -hT
