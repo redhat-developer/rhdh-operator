@@ -5,7 +5,7 @@ runs:
   steps:
     # https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
     - run: |
-        for path in /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"; do
+        for path in /usr/share/dotnet /opt/ghc /usr/local/share/boost "${AGENT_TOOLSDIRECTORY:-}"; do
           sudo rm -rf "$path || true
         done
       shell: bash
