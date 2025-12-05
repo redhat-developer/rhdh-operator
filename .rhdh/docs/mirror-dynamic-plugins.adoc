@@ -111,7 +111,4 @@ bash mirror-plugins.sh \
 
 After mirroring completes, the script generates a `rhdh-plugin-mirroring-summary.txt` file containing mappings of all mirrored plugins. Use this file to reference the correct mirrored plugin URLs when configuring your RHDH deployment.
 
-For configuration details:
-
-* Operator deployments: Configure the `Backstage` Custom Resource with the mirrored plugin references. See link:https://access.redhat.com/documentation/en-us/red_hat_developer_hub[Red Hat Developer Hub Documentation].
-* Helm deployments: Update your `values.yaml` file with the mirrored plugin references. See link:https://access.redhat.com/documentation/en-us/red_hat_developer_hub[Red Hat Developer Hub Documentation].
+For Operator deployments, configure the `Backstage` Custom Resource with the mirrored plugin references. For Helm deployments, update your `values.yaml` file with the mirrored plugin references. See link:https://access.redhat.com/documentation/en-us/red_hat_developer_hub[Red Hat Developer Hub Documentation] for configuration details.
