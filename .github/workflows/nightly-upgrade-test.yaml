@@ -146,10 +146,6 @@ jobs:
             --selector=app.kubernetes.io/component=controller \
             --timeout=90s
 
-      - name: Display disk usage (troubleshooting)
-        if: ${{ (env.ACTIONS_STEP_DEBUG == 'true' || env.ACTIONS_RUNNER_DEBUG == 'true') && steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        run: df -hT
-
       - name: 'Run E2E tests (RHDH Operator Upgrade path: ${{ matrix.from_branch }} => ${{ matrix.to_branch }})'
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' && steps.operator-image-existence-checker.outputs.FROM_OPERATOR_IMAGE_EXISTS == 'true' && steps.operator-image-existence-checker.outputs.TO_OPERATOR_IMAGE_EXISTS == 'true' }}
         env:
