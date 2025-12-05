@@ -12,16 +12,16 @@ The following tools are required to run the mirroring script:
 * `tar >= 1.35` - GNU tar for extracting image layers.
 * `jq >= 1.7` - For JSON parsing and manipulation. See link:https://jqlang.github.io/jq/download/[Download jq].
 * `podman >= 5.6` - For building catalog index images. See link:https://podman.io/docs/installation[Podman Installation Instructions].
+* You have authenticated to the source registry (for example, `quay.io` or `registry.redhat.io`) for pulling plugin artifacts. See link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
+* When mirroring directly to a registry (using `--to-registry`), you have authenticated to the target registry.
 
 === Procedures
 
 [#_mirroring_all_plugins_from_catalog_index]
 ==== Mirroring all plugins from a catalog index (Partially disconnected environment)
 
-. Authenticate to both the source registry (`podman login quay.io`) and your target registry. For more information, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
+Run the mirroring script with the catalog index (replace `1.9` with your desired RHDH version):
 
-. Run the mirroring script with the catalog index (replace `1.9` with your desired RHDH version):
-+
 [source,console]
 ----
 bash mirror-plugins.sh \
@@ -32,7 +32,7 @@ bash mirror-plugins.sh \
 [#_fully_disconnected_workflow]
 ==== Mirroring to a fully disconnected environment
 
-Two-phase process: export plugins to disk from a connected host, transfer to restricted network, then import. Authenticate to registries as needed (`podman login quay.io` for export, `podman login <your-registry>` for import). For more information, see link:https://access.redhat.com/articles/RegistryAuthentication[Red Hat Container Registry Authentication].
+This two-phase process exports plugins to disk from a connected host, transfers them to a restricted network, then imports them to your internal registry.
 
 *Phase 1: Export plugins (Connected Host)*
 
@@ -44,6 +44,8 @@ bash mirror-plugins.sh \
     --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
     --to-dir /tmp/rhdh-plugins
 ----
+
+Transfer the `/tmp/rhdh-plugins` directory to your restricted network environment.
 
 *Phase 2: Import plugins (Restricted Network Environment)*
 
@@ -59,7 +61,7 @@ bash mirror-plugins.sh \
 [#_mirroring_specific_plugins]
 ==== Mirroring specific plugins by direct reference
 
-You can mirror individual plugins by specifying their OCI URLs directly:
+Mirror individual plugins by specifying their OCI URLs directly:
 
 [source,console]
 ----
@@ -74,7 +76,7 @@ NOTE: Plugin URLs containing `!` (OCI subpath) must be quoted to prevent shell i
 [#_mirroring_from_plugin_list_file]
 ==== Mirroring plugins from a file
 
-For repeatable deployments or version control, create a text file listing the plugins to mirror (one per line):
+Create a text file listing the plugins to mirror (one per line):
 
 .Example plugins.txt
 [source,text]
@@ -95,14 +97,15 @@ bash mirror-plugins.sh \
 ----
 
 [#_mixed_mode_catalog_and_custom_plugins]
-==== Mixed mode: Catalog index and custom plugins
+==== Mixed mode: Combining multiple plugin sources
 
-You can combine a catalog index with additional custom or third-party plugins:
+You can combine any of the plugin sources (catalog index, plugin list file, and direct URLs) in a single mirroring operation. The script automatically deduplicates plugins if the same plugin appears in multiple sources.
 
 [source,console]
 ----
 bash mirror-plugins.sh \
     --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --plugin-list custom-plugins.txt \
     --plugins 'oci://registry.internal.example.com/custom/my-plugin:1.0' \
     --to-registry registry.example.com
 ----
@@ -111,4 +114,4 @@ bash mirror-plugins.sh \
 
 After mirroring completes, the script generates a `rhdh-plugin-mirroring-summary.txt` file containing mappings of all mirrored plugins. Use this file to reference the correct mirrored plugin URLs when configuring your RHDH deployment.
 
-For Operator deployments, configure the `Backstage` Custom Resource with the mirrored plugin references. For Helm deployments, update your `values.yaml` file with the mirrored plugin references. See link:https://access.redhat.com/documentation/en-us/red_hat_developer_hub[Red Hat Developer Hub Documentation] for configuration details.
+For Operator deployments, configure the `Backstage` Custom Resource with the mirrored plugin references. For Helm deployments, update your values file with the mirrored plugin references. See link:https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.8/html/installing_and_viewing_plugins_in_red_hat_developer_hub/assembly-third-party-plugins#proc-load-plugin-oci-image_assembly-install-third-party-plugins-rhdh[Red Hat Developer Hub Documentation] for configuration details.
