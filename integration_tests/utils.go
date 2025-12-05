@@ -7,10 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/redhat-developer/rhdh-operator/internal/controller"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"k8s.io/client-go/kubernetes"
@@ -22,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	//. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -146,20 +144,5 @@ func getBackstagePod(ctx context.Context, k8sClient client.Client, ns, backstage
 }
 
 func backstageDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (model.Deployable, error) {
-	nn := client.ObjectKey{Namespace: namespace, Name: model.DeploymentName(backstageName)}
-	deploy := &appsv1.Deployment{}
-	err := k8sClient.Get(ctx, nn, deploy)
-	if err == nil {
-		return model.CreateDeployable(deploy)
-	} else if errors.IsNotFound(err) {
-		ss := &appsv1.StatefulSet{}
-		err = k8sClient.Get(ctx, nn, ss)
-		if err == nil {
-			return model.CreateDeployable(ss)
-		}
-	}
-	if errors.IsNotFound(err) {
-		return nil, fmt.Errorf("neither Deployment nor StatefulSet found for Backstage %s in namespace %s", backstageName, namespace)
-	}
-	return nil, err
+	return controller.FindDeployment(ctx, k8sClient, namespace, backstageName)
 }

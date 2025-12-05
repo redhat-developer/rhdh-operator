@@ -14,12 +14,19 @@ const unsupportedType = "unsupported type for Deployable object: "
 
 // Deployable is an interface for Kubernetes objects that can deploy Backstage Pods (Deployment, StatefulSet)
 type Deployable interface {
+	// GetObject returns the underlying Kubernetes object
 	GetObject() client.Object
+	// PodSpec returns the spec.template.spec of the deployable object
 	PodSpec() *corev1.PodSpec
+	// PodObjectMeta returns the spec.template.metadata of the deployable object
 	PodObjectMeta() *metav1.ObjectMeta
+	// SpecSelector returns the spec.selector of the deployable object
 	SpecSelector() *metav1.LabelSelector
+	// SpecReplicas returns the spec.replicas of the deployable object
 	SpecReplicas() *int32
+	// ConvertTo converts the deployable object to the specified kind (Deployment or StatefulSet)
 	ConvertTo(kind string) (Deployable, error)
+	// SetEmpty sets the deployable object to an empty object of its type
 	SetEmpty()
 }
 

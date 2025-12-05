@@ -7,7 +7,6 @@ import (
 	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -157,18 +156,14 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 		return []reconcile.Request{}
 	}
 
-	deploy := &appsv1.Deployment{}
-	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: object.GetNamespace()}, deploy); err != nil {
-		if errors.IsNotFound(err) {
-			lg.V(1).Info("request by label, deployment not found", "name", model.DeploymentName(backstage.Name))
-		} else {
-			lg.Error(err, "request by label failed, get Deployment ", "error ", err)
-		}
+	deploy, err := FindDeployment(ctx, r.Client, object.GetNamespace(), model.DeploymentName(backstage.Name))
+	if err != nil {
+		lg.Error(err, "request by label failed, find Deployment/StatefulSet ", "error ", err)
 		return []reconcile.Request{}
 	}
 
 	newHash := ec.WatchingHash
-	oldHash := deploy.Spec.Template.GetAnnotations()[model.ExtConfigHashAnnotation]
+	oldHash := deploy.GetObject().GetAnnotations()[model.ExtConfigHashAnnotation]
 	if newHash == oldHash {
 		lg.V(1).Info("request by label, hash are equal", "hash", newHash)
 		return []reconcile.Request{}
@@ -188,6 +183,6 @@ func (r *BackstageReconciler) requestByAppLabels(ctx context.Context, object cli
 		return []reconcile.Request{}
 	}
 
-	lg.V(1).Info("enqueuing reconcile on Deployment change", object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), "namespace: ", object.GetNamespace())
+	lg.V(1).Info("enqueuing reconcile on change of ", "kind: ", object.GetObjectKind().GroupVersionKind().Kind, "name: ", object.GetName(), "namespace: ", object.GetNamespace())
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: backstageName, Namespace: object.GetNamespace()}}}
 }
