@@ -20,9 +20,10 @@ It is highly recommended to read the [Design](design.md) document to understand 
       - [PersistentVolumeClaims](#persistentvolumeclaims)
     - [Extra Environment Variables](#extra-environment-variables)
     - [Dynamic Plugins](#dynamic-plugins)
-    - [Deployment Parameters](#deployment-parameters)
     - [Route](#route)
   - [Deployment Configuration](#deployment-configuration)
+    - [Deployment Kind](#deployment-kind) 
+    - [Deployment Patching](#deployment-patching)
   - [Database Configuration](#database-configuration)
 
 
@@ -34,21 +35,21 @@ The Default Configuration defines the structure of all Backstage instances withi
 
 ### Default Configuration Files
 
-| Key/File Name                            | Object Kind                    | Object Name                                | Mandatory    | Multi | Version | Notes                                           |
-|------------------------------------------|--------------------------------|--------------------------------------------|--------------|-------|---------|-------------------------------------------------|
-| deployment.yaml                          | appsv1.Deployment              | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage deployment                            |
-| service.yaml                             | corev1.Service                 | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage Service                               |
-| db-statefulset.yaml                      | appsv1.StatefulSet             | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL StatefulSet                          |
-| db-service.yaml                          | corev1.Service                 | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL Service                              |
-| db-secret.yaml                           | corev1.Secret                  | backstage-psql-secret-<cr-name>            | For local DB | No    | >=0.1.x | Secret to connect Backstage to PGSQL            |
-| route.yaml                               | openshift.Route                | backstage-<cr-name>                        | No (for OCP) | No    | >=0.1.x | Route exposing Backstage service                |
-| app-config.yaml                          | corev1.ConfigMap               | backstage-appconfig-<cr-name>              | No           | No    | >=0.2.x | Backstage app-config.yaml                       |
-| configmap-files.yaml                     | corev1.ConfigMap               | backstage-files-<cr-name>                  | No           | No    | >=0.2.x | Backstage config file inclusions from configMap |
-| configmap-envs.yaml                      | corev1.ConfigMap               | backstage-envs-<cr-name>                   | No           | No    | >=0.2.x | Backstage environment variables from ConfigMap  |
-| secret-files.yaml                        | []corev1.Secret                | backstage-files-<cr-name>                  | No           | Yes   | >=0.2.x | Backstage config file inclusions from Secret    |
-| secret-envs.yaml                         | []corev1.Secret                | backstage-envs-<cr-name>                   | No           | Yes   | >=0.2.x | Backstage environment variables from Secret     |
-| [dynamic-plugins.yaml](#dynamic-plugins) | corev1.ConfigMap               | backstage-dynamic-plugins-<cr-name>        | No           | No    | >=0.2.x | Dynamic plugins configuration                   |
-| pvcs.yaml                                | []corev1.PersistentVolumeClaim | backstage-&lt;cr-name&gt;-&lt;pvc-name&gt; | No           | Yes   | >=0.4.x | List of PVC objects to be mounted to containers |
+| Key/File Name                            | Object Kind                             | Object Name                                | Mandatory    | Multi | Version | Notes                                                |
+|------------------------------------------|-----------------------------------------|--------------------------------------------|--------------|-------|---------|------------------------------------------------------|
+| deployment.yaml                          | appsv1.Deployment or appsv1.StatefulSet | backstage-<cr-name>                        | Yes          | No    | >=0.1.x*| Backstage deployment, StatefulSet available from 0.9 |
+| service.yaml                             | corev1.Service                          | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage Service                                    |
+| db-statefulset.yaml                      | appsv1.StatefulSet                      | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL StatefulSet                               |
+| db-service.yaml                          | corev1.Service                          | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL Service                                   |
+| db-secret.yaml                           | corev1.Secret                           | backstage-psql-secret-<cr-name>            | For local DB | No    | >=0.1.x | Secret to connect Backstage to PGSQL                 |
+| route.yaml                               | openshift.Route                         | backstage-<cr-name>                        | No (for OCP) | No    | >=0.1.x | Route exposing Backstage service                     |
+| app-config.yaml                          | corev1.ConfigMap                        | backstage-appconfig-<cr-name>              | No           | No    | >=0.2.x | Backstage app-config.yaml                            |
+| configmap-files.yaml                     | corev1.ConfigMap                        | backstage-files-<cr-name>                  | No           | No    | >=0.2.x | Backstage config file inclusions from configMap      |
+| configmap-envs.yaml                      | corev1.ConfigMap                        | backstage-envs-<cr-name>                   | No           | No    | >=0.2.x | Backstage environment variables from ConfigMap       |
+| secret-files.yaml                        | []corev1.Secret                         | backstage-files-<cr-name>                  | No           | Yes   | >=0.2.x | Backstage config file inclusions from Secret         |
+| secret-envs.yaml                         | []corev1.Secret                         | backstage-envs-<cr-name>                   | No           | Yes   | >=0.2.x | Backstage environment variables from Secret          |
+| [dynamic-plugins.yaml](#dynamic-plugins) | corev1.ConfigMap                        | backstage-dynamic-plugins-<cr-name>        | No           | No    | >=0.2.x | Dynamic plugins configuration                        |
+| pvcs.yaml                                | []corev1.PersistentVolumeClaim          | backstage-&lt;cr-name&gt;-&lt;pvc-name&gt; | No           | Yes   | >=0.4.x | List of PVC objects to be mounted to containers      |
 
 **Meanings of "Mandatory" Column:**
 - **Yes** - Must be configured; deployment will fail otherwise.
@@ -195,6 +196,10 @@ The following app-config fields might be updated in this default app-config Conf
 Note that this behavior is done on a best-effort basis and only on OpenShift.
 
 In any case (error or on non-OpenShift clusters), users still have the ability to override such defaults by providing custom app-config ConfigMap(s), as depicted in the [app-config](#app-config) section.
+
+## Deployment kind
+
+Starting from version **0.9.0**, the Backstage Operator supports **StatefulSet** as an alternative to **Deployment** for Backstage deployments. To use **StatefulSet**, modify the `deployment.yaml` file in the Default Configuration to define a StatefulSet object instead of a Deployment. Ensure that you adjust any necessary fields specific to StatefulSets, such as volume claims and service names.
 
 ## Raw Configuration
 
@@ -588,8 +593,24 @@ Here, the user can specify some of the OpenShift Route specifications fields. Th
 Also note that securing Routes with external certificates in TLS secrets (via the `spec.application.route.tls.externalCertificateSecretName` CR field) is a Technology Preview feature in OpenShift. It requires enabling the `RouteExternalCertificate` OpenShift Feature Gate and might not be functionally complete. See [Creating a route with externally managed certificate](https://docs.openshift.com/container-platform/4.16/networking/routes/secured-routes.html#nw-ingress-route-secret-load-external-cert_secured-routes) for more details.
 
 ### Deployment Configuration
-  
-The Backstage CRD contains **spec.deployment** field, allowing to change the shape of the Backstage Deployment resource with fields defined in `spec.deployment.patch`, which contains a fragment of the `apps.Deployment` object. This pathcing is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
+
+The Backstage CRD contains **spec.deployment** field, allowing to change the shape of the Backstage Deployment resource
+
+#### Deployment Kind
+
+By default, the Operator creates a resource of Kind, defined in default configuration, (usually 'Deployment') for Backstage instances. Starting from version **0.9.0**, it is possible to choose between `Deployment` and `StatefulSet`. To use `StatefulSet`, set the following field in the Backstage CR::
+
+```yaml
+spec:
+  deployment:
+    kind: StatefulSet
+```
+
+The motivation for this feature is to allow using StatefulSet-specific capabilities, such as Pod Management Policies or Volume Claim Templates.
+
+#### Deployment Patching
+
+`spec.deployment.patch` field contains a fragment of the `apps.Deployment` or `StatefulSet` resource. This patching is performed via [strategic merge patch](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md) using Kustomize's library. 
 
 For example, the following specification fragment will:
 - Set an additional volume named **my-volume** and mount it to **/my/path** of the Backstage container.

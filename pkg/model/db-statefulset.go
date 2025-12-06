@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -76,9 +74,9 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 }
 
 // implementation of RuntimeObject interface
-func (b *DbStatefulSet) EmptyObject() client.Object {
-	return &appsv1.StatefulSet{}
-}
+//func (b *DbStatefulSet) EmptyObject() client.Object {
+//	return &appsv1.StatefulSet{}
+//}
 
 // implementation of RuntimeObject interface
 func (b *DbStatefulSet) updateAndValidate(backstage bsv1.Backstage) error {

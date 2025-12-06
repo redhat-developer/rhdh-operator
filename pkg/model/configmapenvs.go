@@ -6,8 +6,6 @@ import (
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -55,9 +53,9 @@ func (p *ConfigMapEnvs) setObject(obj runtime.Object) {
 }
 
 // EmptyObject implements RuntimeObject interface
-func (p *ConfigMapEnvs) EmptyObject() client.Object {
-	return &corev1.ConfigMap{}
-}
+//func (p *ConfigMapEnvs) EmptyObject() client.Object {
+//	return &corev1.ConfigMap{}
+//}
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {

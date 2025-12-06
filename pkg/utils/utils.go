@@ -1,21 +1,25 @@
 package utils
 
 import (
-	"bytes"
+	//"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
+
+	//"io"
 	"os"
 	"path/filepath"
-	"reflect"
+
+	//"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -86,49 +90,101 @@ func BackstageDbAppLabelValue(backstageName string) string {
 // platformPatch - yaml content with platform specific patch, to be merged with manifest if exists
 // templ - template object to create new objects
 // scheme - runtime.Scheme
-func ReadYamls(manifest []byte, platformPatch []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
+//func ReadYamls(manifest []byte, platformPatch []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
+//
+//	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
+//
+//	objects := []client.Object{}
+//	for {
+//		// make a new object from template
+//		obj := reflect.New(reflect.ValueOf(templ).Elem().Type()).Interface().(client.Object)
+//
+//		err := dec.Decode(obj)
+//
+//		if errors.Is(err, io.EOF) {
+//			break
+//		}
+//		if err != nil {
+//			return nil, fmt.Errorf("failed to decode YAML: %w", err)
+//		}
+//
+//		if err := checkObjectKind(obj, &scheme); err != nil {
+//			return nil, err
+//		}
+//
+//		// merge platform patch if exists
+//		if platformPatch != nil {
+//
+//			merged, err := merge2.MergeStrings(string(platformPatch), string(manifest), false, kyaml.MergeOptions{})
+//			if err != nil {
+//				return nil, fmt.Errorf("failed to merge platform patch: %w", err)
+//			}
+//
+//			err = yaml.Unmarshal([]byte(merged), obj)
+//			if err != nil {
+//				return nil, fmt.Errorf("failed to unmarshal merged YAML: %w", err)
+//			}
+//		}
+//
+//		objects = append(objects, obj)
+//	}
+//
+//	return objects, nil
+//}
 
-	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
+func ReadYamls(manifest []byte, platformPatch []byte, scheme runtime.Scheme) ([]client.Object, error) {
+	sep := regexp.MustCompile(`(?m)^---\s*$`)
+	rawDocs := sep.Split(string(manifest), -1)
 
 	objects := []client.Object{}
-	for {
-		// make a new object from template
-		obj := reflect.New(reflect.ValueOf(templ).Elem().Type()).Interface().(client.Object)
-
-		err := dec.Decode(obj)
-
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode YAML: %w", err)
+	for _, raw := range rawDocs {
+		doc := strings.TrimSpace(raw)
+		if doc == "" {
+			continue
 		}
 
-		if err := checkObjectKind(obj, &scheme); err != nil {
-			return nil, err
-		}
-
-		// merge platform patch if exists
+		mergedDoc := doc
 		if platformPatch != nil {
-
-			merged, err := merge2.MergeStrings(string(platformPatch), string(manifest), false, kyaml.MergeOptions{})
+			m, err := merge2.MergeStrings(string(platformPatch), doc, false, kyaml.MergeOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to merge platform patch: %w", err)
 			}
-
-			err = yaml.Unmarshal([]byte(merged), obj)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal merged YAML: %w", err)
-			}
+			mergedDoc = m
 		}
 
-		objects = append(objects, obj)
+		u := &unstructured.Unstructured{}
+		if err := yaml.Unmarshal([]byte(mergedDoc), &u.Object); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal YAML to unstructured: %w", err)
+		}
+
+		// Try to instantiate a typed object from scheme using the Unstructured's GVK.
+		var typed client.Object
+		gvk := u.GroupVersionKind()
+		if obj, err := (&scheme).New(gvk); err == nil {
+			// Convert unstructured map into the concrete object returned by scheme.
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, obj); err != nil {
+				return nil, fmt.Errorf("convert to typed object %v: %w", gvk, err)
+			}
+			co, ok := obj.(client.Object)
+			if !ok {
+				return nil, fmt.Errorf("converted object does not implement client.Object, type=%T", obj)
+			}
+			typed = co
+		} else {
+			return nil, fmt.Errorf("create new object from scheme for GVK %v: %w", gvk, err)
+		}
+
+		if err := checkObjectKind(typed, &scheme); err != nil {
+			return nil, err
+		}
+
+		objects = append(objects, typed)
 	}
 
 	return objects, nil
 }
 
-func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+func ReadYamlFiles(path string, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
 	fpath := filepath.Clean(path)
 	if _, err := os.Stat(fpath); err != nil {
 		return nil, err
@@ -143,7 +199,8 @@ func ReadYamlFiles(path string, templ runtime.Object, scheme runtime.Scheme, pla
 	if err != nil {
 		return nil, fmt.Errorf("failed to read platform patch: %w", err)
 	}
-	return ReadYamls(conf, pp, templ, scheme)
+	//return ReadYamls(conf, pp, templ, scheme)
+	return ReadYamls(conf, pp, scheme)
 }
 
 func readPlatformPatch(path string, platformExt string) ([]byte, error) {

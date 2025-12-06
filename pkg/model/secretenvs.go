@@ -7,8 +7,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -59,9 +57,9 @@ func (p *SecretEnvs) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) EmptyObject() client.Object {
-	return &corev1.Secret{}
-}
+//func (p *SecretEnvs) EmptyObject() client.Object {
+//	return &corev1.Secret{}
+//}
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {

@@ -49,7 +49,7 @@ func TestDefaultSecretFiles(t *testing.T) {
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
-	assert.Equal(t, 1, len(deployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 1, len(deployment.podSpec().Volumes))
 
 }
 
@@ -82,7 +82,7 @@ func TestDefaultMultiSecretFiles(t *testing.T) {
 	assert.Equal(t, 3, len(model.backstageDeployment.containerByName("install-dynamic-plugins").VolumeMounts))
 	// data5
 	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-container").VolumeMounts))
-	assert.Equal(t, 3, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 3, len(model.backstageDeployment.podSpec().Volumes))
 }
 
 func TestSpecifiedSecretFiles(t *testing.T) {
@@ -112,7 +112,7 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 
 	assert.Equal(t, 3, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 0, len(deployment.container().Args))
-	assert.Equal(t, 3, len(deployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 3, len(deployment.podSpec().Volumes))
 
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret1"), deployment.podSpec().Volumes[0].Name)
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("secret2"), deployment.podSpec().Volumes[1].Name)
@@ -160,7 +160,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 0, len(deployment.container().Args))
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 2, len(deployment.podSpec().Volumes))
 	assert.True(t, checkIfContainVolumes(deployment.podSpec().Volumes, utils.GenerateVolumeNameFromCmOrSecret("secret1")))
 }
 
@@ -183,7 +183,7 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
 	assert.Equal(t, 0, len(deployment.container().Args))
-	assert.Equal(t, 2, len(deployment.deployment.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 2, len(deployment.podSpec().Volumes))
 	assert.True(t, checkIfContainVolumes(deployment.podSpec().Volumes, "secret1"))
 
 }
