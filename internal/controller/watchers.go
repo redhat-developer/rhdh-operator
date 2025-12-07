@@ -156,9 +156,13 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 		return []reconcile.Request{}
 	}
 
-	deploy, err := FindDeployment(ctx, r.Client, object.GetNamespace(), model.DeploymentName(backstage.Name))
+	deploy, err := FindDeployment(ctx, r.Client, object.GetNamespace(), backstage.Name)
 	if err != nil {
-		lg.Error(err, "request by label failed, find Deployment/StatefulSet ", "error ", err)
+		if !errors.IsNotFound(err) {
+			lg.V(1).Info("request by label could not find a resource (most likely not created yet)", "error", err.Error())
+		} else {
+			lg.Error(err, "request by label failed, find deployment ")
+		}
 		return []reconcile.Request{}
 	}
 

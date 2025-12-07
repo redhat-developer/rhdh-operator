@@ -24,6 +24,27 @@ import (
 
 // TODO make it with test matrix to not to repeat code
 
+var appConfig = "app-config1"
+var secretEnv = "secret-env1"
+
+//var secretFile = "secret1"
+
+var bsSpec = bsv1.BackstageSpec{
+	Application: &bsv1.Application{
+		AppConfig: &bsv1.AppConfig{
+			MountPath: "/my/mount/path",
+			ConfigMaps: []bsv1.FileObjectRef{
+				{Name: appConfig},
+			},
+		},
+		ExtraEnvs: &bsv1.ExtraEnvs{
+			Secrets: []bsv1.EnvObjectRef{
+				{Name: secretEnv, Key: "sec11"},
+			},
+		},
+	},
+}
+
 var _ = When("create backstage with external configuration", func() {
 
 	var (
@@ -50,8 +71,8 @@ var _ = When("create backstage with external configuration", func() {
 			Skip("Skipped for not real controller")
 		}
 
-		appConfig1 := "app-config1"
-		secretEnv1 := "secret-env1"
+		//appConfig1 := "app-config1"
+		//secretEnv1 := "secret-env1"
 
 		backstageName := generateRandName("")
 
@@ -60,26 +81,12 @@ organization:
   name: "my org"
 `
 
-		generateConfigMap(ctx, k8sClient, appConfig1, ns, map[string]string{"appconfig11": conf}, nil, nil)
-		generateSecret(ctx, k8sClient, secretEnv1, ns, map[string]string{"sec11": "val11"}, nil, nil)
+		generateConfigMap(ctx, k8sClient, appConfig, ns, map[string]string{"appconfig11": conf}, nil, nil)
+		generateSecret(ctx, k8sClient, secretEnv, ns, map[string]string{"sec11": "val11"}, nil, nil)
 
-		bs := bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
-					MountPath: "/my/mount/path",
-					ConfigMaps: []bsv1.FileObjectRef{
-						{Name: appConfig1},
-					},
-				},
-				ExtraEnvs: &bsv1.ExtraEnvs{
-					Secrets: []bsv1.EnvObjectRef{
-						{Name: secretEnv1, Key: "sec11"},
-					},
-				},
-			},
-		}
+		bs := bsSpec
 
-		check(NewGomegaWithT(GinkgoT()), ctx, k8sClient, bs, ns, backstageName, conf, appConfig1, secretEnv1)
+		checkMountWSubpath(NewGomegaWithT(GinkgoT()), ctx, k8sClient, bs, ns, backstageName, conf)
 	})
 
 	It("refreshes mounts without subPath", func() {
@@ -164,7 +171,7 @@ organization:
 			// no need to re-ask pod name, it is not recreated, just use what we've got
 			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/appconfig/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
-			// let's check, just in case (it is k8s job to refresh it :)
+			// let's checkMountWSubpath, just in case (it is k8s job to refresh it :)
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))
 
 		}, 4*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
@@ -181,8 +188,8 @@ organization:
 			Skip("Skipped for not real controller")
 		}
 
-		appConfig1 := "app-config1"
-		secretEnv1 := "secret-env1"
+		//appConfig1 := "app-config1"
+		//secretEnv1 := "secret-env1"
 
 		backstageName := generateRandName("")
 
@@ -191,35 +198,20 @@ organization:
   name: "my org"
 `
 
-		generateConfigMap(ctx, k8sClient, appConfig1, ns, map[string]string{"appconfig11": conf}, nil, nil)
-		generateSecret(ctx, k8sClient, secretEnv1, ns, map[string]string{"sec11": "val11"}, nil, nil)
+		generateConfigMap(ctx, k8sClient, appConfig, ns, map[string]string{"appconfig11": conf}, nil, nil)
+		generateSecret(ctx, k8sClient, secretEnv, ns, map[string]string{"sec11": "val11"}, nil, nil)
 
-		bs := bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
-					MountPath: "/my/mount/path",
-					ConfigMaps: []bsv1.FileObjectRef{
-						{Name: appConfig1},
-					},
-				},
-				ExtraEnvs: &bsv1.ExtraEnvs{
-					Secrets: []bsv1.EnvObjectRef{
-						{Name: secretEnv1, Key: "sec11"},
-					},
-				},
-			},
-			Deployment: &bsv1.BackstageDeployment{
-				Kind: "StatefulSet",
-			},
+		bs := bsSpec
+		bs.Deployment = &bsv1.BackstageDeployment{
+			Kind: "StatefulSet",
 		}
-
-		check(NewGomegaWithT(GinkgoT()), ctx, k8sClient, bs, ns, backstageName, conf, appConfig1, secretEnv1)
+		checkMountWSubpath(NewGomegaWithT(GinkgoT()), ctx, k8sClient, bs, ns, backstageName, conf)
 
 	})
 
 })
 
-func check(g Gomega, ctx context.Context, k8sClient client.Client, bs bsv1.BackstageSpec, ns, backstageName, conf, appConfig1, secretEnv1 string) {
+func checkMountWSubpath(g Gomega, ctx context.Context, k8sClient client.Client, bs bsv1.BackstageSpec, ns, backstageName, conf string) {
 
 	createAndReconcileBackstage(ctx, ns, bs, backstageName)
 
@@ -245,7 +237,7 @@ func check(g Gomega, ctx context.Context, k8sClient client.Client, bs bsv1.Backs
 	}, 5*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
 
 	cm := &corev1.ConfigMap{}
-	err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig1}, cm)
+	err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig}, cm)
 	Expect(err).ShouldNot(HaveOccurred())
 
 	// update appconfig11
@@ -258,7 +250,7 @@ organization:
 	Expect(err).ShouldNot(HaveOccurred())
 
 	sec := &corev1.Secret{}
-	err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
+	err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv}, sec)
 	Expect(err).ShouldNot(HaveOccurred())
 	newEnv := "val22"
 	sec.StringData = map[string]string{"sec11": newEnv}
@@ -266,7 +258,7 @@ organization:
 	Expect(err).ShouldNot(HaveOccurred())
 
 	Eventually(func(g Gomega) {
-		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig1}, cm)
+		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: appConfig}, cm)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect(cm.Data["appconfig11"]).To(Equal(newData))
 
@@ -285,7 +277,7 @@ organization:
 		// NOTE: it does not work well on envtest, real controller needed
 		g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))
 
-		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv1}, sec)
+		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv}, sec)
 		g.Expect(err).ShouldNot(HaveOccurred())
 
 		out2, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "echo $sec11")
