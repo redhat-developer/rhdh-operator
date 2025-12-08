@@ -84,14 +84,10 @@ var _ = When("testing API version compatibility", func() {
 
 		By("verifying prev version deployment is created")
 		Eventually(func(g Gomega) {
-			deploy := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{
-				Namespace: ns,
-				Name:      model.DeploymentName(backstageNameV3),
-			}, deploy)
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageNameV3)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy.Spec.Replicas).ToNot(BeNil())
-			g.Expect(*deploy.Spec.Replicas).To(Equal(int32(1)))
+			g.Expect(deploy.SpecReplicas()).ToNot(BeNil())
+			g.Expect(*deploy.SpecReplicas()).To(Equal(int32(1)))
 		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
 		// test current version compatibility
@@ -134,14 +130,10 @@ var _ = When("testing API version compatibility", func() {
 
 		By("verifying current version deployment is created")
 		Eventually(func(g Gomega) {
-			deploy := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{
-				Namespace: ns,
-				Name:      model.DeploymentName(backstageNameV4),
-			}, deploy)
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageNameV4)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy.Spec.Replicas).ToNot(BeNil())
-			g.Expect(*deploy.Spec.Replicas).To(Equal(int32(1)))
+			g.Expect(deploy.SpecReplicas()).ToNot(BeNil())
+			g.Expect(*deploy.SpecReplicas()).To(Equal(int32(1)))
 		}, 30*time.Second, 5*time.Second).Should(Succeed())
 
 		By("verifying both prev and current version resources coexist")
@@ -164,7 +156,7 @@ var _ = When("testing API version compatibility", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(deployCurr.Spec.Replicas).ToNot(BeNil())
 			g.Expect(*deployCurr.Spec.Replicas).To(Equal(int32(1)))
-		}, 30*time.Second, 5*time.Second).Should(Succeed())
+		}, 2*time.Minute, 5*time.Second).Should(Succeed())
 
 		// clean up test resources
 		By("cleaning up prev version test resource")

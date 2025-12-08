@@ -12,8 +12,6 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	appsv1 "k8s.io/api/apps/v1"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
@@ -116,12 +114,11 @@ spec:
 		backstageName := createAndReconcileBackstage(ctx, ns, bs, "")
 
 		Eventually(func(g Gomega) {
-			deploy := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			podSpec := deploy.Spec.Template.Spec
-			backstageContainer := podSpec.Containers[model.BackstageContainerIndex(deploy)]
+			podSpec := deploy.PodSpec()
+			backstageContainer := backstageContainer(*podSpec)
 			sidecarContainer := corev1.Container{}
 			for i := range podSpec.Containers {
 				if podSpec.Containers[i].Name == "sidecar" {
@@ -131,9 +128,9 @@ spec:
 			}
 
 			By("checking if app-config volumes are added to PodSpec")
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig1)).To(BeAddedAsVolumeToPodSpec(podSpec))
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig2)).To(BeAddedAsVolumeToPodSpec(podSpec))
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig3)).To(BeAddedAsVolumeToPodSpec(podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig1)).To(BeAddedAsVolumeToPodSpec(*podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig2)).To(BeAddedAsVolumeToPodSpec(*podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(appConfig3)).To(BeAddedAsVolumeToPodSpec(*podSpec))
 
 			By("checking if app-config volumes are mounted to the Backstage container")
 			g.Expect("/my/mount/path/key11").To(BeMountedToContainer(backstageContainer))
@@ -150,9 +147,9 @@ spec:
 			g.Expect("/my/mount/path/key.31").To(BeAddedAsArgToContainer(backstageContainer))
 
 			By("checking if extra-cm-file volumes are added to PodSpec")
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmFile1)).To(BeAddedAsVolumeToPodSpec(podSpec))
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmFile2)).To(BeAddedAsVolumeToPodSpec(podSpec))
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmFile3)).To(BeAddedAsVolumeToPodSpec(podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmFile1)).To(BeAddedAsVolumeToPodSpec(*podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmFile2)).To(BeAddedAsVolumeToPodSpec(*podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmFile3)).To(BeAddedAsVolumeToPodSpec(*podSpec))
 
 			By("checking if extra-cm-file volumes are mounted to the Backstage container")
 			g.Expect("/my/file/path/cm11").To(BeMountedToContainer(backstageContainer))
@@ -164,9 +161,9 @@ spec:
 			g.Expect("/cm/file/withpath").To(BeMountedToContainer(backstageContainer))
 
 			By("checking if extra-secret-file volumes are added to PodSpec")
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret("secret-file1")).To(BeAddedAsVolumeToPodSpec(podSpec))
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret("secret-file2")).To(BeAddedAsVolumeToPodSpec(podSpec))
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret("secret-file3.dot")).To(BeAddedAsVolumeToPodSpec(podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret("secret-file1")).To(BeAddedAsVolumeToPodSpec(*podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret("secret-file2")).To(BeAddedAsVolumeToPodSpec(*podSpec))
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret("secret-file3.dot")).To(BeAddedAsVolumeToPodSpec(*podSpec))
 
 			By("checking if extra-secret-file volumes are mounted to the Backstage container")
 
@@ -221,22 +218,21 @@ spec:
 
 	})
 
-	It("creates Backstage deployment with spec.deployment ", func() {
+	It("creates Backstage with spec.deployment.patch ", func() {
 
 		bs2 := &bsv1.Backstage{}
 
-		err := ReadYamlFile("testdata/spec-deployment.yaml", bs2)
+		err := readYamlFile("testdata/spec-deployment.yaml", bs2)
 		Expect(err).To(Not(HaveOccurred()))
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bs2.Spec, "")
 
 		Eventually(func(g Gomega) {
 			By("creating Deployment ")
-			deploy := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 			var bscontainer corev1.Container
-			for _, c := range deploy.Spec.Template.Spec.Containers {
+			for _, c := range deploy.PodSpec().Containers {
 
 				if c.Name == "backstage-backend" {
 					bscontainer = c
@@ -248,7 +244,7 @@ spec:
 			g.Expect(bscontainer.Image).To(HaveValue(Equal("busybox")))
 
 			var bsvolume corev1.Volume
-			for _, v := range deploy.Spec.Template.Spec.Volumes {
+			for _, v := range deploy.PodSpec().Volumes {
 
 				if v.Name == "my-volume" {
 					bsvolume = v
@@ -264,14 +260,42 @@ spec:
 
 	})
 
+	It("creates Backstage with spec.deployment.kind=StatefulSet ", func() {
+
+		bs2 := &bsv1.Backstage{
+			Spec: bsv1.BackstageSpec{
+				Deployment: &bsv1.BackstageDeployment{
+					Kind: "StatefulSet",
+				},
+			},
+		}
+
+		backstageName := createAndReconcileBackstage(ctx, ns, bs2.Spec, "")
+
+		Eventually(func(g Gomega) {
+			By("get StatefulSet ")
+			ss, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).To(Not(HaveOccurred()))
+			gvk := utils.GetObjectKind(ss.GetObject(), k8sClient.Scheme())
+			g.Expect("StatefulSet").To(Equal(gvk.Kind))
+		}, 30*time.Second, 2*time.Second).Should(Succeed())
+
+	})
+
+	It("failed Backstage with unknown spec.deployment.kind ", func() {
+
+		bs2 := &bsv1.Backstage{
+			Spec: bsv1.BackstageSpec{
+				Deployment: &bsv1.BackstageDeployment{
+					Kind: "Unknown",
+				},
+			},
+		}
+		// should fail immediately
+		_, err := createBackstage(ctx, bs2.Spec, ns, "")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("spec.deployment.kind: Unsupported value"))
+
+	})
+
 })
-
-// Duplicated files in different CMs
-// Message: "Deployment.apps \"test-backstage-ro86g-deployment\" is invalid: spec.template.spec.containers[0].volumeMounts[4].mountPath: Invalid value: \"/my/mount/path/key12\": must be unique",
-
-// No CM configured
-//failed to preprocess backstage spec app-configs failed to get configMap app-config3: configmaps "app-config3" not found
-
-// If no such a key - no reaction, it is just not included
-
-// mounting/injecting secret by key only

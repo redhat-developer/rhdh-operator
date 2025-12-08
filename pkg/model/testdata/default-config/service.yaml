@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: backstage
   labels:
-    default: true
+    default: "true"
 spec:
   type: NodePort
   selector:

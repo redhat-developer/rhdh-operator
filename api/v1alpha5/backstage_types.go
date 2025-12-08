@@ -46,6 +46,11 @@ type BackstageDeployment struct {
 	// Optional.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Patch *apiextensionsv1.JSON `json:"patch,omitempty"`
+
+	// Kind of the deployment object. Can be Deployment or StatefulSet.
+	// +optional
+	// +kubebuilder:validation:Enum=Deployment;StatefulSet
+	Kind string `json:"kind,omitempty"`
 }
 
 type RuntimeConfig struct {
