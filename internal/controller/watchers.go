@@ -150,11 +150,11 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 		return []reconcile.Request{}
 	}
 
-	ec, err := r.preprocessSpec(ctx, backstage)
-	if err != nil {
-		lg.Error(err, "request by label failed, preprocess Backstage ")
-		return []reconcile.Request{}
-	}
+	//ec, err := r.preprocessSpec(ctx, backstage)
+	//if err != nil {
+	//	lg.Error(err, "request by label failed, preprocess Backstage ")
+	//	return []reconcile.Request{}
+	//}
 
 	deploy, err := FindDeployment(ctx, r.Client, object.GetNamespace(), backstage.Name)
 	if err != nil {
@@ -163,6 +163,12 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 		} else {
 			lg.Error(err, "request by label failed, find deployment ")
 		}
+		return []reconcile.Request{}
+	}
+
+	ec, err := r.preprocessSpec(ctx, backstage)
+	if err != nil {
+		lg.Error(err, "request by label failed, preprocess Backstage ")
 		return []reconcile.Request{}
 	}
 
