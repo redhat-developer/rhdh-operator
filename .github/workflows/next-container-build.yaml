@@ -3,11 +3,8 @@ name: Build and push operator, bundle, and catalog images
 
 on:
   push:
-    branches: 
-      - main
-      - rhdh-1.[0-9]+
-      - 1.[0-9]+.x
-      - release-1.[0-9]+
+    branches:
+      - 'hotfix/**/*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -94,12 +91,6 @@ jobs:
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
 
           export CONTAINER_TOOL=podman
-          latestNext="next"
-          # for main branch, use next tags; for 1.y branches, use :latest tags
-          if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]; then
-            latestNext="latest" 
-          fi
-
           export VERSION=${{ env.BASE_VERSION }}
           export REGISTRY_WITH_ORG=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}
           export OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME:-operator}
@@ -114,7 +105,6 @@ jobs:
           for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
             podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
             skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}-${{ env.SHORT_SHA }}
-            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${latestNext}
           done
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}

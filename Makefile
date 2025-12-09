@@ -16,7 +16,7 @@ PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 # Set a default VERSION if it is not defined
 ifeq ($(origin VERSION), undefined)
-VERSION ?= 0.7.4
+VERSION ?= 0.7.4-hotfix-rhdhsupp-290
 DEFAULT_VERSION := true
 else
 DEFAULT_VERSION := false
@@ -34,7 +34,7 @@ ifeq ($(PROFILE), rhdh)
 		INCREMENTED_MAJOR := $(shell expr $(MAJOR) + 1)
 		MINOR_PATCH := $(shell echo $(VERSION) | cut -d. -f2-)
 		VERSION := $(INCREMENTED_MAJOR).$(MINOR_PATCH)
-		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
+		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2-)
 	endif
 
 	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
