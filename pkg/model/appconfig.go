@@ -5,7 +5,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -63,9 +62,9 @@ func (b *AppConfig) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) EmptyObject() client.Object {
-	return &corev1.ConfigMap{}
-}
+//func (b *AppConfig) EmptyObject() client.Object {
+//	return &corev1.ConfigMap{}
+//}
 
 // implementation of RuntimeObject interface
 func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {

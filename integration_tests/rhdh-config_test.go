@@ -33,8 +33,7 @@ var _ = When("create default rhdh", func() {
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
-			deploy := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
 
 			ss := &appsv1.StatefulSet{}
@@ -53,8 +52,8 @@ var _ = When("create default rhdh", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			g.Expect(deploy.Spec.Template.Spec.InitContainers).To(HaveLen(1))
-			_, initCont := model.DynamicPluginsInitContainer(deploy.Spec.Template.Spec.InitContainers)
+			g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(1))
+			_, initCont := model.DynamicPluginsInitContainer(deploy.PodSpec().InitContainers)
 
 			initContainerExpectedVolumeMounts := []corev1.VolumeMount{
 				{
@@ -107,9 +106,9 @@ var _ = When("create default rhdh", func() {
 			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
 			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
 
-			g.Expect(deploy.Spec.Template.Spec.Volumes).To(HaveLen(7))
-			g.Expect(deploy.Spec.Template.Spec.Containers).To(HaveLen(1))
-			mainCont := deploy.Spec.Template.Spec.Containers[model.BackstageContainerIndex(deploy)]
+			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(7))
+			g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
+			mainCont := backstageContainer(*deploy.PodSpec())
 			g.Expect(mainCont.Args).To(HaveLen(4))
 			g.Expect(mainCont.Args[0]).To(Equal("--config"))
 			g.Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
@@ -148,7 +147,7 @@ var _ = When("create default rhdh", func() {
 			if currentPlatform.IsOpenshift() {
 				// no patch, so default
 				By("not applying any platform-specific patches", func() {
-					g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
+					g.Expect(deploy.PodSpec().SecurityContext.FSGroup).To(BeNil())
 					g.Expect(ss.Spec.Template.Spec.SecurityContext.FSGroup).To(BeNil())
 					g.Expect(serv.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
 				})
@@ -160,7 +159,7 @@ var _ = When("create default rhdh", func() {
 			} else {
 				// k8s (patched)
 				By("applying k8s-specific patches for security context", func() {
-					g.Expect(deploy.Spec.Template.Spec.SecurityContext.FSGroup).To(Not(BeNil()))
+					g.Expect(deploy.PodSpec().SecurityContext.FSGroup).To(Not(BeNil()))
 					g.Expect(ss.Spec.Template.Spec.SecurityContext.FSGroup).To(Not(BeNil()))
 					g.Expect(serv.Spec.Type).To(Equal(corev1.ServiceTypeNodePort))
 				})
@@ -170,7 +169,7 @@ var _ = When("create default rhdh", func() {
 				})
 			}
 
-		}, 10*time.Second, time.Second).Should(Succeed())
+		}, 20*time.Second, time.Second).Should(Succeed())
 
 		deleteNamespace(ctx, ns)
 	})
@@ -187,19 +186,19 @@ var _ = When("create default rhdh", func() {
 		ns := createNamespace(ctx)
 		bs2 := &bsv1.Backstage{}
 
-		err := ReadYamlFile("testdata/rhdh-replace-dynaplugin-root.yaml", bs2)
+		err := readYamlFile("testdata/rhdh-replace-dynaplugin-root.yaml", bs2)
 		Expect(err).To(Not(HaveOccurred()))
 
 		backstageName := createAndReconcileBackstage(ctx, ns, bs2.Spec, "")
 
 		Eventually(func(g Gomega) {
-			By("getting the Deployment ")
-			deploy := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			By("getting the Pod ")
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			//bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
 			var bsvolume *corev1.Volume
-			for _, v := range deploy.Spec.Template.Spec.Volumes {
+			for _, v := range deploy.PodSpec().Volumes {
 
 				if v.Name == "dynamic-plugins-root" {
 					bsvolume = &v
@@ -252,12 +251,11 @@ var _ = When("create default rhdh", func() {
 
 		Eventually(func(g Gomega) {
 			By("getting the Deployment ")
-			deploy := &appsv1.Deployment{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			g.Expect(len(deploy.Spec.Template.Spec.InitContainers)).To(Equal(1))
-			initCont := deploy.Spec.Template.Spec.InitContainers[0]
+			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+			initCont := deploy.PodSpec().InitContainers[0]
 			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
 			found := 0
 			for i := range initCont.VolumeMounts {

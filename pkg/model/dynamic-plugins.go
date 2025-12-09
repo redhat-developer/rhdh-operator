@@ -8,8 +8,6 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
@@ -83,9 +81,9 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (p *DynamicPlugins) EmptyObject() client.Object {
-	return &corev1.ConfigMap{}
-}
+//func (p *DynamicPlugins) EmptyObject() client.Object {
+//	return &corev1.ConfigMap{}
+//}
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
@@ -274,7 +272,7 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 	return string(mergedData), nil
 }
 func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
-	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.deployment.Spec.Template.Spec.InitContainers)
+	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.podSpec().InitContainers)
 
 	// override image with env var
 	if os.Getenv(BackstageImageEnvVar) != "" {

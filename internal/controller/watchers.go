@@ -7,7 +7,6 @@ import (
 	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -89,23 +88,40 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 		return fmt.Errorf("failed to construct the predicate for backstage deployment. This should not happen: %w", err)
 	}
 
+	commonPreds := builder.WithPredicates(labelPred, predicate.Funcs{
+		DeleteFunc: func(e event.DeleteEvent) bool { return true },
+		UpdateFunc: func(e event.UpdateEvent) bool { return true },
+		CreateFunc: func(e event.CreateEvent) bool { return true },
+	})
+
+	metaFor := func(kind string) *metav1.PartialObjectMetadata {
+		m := &metav1.PartialObjectMetadata{}
+		m.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "apps",
+			Version: "v1",
+			Kind:    kind,
+		})
+		return m
+	}
+
+	// Deployment
 	b.WatchesMetadata(
-		&metav1.PartialObjectMetadata{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "apps/v1",
-				Kind:       "Deployment",
-			},
-		},
+		metaFor("Deployment"),
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 			return r.requestByAppLabels(ctx, o)
 		}),
-		builder.WithPredicates(labelPred,
-			predicate.Funcs{
-				DeleteFunc: func(e event.DeleteEvent) bool { return true },
-				UpdateFunc: func(e event.UpdateEvent) bool { return true },
-				CreateFunc: func(e event.CreateEvent) bool { return true },
-			}),
+		commonPreds,
 	)
+
+	// StatefulSet
+	b.WatchesMetadata(
+		metaFor("StatefulSet"),
+		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+			return r.requestByAppLabels(ctx, o)
+		}),
+		commonPreds,
+	)
+
 	return nil
 }
 
@@ -134,24 +150,30 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 		return []reconcile.Request{}
 	}
 
+	//ec, err := r.preprocessSpec(ctx, backstage)
+	//if err != nil {
+	//	lg.Error(err, "request by label failed, preprocess Backstage ")
+	//	return []reconcile.Request{}
+	//}
+
+	deploy, err := FindDeployment(ctx, r.Client, object.GetNamespace(), backstage.Name)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			lg.V(1).Info("request by label could not find a resource (most likely not created yet)", "error", err.Error())
+		} else {
+			lg.Error(err, "request by label failed, find deployment ")
+		}
+		return []reconcile.Request{}
+	}
+
 	ec, err := r.preprocessSpec(ctx, backstage)
 	if err != nil {
 		lg.Error(err, "request by label failed, preprocess Backstage ")
 		return []reconcile.Request{}
 	}
 
-	deploy := &appsv1.Deployment{}
-	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: object.GetNamespace()}, deploy); err != nil {
-		if errors.IsNotFound(err) {
-			lg.V(1).Info("request by label, deployment not found", "name", model.DeploymentName(backstage.Name))
-		} else {
-			lg.Error(err, "request by label failed, get Deployment ", "error ", err)
-		}
-		return []reconcile.Request{}
-	}
-
 	newHash := ec.WatchingHash
-	oldHash := deploy.Spec.Template.GetAnnotations()[model.ExtConfigHashAnnotation]
+	oldHash := deploy.GetObject().GetAnnotations()[model.ExtConfigHashAnnotation]
 	if newHash == oldHash {
 		lg.V(1).Info("request by label, hash are equal", "hash", newHash)
 		return []reconcile.Request{}
@@ -171,6 +193,6 @@ func (r *BackstageReconciler) requestByAppLabels(ctx context.Context, object cli
 		return []reconcile.Request{}
 	}
 
-	lg.V(1).Info("enqueuing reconcile on Deployment change", object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), "namespace: ", object.GetNamespace())
+	lg.V(1).Info("enqueuing reconcile on change of ", "kind: ", object.GetObjectKind().GroupVersionKind().Kind, "name: ", object.GetName(), "namespace: ", object.GetNamespace())
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: backstageName, Namespace: object.GetNamespace()}}}
 }

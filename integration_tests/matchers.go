@@ -190,7 +190,7 @@ func HaveAppConfigBaseUrl(expected any) types.GomegaMatcher {
 		GinkgoWriter.Printf("actual: %v\n", actual)
 		for k, v := range actual.Data {
 			var appConfig AppConfigData
-			err := ReadYaml([]byte(v), &appConfig)
+			err := readYaml([]byte(v), &appConfig)
 			if err != nil {
 				return false, fmt.Errorf("could not parse key %q into an AppConfig struct: %w", k, err)
 			}

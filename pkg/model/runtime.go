@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
@@ -87,6 +88,10 @@ func (m *BackstageModel) sortRuntimeObjects() {
 		})
 }
 
+func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
+	return m.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind()
+}
+
 // Registers config object
 func registerConfig(key string, factory ObjectFactory, multiple bool) {
 	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory, Multiple: multiple})
@@ -113,8 +118,8 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		var templ = backstageObject.EmptyObject()
-		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), templ, *scheme, platform.Extension); err != nil {
+		//var templ = backstageObject.EmptyObject()
+		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), *scheme, platform.Extension); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}
@@ -131,8 +136,8 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {
 			// new object to replace default, not merge
-			templ = backstageObject.EmptyObject()
-			if objs, err := utils.ReadYamls([]byte(overlay), nil, templ, *scheme); err != nil {
+			// templ = backstageObject.EmptyObject()
+			if objs, err := utils.ReadYamls([]byte(overlay), nil, *scheme); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
 					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 				}

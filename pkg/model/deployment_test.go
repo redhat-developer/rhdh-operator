@@ -6,6 +6,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
+	appv1 "k8s.io/api/apps/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"k8s.io/utils/ptr"
@@ -80,8 +81,8 @@ func TestSpecImagePullSecrets(t *testing.T) {
 	assert.NoError(t, err)
 
 	// if imagepullsecrets not defined - default used
-	assert.Equal(t, 2, len(model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets))
-	assert.Equal(t, "ips1", model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets[0].Name)
+	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().ImagePullSecrets))
+	assert.Equal(t, "ips1", model.backstageDeployment.podSpec().ImagePullSecrets[0].Name)
 
 	//bs.Spec.Application.ImagePullSecrets = []string{}
 	//
@@ -136,13 +137,13 @@ spec:
 	assert.NoError(t, err)
 
 	// label added
-	assert.Equal(t, "java", model.backstageDeployment.deployment.Labels["mylabel"])
-	assert.Equal(t, "backstage", model.backstageDeployment.deployment.Spec.Template.Labels["pod"])
+	assert.Equal(t, "java", model.backstageDeployment.deployable.GetObject().GetLabels()["mylabel"])
+	assert.Equal(t, "backstage", model.backstageDeployment.deployable.PodObjectMeta().GetLabels()["pod"])
 
 	// sidecar added
-	assert.Equal(t, 2, len(model.backstageDeployment.deployment.Spec.Template.Spec.Containers))
-	assert.Equal(t, "sidecar", model.backstageDeployment.deployment.Spec.Template.Spec.Containers[1].Name)
-	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.deployment.Spec.Template.Spec.Containers[1].Image)
+	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Containers))
+	assert.Equal(t, "sidecar", model.backstageDeployment.podSpec().Containers[1].Name)
+	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.podSpec().Containers[1].Image)
 
 	// backstage container resources updated
 	assert.Equal(t, "backstage-backend", model.backstageDeployment.container().Name)
@@ -150,12 +151,12 @@ spec:
 
 	// volumes
 	// dynamic-plugins-root, dynamic-plugins-npmrc, dynamic-plugins-auth, my-vol
-	assert.Equal(t, 4, len(model.backstageDeployment.deployment.Spec.Template.Spec.Volumes))
-	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[0].Name)
+	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
+	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.podSpec().Volumes[0].Name)
 	// overrides StorageClassName
-	assert.Equal(t, "special", *model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
+	assert.Equal(t, "special", *model.backstageDeployment.podSpec().Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
 	// adds new volume
-	assert.Equal(t, "my-vol", model.backstageDeployment.deployment.Spec.Template.Spec.Volumes[3].Name)
+	assert.Equal(t, "my-vol", model.backstageDeployment.podSpec().Volumes[3].Name)
 }
 
 func TestImageInCRPrevailsOnEnvVar(t *testing.T) {
@@ -267,4 +268,49 @@ spec:
 	assert.Equal(t, 1, len(sidecar.Env))
 	assert.Equal(t, "VAR1", sidecar.Env[0].Name)
 
+}
+
+func TestDeploymentKind(t *testing.T) {
+
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	depPodSpec := model.backstageDeployment.podSpec()
+
+	bs.Spec.Deployment.Kind = "StatefulSet"
+	testObj = createBackstageTest(bs).withDefaultConfig(true)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "StatefulSet", model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
+
+	ssPodSpec := model.backstageDeployment.podSpec()
+	assert.Equal(t, depPodSpec, ssPodSpec)
+}
+
+func TestPatchedStatefulSet(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Kind = "StatefulSet"
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+ serviceName: my-service
+`),
+	}
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "StatefulSet", model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
+
+	ss, ok := model.backstageDeployment.deployable.GetObject().(*appv1.StatefulSet)
+	assert.True(t, ok)
+	assert.Equal(t, "my-service", ss.Spec.ServiceName)
 }
