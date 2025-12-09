@@ -45,7 +45,7 @@ func (f BackstageDeploymentFactory) newBackstageObject() RuntimeObject {
 }
 
 type BackstageDeployment struct {
-	deployment *appsv1.Deployment
+	deployment *appsv1.StatefulSet
 }
 
 func init() {
@@ -57,7 +57,7 @@ func DeploymentName(backstageName string) string {
 }
 
 // BackstageContainerIndex returns the index of backstage container in from deployment.spec.template.spec.containers array
-func BackstageContainerIndex(bsd *appsv1.Deployment) int {
+func BackstageContainerIndex(bsd *appsv1.StatefulSet) int {
 	for i, c := range bsd.Spec.Template.Spec.Containers {
 		if c.Name == BackstageContainerName() {
 			return i
@@ -79,23 +79,23 @@ func (b *BackstageDeployment) Object() runtime.Object {
 func (b *BackstageDeployment) setObject(obj runtime.Object) {
 	b.deployment = nil
 	if obj != nil {
-		b.deployment = obj.(*appsv1.Deployment)
+		b.deployment = obj.(*appsv1.StatefulSet)
 	}
 }
 
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) EmptyObject() client.Object {
-	return &appsv1.Deployment{}
+	return &appsv1.StatefulSet{}
 }
 
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 	if b.deployment == nil {
-		return false, fmt.Errorf("Backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
+		return false, fmt.Errorf("Backstage deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
 	}
 
 	if BackstageContainerIndex(b.deployment) < 0 {
-		return false, fmt.Errorf("Backstage Deployment is not initialized, Backstage Container is not identified")
+		return false, fmt.Errorf("Backstage deployment is not initialized, Backstage Container is not identified")
 	}
 
 	if b.deployment.Spec.Template.ObjectMeta.Annotations == nil {
@@ -234,7 +234,7 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 				return fmt.Errorf("can not merge spec.deployment: %w", err)
 			}
 
-			b.deployment = &appsv1.Deployment{}
+			b.deployment = &appsv1.StatefulSet{}
 			err = yaml.Unmarshal([]byte(merged), b.deployment)
 			if err != nil {
 				return fmt.Errorf("can not unmarshal merged deployment: %w", err)

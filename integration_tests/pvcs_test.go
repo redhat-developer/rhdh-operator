@@ -102,7 +102,7 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(pv.Status.Phase).To(Equal(corev1.VolumeBound))
 
 			// check if added to deployment
-			depl := &appsv1.Deployment{}
+			depl := &appsv1.StatefulSet{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -190,7 +190,7 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(*pvc.Spec.StorageClassName).To(Equal(scName))
 
 			// check if added to deployment
-			depl := &appsv1.Deployment{}
+			depl := &appsv1.StatefulSet{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1")))
@@ -290,7 +290,7 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if added to deployment
-			depl := &appsv1.Deployment{}
+			depl := &appsv1.StatefulSet{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			path := filepath.Join(model.DefaultMountDir, "my-pvc1")

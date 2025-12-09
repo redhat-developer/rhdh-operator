@@ -104,7 +104,7 @@ var _ = When("create backstage with CR configured", func() {
 		backstageName := createAndReconcileBackstage(ctx, ns, bs, "")
 
 		Eventually(func(g Gomega) {
-			deploy := &appsv1.Deployment{}
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -204,8 +204,8 @@ var _ = When("create backstage with CR configured", func() {
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
-			By("creating Deployment with replicas=1 by default")
-			deploy := &appsv1.Deployment{}
+			By("creating deployment with replicas=1 by default")
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).To(Not(HaveOccurred()))
 			g.Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
@@ -233,7 +233,7 @@ var _ = When("create backstage with CR configured", func() {
 
 		Eventually(func(g Gomega) {
 
-			deploy := &appsv1.Deployment{}
+			deploy := &appsv1.StatefulSet{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).To(Not(HaveOccurred()))
 			g.Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(2)))
@@ -254,8 +254,8 @@ var _ = When("create backstage with CR configured", func() {
 		backstageName := createAndReconcileBackstage(ctx, ns, bs2.Spec, "")
 
 		Eventually(func(g Gomega) {
-			By("creating Deployment ")
-			deploy := &appsv1.Deployment{}
+			By("creating deployment ")
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).To(Not(HaveOccurred()))
 			var bscontainer corev1.Container
@@ -290,7 +290,7 @@ var _ = When("create backstage with CR configured", func() {
 })
 
 // Duplicated files in different CMs
-// Message: "Deployment.apps \"test-backstage-ro86g-deployment\" is invalid: spec.template.spec.containers[0].volumeMounts[4].mountPath: Invalid value: \"/my/mount/path/key12\": must be unique",
+// Message: "StatefulSet.apps \"test-backstage-ro86g-deployment\" is invalid: spec.template.spec.containers[0].volumeMounts[4].mountPath: Invalid value: \"/my/mount/path/key12\": must be unique",
 
 // No CM configured
 //failed to preprocess backstage spec app-configs failed to get configMap app-config3: configmaps "app-config3" not found

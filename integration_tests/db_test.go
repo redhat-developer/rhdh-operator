@@ -45,7 +45,7 @@ var _ = When("create backstage with CR configured", func() {
 		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
-			By("creating Deployment with database.enableLocalDb=true by default")
+			By("creating deployment with database.enableLocalDb=true by default")
 
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &appsv1.StatefulSet{})
 			g.Expect(err).To(Not(HaveOccurred()))
@@ -104,8 +104,8 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(err).Should(HaveOccurred())
 			g.Expect(errors.IsNotFound(err))
 
-			By("Checking if Deployment was successfully created in the reconciliation")
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, &appsv1.Deployment{})
+			By("Checking if deployment was successfully created in the reconciliation")
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, &appsv1.StatefulSet{})
 			g.Expect(err).Should(Not(HaveOccurred()))
 		}, time.Minute, time.Second).Should(Succeed())
 	})
@@ -125,8 +125,8 @@ var _ = When("create backstage with CR configured", func() {
 			g.Expect(err).Should(HaveOccurred())
 			g.Expect(errors.IsNotFound(err))
 
-			By("Checking if Deployment was successfully created in the reconciliation")
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, &appsv1.Deployment{})
+			By("Checking if deployment was successfully created in the reconciliation")
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, &appsv1.StatefulSet{})
 			g.Expect(err).Should(Not(HaveOccurred()))
 		}, time.Minute, time.Second).Should(Succeed())
 	})

@@ -121,10 +121,10 @@ func TestPlatformPatchMerge(t *testing.T) {
 
 	// ocp (no patch, so default)
 	//t.Setenv(PlatformEnvVar, "ocp")
-	obj, err := ReadYamlFiles("testdata/deployment.yaml", &appsv1.Deployment{}, *util_test_scheme, "ocp")
+	obj, err := ReadYamlFiles("testdata/deployment.yaml", &appsv1.StatefulSet{}, *util_test_scheme, "ocp")
 	assert.NoError(t, err)
 
-	depl, ok := obj[0].(*appsv1.Deployment)
+	depl, ok := obj[0].(*appsv1.StatefulSet)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, int32(1), *depl.Spec.Replicas)
 	assert.Nil(t, depl.Spec.Template.Spec.SecurityContext)
@@ -132,10 +132,10 @@ func TestPlatformPatchMerge(t *testing.T) {
 	// k8s (patched)
 	//t.Setenv(PlatformEnvVar, "k8s")
 
-	obj, err = ReadYamlFiles("testdata/deployment.yaml", &appsv1.Deployment{}, *util_test_scheme, "k8s")
+	obj, err = ReadYamlFiles("testdata/deployment.yaml", &appsv1.StatefulSet{}, *util_test_scheme, "k8s")
 	assert.NoError(t, err)
 
-	depl, ok = obj[0].(*appsv1.Deployment)
+	depl, ok = obj[0].(*appsv1.StatefulSet)
 	assert.Equal(t, true, ok)
 	assert.Equal(t, int32(2), *depl.Spec.Replicas)
 	assert.NotNil(t, *depl.Spec.Template.Spec.SecurityContext)

@@ -60,7 +60,7 @@ var _ = When("test plugin deps", func() {
 
 		Eventually(func(g Gomega) {
 
-			deploy := &appsv1.Deployment{}
+			deploy := &appsv1.StatefulSet{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 

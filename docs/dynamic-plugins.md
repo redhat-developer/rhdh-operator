@@ -76,3 +76,41 @@ data:
 In this example, both example-dep1.yaml and example-dep1.yaml will be picked and operator create the resources described in the files. 
 
 See also [Orchestrator plugin dependencies](orchestrator.md#plugin-dependencies) as an example.
+
+## Dynamic Plugins cache
+
+This should create Backstage CR with persistent cache for dynamic plugins and StatefulSet with 2 replicas.
+Make sure that the patch like this is applied to your Backstage Custom Resource definition to enable persistent storage for dynamic plugins caching:
+````yaml
+spec:
+  deployment:
+    patch:
+      spec:
+        replicas: 2
+        template:
+          spec:
+            volumes:
+              - $patch: replace
+                name: dynamic-plugins-root
+                persistentVolumeClaim:
+                  claimName: dynamic-plugins-root
+        updateStrategy:
+          type: RollingUpdate
+        volumeClaimTemplates:
+          - apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: dynamic-plugins-root
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+````
+
+4. Create Backstage Custom Resource on some namespace (make sure this namespace exists)
+```shell
+kubectl -n <your-namespace> apply -f <your-CR-file>.yaml
+```
+or using OpenShift Developer Console.

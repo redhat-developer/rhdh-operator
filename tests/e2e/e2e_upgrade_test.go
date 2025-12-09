@@ -111,7 +111,7 @@ metadata:
 
 			crLabel := fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName)
 
-			// TODO(rm3l): this might never work because the Deployment may not necessarily change after an upgrade of the Operator
+			// TODO(rm3l): this might never work because the StatefulSet may not necessarily change after an upgrade of the Operator
 			// It might not result in a different replicas if the newer operator did not change anything.
 			//By("ensuring the current operator eventually reconciled through the creation of a new ReplicaSet of the application")
 			//Eventually(func(g Gomega) {

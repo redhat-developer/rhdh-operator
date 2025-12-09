@@ -82,7 +82,7 @@ organization:
 		createAndReconcileBackstage(ctx, ns, bs, backstageName)
 
 		Eventually(func(g Gomega) {
-			deploy := &appsv1.Deployment{}
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -129,7 +129,7 @@ organization:
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(cm.Data["appconfig11"]).To(Equal(newData))
 
-			deploy := &appsv1.Deployment{}
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -200,7 +200,7 @@ organization:
 
 		var podName string
 		Eventually(func(g Gomega) {
-			deploy := &appsv1.Deployment{}
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -234,7 +234,7 @@ organization:
 
 		Eventually(func(g Gomega) {
 
-			deploy := &appsv1.Deployment{}
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 

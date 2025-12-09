@@ -14,7 +14,7 @@ The Default Configuration defines the structure of all Backstage instances withi
 
 | Key/File Name                            | Object Kind                    | Object Name                                | Mandatory    | Multi | Version | Notes                                           |
 |------------------------------------------|--------------------------------|--------------------------------------------|--------------|-------|---------|-------------------------------------------------|
-| deployment.yaml                          | appsv1.Deployment              | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage deployment                            |
+| deployment.yaml                          | appsv1.StatefulSet              | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage deployment                            |
 | service.yaml                             | corev1.Service                 | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage Service                               |
 | db-statefulset.yaml                      | appsv1.StatefulSet             | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL StatefulSet                          |
 | db-service.yaml                          | corev1.Service                 | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL Service                              |

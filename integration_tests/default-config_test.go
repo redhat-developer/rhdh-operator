@@ -64,8 +64,8 @@ var _ = When("create default backstage", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}, &corev1.Service{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			By("creating Deployment")
-			deploy := &appsv1.Deployment{}
+			By("creating deployment")
+			deploy := &appsv1.StatefulSet{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
@@ -94,7 +94,7 @@ var _ = When("create default backstage", func() {
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
 				g.Expect(err).ShouldNot(HaveOccurred())
 
-				deploy := &appsv1.Deployment{}
+				deploy := &appsv1.StatefulSet{}
 				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 				g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -127,8 +127,8 @@ var _ = When("create default backstage", func() {
 		}, "")
 
 		Eventually(func(g Gomega) {
-			By("creating Deployment")
-			deploy := &appsv1.Deployment{}
+			By("creating deployment")
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(deploy.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
@@ -163,8 +163,8 @@ var _ = When("create default backstage", func() {
 		}, "")
 
 		Eventually(func(g Gomega) {
-			By("creating Deployment")
-			deploy := &appsv1.Deployment{}
+			By("creating deployment")
+			deploy := &appsv1.StatefulSet{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, deploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 

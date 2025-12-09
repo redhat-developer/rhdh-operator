@@ -13,7 +13,7 @@ type ObjectConfig struct {
 	// Factory to create the object
 	ObjectFactory ObjectFactory
 	// Unique key identifying the "kind" of Object which also is the name of config file.
-	// For example: "deployment.yaml" containing configuration of Backstage Deployment
+	// For example: "deployment.yaml" containing configuration of Backstage deployment
 	Key string
 	// Single or multiple object
 	Multiple bool
