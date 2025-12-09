@@ -43,6 +43,43 @@ spec:
 
 TODO: Dynamic plugins can be configured to use container registries for authentication and image pulling. This section should cover the configuration options available for container registry integration with dynamic plugins.
 
+## Catalog Index Configuration
+
+The catalog index is an OCI artifact that contains `dynamic-plugins.default.yaml`, which defines the default set of dynamic plugins to be installed. The operator automatically configures the `install-dynamic-plugins` init container to pull and extract this catalog index.
+
+By default, the operator sets the `CATALOG_INDEX_IMAGE` environment variable in the `install-dynamic-plugins` init container:
+
+```yaml
+env:
+  - name: CATALOG_INDEX_IMAGE
+    value: "quay.io/rhdh/plugin-catalog-index:1.9"
+```
+
+The `install-dynamic-plugins.py` script:
+1. Pulls the catalog index OCI image using `skopeo`
+2. Extracts the image layers to a temporary directory (`.catalog-index-temp`)
+3. Locates `dynamic-plugins.default.yaml` within the extracted content
+4. Replaces the `dynamic-plugins.default.yaml` reference in your `includes` list with the extracted catalog index version
+
+### Overriding the Catalog Index Image
+
+To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    extraEnvs:
+      envs:
+        - name: CATALOG_INDEX_IMAGE
+          value: "quay.io/rhdh/plugin-catalog-index:1.9"
+          containers:
+            - install-dynamic-plugins
+```
+
 ## Dynamic plugins dependency management
 
 ### Overview
