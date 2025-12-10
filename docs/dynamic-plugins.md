@@ -75,7 +75,7 @@ spec:
     extraEnvs:
       envs:
         - name: CATALOG_INDEX_IMAGE
-          value: "quay.io/rhdh/plugin-catalog-index: 1.9"
+          value: "quay.io/rhdh/plugin-catalog-index:1.9"
           containers:
             - install-dynamic-plugins
 ```
