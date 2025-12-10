@@ -2088,6 +2088,8 @@ data:
                   value: /opt/app-root/src/.npmrc.dynamic-plugins/.npmrc
                 - name: MAX_ENTRY_SIZE
                   value: "30000000"
+                - name: CATALOG_INDEX_IMAGE
+                  value: "quay.io/rhdh/plugin-catalog-index:1.9"
               volumeMounts:
                 - mountPath: /dynamic-plugins-root
                   name: dynamic-plugins-root
@@ -2948,6 +2950,8 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
+        - name: RELATED_IMAGE_catalog_index
+          value: quay.io/rhdh/plugin-catalog-index:1.9
         image: quay.io/rhdh/rhdh-rhel9-operator:1.9
         livenessProbe:
           httpGet:
