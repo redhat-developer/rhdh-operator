@@ -48,9 +48,6 @@ TODO: Dynamic plugins can be configured to use container registries for authenti
 The operator supports loading default plugin configurations from an OCI container image (catalog index). For general information about how the catalog index works, see [Using a Catalog Index Image for Default Plugin Configurations](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-a-catalog-index-image-for-default-plugin-configurations).
 
 By default, the operator sets `CATALOG_INDEX_IMAGE` to `quay.io/rhdh/plugin-catalog-index:1.9` in the `install-dynamic-plugins` init container.
-
-### Overriding the Catalog Index Image
-
 To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR:
 
 ```yaml
