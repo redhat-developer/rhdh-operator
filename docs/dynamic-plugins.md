@@ -45,25 +45,13 @@ TODO: Dynamic plugins can be configured to use container registries for authenti
 
 ## Catalog Index Configuration
 
-The catalog index is an OCI artifact that contains `dynamic-plugins.default.yaml`, which defines the default set of dynamic plugins to be installed. The operator automatically configures the `install-dynamic-plugins` init container to pull and extract this catalog index.
+The operator supports loading default plugin configurations from an OCI container image (catalog index). For general information about how the catalog index works, see [Using a Catalog Index Image for Default Plugin Configurations](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-a-catalog-index-image-for-default-plugin-configurations).
 
-By default, the operator sets `CATALOG_INDEX_IMAGE` environment variable in the `install-dynamic-plugins` init container:
-
-```yaml
-env:
-  - name: CATALOG_INDEX_IMAGE
-    value: "quay.io/rhdh/plugin-catalog-index:1.9"
-```
-
-The `install-dynamic-plugins.py` script:
-1. Pulls the catalog index OCI image using `skopeo`
-2. Extracts the image layers to a temporary directory (`.catalog-index-tmp`)
-3. locates `dynamic-plugins.default.yaml` within the extracted content
-4. Replaces the `dynamic-plugins.default.yaml` reference in your `includes` list with the extracted catalog index version
+By default, the operator sets `CATALOG_INDEX_IMAGE` to `quay.io/rhdh/plugin-catalog-index:1.9` in the `install-dynamic-plugins` init container.
 
 ### Overriding the Catalog Index Image
 
-To use a different catalog index, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR:
+To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR:
 
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha5
