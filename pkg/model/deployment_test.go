@@ -288,14 +288,14 @@ spec:
         - name: install-dynamic-plugins
           env:
             - name: CATALOG_INDEX_IMAGE
-              value: "quay.io/rhdh/plugin-catalog-index:1.9"
+              value: "quay.io/rhdh/plugin-catalog-index:1.8"
 `),
 	}
 
-	// Now specify the same env var via extraEnvs with a different value
+	// Now specify the same env var via extraEnvs with a different value (upgrading to latest)
 	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
 		Envs: []bsv1.Env{
-			{Name: "CATALOG_INDEX_IMAGE", Value: "quay.io/rhdh/plugin-catalog-index:1.8", Containers: []string{"install-dynamic-plugins"}},
+			{Name: "CATALOG_INDEX_IMAGE", Value: "quay.io/rhdh/plugin-catalog-index:1.9", Containers: []string{"install-dynamic-plugins"}},
 		},
 	}
 
@@ -325,7 +325,7 @@ spec:
 	}
 
 	assert.Equal(t, 1, catalogIndexCount, "CATALOG_INDEX_IMAGE should appear exactly once, not duplicated")
-	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.8", catalogIndexValue, "extraEnvs value should override the default")
+	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.9", catalogIndexValue, "extraEnvs value should override the default")
 }
 
 func TestDeploymentKind(t *testing.T) {

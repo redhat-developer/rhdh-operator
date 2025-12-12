@@ -65,6 +65,12 @@ spec:
             - install-dynamic-plugins
 ```
 
+### Using a Private Registry
+
+If your catalog index image is stored in a private registry that requires authentication, create a secret named `<backstage-cr-name>-dynamic-plugins-registry-auth` containing an `auth.json` file with your registry credentials.
+
+For detailed instructions on configuring private registry authentication, see the [official Red Hat Developer Hub documentation](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.8/html/installing_and_viewing_plugins_in_red_hat_developer_hub/assembly-third-party-plugins#proc-load-plugin-oci-image_assembly-install-third-party-plugins-rhdh).
+
 ## Dynamic plugins dependency management
 
 ### Overview
