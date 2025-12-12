@@ -296,10 +296,11 @@ func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
 			return fmt.Errorf("can not get containers to add env %s: %w", env.Name, err)
 		}
 		for _, container := range containers {
-			container.Env = append(container.Env, corev1.EnvVar{
-				Name:  env.Name,
-				Value: env.Value,
-			})
+			container.Env =
+				append(container.Env, corev1.EnvVar{
+					Name:  env.Name,
+					Value: env.Value,
+				})
 		}
 	}
 	return nil
