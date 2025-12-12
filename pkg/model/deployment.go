@@ -285,7 +285,6 @@ func (b *BackstageDeployment) setImage(image *string) {
 }
 
 // adds environment from source to the Backstage Container
-// If an env var with the same name already exists, it will be replaced (not duplicated)
 func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
 	if extraEnvs == nil {
 		return nil
@@ -297,21 +296,13 @@ func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
 			return fmt.Errorf("can not get containers to add env %s: %w", env.Name, err)
 		}
 		for _, container := range containers {
-			b.setOrAppendEnvVar(container, env.Name, env.Value)
+			container.Env = append(container.Env, corev1.EnvVar{
+				Name:  env.Name,
+				Value: env.Value,
+			})
 		}
 	}
 	return nil
-}
-
-// setOrAppendEnvVar sets an env var on a container, replacing if it exists or appending if not
-func (b *BackstageDeployment) setOrAppendEnvVar(container *corev1.Container, name, value string) {
-	for i, existingEnv := range container.Env {
-		if existingEnv.Name == name {
-			container.Env[i] = corev1.EnvVar{Name: name, Value: value}
-			return
-		}
-	}
-	container.Env = append(container.Env, corev1.EnvVar{Name: name, Value: value})
 }
 
 // MountFilesFrom adds Volume to specified podSpec and related VolumeMounts to specified belonging to this podSpec container
