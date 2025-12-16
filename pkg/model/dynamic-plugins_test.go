@@ -247,6 +247,38 @@ func initContainer(model *BackstageModel) *corev1.Container {
 	return nil
 }
 
+// TestCatalogIndexImageEnvVar verifies that the operator reads RELATED_IMAGE_catalog_index
+// and sets CATALOG_INDEX_IMAGE on the install-dynamic-plugins init container
+func TestCatalogIndexImageEnvVar(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "sidecar-deployment.yaml")
+
+	// Set the RELATED_IMAGE_catalog_index env var (simulating operator environment)
+	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:1.9")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	// Verify CATALOG_INDEX_IMAGE is set on the init container
+	var catalogIndexValue string
+	for _, env := range ic.Env {
+		if env.Name == "CATALOG_INDEX_IMAGE" {
+			catalogIndexValue = env.Value
+			break
+		}
+	}
+
+	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.9", catalogIndexValue,
+		"CATALOG_INDEX_IMAGE should be set from RELATED_IMAGE_catalog_index")
+}
+
 func TestUnmarshalDynaPluginsConfig(t *testing.T) {
 	yamlData := `
 plugins:

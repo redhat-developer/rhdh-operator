@@ -29,6 +29,7 @@ const (
 )
 
 const BackstageImageEnvVar = "RELATED_IMAGE_backstage"
+const CatalogIndexImageEnvVar = "RELATED_IMAGE_catalog_index"
 const DefaultMountDir = "/opt/app-root/src"
 const ExtConfigHashAnnotation = "rhdh.redhat.com/ext-config-hash"
 
