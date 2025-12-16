@@ -7,6 +7,7 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"k8s.io/utils/ptr"
@@ -268,6 +269,63 @@ spec:
 	assert.Equal(t, 1, len(sidecar.Env))
 	assert.Equal(t, "VAR1", sidecar.Env[0].Name)
 
+}
+
+// TestExtraEnvsReplacesExistingEnvVar verifies that when a user specifies an env var
+// via extraEnvs that already exists in the default config, it replaces the existing
+// value instead of creating duplicates (which would cause Kubernetes to reject the deployment)
+func TestExtraEnvsReplacesExistingEnvVar(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+
+	// Add an env var via patch that will already exist in the deployment
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: install-dynamic-plugins
+          env:
+            - name: CATALOG_INDEX_IMAGE
+              value: "quay.io/rhdh/plugin-catalog-index:1.8"
+`),
+	}
+
+	// Now specify the same env var via extraEnvs with a different value (upgrading to latest)
+	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
+		Envs: []bsv1.Env{
+			{Name: "CATALOG_INDEX_IMAGE", Value: "quay.io/rhdh/plugin-catalog-index:1.9", Containers: []string{"install-dynamic-plugins"}},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	// Find the init container
+	var initContainerEnvs []corev1.EnvVar
+	for _, ic := range model.backstageDeployment.podSpec().InitContainers {
+		if ic.Name == "install-dynamic-plugins" {
+			initContainerEnvs = ic.Env
+			break
+		}
+	}
+
+	// Verify there's no duplicate - only ONE CATALOG_INDEX_IMAGE env var should exist
+	catalogIndexCount := 0
+	var catalogIndexValue string
+	for _, env := range initContainerEnvs {
+		if env.Name == "CATALOG_INDEX_IMAGE" {
+			catalogIndexCount++
+			catalogIndexValue = env.Value
+		}
+	}
+
+	assert.Equal(t, 1, catalogIndexCount, "CATALOG_INDEX_IMAGE should appear exactly once, not duplicated")
+	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.9", catalogIndexValue, "extraEnvs value should override the default")
 }
 
 func TestDeploymentKind(t *testing.T) {
