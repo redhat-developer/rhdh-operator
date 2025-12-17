@@ -279,6 +279,46 @@ func TestCatalogIndexImageEnvVar(t *testing.T) {
 		"CATALOG_INDEX_IMAGE should be set from RELATED_IMAGE_catalog_index")
 }
 
+// TestCatalogIndexImageExtraEnvsOverride verifies that user-specified extraEnvs
+// takes precedence over the operator's RELATED_IMAGE_catalog_index env var
+func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	// User specifies a different catalog index image via extraEnvs
+	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
+		Envs: []bsv1.Env{
+			{Name: "CATALOG_INDEX_IMAGE", Value: "quay.io/rhdh/plugin-catalog-index:1.8", Containers: []string{"install-dynamic-plugins"}},
+		},
+	}
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+
+	// Set the RELATED_IMAGE_catalog_index env var (simulating operator environment)
+	// This should NOT override the user's extraEnvs value
+	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:1.9")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	// Verify user's extraEnvs value takes precedence
+	var catalogIndexValue string
+	for _, env := range ic.Env {
+		if env.Name == "CATALOG_INDEX_IMAGE" {
+			catalogIndexValue = env.Value
+			break
+		}
+	}
+
+	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.8", catalogIndexValue,
+		"extraEnvs value should override the operator's RELATED_IMAGE_catalog_index")
+}
+
 func TestUnmarshalDynaPluginsConfig(t *testing.T) {
 	yamlData := `
 plugins:
