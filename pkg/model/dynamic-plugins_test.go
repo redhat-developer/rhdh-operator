@@ -254,7 +254,7 @@ func TestCatalogIndexImageEnvVar(t *testing.T) {
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "sidecar-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
 	// Set the RELATED_IMAGE_catalog_index env var (simulating operator environment)
 	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:1.9")
