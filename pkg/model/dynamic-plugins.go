@@ -283,25 +283,8 @@ func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 		actualInitContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
 
-	// Only set CATALOG_INDEX_IMAGE from operator env var if user hasn't already specified it
-	// (e.g., via extraEnvs or deployment patch)
-	if catalogIndexImage := os.Getenv(CatalogIndexImageEnvVar); catalogIndexImage != "" {
-		if !hasEnvVar(actualInitContainer, "CATALOG_INDEX_IMAGE") {
-			p.model.backstageDeployment.setOrAppendEnvVar(actualInitContainer, "CATALOG_INDEX_IMAGE", catalogIndexImage)
-		}
-	}
 
 	return i, actualInitContainer
-}
-
-// hasEnvVar checks if a container already has an environment variable with the given name
-func hasEnvVar(container *corev1.Container, name string) bool {
-	for _, env := range container.Env {
-		if env.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 // returns initContainer supposed to initialize DynamicPlugins

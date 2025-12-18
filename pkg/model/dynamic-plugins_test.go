@@ -15,6 +15,7 @@ import (
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -277,6 +278,90 @@ func TestCatalogIndexImageEnvVar(t *testing.T) {
 
 	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.9", catalogIndexValue,
 		"CATALOG_INDEX_IMAGE should be set from RELATED_IMAGE_catalog_index")
+}
+
+// TestCatalogIndexImageOverridesDefaultConfig verifies that RELATED_IMAGE_catalog_index
+// overrides the CATALOG_INDEX_IMAGE value that comes from the default config.
+// This is the critical test case: the default-config deployment.yaml has CATALOG_INDEX_IMAGE
+// set to one value, but RELATED_IMAGE_catalog_index should override it.
+func TestCatalogIndexImageOverridesDefaultConfig(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	// janus-deployment.yaml has CATALOG_INDEX_IMAGE set (like the real default-config)
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+
+	// Set RELATED_IMAGE_catalog_index to a DIFFERENT value - this should override the default config
+	t.Setenv(CatalogIndexImageEnvVar, "quay.io/fake-reg/img:1.2.3")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	// Verify RELATED_IMAGE_catalog_index value is used, NOT the default config value
+	var catalogIndexValue string
+	catalogIndexCount := 0
+	for _, env := range ic.Env {
+		if env.Name == "CATALOG_INDEX_IMAGE" {
+			catalogIndexValue = env.Value
+			catalogIndexCount++
+		}
+	}
+
+	assert.Equal(t, 1, catalogIndexCount, "CATALOG_INDEX_IMAGE should appear exactly once")
+	assert.Equal(t, "quay.io/fake-reg/img:1.2.3", catalogIndexValue,
+		"RELATED_IMAGE_catalog_index should override the default config value")
+}
+
+// TestCatalogIndexImageUserPatchTakesPrecedence verifies that user-specified deployment patch
+// takes precedence over the operator's RELATED_IMAGE_catalog_index env var
+func TestCatalogIndexImageUserPatchTakesPrecedence(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	// User specifies CATALOG_INDEX_IMAGE via deployment patch
+	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: install-dynamic-plugins
+          env:
+            - name: CATALOG_INDEX_IMAGE
+              value: "quay.io/user-specified/image:2.0"
+`),
+	}
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+
+	// Set RELATED_IMAGE_catalog_index - but user's patch should take precedence
+	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:1.9")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	// Verify user's patch value takes precedence
+	var catalogIndexValue string
+	for _, env := range ic.Env {
+		if env.Name == "CATALOG_INDEX_IMAGE" {
+			catalogIndexValue = env.Value
+			break
+		}
+	}
+
+	assert.Equal(t, "quay.io/user-specified/image:2.0", catalogIndexValue,
+		"user's deployment patch should override RELATED_IMAGE_catalog_index")
 }
 
 // TestCatalogIndexImageExtraEnvsOverride verifies that user-specified extraEnvs
