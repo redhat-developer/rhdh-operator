@@ -2670,7 +2670,7 @@ data:
           workingDir: $(workspaces.workflow-source.path)/flat/$(params.workflowId)
           script: |
             microdnf install -y tar gzip
-            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.35.0/kn-workflow-linux-amd64.tar.gz"
+            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.37.0/kn-workflow-linux-amd64.tar.gz"
             curl -L "$KN_CLI_URL" | tar -xz --no-same-owner && chmod +x kn-workflow-linux-amd64 && mv kn-workflow-linux-amd64 kn-workflow
             ./kn-workflow gen-manifest --namespace ""
     ---
