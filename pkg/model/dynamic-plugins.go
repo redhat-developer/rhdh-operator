@@ -279,7 +279,6 @@ func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
 
-
 	return i, initContainer
 }
 
