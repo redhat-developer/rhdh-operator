@@ -280,7 +280,7 @@ func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 
 	// override image with env var
 	if os.Getenv(BackstageImageEnvVar) != "" {
-		actualInitContainer.Image = os.Getenv(BackstageImageEnvVar)
+		initContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
 
 
