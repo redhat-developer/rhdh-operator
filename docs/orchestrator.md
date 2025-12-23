@@ -112,7 +112,8 @@ The orchestrator plugin instance requires the following dependencies to be insta
 
 The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
 
-**Note:** Upgrading an existing OpenShift Serverless Logic Operator subscription to v1.37 requires deleting the previous logic-operator-rhel8 subscription before installing the new one. see [OpenShift Serverless Logic Operator documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.37/html/serverless_logic/getting-started#serverless-logic-upgrading-operator) for more details on the new OpenShift Serverless Logic Operator version.
+**Note:** Upgrading an existing OpenShift Serverless Logic Operator subscription to v1.37 requires deleting the previous logic-operator-rhel8 subscription before installing the new one. That being said, the related SonataflowPlatform operands **should not be deleted**. See [OpenShift Serverless Logic Operator documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.37/html/serverless_logic/getting-started#serverless-logic-upgrading-operator) for more details on the recently released OpenShift Serverless Logic Operator versions and upgrade process.
+
 
 **Important:** The sonataflowplatform CR contains dataIndex service that requires PostgreSQL database.
 
