@@ -60,6 +60,9 @@ spec:
               value: /opt/app-root/src/.npmrc.dynamic-plugins/.npmrc
             - name: MAX_ENTRY_SIZE
               value: "30000000"
+            # CATALOG_INDEX_IMAGE will be replaced by the value of the `RELATED_IMAGE_catalog_index` env var, if set
+            - name: CATALOG_INDEX_IMAGE
+              value: "quay.io/rhdh/plugin-catalog-index:1.9"
           volumeMounts:
             - mountPath: /dynamic-plugins-root
               name: dynamic-plugins-root
