@@ -24,7 +24,7 @@ There are three methods to install the required components for the Orchestrator 
 This method is recommended for production environments, especially when specific versions of the required components are installed (e.g., when OpenShift Serverless is already in use by other applications).
 
 ##### Version Compatibility
-This recommendation is based on OpenShift Serverless version `1.36`. Refer to the Orchestrator plugin compatibility documentation to ensure the correct version of OpenShift Serverless is supported for your Orchestrator plugin version.
+This recommendation is based on OpenShift Serverless version `1.37`. Refer to the Orchestrator plugin compatibility documentation to ensure the correct version of OpenShift Serverless is supported for your Orchestrator plugin version.
 
 ##### Steps
 Go to the [OpenShift Serverless documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless) for installation instructions and follow these steps:
@@ -112,6 +112,9 @@ The orchestrator plugin instance requires the following dependencies to be insta
 
 The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
 
+**Note:** Upgrading an existing OpenShift Serverless Logic Operator subscription to v1.37 requires deleting the previous logic-operator-rhel8 subscription before installing the new one. That being said, the related SonataflowPlatform operands **should not be deleted**. See [OpenShift Serverless Logic Operator documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.37/html/serverless_logic/getting-started#serverless-logic-upgrading-operator) for more details on the recently released OpenShift Serverless Logic Operator versions and upgrade process.
+
+
 **Important:** The sonataflowplatform CR contains dataIndex service that requires PostgreSQL database.
 
 ```yaml
@@ -147,7 +150,7 @@ This is done by the Backstage operator automatically when the SonataFlowPlatform
 #### Troubleshooting database migration issues
 
 After installing and configuring the Orchestrator plugin, you can deploy Serverless Workflows to RHDH and run them through the plugin.  
-For more information, see the [OpenShift Serverless Logic documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/serverless_logic/getting-started#serverless-logic-creating-managing-workflows).
+For more information, see the [OpenShift Serverless Logic documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.37/html/serverless_logic/getting-started#serverless-logic-creating-managing-workflows).
 
 If your workflow uses persistence, database migration issues might occur when building or running new workflows.  
 To resolve this, ensure the following property is set in the workflow’s SonataFlow custom resource (CR) or in the `application.properties` file associated with the workflow:
@@ -156,7 +159,7 @@ To resolve this, ensure the following property is set in the workflow’s Sonata
 kie.flyway.enabled=true
 ```
 
-For more details, refer to the Flyway configuration section in the [Openshift Serverless Logic documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.36/html/serverless_logic/serverless-logic-managing-persistence#serverless-logic-flyway-config-workflow-configmap_serverless-logic-managing-persistence).
+For more details, refer to the Flyway configuration section in the [Openshift Serverless Logic documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.37/html/serverless_logic/serverless-logic-managing-persistence#serverless-logic-flyway-config-workflow-configmap_serverless-logic-managing-persistence).
 
 ## Optional: Enable GitOps/Pipelines for Orchestrator Workflows
 To enable CI/CD for RHDH Orchestrator workflows, please follow this [guide](orchestrator-cicd.md).
