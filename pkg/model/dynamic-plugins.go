@@ -284,7 +284,7 @@ func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 	}
 
 
-	return i, actualInitContainer
+	return i, initContainer
 }
 
 // returns initContainer supposed to initialize DynamicPlugins

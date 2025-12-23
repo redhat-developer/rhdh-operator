@@ -248,17 +248,15 @@ func initContainer(model *BackstageModel) *corev1.Container {
 	return nil
 }
 
-// TestCatalogIndexImageEnvVar verifies that the operator reads RELATED_IMAGE_catalog_index
-// and sets CATALOG_INDEX_IMAGE on the install-dynamic-plugins init container
-func TestCatalogIndexImageEnvVar(t *testing.T) {
+
+// TestCatalogIndexImageFromDefaultConfig verifies that the operator sets CATALOG_INDEX_IMAGE
+// on the install-dynamic-plugins init container from the default config by default
+func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
-
-	// Set the RELATED_IMAGE_catalog_index env var (simulating operator environment)
-	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:1.9")
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -267,17 +265,10 @@ func TestCatalogIndexImageEnvVar(t *testing.T) {
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
 
-	// Verify CATALOG_INDEX_IMAGE is set on the init container
-	var catalogIndexValue string
-	for _, env := range ic.Env {
-		if env.Name == "CATALOG_INDEX_IMAGE" {
-			catalogIndexValue = env.Value
-			break
-		}
-	}
-
-	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.9", catalogIndexValue,
-		"CATALOG_INDEX_IMAGE should be set from RELATED_IMAGE_catalog_index")
+	assert.Len(t, ic.Env, 2)
+	assert.Equal(t, "NPM_CONFIG_USERCONFIG", ic.Env[0].Name)
+	assert.Equal(t, "CATALOG_INDEX_IMAGE", ic.Env[1].Name)
+	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.9", ic.Env[1].Value, "CATALOG_INDEX_IMAGE should be set from the default config")
 }
 
 // TestCatalogIndexImageOverridesDefaultConfig verifies that RELATED_IMAGE_catalog_index
@@ -302,19 +293,10 @@ func TestCatalogIndexImageOverridesDefaultConfig(t *testing.T) {
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
 
-	// Verify RELATED_IMAGE_catalog_index value is used, NOT the default config value
-	var catalogIndexValue string
-	catalogIndexCount := 0
-	for _, env := range ic.Env {
-		if env.Name == "CATALOG_INDEX_IMAGE" {
-			catalogIndexValue = env.Value
-			catalogIndexCount++
-		}
-	}
-
-	assert.Equal(t, 1, catalogIndexCount, "CATALOG_INDEX_IMAGE should appear exactly once")
-	assert.Equal(t, "quay.io/fake-reg/img:1.2.3", catalogIndexValue,
-		"RELATED_IMAGE_catalog_index should override the default config value")
+	assert.Len(t, ic.Env, 2)
+	assert.Equal(t, "NPM_CONFIG_USERCONFIG", ic.Env[0].Name)
+	assert.Equal(t, "CATALOG_INDEX_IMAGE", ic.Env[1].Name)
+	assert.Equal(t, "quay.io/fake-reg/img:1.2.3", ic.Env[1].Value, "RELATED_IMAGE_catalog_index should override the default config value")
 }
 
 // TestCatalogIndexImageUserPatchTakesPrecedence verifies that user-specified deployment patch
@@ -342,7 +324,7 @@ spec:
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
 	// Set RELATED_IMAGE_catalog_index - but user's patch should take precedence
-	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:1.9")
+	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:related-image")
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -350,18 +332,10 @@ spec:
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
-
-	// Verify user's patch value takes precedence
-	var catalogIndexValue string
-	for _, env := range ic.Env {
-		if env.Name == "CATALOG_INDEX_IMAGE" {
-			catalogIndexValue = env.Value
-			break
-		}
-	}
-
-	assert.Equal(t, "quay.io/user-specified/image:2.0", catalogIndexValue,
-		"user's deployment patch should override RELATED_IMAGE_catalog_index")
+	assert.Len(t, ic.Env, 2)
+	assert.Equal(t, "NPM_CONFIG_USERCONFIG", ic.Env[0].Name)
+	assert.Equal(t, "CATALOG_INDEX_IMAGE", ic.Env[1].Name)
+	assert.Equal(t, "quay.io/user-specified/image:2.0", ic.Env[1].Value, "user's deployment patch should override RELATED_IMAGE_catalog_index")
 }
 
 // TestCatalogIndexImageExtraEnvsOverride verifies that user-specified extraEnvs
@@ -372,7 +346,7 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 	// User specifies a different catalog index image via extraEnvs
 	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
 		Envs: []bsv1.Env{
-			{Name: "CATALOG_INDEX_IMAGE", Value: "quay.io/rhdh/plugin-catalog-index:1.8", Containers: []string{"install-dynamic-plugins"}},
+			{Name: "CATALOG_INDEX_IMAGE", Value: "quay.io/rhdh/plugin-catalog-index:extra-env", Containers: []string{"install-dynamic-plugins"}},
 		},
 	}
 
@@ -382,7 +356,7 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 
 	// Set the RELATED_IMAGE_catalog_index env var (simulating operator environment)
 	// This should NOT override the user's extraEnvs value
-	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:1.9")
+	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:related-image")
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -390,18 +364,10 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
-
-	// Verify user's extraEnvs value takes precedence
-	var catalogIndexValue string
-	for _, env := range ic.Env {
-		if env.Name == "CATALOG_INDEX_IMAGE" {
-			catalogIndexValue = env.Value
-			break
-		}
-	}
-
-	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.8", catalogIndexValue,
-		"extraEnvs value should override the operator's RELATED_IMAGE_catalog_index")
+	assert.Len(t, ic.Env, 2)
+	assert.Equal(t, "NPM_CONFIG_USERCONFIG", ic.Env[0].Name)
+	assert.Equal(t, "CATALOG_INDEX_IMAGE", ic.Env[1].Name)
+	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:extra-env", ic.Env[1].Value, "extraEnvs value should override the operator's RELATED_IMAGE_catalog_index")
 }
 
 func TestUnmarshalDynaPluginsConfig(t *testing.T) {
