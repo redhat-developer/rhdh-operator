@@ -7,7 +7,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	appv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"k8s.io/utils/ptr"
