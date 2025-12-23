@@ -75,6 +75,11 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make lint
 
+      - name: Test
+        # run this stage only if there are changes that match the includes and not the excludes
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: make test
+
       - name: Create Kind cluster
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
@@ -91,11 +96,6 @@ jobs:
           # but the `make test` command tries to use it.
           make manifests generate fmt vet install
           make run &
-
-      - name: Test
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
-        run: make test
 
       - name: Generic Integration test
         # run this stage only if there are changes that match the includes and not the excludes
