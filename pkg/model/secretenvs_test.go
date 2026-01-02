@@ -33,7 +33,7 @@ func TestDefaultSecretEnvFrom(t *testing.T) {
 
 	bs := *secretEnvsTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretEnvsObjectKey, "raw-sec-envs.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig(SecretEnvsObjectKey, "raw-sec-envs.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -52,7 +52,8 @@ func TestDefaultMultiSecretEnv(t *testing.T) {
 
 	bs := *secretEnvsTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
+	testObj := createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
 		addToDefaultConfig(SecretEnvsObjectKey, "raw-multi-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -81,7 +82,7 @@ func TestSpecifiedSecretEnvs(t *testing.T) {
 	bs.Spec.Application.ExtraEnvs.Secrets = append(bs.Spec.Application.ExtraEnvs.Secrets,
 		bsv1.EnvObjectRef{Name: "secName", Key: "ENV1"})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvConfigMapKeys["secName"] = NewDataObjectKeys(map[string]string{"secName": "ENV1"}, nil)
 
@@ -101,62 +102,7 @@ func TestSpecifiedSecretEnvs(t *testing.T) {
 
 func TestSpecifiedSecretEnvsWithContainers(t *testing.T) {
 
-	bs := *secretEnvsTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraEnvs: &bsv1.ExtraEnvs{
-			Secrets: []bsv1.EnvObjectRef{
-				{
-					Name:       "secName",
-					Key:        "ENV1",
-					Containers: []string{"install-dynamic-plugins", "another-container"},
-				},
-			},
-		},
-	}
-
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
-	testObj.externalConfig.ExtraEnvSecretKeys = map[string]DataObjectKeys{}
-	testObj.externalConfig.ExtraEnvSecretKeys["secName"] = NewDataObjectKeys(map[string]string{"secName": "ENV1"}, nil)
-
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, model)
-
-	cont := model.backstageDeployment.containerByName("install-dynamic-plugins")
-	assert.NotNil(t, cont)
-	assert.Equal(t, 1, len(cont.Env))
-	assert.NotNil(t, cont.Env[0])
-	assert.Equal(t, "ENV1", cont.Env[0].Name)
-
-	cont = model.backstageDeployment.containerByName("another-container")
-	assert.NotNil(t, cont)
-	assert.Equal(t, 1, len(cont.Env))
-	assert.NotNil(t, cont.Env[0])
-	assert.Equal(t, "ENV1", cont.Env[0].Name)
-
-	cont = model.backstageDeployment.containerByName("backstage-backend")
-	assert.NotNil(t, cont)
-	assert.Equal(t, 0, len(cont.Env))
-
-	// check *
-	bs.Spec.Application.ExtraEnvs.Secrets[0].Containers = []string{"*"}
-
-	testObj = createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
-	testObj.externalConfig.ExtraEnvSecretKeys = map[string]DataObjectKeys{}
-	testObj.externalConfig.ExtraEnvSecretKeys["secName"] = NewDataObjectKeys(map[string]string{"secName": "ENV1"}, nil)
-
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, model)
-	assert.Equal(t, 4, len(model.backstageDeployment.allContainers()))
-	for _, cn := range model.backstageDeployment.allContainers() {
-		c := model.backstageDeployment.containerByName(cn)
-		assert.Equal(t, 1, len(c.Env))
-		assert.NotNil(t, c.Env[0])
-		assert.Equal(t, "ENV1", c.Env[0].Name)
-	}
+	doCheckSpecifiedEnvsWithContainers(t, "secret")
 }
 
 func TestSecretEnvsWithNonExistedContainerFailed(t *testing.T) {
@@ -173,7 +119,7 @@ func TestSecretEnvsWithNonExistedContainerFailed(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 

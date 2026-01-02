@@ -54,7 +54,8 @@ func DeploymentName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage")
 }
 
-// BackstageContainerIndex returns the index of backstage container in from deployment.spec.template.spec.containers array
+// BackstageContainerIndex returns the index of backstage container
+// in from deployment.spec.template.spec.containers array
 func BackstageContainerIndex(bsdPod *corev1.PodSpec) int {
 	for i, c := range bsdPod.Containers {
 		if c.Name == BackstageContainerName() {
@@ -76,11 +77,11 @@ func (b *BackstageDeployment) Object() runtime.Object {
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) setObject(obj runtime.Object) {
 
-	//b.deployable = DeploymentObj{}
+	// b.deployable = DeploymentObj{}
 
-	//if obj != nil {
-	//	b.deployable.setObject(obj)
-	//}
+	// if obj != nil {
+	// 	b.deployable.setObject(obj)
+	// }
 	var err error
 	b.deployable, err = CreateDeployable(obj)
 	if err != nil {
@@ -91,7 +92,8 @@ func (b *BackstageDeployment) setObject(obj runtime.Object) {
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
 	if b.deployable.GetObject() == nil {
-		return false, fmt.Errorf("backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
+		return false, fmt.Errorf(
+			"backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
 	}
 
 	if BackstageContainerIndex(b.podSpec()) < 0 {
@@ -112,7 +114,8 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 		b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
 	}
 
-	// Set CATALOG_INDEX_IMAGE from operator env var BEFORE extraEnvs are applied, so user-specified extraEnvs can still override this value
+	// Set CATALOG_INDEX_IMAGE from operator env var BEFORE extraEnvs are applied,
+	// so user-specified extraEnvs can still override this value
 	if catalogIndexImage := os.Getenv(CatalogIndexImageEnvVar); catalogIndexImage != "" {
 		if i, _ := DynamicPluginsInitContainer(b.podSpec().InitContainers); i >= 0 {
 			b.setOrAppendEnvVar(&b.podSpec().InitContainers[i], "CATALOG_INDEX_IMAGE", catalogIndexImage)
@@ -129,7 +132,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error {
 
-	//DbSecret
+	// DbSecret
 	var err error
 	if backstage.Spec.IsAuthSecretSpecified() {
 		err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, backstage.Spec.Database.AuthSecretName, "")
@@ -146,7 +149,8 @@ func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error 
 
 func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	b.deployable.GetObject().SetName(DeploymentName(backstage.Name))
-	utils.GenerateLabel(&b.deployable.PodObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+	utils.GenerateLabel(
+		&b.deployable.PodObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
 
 	b.deployable.SpecSelector().MatchLabels[BackstageAppLabel] = utils.BackstageAppLabelValue(backstage.Name)
 	setMetaInfo(b.deployable.GetObject(), backstage, scheme)
@@ -322,16 +326,19 @@ func (b *BackstageDeployment) setOrAppendEnvVar(container *corev1.Container, nam
 	container.Env = append(container.Env, corev1.EnvVar{Name: name, Value: value})
 }
 
-// MountFilesFrom adds Volume to specified podSpec and related VolumeMounts to specified belonging to this podSpec container
-// from ConfigMap or Secret volume source
+// MountFilesFrom adds Volume to specified podSpec and related VolumeMounts
+// to specified belonging to this podSpec container from ConfigMap or Secret volume source
 // containers - array of containers to add VolumeMount(s) to
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // mountPath - mount path, default one or  as it specified in BackstageCR.spec.Application.AppConfig|ExtraFiles
 // fileName - file name which fits one of the object's key, otherwise error will be returned.
-// withSubPath - if true will be mounted file-by-file with subpath, otherwise will be mounted as directory to specified path
+// withSubPath - if true will be mounted file-by-file with subpath, otherwise will be mounted as directory
 // dataKeys - keys for ConfigMap/Secret data
-func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, kind ObjectKind, objectName, mountPath, fileName string, withSubPath bool, dataKeys []string) error {
+func (b *BackstageDeployment) mountFilesFrom(
+	containersFilter containersFilter, kind ObjectKind, objectName, mountPath, fileName string,
+	withSubPath bool, dataKeys []string,
+) error {
 
 	containers, err := containersFilter.getContainers(b)
 	if err != nil {
@@ -375,7 +382,8 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 				}
 			}
 		} else {
-			mountsToAdd = []corev1.VolumeMount{{Name: volName, MountPath: filepath.Join(mountPath, fileName), SubPath: fileName, ReadOnly: true}}
+			mountsToAdd = []corev1.VolumeMount{{
+				Name: volName, MountPath: filepath.Join(mountPath, fileName), SubPath: fileName, ReadOnly: true}}
 		}
 
 		// Replace or append
@@ -408,7 +416,11 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 // objectName - name of source object
 // varName - name of env variable
 
-func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, kind ObjectKind, objectName, varName string) error {
+func (b *BackstageDeployment) addEnvVarsFrom(
+	containersFilter containersFilter,
+	kind ObjectKind,
+	objectName, varName string,
+) error {
 
 	containers, err := containersFilter.getContainers(b)
 	if err != nil {

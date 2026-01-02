@@ -47,7 +47,8 @@ func (b *DbService) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 	b.model = model
 	if b.service == nil {
 		if model.localDbEnabled {
-			return false, fmt.Errorf("LocalDb Service not initialized, make sure there is db-service.yaml in default or raw configuration")
+			return false, fmt.Errorf(
+				"LocalDb Service not initialized, make sure there is db-service.yaml in default or raw configuration")
 		}
 		return false, nil
 	} else {
@@ -66,9 +67,9 @@ func (b *DbService) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 }
 
 // implementation of RuntimeObject interface
-//func (b *DbService) EmptyObject() client.Object {
-//	return &corev1.Service{}
-//}
+// func (b *DbService) EmptyObject() client.Object {
+// 	return &corev1.Service{}
+// }
 
 // implementation of RuntimeObject interface
 func (b *DbService) updateAndValidate(_ bsv1.Backstage) error {

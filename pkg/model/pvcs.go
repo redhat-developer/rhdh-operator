@@ -23,21 +23,34 @@ func init() {
 }
 
 func (b *BackstagePvcs) addExternalConfig(spec bsv1.BackstageSpec) error {
-	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Pvcs == nil || len(spec.Application.ExtraFiles.Pvcs) == 0 {
+	if spec.Application == nil ||
+		spec.Application.ExtraFiles == nil ||
+		spec.Application.ExtraFiles.Pvcs == nil ||
+		len(spec.Application.ExtraFiles.Pvcs) == 0 {
 		return nil
 	}
 
 	for _, pvcSpec := range spec.Application.ExtraFiles.Pvcs {
 
 		subPath := ""
-		mountPath, wSubpath := b.model.backstageDeployment.mountPath(pvcSpec.MountPath, "", spec.Application.ExtraFiles.MountPath)
+		mountPath, wSubpath := b.model.backstageDeployment.mountPath(
+			pvcSpec.MountPath,
+			"",
+			spec.Application.ExtraFiles.MountPath,
+		)
 
 		if wSubpath {
 			mountPath = filepath.Join(mountPath, pvcSpec.Name)
 			subPath = utils.ToRFC1123Label(pvcSpec.Name)
 		}
 
-		err := addPvc(b.model.backstageDeployment, pvcSpec.Name, mountPath, subPath, containersFilter{names: pvcSpec.Containers})
+		err := addPvc(
+			b.model.backstageDeployment,
+			pvcSpec.Name,
+			mountPath,
+			subPath,
+			containersFilter{names: pvcSpec.Containers},
+		)
 		if err != nil {
 			return fmt.Errorf("failed to add pvc %s: %w", pvcSpec.Name, err)
 		}
@@ -62,9 +75,9 @@ func (b *BackstagePvcs) setObject(object runtime.Object) {
 	b.pvcs = object.(*multiobject.MultiObject)
 }
 
-//func (b *BackstagePvcs) EmptyObject() client.Object {
+// func (b *BackstagePvcs) EmptyObject() client.Object {
 //	return &corev1.PersistentVolumeClaim{}
-//}
+// }
 
 func (b *BackstagePvcs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
 	b.model = model
@@ -82,7 +95,9 @@ func (b *BackstagePvcs) updateAndValidate(_ bsv1.Backstage) error {
 			return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
 		}
 		mountPath, subPath := b.model.backstageDeployment.getDefConfigMountPath(o)
-		err := addPvc(b.model.backstageDeployment, pvc.Name, mountPath, subPath, containersFilter{annotation: o.GetAnnotations()[ContainersAnnotation]})
+		annotation := o.GetAnnotations()[ContainersAnnotation]
+		err := addPvc(
+			b.model.backstageDeployment, pvc.Name, mountPath, subPath, containersFilter{annotation: annotation})
 		if err != nil {
 			return fmt.Errorf("failed to get containers for pvc %s: %w", o.GetName(), err)
 		}
@@ -114,7 +129,7 @@ func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string, filter
 		return fmt.Errorf("failed to mount files for pvc %s: %w", pvcName, err)
 	}
 	for _, c := range affectedContainers {
-		//update := bsd.containerByName(c)
+		// update := bsd.containerByName(c)
 		c.VolumeMounts = append(c.VolumeMounts,
 			corev1.VolumeMount{Name: volName, MountPath: mountPath, SubPath: subPath})
 	}

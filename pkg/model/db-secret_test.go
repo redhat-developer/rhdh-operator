@@ -33,7 +33,8 @@ func TestEmptyDbSecret(t *testing.T) {
 	bs := *dbSecretBackstage.DeepCopy()
 
 	// expected generatePassword = false (default db-secret defined) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-empty-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().withLocalDb().
+		addToDefaultConfig("db-secret.yaml", "db-empty-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -52,15 +53,16 @@ func TestDefaultWithGeneratedSecrets(t *testing.T) {
 	bs := *dbSecretBackstage.DeepCopy()
 
 	// expected generatePassword = true (no db-secret defined) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().withLocalDb().
+		addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf("backstage-psql-secret-%s", bs.Name), model.LocalDbSecret.secret.Name)
-	//should be generated
-	//	assert.NotEmpty(t, model.LocalDbSecret.secret.StringData["POSTGRES_USER"])
-	//	assert.NotEmpty(t, model.LocalDbSecret.secret.StringData["POSTGRES_PASSWORD"])
+	// should be generated
+	// 	assert.NotEmpty(t, model.LocalDbSecret.secret.StringData["POSTGRES_USER"])
+	// 	assert.NotEmpty(t, model.LocalDbSecret.secret.StringData["POSTGRES_PASSWORD"])
 
 	dbss := model.localDbStatefulSet
 	assert.NotNil(t, dbss)
@@ -73,7 +75,8 @@ func TestSpecifiedSecret(t *testing.T) {
 	bs.Spec.Database.AuthSecretName = "custom-db-secret"
 
 	// expected generatePassword = false (db-secret defined in the spec) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().withLocalDb().
+		addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 

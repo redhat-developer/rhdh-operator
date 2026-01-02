@@ -34,6 +34,7 @@ func AppConfigDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-appconfig")
 }
 
+// nolint:unparam // this is required by the interface
 func (b *AppConfig) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 	if spec.Application == nil || spec.Application.AppConfig == nil || spec.Application.AppConfig.ConfigMaps == nil {
@@ -41,7 +42,8 @@ func (b *AppConfig) addExternalConfig(spec bsv1.BackstageSpec) error {
 	}
 
 	for _, specCm := range spec.Application.AppConfig.ConfigMaps {
-		mp, wSubpath := b.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
+		mp, wSubpath := b.model.backstageDeployment.mountPath(
+			specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
 		updatePodWithAppConfig(b.model.backstageDeployment, specCm.Name,
 			mp, specCm.Key, wSubpath, b.model.ExternalConfig.AppConfigKeys[specCm.Name])
 	}
@@ -62,9 +64,9 @@ func (b *AppConfig) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (b *AppConfig) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
+// func (b *AppConfig) EmptyObject() client.Object {
+// 	return &corev1.ConfigMap{}
+// }
 
 // implementation of RuntimeObject interface
 func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
@@ -90,10 +92,11 @@ func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme
 }
 
 // updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args
-func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key string, withSubPath bool, cmData []string) {
+func updatePodWithAppConfig(
+	bsd *BackstageDeployment, cmName, mountPath, key string, withSubPath bool, cmData []string,
+) {
 
-	_ = bsd.mountFilesFrom(containersFilter{}, ConfigMapObjectKind,
-		cmName, mountPath, key, withSubPath, cmData)
+	_ = bsd.mountFilesFrom(containersFilter{}, ConfigMapObjectKind, cmName, mountPath, key, withSubPath, cmData)
 	container := bsd.container()
 
 	for _, file := range cmData {

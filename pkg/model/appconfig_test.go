@@ -63,7 +63,7 @@ func TestDefaultAppConfig(t *testing.T) {
 
 	bs := *appConfigTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Kubernetes, testObj.scheme)
 
@@ -75,7 +75,8 @@ func TestDefaultAppConfig(t *testing.T) {
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
 	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath, deployment.defaultMountPath())
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)),
+		deployment.container().VolumeMounts[0].Name)
 	assert.Equal(t, 2, len(deployment.container().Args))
 	assert.Equal(t, 1, len(deployment.podSpec().Volumes))
 
@@ -92,7 +93,7 @@ func TestSpecifiedAppConfig(t *testing.T) {
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
 		bsv1.FileObjectRef{Name: appConfigTestCm3.Name, Key: "conf31.yaml"})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	testObj.externalConfig.AppConfigKeys = map[string][]string{appConfigTestCm.Name: maps.Keys(appConfigTestCm.Data),
 		appConfigTestCm2.Name: maps.Keys(appConfigTestCm2.Data), appConfigTestCm3.Name: maps.Keys(appConfigTestCm3.Data)}
@@ -127,7 +128,7 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 	cms := &bs.Spec.Application.AppConfig.ConfigMaps
 	*cms = append(*cms, bsv1.FileObjectRef{Name: appConfigTestCm.Name})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
 
 	testObj.externalConfig.AppConfigKeys = map[string][]string{appConfigTestCm.Name: maps.Keys(appConfigTestCm.Data)}
 

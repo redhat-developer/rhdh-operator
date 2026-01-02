@@ -1,0 +1,27 @@
+name: Lint Config Checks
+
+on:
+  push:
+    paths:
+      - '.golangci.yml'
+      - '.github/workflows/lint-config-checks.yaml'
+    branches: [ main ]
+  pull_request:
+    paths:
+      - '.golangci.yml'
+      - '.github/workflows/lint-config-checks.yaml'
+    branches: [ main ]
+
+jobs:
+  lint-config-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+
+      - name: Setup Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Verify linter configuration
+        run: make lint-config

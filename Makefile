@@ -92,12 +92,10 @@ endif
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.37.0
-OPM_VERSION ?= v1.23.0
+OPERATOR_SDK_VERSION ?= v1.42.0
+OPM_VERSION ?= v1.55.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG_VERSION)
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.28.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -127,7 +125,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Source packages outside of tests
-PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|api/v1alpha([1-2]))')
+PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|api/v1alpha([1-9]+))')
 
 .PHONY: all
 all: build
@@ -164,7 +162,7 @@ fmt: goimports ## Format the code using goimports
 	find . -not -path '*/\.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
 
 .PHONY: test
-test: manifests generate fmt vet envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
+test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
 	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps 2>/dev/null || :
 	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
@@ -200,7 +198,7 @@ test-e2e-upgrade: ginkgo ## Run end-to-end tests dedicated to the operator upgra
 .PHONY: gosec
 gosec: addgosec ## run the gosec scanner for non-test files in this repo
   	# we let the report content trigger a failure using the GitHub Security features.
-	$(GOSEC) -no-fail -fmt $(GOSEC_FMT) -out $(GOSEC_OUTPUT_FILE)  ./...
+	$(GOSEC) -no-fail -exclude-generated -fmt $(GOSEC_FMT) -out $(GOSEC_OUTPUT_FILE) ./...
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
@@ -209,6 +207,10 @@ lint: golangci-lint ## Run golangci-lint linter & yamllint
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix --timeout 15m
+
+.PHONY: lint-config
+lint-config: golangci-lint ## Verify golangci-lint linter configuration
+	$(GOLANGCI_LINT) config verify
 
 .PHONY: vet
 vet: ## Run go vet against code.
@@ -463,22 +465,23 @@ $(LOCALBIN):
 
 ## Tool Binaries
 KUBECTL ?= kubectl
-KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
-ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
-GOIMPORTS ?= $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)
-GOSEC ?= $(LOCALBIN)/gosec-$(GOSEC_VERSION)
-GINKGO ?= $(LOCALBIN)/ginkgo-$(GINKGO_VERSION)
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+GOIMPORTS ?= $(LOCALBIN)/goimports
+GOSEC ?= $(LOCALBIN)/gosec
+GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.2
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
-ENVTEST_VERSION ?= release-0.17
+KUSTOMIZE_VERSION ?= v5.4.3
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
+ENVTEST_VERSION := $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
+ENVTEST_K8S_VERSION := $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= v2.6.2
-GOIMPORTS_VERSION ?= v0.16.1
-GOSEC_VERSION ?= v2.22.8
-GINKGO_VERSION ?= v2.22.2
+GOIMPORTS_VERSION ?= v0.40.0
+GOSEC_VERSION ?= v2.22.11
+GINKGO_VERSION ?= v2.27.3
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
@@ -494,6 +497,14 @@ controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessar
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
+.PHONY: setup-envtest
+setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.
+	@echo "Setting up envtest binaries for Kubernetes version $(ENVTEST_K8S_VERSION)..."
+	@$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path || { \
+		echo "Error: Failed to set up envtest binaries for version $(ENVTEST_K8S_VERSION)."; \
+		exit 1; \
+	}
+
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
 $(ENVTEST): $(LOCALBIN)
@@ -502,62 +513,68 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 .PHONY: goimports
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
 $(GOIMPORTS): $(LOCALBIN)
-	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,${GOIMPORTS_VERSION})
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
 
 .PHONY: addgosec
 addgosec: $(GOSEC) ## Download gosec locally if necessary.
 $(GOSEC): $(LOCALBIN)
-	$(call go-install-tool,$(GOSEC),github.com/securego/gosec/v2/cmd/gosec,${GOSEC_VERSION})
+	$(call go-install-tool,$(GOSEC),github.com/securego/gosec/v2/cmd/gosec,$(GOSEC_VERSION))
 
 .PHONY: ginkgo
 ginkgo: $(GINKGO) ## Download Ginkgo locally if necessary.
 $(GINKGO): $(LOCALBIN)
-	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,${GINKGO_VERSION})
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)
 # $2 - package url which can be installed
 # $3 - specific version of package
 define go-install-tool
-@[ -f $(1) ] || { \
+@[ -f "$(1)-$(3)" ] || { \
 set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
+rm -f $(1) || true ;\
 GOBIN=$(LOCALBIN) go install $${package} ;\
-mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
-}
+mv $(1) $(1)-$(3) ;\
+} ;\
+ln -sf $(1)-$(3) $(1)
 endef
 
 .PHONY: operator-sdk
-OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
+OPERATOR_SDK_WITH_VER ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
-ifeq (,$(wildcard $(OPERATOR_SDK)))
+ifeq (,$(wildcard $(OPERATOR_SDK_WITH_VER)))
 	@{ \
 	set -e ;\
-	mkdir -p $(dir $(OPERATOR_SDK)) ;\
+	mkdir -p $(dir $(OPERATOR_SDK_WITH_VER)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
-	chmod +x $(OPERATOR_SDK) ;\
+	curl -sSLo $(OPERATOR_SDK_WITH_VER) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
+	chmod +x $(OPERATOR_SDK_WITH_VER) ;\
 	}
 endif
+	ln -sf $(OPERATOR_SDK_WITH_VER) $(OPERATOR_SDK)
 
 .PHONY: opm
-OPM ?= $(LOCALBIN)/opm-$(OPM_VERSION)
+OPM_WITH_VER ?= $(LOCALBIN)/opm-$(OPM_VERSION)
+OPM ?= $(LOCALBIN)/opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(wildcard $(OPM)))
+ifeq (,$(wildcard $(OPM_WITH_VER)))
 	@{ \
 	set -e ;\
-	mkdir -p $(dir $(OPM)) ;\
+	mkdir -p $(dir $(OPM_WITH_VER)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
-	chmod +x $(OPM) ;\
+	curl -sSLo $(OPM_WITH_VER) https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
+	chmod +x $(OPM_WITH_VER) ;\
 	}
 endif
+	ln -sf $(OPM_WITH_VER) $(OPM)
 
 ##@ Misc.
 

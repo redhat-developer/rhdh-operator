@@ -54,8 +54,8 @@ var _ = When("create default backstage", func() {
 		{
 			name: "route with subdomain",
 			desiredRoute: bsv1.Route{
-				//Host:      "localhost",
-				//Enabled:   ptr.To(true),
+				// Host:      "localhost",
+				// Enabled:   ptr.To(true),
 				Subdomain: "test",
 			},
 			expectedBaseUrlMatcher: func() any {
@@ -73,7 +73,6 @@ var _ = When("create default backstage", func() {
 			},
 		},
 	} {
-		tt := tt
 		It("creates Backstage object (on Openshift) - "+tt.name, func() {
 
 			if !currentPlatform.IsOpenshift() {
@@ -109,7 +108,9 @@ var _ = When("create default backstage", func() {
 
 				By("updating the baseUrls in the default app-config CM, per the desired route settings (RHIDP-6192)")
 				var appConfigCm corev1.ConfigMap
-				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
+				appConfigCmName := types.NamespacedName{
+					Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}
+				err = k8sClient.Get(ctx, appConfigCmName, &appConfigCm)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(appConfigCm).To(HaveAppConfigBaseUrl(tt.expectedBaseUrlMatcher()))
 			}, 5*time.Minute, time.Second).Should(Succeed())

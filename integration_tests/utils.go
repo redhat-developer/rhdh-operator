@@ -7,10 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"k8s.io/apimachinery/pkg/util/yaml"
+
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -24,7 +25,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func generateConfigMap(ctx context.Context, k8sClient client.Client, name string, namespace string, data, labels map[string]string, annotations map[string]string) string {
+func generateConfigMap(
+	ctx context.Context, k8sClient client.Client, name, namespace string,
+	data, labels, annotations map[string]string,
+) string {
 	Expect(k8sClient.Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -38,7 +42,10 @@ func generateConfigMap(ctx context.Context, k8sClient client.Client, name string
 	return name
 }
 
-func generateSecret(ctx context.Context, k8sClient client.Client, name, namespace string, data, labels, annotations map[string]string) string {
+func generateSecret(
+	ctx context.Context, k8sClient client.Client, name, namespace string,
+	data, labels, annotations map[string]string,
+) string {
 	Expect(k8sClient.Create(ctx, &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -59,7 +66,9 @@ func readTestYamlFile(name string) string {
 	return string(b)
 }
 
-func executeRemoteCommand(ctx context.Context, podNamespace, podName, container, command string) (string, string, error) {
+func executeRemoteCommand(
+	ctx context.Context, podNamespace, podName, container, command string,
+) (string, string, error) {
 	kubeCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{},
@@ -132,7 +141,8 @@ func backstageContainer(pod corev1.PodSpec) corev1.Container {
 
 func getBackstagePod(ctx context.Context, k8sClient client.Client, ns, backstageName string) (*corev1.Pod, error) {
 	podList := &corev1.PodList{}
-	err := k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+	labels := client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)}
+	err := k8sClient.List(ctx, podList, client.InNamespace(ns), labels)
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +153,8 @@ func getBackstagePod(ctx context.Context, k8sClient client.Client, ns, backstage
 	return &podList.Items[0], nil
 }
 
-func backstageDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (model.Deployable, error) {
+func backstageDeployment(
+	ctx context.Context, k8sClient client.Client, namespace, backstageName string,
+) (model.Deployable, error) {
 	return controller.FindDeployment(ctx, k8sClient, namespace, backstageName)
 }

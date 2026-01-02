@@ -38,7 +38,7 @@ func TestDefaultPvcs(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
@@ -46,7 +46,8 @@ func TestDefaultPvcs(t *testing.T) {
 
 	obj := model.getRuntimeObjectByType(&BackstagePvcs{})
 	assert.NotNil(t, obj)
-	assert.Equal(t, utils.GetObjectKind(&corev1.PersistentVolumeClaim{}, testObj.scheme).Kind, obj.Object().GetObjectKind().GroupVersionKind().Kind)
+	expectedKind := utils.GetObjectKind(&corev1.PersistentVolumeClaim{}, testObj.scheme).Kind
+	assert.Equal(t, expectedKind, obj.Object().GetObjectKind().GroupVersionKind().Kind)
 	mv, ok := obj.Object().(*multiobject.MultiObject)
 	assert.True(t, ok)
 	assert.Equal(t, 2, len(mv.Items))
@@ -59,7 +60,8 @@ func TestDefaultPvcs(t *testing.T) {
 	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), model.backstageDeployment.podSpec().Volumes[0].Name)
 	assert.Equal(t, 2, len(model.backstageDeployment.container().VolumeMounts))
 	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), model.backstageDeployment.container().VolumeMounts[0].Name)
-	assert.Equal(t, filepath.Join(DefaultMountDir, PvcsName(bs.Name, "myclaim1")), model.backstageDeployment.container().VolumeMounts[0].MountPath)
+	expectedMountPath := filepath.Join(DefaultMountDir, PvcsName(bs.Name, "myclaim1"))
+	assert.Equal(t, expectedMountPath, model.backstageDeployment.container().VolumeMounts[0].MountPath)
 	assert.Equal(t, "/mount/path/from/annotation", model.backstageDeployment.container().VolumeMounts[1].MountPath)
 
 }
@@ -71,7 +73,9 @@ func TestMultiContainersPvc(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").addToDefaultConfig("pvcs.yaml", "multi-pvc-containers.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
+		addToDefaultConfig("pvcs.yaml", "multi-pvc-containers.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -111,7 +115,7 @@ func TestSpecifiedPvcs(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	testObj.externalConfig.ExtraPvcKeys = []string{"my-pvc1", "my-pvc2"}
 
@@ -151,7 +155,8 @@ func TestSpecifiedPvcsWithContainers(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
 
 	testObj.externalConfig.ExtraPvcKeys = []string{"my-pvc1", "my-pvc2"}
 
@@ -181,7 +186,7 @@ func TestPvcsWithNonExistedContainerFailed(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 

@@ -36,7 +36,7 @@ type NameKind struct {
 func kind(obj runtime.Object) string {
 	str := reflect.TypeOf(obj).String()
 	return str[strings.LastIndex(str, ".")+1:]
-	//return reflect.TypeOf(obj).String()
+	// return reflect.TypeOf(obj).String()
 }
 
 func (m MockClient) Get(_ context.Context, key client.ObjectKey, obj client.Object, _ ...client.GetOption) error {

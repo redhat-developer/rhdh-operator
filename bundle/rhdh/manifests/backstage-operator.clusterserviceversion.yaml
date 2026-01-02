@@ -39,7 +39,7 @@ metadata:
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.9
-    createdAt: "2025-12-18T16:30:39Z"
+    createdAt: "2026-01-02T16:04:23Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -56,7 +56,7 @@ metadata:
     features.operators.openshift.io/token-auth-gcp: "false"
     operatorframework.io/suggested-namespace: rhdh-operator
     operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.37.0
+    operators.operatorframework.io/builder: operator-sdk-v1.42.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
     skipRange: '>=1.0.0 <1.9.0'
@@ -322,9 +322,8 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --metrics-bind-address=:8443
-                - --metrics-secure=true
                 - --leader-elect
+                - --metrics-bind-address=:8443
                 command:
                 - /manager
                 env:

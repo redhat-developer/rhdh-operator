@@ -30,11 +30,11 @@ func setupMonitorTestReconciler() BackstageReconciler {
 	}
 }
 
-func createTestBackstage(name, namespace string, monitoringEnabled bool) *bs.Backstage {
+func createTestBackstage(monitoringEnabled bool) *bs.Backstage {
 	backstage := &bs.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      "test-bs",
+			Namespace: "test-ns",
 		},
 		Spec: bs.BackstageSpec{
 			Monitoring: bs.Monitoring{
@@ -50,7 +50,7 @@ func TestApplyServiceMonitor_MonitoringDisabled(t *testing.T) {
 	ctx := context.TODO()
 	r := setupMonitorTestReconciler()
 
-	backstage := createTestBackstage("test-bs", "test-ns", false)
+	backstage := createTestBackstage(false)
 
 	// Create the backstage object
 	err := r.Create(ctx, backstage)
@@ -97,7 +97,7 @@ func TestApplyServiceMonitor_MonitoringEnabled_NoCRD(t *testing.T) {
 		Scheme: scheme,
 	}
 
-	backstage := createTestBackstage("test-bs", "test-ns", true)
+	backstage := createTestBackstage(true)
 
 	// Create the backstage object
 	err := r.Create(ctx, backstage)
@@ -114,7 +114,7 @@ func TestApplyServiceMonitor_MonitoringEnabled_WithCRD(t *testing.T) {
 	ctx := context.TODO()
 	r := setupMonitorTestReconciler()
 
-	backstage := createTestBackstage("test-bs", "test-ns", true)
+	backstage := createTestBackstage(true)
 
 	// Create the backstage object
 	err := r.Create(ctx, backstage)
@@ -169,7 +169,7 @@ func TestApplyServiceMonitor_Update_ExistingServiceMonitor(t *testing.T) {
 	ctx := context.TODO()
 	r := setupMonitorTestReconciler()
 
-	backstage := createTestBackstage("test-bs", "test-ns", true)
+	backstage := createTestBackstage(true)
 
 	// Create the backstage object
 	err := r.Create(ctx, backstage)

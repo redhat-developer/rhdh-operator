@@ -45,11 +45,15 @@ var _ = When("create default rhdh", func() {
 			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
 
 			dpCm := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DynamicPluginsDefaultName(backstageName)}, dpCm)
+			dpCmName := types.NamespacedName{
+				Namespace: ns, Name: model.DynamicPluginsDefaultName(backstageName)}
+			err = k8sClient.Get(ctx, dpCmName, dpCm)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			var appConfigCm corev1.ConfigMap
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
+			appConfigCmName := types.NamespacedName{
+				Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}
+			err = k8sClient.Get(ctx, appConfigCmName, &appConfigCm)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(1))
@@ -194,7 +198,7 @@ var _ = When("create default rhdh", func() {
 		Eventually(func(g Gomega) {
 			By("getting the Pod ")
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
-			//bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
+			// bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
 			var bsvolume *corev1.Volume
@@ -229,7 +233,9 @@ var _ = When("create default rhdh", func() {
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		npmrcSecret := generateSecret(ctx, k8sClient, "my-dynamic-plugins-npmrc", ns, map[string]string{".npmrc": "new-npmrc"}, nil, nil)
+		npmrcSecret := generateSecret(
+			ctx, k8sClient, "my-dynamic-plugins-npmrc", ns,
+			map[string]string{".npmrc": "new-npmrc"}, map[string]string{}, map[string]string{})
 
 		bsSpec := bsv1.BackstageSpec{
 			Application: &bsv1.Application{
@@ -254,7 +260,7 @@ var _ = When("create default rhdh", func() {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+			g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(1))
 			initCont := deploy.PodSpec().InitContainers[0]
 			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
 			found := 0

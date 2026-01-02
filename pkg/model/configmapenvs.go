@@ -32,7 +32,8 @@ func (p *ConfigMapEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
 	}
 
 	for _, specCm := range spec.Application.ExtraEnvs.ConfigMaps {
-		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{names: specCm.Containers}, ConfigMapObjectKind, specCm.Name, specCm.Key)
+		err := p.model.backstageDeployment.addEnvVarsFrom(
+			containersFilter{names: specCm.Containers}, ConfigMapObjectKind, specCm.Name, specCm.Key)
 		if err != nil {
 			return fmt.Errorf("failed to add env vars on config map %s: %w", specCm.Name, err)
 		}
@@ -53,9 +54,9 @@ func (p *ConfigMapEnvs) setObject(obj runtime.Object) {
 }
 
 // EmptyObject implements RuntimeObject interface
-//func (p *ConfigMapEnvs) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
+// func (p *ConfigMapEnvs) EmptyObject() client.Object {
+// 	return &corev1.ConfigMap{}
+// }
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
@@ -70,8 +71,9 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage bsv1.Backsta
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) updateAndValidate(backstage bsv1.Backstage) error {
 	if p.ConfigMap != nil {
-		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{annotation: p.ConfigMap.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
-			p.ConfigMap.Name, "")
+		annotation := p.ConfigMap.GetAnnotations()[ContainersAnnotation]
+		err := p.model.backstageDeployment.addEnvVarsFrom(
+			containersFilter{annotation: annotation}, ConfigMapObjectKind, p.ConfigMap.Name, "")
 		if err != nil {
 			return fmt.Errorf("failed to add env vars on configmap %s: %w", p.ConfigMap.Name, err)
 		}

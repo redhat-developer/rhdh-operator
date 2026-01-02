@@ -62,9 +62,9 @@ func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (
 }
 
 // implementation of RuntimeObject interface
-//func (b *DbSecret) EmptyObject() client.Object {
-//	return &corev1.Secret{}
-//}
+// func (b *DbSecret) EmptyObject() client.Object {
+// 	return &corev1.Secret{}
+// }
 
 // implementation of RuntimeObject interface
 func (b *DbSecret) updateAndValidate(_ bsv1.Backstage) error {

@@ -18,14 +18,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
-//	for _, cfg := range runtimeConfig {
-//		cfg.ObjectFactory.newBackstageObject()
-//		//assert.NotNil(t, Obj.EmptyObject())
-//		// TODO uncomment when Kind is available
-//		//assert.NotEmpty(t, Obj.EmptyObject().GetObjectKind().GroupVersionKind().Kind)
-//	}
-//}
+// func TestIfEmptyObjectsContainTypeinfo(t *testing.T) {
+// 	for _, cfg := range runtimeConfig {
+// 		cfg.ObjectFactory.newBackstageObject()
+// 		//assert.NotNil(t, Obj.EmptyObject())
+// 		// TODO uncomment when Kind is available
+// 		//assert.NotEmpty(t, Obj.EmptyObject().GetObjectKind().GroupVersionKind().Kind)
+// 	}
+// }
 
 // NOTE: to make it work locally env var LOCALBIN should point to the directory where default-config folder located
 func TestInitDefaultDeploy(t *testing.T) {
@@ -42,7 +42,7 @@ func TestInitDefaultDeploy(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -79,7 +79,7 @@ func TestIfEmptyObjectIsValid(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	assert.False(t, bs.Spec.IsLocalDbEnabled())
 
@@ -103,7 +103,7 @@ func TestAddToModel(t *testing.T) {
 			},
 		},
 	}
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -141,7 +141,7 @@ func TestRawConfig(t *testing.T) {
 			Namespace: "ns123",
 		},
 	}
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 	serviceYaml := `apiVersion: v1
 kind: Service
 metadata:
@@ -174,7 +174,7 @@ spec:
 
 func TestMultiobject(t *testing.T) {
 	bs := bsv1.Backstage{}
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -191,7 +191,7 @@ func TestMultiobject(t *testing.T) {
 
 func TestSingleMultiobject(t *testing.T) {
 	bs := bsv1.Backstage{}
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "single-pvc.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("pvcs.yaml", "single-pvc.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -208,14 +208,14 @@ func TestSingleMultiobject(t *testing.T) {
 
 func TestSingleFailedWithMultiDefinition(t *testing.T) {
 	bs := bsv1.Backstage{}
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "multi-service-err.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("service.yaml", "multi-service-err.yaml")
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.EqualError(t, err, "failed to initialize object: multiple objects not expected for: service.yaml")
 }
 
 func TestInvalidObjectKind(t *testing.T) {
 	bs := bsv1.Backstage{}
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "invalid-service-type.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("service.yaml", "invalid-service-type.yaml")
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.ErrorContains(t, err, "failed to read default value for the key service.yaml")

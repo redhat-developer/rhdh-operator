@@ -52,7 +52,8 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 	b.model = model
 	if b.statefulSet == nil {
 		if model.localDbEnabled {
-			return false, fmt.Errorf("LocalDb StatefulSet not configured, make sure there is db-statefulset.yaml in default or raw configuration")
+			return false, fmt.Errorf(
+				"LocalDb StatefulSet not configured, make sure there is db-statefulset.yaml in default or raw configuration")
 		}
 		return false, nil
 	} else {
@@ -74,19 +75,14 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 }
 
 // implementation of RuntimeObject interface
-//func (b *DbStatefulSet) EmptyObject() client.Object {
-//	return &appsv1.StatefulSet{}
-//}
-
-// implementation of RuntimeObject interface
 func (b *DbStatefulSet) updateAndValidate(backstage bsv1.Backstage) error {
 
 	// point ServiceName to localDb
 	b.statefulSet.Spec.ServiceName = b.model.LocalDbService.service.Name
 
-	//if backstage.Spec.Application != nil && backstage.Spec.Application.ImagePullSecrets != nil {
-	//	utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-	//}
+	// if backstage.Spec.Application != nil && backstage.Spec.Application.ImagePullSecrets != nil {
+	// 	utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
+	// }
 
 	if backstage.Spec.IsAuthSecretSpecified() {
 		b.setDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
@@ -98,8 +94,10 @@ func (b *DbStatefulSet) updateAndValidate(backstage bsv1.Backstage) error {
 
 func (b *DbStatefulSet) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
 	b.statefulSet.SetName(DbStatefulSetName(backstage.Name))
-	utils.GenerateLabel(&b.statefulSet.Spec.Template.Labels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
-	utils.GenerateLabel(&b.statefulSet.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
+	utils.GenerateLabel(
+		&b.statefulSet.Spec.Template.Labels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
+	utils.GenerateLabel(
+		&b.statefulSet.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
 	setMetaInfo(b.statefulSet, backstage, scheme)
 }
 
@@ -114,7 +112,7 @@ func (b *DbStatefulSet) podSpec() *corev1.PodSpec {
 }
 
 func (b *DbStatefulSet) setDbSecretEnvVar(container *corev1.Container, secretName string) {
-	//AddEnvVarsFrom(container, SecretObjectKind, secretName, "")
+	// AddEnvVarsFrom(container, SecretObjectKind, secretName, "")
 	envFromSrc := corev1.EnvFromSource{}
 	envFromSrc.SecretRef = &corev1.SecretEnvSource{
 		LocalObjectReference: corev1.LocalObjectReference{Name: secretName}}

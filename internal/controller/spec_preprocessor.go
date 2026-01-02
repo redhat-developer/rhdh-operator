@@ -34,8 +34,9 @@ import (
 
 // Add additional details to the Backstage Spec helping in making Backstage RuntimeObjects Model
 // Validates Backstage Spec and fails fast if something not correct
+// nolint:gocyclo // TODO: refactor this function to reduce cyclomatic complexity
 func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1.Backstage) (model.ExternalConfig, error) {
-	//lg := log.FromContext(ctx)
+	// lg := log.FromContext(ctx)
 
 	bsSpec := backstage.Spec
 	ns := backstage.Namespace
@@ -129,7 +130,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 			if hashingData, err = r.addExtConfig(ctx, secret, backstage.Name, ee.Name, ns, true, hashingData); err != nil {
 				return result, err
 			}
-			//result.ExtraEnvSecrets[secret.Name] = *secret
+			// result.ExtraEnvSecrets[secret.Name] = *secret
 			result.ExtraEnvSecretKeys[ee.Name] = model.NewDataObjectKeys(secret.StringData, secret.Data)
 		}
 	}
@@ -141,7 +142,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 			if err := r.checkExternalObject(ctx, pvc, ep.Name, ns); err != nil {
 				return result, err
 			}
-			//result.ExtraPvcs[pvc.Name] = *pvc
+			// result.ExtraPvcs[pvc.Name] = *pvc
 			result.ExtraPvcKeys = append(result.ExtraPvcKeys, pvc.Name)
 		}
 	}
