@@ -125,7 +125,7 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 # Source packages outside of tests
-PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|api/v1alpha([1-2]))')
+PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|api/v1alpha([1-9]+))')
 
 .PHONY: all
 all: build
@@ -198,7 +198,7 @@ test-e2e-upgrade: ginkgo ## Run end-to-end tests dedicated to the operator upgra
 .PHONY: gosec
 gosec: addgosec ## run the gosec scanner for non-test files in this repo
   	# we let the report content trigger a failure using the GitHub Security features.
-	$(GOSEC) -no-fail -fmt $(GOSEC_FMT) -out $(GOSEC_OUTPUT_FILE)  ./...
+	$(GOSEC) -no-fail -exclude-generated -fmt $(GOSEC_FMT) -out $(GOSEC_OUTPUT_FILE) ./...
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
