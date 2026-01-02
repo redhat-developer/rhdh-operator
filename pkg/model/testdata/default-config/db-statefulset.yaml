@@ -24,7 +24,7 @@ spec:
               value: /var/lib/pgsql/data
             - name: PGDATA
               value: /var/lib/pgsql/data/userdata
-          image: quay.io/fedora/postgresql-15:latest
+          image: quay.io/fedora/postgresql-16:latest
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true

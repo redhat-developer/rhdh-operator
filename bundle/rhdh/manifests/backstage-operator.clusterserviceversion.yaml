@@ -335,7 +335,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.name
                 - name: RELATED_IMAGE_postgresql
-                  value: quay.io/fedora/postgresql-15:latest
+                  value: quay.io/fedora/postgresql-16:latest
                 - name: RELATED_IMAGE_backstage
                   value: quay.io/rhdh-community/rhdh:next
                 - name: RELATED_IMAGE_catalog_index
@@ -457,7 +457,7 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   relatedImages:
-  - image: quay.io/fedora/postgresql-15:latest
+  - image: quay.io/fedora/postgresql-16:latest
     name: postgresql
   - image: quay.io/rhdh-community/rhdh:next
     name: backstage

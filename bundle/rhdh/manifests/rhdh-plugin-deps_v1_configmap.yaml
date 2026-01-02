@@ -93,7 +93,7 @@ data:
         spec:
           containers:
             - name: psql
-              image: quay.io/fedora/postgresql-15:latest
+              image: quay.io/fedora/postgresql-16:latest
               resources:
                 limits:
                   cpu: "100m"

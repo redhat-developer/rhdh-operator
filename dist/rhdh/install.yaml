@@ -1900,7 +1900,7 @@ data:
                   value: /var/lib/pgsql/data
                 - name: PGDATA
                   value: /var/lib/pgsql/data/userdata
-              image: quay.io/fedora/postgresql-15:latest # will be replaced with the actual image
+              image: quay.io/fedora/postgresql-16:latest # will be replaced with the actual image
               imagePullPolicy: IfNotPresent
               securityContext:
                 # runAsUser:26 does not work for Openshift but looks work for AKS/EKS
@@ -2372,7 +2372,7 @@ data:
         spec:
           containers:
             - name: psql
-              image: quay.io/fedora/postgresql-15:latest
+              image: quay.io/fedora/postgresql-16:latest
               resources:
                 limits:
                   cpu: "100m"
@@ -2923,7 +2923,7 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         - name: RELATED_IMAGE_postgresql
-          value: quay.io/fedora/postgresql-15:latest
+          value: quay.io/fedora/postgresql-16:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
         - name: RELATED_IMAGE_catalog_index
