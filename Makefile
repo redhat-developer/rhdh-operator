@@ -479,9 +479,9 @@ CONTROLLER_TOOLS_VERSION ?= v0.18.0
 ENVTEST_VERSION := $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 ENVTEST_K8S_VERSION := $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= v2.6.2
-GOIMPORTS_VERSION ?= v0.16.1
-GOSEC_VERSION ?= v2.22.8
-GINKGO_VERSION ?= v2.22.2
+GOIMPORTS_VERSION ?= v0.40.0
+GOSEC_VERSION ?= v2.22.11
+GINKGO_VERSION ?= v2.27.3
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
