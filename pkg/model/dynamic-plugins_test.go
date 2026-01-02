@@ -21,6 +21,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const dplugin = "dplugin"
+
 var testDynamicPluginsBackstage = bsv1.Backstage{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "bs",
@@ -38,12 +40,12 @@ func TestDynamicPluginsValidationFailed(t *testing.T) {
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml")
 
 	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
-	//"failed object validation, reason: failed to find initContainer named install-dynamic-plugins")
+	// "failed object validation, reason: failed to find initContainer named install-dynamic-plugins")
 	assert.Error(t, err)
 
 }
@@ -51,21 +53,21 @@ func TestDynamicPluginsValidationFailed(t *testing.T) {
 func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
-	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
+	bs.Spec.Application.DynamicPluginsConfigMapName = dplugin
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
+		ObjectMeta: metav1.ObjectMeta{Name: dplugin},
 		Data:       map[string]string{"WrongKeyName.yml": "tt"},
 	}
 
 	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.Error(t, err)
-	//assert.Contains(t, err.Error(), "expects exactly one Data key named 'dynamic-plugins.yaml'")
+	// assert.Contains(t, err.Error(), "expects exactly one Data key named 'dynamic-plugins.yaml'")
 	assert.Contains(t, err.Error(), "dynamic plugin configMap expects 'dynamic-plugins.yaml' Data key")
 
 }
@@ -75,7 +77,7 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
@@ -83,18 +85,18 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageDeployment)
-	//dynamic-plugins-root
-	//dynamic-plugins-npmrc
-	//dynamic-plugins-auth
-	//vol-default-dynamic-plugins
+	// dynamic-plugins-root
+	// dynamic-plugins-npmrc
+	// dynamic-plugins-auth
+	// vol-default-dynamic-plugins
 	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
-	//dynamic-plugins-root
-	//dynamic-plugins-npmrc
-	//dynamic-plugins-auth
-	//vol-default-dynamic-plugins
+	// dynamic-plugins-root
+	// dynamic-plugins-npmrc
+	// dynamic-plugins-auth
+	// vol-default-dynamic-plugins
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 
 	deps, err := model.DynamicPlugins.Dependencies()
@@ -106,14 +108,14 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
-	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
+	bs.Spec.Application.DynamicPluginsConfigMapName = dplugin
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
+		ObjectMeta: metav1.ObjectMeta{Name: dplugin},
 		Data:       map[string]string{DynamicPluginsFile: "dynamic-plugins.yaml: | \n plugins: []"},
 	}
 
@@ -124,10 +126,10 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
-	//dynamic-plugins-root
-	//dynamic-plugins-npmrc
-	//dynamic-plugins-auth
-	//vol-dplugin
+	// dynamic-plugins-root
+	// dynamic-plugins-npmrc
+	// dynamic-plugins-auth
+	// vol-dplugin
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(DynamicPluginsDefaultName(bs.Name)), ic.VolumeMounts[3].Name)
 
@@ -139,13 +141,13 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
-	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
+	bs.Spec.Application.DynamicPluginsConfigMapName = dplugin
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
+		ObjectMeta: metav1.ObjectMeta{Name: dplugin},
 		Data:       map[string]string{DynamicPluginsFile: "dynamic-plugins.yaml: | \n plugins: []"},
 	}
 
@@ -156,10 +158,10 @@ func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
-	//dynamic-plugins-root
-	//dynamic-plugins-npmrc
-	//dynamic-plugins-auth
-	//dplugin
+	// dynamic-plugins-root
+	// dynamic-plugins-npmrc
+	// dynamic-plugins-auth
+	// dplugin
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 	assert.Equal(t, bs.Spec.Application.DynamicPluginsConfigMapName, ic.VolumeMounts[3].Name)
 
@@ -171,9 +173,9 @@ func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
 func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
-	//bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
+	// bs.Spec.Application.DynamicPluginsConfigMapName = dplugin
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml")
 
 	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -186,7 +188,7 @@ func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 	assert.Empty(t, bs.Spec.Application.DynamicPluginsConfigMapName)
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true)
+	testObj := createBackstageTest(*bs).withDefaultConfig()
 
 	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -201,9 +203,9 @@ func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
 func TestWithDynamicPluginsDeps(t *testing.T) {
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
-	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
+	bs.Spec.Application.DynamicPluginsConfigMapName = dplugin
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
@@ -217,7 +219,7 @@ plugins:
 `
 
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
+		ObjectMeta: metav1.ObjectMeta{Name: dplugin},
 		Data:       map[string]string{DynamicPluginsFile: yamlData},
 	}
 
@@ -248,13 +250,12 @@ func initContainer(model *BackstageModel) *corev1.Container {
 	return nil
 }
 
-
 // TestCatalogIndexImageFromDefaultConfig verifies that the operator sets CATALOG_INDEX_IMAGE
 // on the install-dynamic-plugins init container from the default config by default
 func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
@@ -268,7 +269,8 @@ func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
 	assert.Len(t, ic.Env, 2)
 	assert.Equal(t, "NPM_CONFIG_USERCONFIG", ic.Env[0].Name)
 	assert.Equal(t, "CATALOG_INDEX_IMAGE", ic.Env[1].Name)
-	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.9", ic.Env[1].Value, "CATALOG_INDEX_IMAGE should be set from the default config")
+	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:1.9", ic.Env[1].Value,
+		"CATALOG_INDEX_IMAGE should be set from the default config")
 }
 
 // TestCatalogIndexImageOverridesDefaultConfig verifies that RELATED_IMAGE_catalog_index
@@ -279,7 +281,7 @@ func TestCatalogIndexImageOverridesDefaultConfig(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
 	// janus-deployment.yaml has CATALOG_INDEX_IMAGE set (like the real default-config)
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
@@ -296,7 +298,8 @@ func TestCatalogIndexImageOverridesDefaultConfig(t *testing.T) {
 	assert.Len(t, ic.Env, 2)
 	assert.Equal(t, "NPM_CONFIG_USERCONFIG", ic.Env[0].Name)
 	assert.Equal(t, "CATALOG_INDEX_IMAGE", ic.Env[1].Name)
-	assert.Equal(t, "quay.io/fake-reg/img:1.2.3", ic.Env[1].Value, "RELATED_IMAGE_catalog_index should override the default config value")
+	assert.Equal(t, "quay.io/fake-reg/img:1.2.3", ic.Env[1].Value,
+		"RELATED_IMAGE_catalog_index should override the default config value")
 }
 
 // TestCatalogIndexImageUserPatchTakesPrecedence verifies that user-specified deployment patch
@@ -319,7 +322,7 @@ spec:
 `),
 	}
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
@@ -335,7 +338,8 @@ spec:
 	assert.Len(t, ic.Env, 2)
 	assert.Equal(t, "NPM_CONFIG_USERCONFIG", ic.Env[0].Name)
 	assert.Equal(t, "CATALOG_INDEX_IMAGE", ic.Env[1].Name)
-	assert.Equal(t, "quay.io/user-specified/image:2.0", ic.Env[1].Value, "user's deployment patch should override RELATED_IMAGE_catalog_index")
+	assert.Equal(t, "quay.io/user-specified/image:2.0", ic.Env[1].Value,
+		"user's deployment patch should override RELATED_IMAGE_catalog_index")
 }
 
 // TestCatalogIndexImageExtraEnvsOverride verifies that user-specified extraEnvs
@@ -346,11 +350,15 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 	// User specifies a different catalog index image via extraEnvs
 	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
 		Envs: []bsv1.Env{
-			{Name: "CATALOG_INDEX_IMAGE", Value: "quay.io/rhdh/plugin-catalog-index:extra-env", Containers: []string{"install-dynamic-plugins"}},
+			{
+				Name:       "CATALOG_INDEX_IMAGE",
+				Value:      "quay.io/rhdh/plugin-catalog-index:extra-env",
+				Containers: []string{"install-dynamic-plugins"},
+			},
 		},
 	}
 
-	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+	testObj := createBackstageTest(*bs).withDefaultConfig().
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
@@ -367,7 +375,8 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 	assert.Len(t, ic.Env, 2)
 	assert.Equal(t, "NPM_CONFIG_USERCONFIG", ic.Env[0].Name)
 	assert.Equal(t, "CATALOG_INDEX_IMAGE", ic.Env[1].Name)
-	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:extra-env", ic.Env[1].Value, "extraEnvs value should override the operator's RELATED_IMAGE_catalog_index")
+	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:extra-env", ic.Env[1].Value,
+		"extraEnvs value should override the operator's RELATED_IMAGE_catalog_index")
 }
 
 func TestUnmarshalDynaPluginsConfig(t *testing.T) {
@@ -548,8 +557,8 @@ includes:
 	assert.Equal(t, 5, len(mergedConfig.Plugins))
 
 	// Validate plugin-a (overridden by specData)
-	//pluginA := mergedConfig.Plugins[0]
-	//assert.Equal(t, "plugin-a", pluginA.Package)
+	// pluginA := mergedConfig.Plugins[0]
+	// assert.Equal(t, "plugin-a", pluginA.Package)
 	pluginA := findPluginByPackage(mergedConfig.Plugins, "plugin-a")
 	assert.NotNil(t, pluginA)
 	assert.Equal(t, "sha256-overridden", pluginA.Integrity)
@@ -564,17 +573,17 @@ includes:
 	assert.Equal(t, true, pluginB.Disabled)
 
 	// Validate plugin-c (from modelDp, as plugin-b is disabled)
-	//pluginC := mergedConfig.Plugins[1]
+	// pluginC := mergedConfig.Plugins[1]
 	pluginC := findPluginByPackage(mergedConfig.Plugins, "plugin-c")
 	assert.NotNil(t, pluginC)
-	//assert.Equal(t, "plugin-c", pluginC.Package)
+	// assert.Equal(t, "plugin-c", pluginC.Package)
 	assert.Equal(t, "sha256-ghi789", pluginC.Integrity)
 	assert.Equal(t, "value3", pluginC.PluginConfig["key3"])
 
-	//pluginD := mergedConfig.Plugins[2]
+	// pluginD := mergedConfig.Plugins[2]
 	pluginD := findPluginByPackage(mergedConfig.Plugins, "plugin-d")
 	assert.NotNil(t, pluginD)
-	//assert.Equal(t, "plugin-d", pluginD.Package)
+	// assert.Equal(t, "plugin-d", pluginD.Package)
 	assert.Equal(t, "sha256-ddd", pluginD.Integrity)
 
 	// Validate merged includes

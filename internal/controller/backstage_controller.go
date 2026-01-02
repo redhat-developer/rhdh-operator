@@ -52,16 +52,16 @@ type BackstageReconciler struct {
 	Platform platform.Platform
 }
 
-//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=configmaps;secrets;services;persistentvolumeclaims,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
-//+kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get
-//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;update;patch;delete
+// +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=configmaps;secrets;services;persistentvolumeclaims,verbs=get;watch;create;update;list;delete;patch
+// +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
+// +kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
+// +kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
+// +kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -106,7 +106,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply ServiceMonitor", err)
 	}
 
-	// This creates array of model objects to be reconsiled
+	// This creates array of model objects to be reconsider
 	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
@@ -203,7 +203,7 @@ func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Bac
 		}
 	}
 
-	//// check if route disabled, respective objects have to deleted/unowned
+	// // check if route disabled, respective objects have to deleted/unowned
 	if r.Platform.IsOpenshift() && !backstage.Spec.IsRouteEnabled() {
 		if err := r.tryToDelete(ctx, &openshift.Route{}, model.RouteName(backstage.Name), backstage.Namespace); err != nil {
 			return fmt.Errorf("%s %w", failedToCleanup, err)

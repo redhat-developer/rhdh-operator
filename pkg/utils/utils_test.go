@@ -80,7 +80,7 @@ spec:
      requests:
        storage: 2Gi`
 
-	objects, err := ReadYamls([]byte(y), nil /*&corev1.PersistentVolumeClaim{},*/, *util_test_scheme)
+	objects, err := ReadYamls([]byte(y), nil /* &corev1.PersistentVolumeClaim{}, */, *util_test_scheme)
 
 	assert.NoError(t, err)
 
@@ -110,18 +110,20 @@ metadata:
   name: pvc2
 data:`
 
-	_, err := ReadYamls([]byte(y), nil /*&corev1.PersistentVolumeClaim{},*/, *util_test_scheme)
+	_, err := ReadYamls([]byte(y), nil /* &corev1.PersistentVolumeClaim{}, */, *util_test_scheme)
 
 	// Kind not match for the second item, PersistentVolumeClaim expected
-	// TODO with unstructured change we do not have this error anymore as we do not have expected kind. Should we test it in another way/place?
-	//assert.EqualError(t, err, "GroupVersionKind not match, found: /v1, Kind=ConfigMap, expected: [/v1, Kind=PersistentVolumeClaim]")
+	// TODO with unstructured change we do not have this error anymore as we do not have expected kind.
+	//   Should we test it in another way/place?
+	// assert.EqualError(t, err, "GroupVersionKind not match, found: /v1, Kind=ConfigMap,
+	// expected: [/v1, Kind=PersistentVolumeClaim]")
 	assert.NoError(t, err)
 }
 
 func TestPlatformPatchMerge(t *testing.T) {
 
 	// ocp (no patch, so default)
-	//t.Setenv(PlatformEnvVar, "ocp")
+	// t.Setenv(PlatformEnvVar, "ocp")
 	obj, err := ReadYamlFiles("testdata/deployment.yaml", *util_test_scheme, "ocp")
 	assert.NoError(t, err)
 
@@ -131,7 +133,7 @@ func TestPlatformPatchMerge(t *testing.T) {
 	assert.Nil(t, depl.Spec.Template.Spec.SecurityContext)
 
 	// k8s (patched)
-	//t.Setenv(PlatformEnvVar, "k8s")
+	// t.Setenv(PlatformEnvVar, "k8s")
 
 	obj, err = ReadYamlFiles("testdata/deployment.yaml", *util_test_scheme, "k8s")
 	assert.NoError(t, err)

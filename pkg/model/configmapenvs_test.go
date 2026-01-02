@@ -29,7 +29,7 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-envs.yaml", "raw-cm-envs.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("configmap-envs.yaml", "raw-cm-envs.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -66,7 +66,7 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 	bs.Spec.Application.ExtraEnvs.ConfigMaps = append(bs.Spec.Application.ExtraEnvs.ConfigMaps,
 		bsv1.EnvObjectRef{Name: "mapName", Key: "ENV1"})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvConfigMapKeys["mapName"] = NewDataObjectKeys(map[string]string{"mapName": "ENV1"}, nil)
@@ -106,7 +106,7 @@ func TestDefaultAndSpecifiedConfigMapEnvFrom(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-envs.yaml", "raw-cm-envs.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("configmap-envs.yaml", "raw-cm-envs.yaml")
 
 	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvConfigMapKeys["mapName"] = NewDataObjectKeys(map[string]string{"mapName": "ENV1"}, nil)
@@ -124,22 +124,25 @@ func TestDefaultAndSpecifiedConfigMapEnvFrom(t *testing.T) {
 
 }
 
-func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
-
+func doCheckSpecifiedEnvsWithContainers(t *testing.T, envType string) {
 	bs := *secretEnvsTestBackstage.DeepCopy()
 	bs.Spec.Application = &bsv1.Application{
-		ExtraEnvs: &bsv1.ExtraEnvs{
-			ConfigMaps: []bsv1.EnvObjectRef{
-				{
-					Name:       "cmName",
-					Key:        "ENV1",
-					Containers: []string{"install-dynamic-plugins", "another-container"},
-				},
-			},
-		},
+		ExtraEnvs: &bsv1.ExtraEnvs{},
+	}
+	ref := bsv1.EnvObjectRef{
+		Name:       "cmName",
+		Key:        "ENV1",
+		Containers: []string{"install-dynamic-plugins", "another-container"},
+	}
+	switch envType {
+	case "cm":
+		bs.Spec.Application.ExtraEnvs.ConfigMaps = []bsv1.EnvObjectRef{ref}
+	case "secret":
+		bs.Spec.Application.ExtraEnvs.Secrets = []bsv1.EnvObjectRef{ref}
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
 	testObj.externalConfig.ExtraEnvSecretKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvSecretKeys["cmName"] = NewDataObjectKeys(map[string]string{"cmName": "ENV1"}, nil)
 
@@ -167,7 +170,8 @@ func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
 	// check *
 	bs.Spec.Application.ExtraEnvs.ConfigMaps[0].Containers = []string{"*"}
 
-	testObj = createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
+	testObj = createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
 	testObj.externalConfig.ExtraEnvSecretKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvSecretKeys["cmName"] = NewDataObjectKeys(map[string]string{"cmName": "ENV1"}, nil)
 
@@ -184,6 +188,10 @@ func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
 	}
 }
 
+func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
+	doCheckSpecifiedEnvsWithContainers(t, "cm")
+}
+
 func TestCMEnvsWithNonExistedContainerFailed(t *testing.T) {
 	bs := *secretEnvsTestBackstage.DeepCopy()
 	bs.Spec.Application = &bsv1.Application{
@@ -198,7 +206,7 @@ func TestCMEnvsWithNonExistedContainerFailed(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 

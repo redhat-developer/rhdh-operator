@@ -43,7 +43,8 @@ func (p *SecretFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 		if specSec.MountPath == "" && specSec.Key == "" {
 			return fmt.Errorf("key or mountPath has to be specified for secret %s", specSec.Name)
 		}
-		mp, wSubpath := p.model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
+		mp, wSubpath := p.model.backstageDeployment.mountPath(
+			specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
 		keys := p.model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
 		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: specSec.Containers}, SecretObjectKind,
 			specSec.Name, mp, specSec.Key, wSubpath, keys)
@@ -68,9 +69,9 @@ func (p *SecretFiles) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (p *SecretFiles) EmptyObject() client.Object {
-//	return &corev1.Secret{}
-//}
+// func (p *SecretFiles) EmptyObject() client.Object {
+// 	return &corev1.Secret{}
+// }
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
@@ -93,8 +94,9 @@ func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
 
 		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
 		mountPath, subPath := p.model.backstageDeployment.getDefConfigMountPath(item)
-		//containers, err := p.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
-		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
+		annotation := item.GetAnnotations()[ContainersAnnotation]
+		err := p.model.backstageDeployment.mountFilesFrom(
+			containersFilter{annotation: annotation}, SecretObjectKind,
 			item.GetName(), mountPath, "", subPath != "", keys)
 		if err != nil {
 			return fmt.Errorf("failed to add files from secret %s: %w", item.GetName(), err)

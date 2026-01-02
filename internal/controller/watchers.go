@@ -59,7 +59,7 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 			builder.WithPredicates(pred, predicate.Funcs{
 				DeleteFunc: func(e event.DeleteEvent) bool { return true },
 				UpdateFunc: func(e event.UpdateEvent) bool { return true },
-				//CreateFunc: func(e event.CreateEvent) bool { return true },
+				// CreateFunc: func(e event.CreateEvent) bool { return true },
 			}),
 		).
 			WatchesMetadata(
@@ -70,7 +70,7 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 				builder.WithPredicates(pred, predicate.Funcs{
 					DeleteFunc: func(e event.DeleteEvent) bool { return true },
 					UpdateFunc: func(e event.UpdateEvent) bool { return true },
-					//CreateFunc: func(e event.CreateEvent) bool { return true },
+					// CreateFunc: func(e event.CreateEvent) bool { return true },
 				}))
 	}
 
@@ -133,7 +133,7 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 
 	backstageName := object.GetAnnotations()[model.BackstageNameAnnotation]
 	if backstageName == "" {
-		//lg.V(1).Info(fmt.Sprintf("warning: %s annotation is not defined for %s, Backstage instances will not be reconciled in this loop", model.BackstageNameAnnotation, object.GetName()))
+		// lg.V(1).Info(fmt.Sprintf("warning: %s annotation is not defined for %s, Backstage instances will not be reconciled in this loop", model.BackstageNameAnnotation, object.GetName()))
 		return []reconcile.Request{}
 	}
 
@@ -150,11 +150,11 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 		return []reconcile.Request{}
 	}
 
-	//ec, err := r.preprocessSpec(ctx, backstage)
-	//if err != nil {
-	//	lg.Error(err, "request by label failed, preprocess Backstage ")
-	//	return []reconcile.Request{}
-	//}
+	// ec, err := r.preprocessSpec(ctx, backstage)
+	// if err != nil {
+	// 	lg.Error(err, "request by label failed, preprocess Backstage ")
+	// 	return []reconcile.Request{}
+	// }
 
 	deploy, err := FindDeployment(ctx, r.Client, object.GetNamespace(), backstage.Name)
 	if err != nil {

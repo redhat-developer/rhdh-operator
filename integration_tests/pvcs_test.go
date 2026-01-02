@@ -100,8 +100,8 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(pv.Status.Phase).To(Equal(corev1.VolumeBound))
 
 			// check if added to deployment
-			//depl := &appsv1.Deployment{}
-			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
+			// depl := &appsv1.Deployment{}
+			// err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
 			bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -118,7 +118,8 @@ var _ = When("create backstage PVCs configured", func() {
 				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, bpod.Name, backstageContainer(bpod.Spec).Name, fmt.Sprintf("test -d %s", path))
+			_, _, err = executeRemoteCommand(
+				ctx, ns, bpod.Name, backstageContainer(bpod.Spec).Name, fmt.Sprintf("test -d %s", path))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
@@ -130,7 +131,7 @@ var _ = When("create backstage PVCs configured", func() {
 			Skip("Skipped for not real cluster")
 		}
 
-		//Precreate StorageClass
+		// Precreate StorageClass
 		sc := storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: scName,
@@ -165,7 +166,7 @@ var _ = When("create backstage PVCs configured", func() {
 		err = k8sClient.Create(ctx, &pv)
 		Expect(err).ShouldNot(HaveOccurred())
 
-		//Add PVC to Backstage CR configuration
+		// Add PVC to Backstage CR configuration
 		pvcCm := generateConfigMap(ctx, k8sClient, "pvc-conf", ns,
 			map[string]string{"pvcs.yaml": readTestYamlFile("raw-pvcs2.yaml")}, nil, nil)
 
@@ -199,7 +200,8 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainer(*depl.PodSpec()).Name, fmt.Sprintf("test -d %s", path))
+			_, _, err = executeRemoteCommand(
+				ctx, ns, pod.Name, backstageContainer(*depl.PodSpec()).Name, fmt.Sprintf("test -d %s", path))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
@@ -300,9 +302,12 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainer(*depl.PodSpec()).Name, fmt.Sprintf("test -d %s", path))
+			contName := backstageContainer(*depl.PodSpec()).Name
+			_, _, err = executeRemoteCommand(
+				ctx, ns, pod.Name, contName, fmt.Sprintf("test -d %s", path))
 			g.Expect(err).ShouldNot(HaveOccurred())
-			_, _, err = executeRemoteCommand(ctx, ns, pod.Name, backstageContainer(*depl.PodSpec()).Name, fmt.Sprintf("test -d %s", path2))
+			_, _, err = executeRemoteCommand(
+				ctx, ns, pod.Name, contName, fmt.Sprintf("test -d %s", path2))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())

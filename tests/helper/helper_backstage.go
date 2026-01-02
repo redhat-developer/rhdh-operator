@@ -80,7 +80,8 @@ func GuestAuth(baseUrl string) (string, error) {
 		return "", fmt.Errorf("error while trying to read response body from 'GET %q': %w", url, err)
 	}
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("expected status code 200, but got %d in response to 'GET %q', body: %s", resp.StatusCode, url, string(body))
+		return "", fmt.Errorf("expected status code 200, but got %d in response to 'GET %q', body: %s",
+			resp.StatusCode, url, string(body))
 	}
 	var authResponse BackstageAuthRefreshResponse
 	err = json.Unmarshal(body, &authResponse)
@@ -104,7 +105,8 @@ func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus
 }
 
 func VerifyBackstageCRStatus(g Gomega, ns string, crName string, statusMatcher types.GomegaMatcher) {
-	cmd := exec.Command(GetPlatformTool(), "get", "backstage", crName, "-o", "jsonpath={.status.conditions}", "-n", ns) // #nosec G204
+	cmd := exec.Command(
+		GetPlatformTool(), "get", "backstage", crName, "-o", "jsonpath={.status.conditions}", "-n", ns) // #nosec G204
 	status, err := Run(cmd)
 	GinkgoWriter.Println(string(status))
 	g.Expect(err).ShouldNot(HaveOccurred())
@@ -116,7 +118,8 @@ func PatchBackstageCR(ns string, crName string, jsonPatch string, patchType stri
 	if p == "" {
 		p = "strategic"
 	}
-	_, err := Run(exec.Command(GetPlatformTool(), "-n", ns, "patch", "backstage", crName, "--patch", jsonPatch, "--type="+p)) // #nosec G204
+	_, err := Run(exec.Command(
+		GetPlatformTool(), "-n", ns, "patch", "backstage", crName, "--patch", jsonPatch, "--type="+p)) // #nosec G204
 	return err
 }
 
@@ -136,7 +139,8 @@ func GetBackstageRouteHost(ns string, crName string) (string, error) {
 	routeName := model.RouteName(crName)
 
 	hostBytes, err := Run(exec.Command(
-		GetPlatformTool(), "get", "route", routeName, "-o", "go-template={{if .spec.host}}{{.spec.host}}{{end}}", "-n", ns)) // #nosec G204
+		GetPlatformTool(), "get", "route", routeName,
+		"-o", "go-template={{if .spec.host}}{{.spec.host}}{{end}}", "-n", ns)) // #nosec G204
 	if err != nil {
 		return "", fmt.Errorf("unable to determine host for route %s/%s: %w", ns, routeName, err)
 	}
@@ -147,7 +151,8 @@ func GetBackstageRouteHost(ns string, crName string) (string, error) {
 
 	// try with subdomain in case it was set
 	subDomainBytes, err := Run(exec.Command(
-		GetPlatformTool(), "get", "route", routeName, "-o", "go-template={{if .spec.subdomain}}{{.spec.subdomain}}{{end}}", "-n", ns)) // #nosec G204
+		GetPlatformTool(), "get", "route", routeName,
+		"-o", "go-template={{if .spec.subdomain}}{{.spec.subdomain}}{{end}}", "-n", ns)) // #nosec G204
 	if err != nil {
 		return "", fmt.Errorf("unable to determine subdomain for route %s/%s: %w", ns, routeName, err)
 	}
@@ -155,7 +160,8 @@ func GetBackstageRouteHost(ns string, crName string) (string, error) {
 	if subDomain == "" {
 		return "", nil
 	}
-	ingressDomainBytes, err := Run(exec.Command(GetPlatformTool(), "get", "ingresses.config/cluster", "-o", "jsonpath={.spec.domain}")) // #nosec G204
+	ingressDomainBytes, err := Run(exec.Command(
+		GetPlatformTool(), "get", "ingresses.config/cluster", "-o", "jsonpath={.spec.domain}")) // #nosec G204
 	if err != nil {
 		return "", fmt.Errorf("unable to determine ingress sub-domain: %w", err)
 	}
@@ -184,7 +190,11 @@ func VerifyBackstageRoute(g Gomega, ns string, crName string, tests []ApiEndpoin
 	VerifyBackstageAppAccess(g, fmt.Sprintf("https://%s", host), tests)
 }
 
-func VerifyBackstageAppAccessWithUrlProvider(g Gomega, baseUrlProvider func(g Gomega) (context.CancelFunc, string), tests []ApiEndpointTest) {
+func VerifyBackstageAppAccessWithUrlProvider(
+	g Gomega,
+	baseUrlProvider func(g Gomega) (context.CancelFunc, string),
+	tests []ApiEndpointTest,
+) {
 	cancelFunc, appUrl := baseUrlProvider(g)
 	if cancelFunc != nil {
 		defer cancelFunc()
@@ -210,7 +220,8 @@ func VerifyBackstageAppAccess(g Gomega, baseUrl string, tests []ApiEndpointTest)
 
 		if tt.BearerTokenRetrievalFn != nil {
 			bearerToken, tErr := tt.BearerTokenRetrievalFn(baseUrl)
-			g.Expect(tErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while retrieving bearer token, context: %q", tt.Endpoint))
+			g.Expect(tErr).ShouldNot(HaveOccurred(),
+				fmt.Sprintf("error while retrieving bearer token, context: %q", tt.Endpoint))
 			if bearerToken != "" {
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", bearerToken))
 			}
@@ -227,7 +238,8 @@ func VerifyBackstageAppAccess(g Gomega, baseUrl string, tests []ApiEndpointTest)
 		body, rErr := io.ReadAll(resp.Body)
 		g.Expect(rErr).ShouldNot(HaveOccurred(), fmt.Sprintf("error while trying to read response body from 'GET %q'", url))
 		bodyStr := string(body)
-		g.Expect(resp.StatusCode).Should(Equal(tt.ExpectedHttpStatusCode), fmt.Sprintf("context: %s\n===Response body===\n%s", tt.Endpoint, bodyStr))
+		g.Expect(resp.StatusCode).Should(Equal(tt.ExpectedHttpStatusCode),
+			fmt.Sprintf("context: %s\n===Response body===\n%s", tt.Endpoint, bodyStr))
 		if tt.BodyMatcher != nil {
 			g.Expect(bodyStr).Should(tt.BodyMatcher, "context: "+tt.Endpoint)
 		}

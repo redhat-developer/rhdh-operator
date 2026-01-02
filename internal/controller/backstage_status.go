@@ -4,14 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
-	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 )
 
 func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *bs.Backstage, backstageModel model.BackstageModel) {
@@ -40,6 +41,7 @@ func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage
 	setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, state, msg)
 }
 
+// nolint:unparam // The condType parameter might be called with different values in the future
 func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionType, status metav1.ConditionStatus, reason bs.BackstageConditionReason, msg string) {
 	meta.SetStatusCondition(&backstage.Status.Conditions, metav1.Condition{
 		Type:               string(condType),
@@ -84,7 +86,7 @@ func statefulSetState(deploy *appsv1.StatefulSet) (state bs.BackstageConditionRe
 		desired = *deploy.Spec.Replicas
 	}
 
-	//if deploy.Status.ReadyReplicas == desired {
+	// if deploy.Status.ReadyReplicas == desired {
 	if deploy.Status.ReadyReplicas == desired && deploy.Status.CurrentReplicas == deploy.Status.UpdatedReplicas {
 		return bs.BackstageConditionReasonDeployed, ""
 	}

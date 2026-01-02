@@ -19,7 +19,8 @@ import (
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 )
 
-// testBackstageObject it is a helper object to simplify testing model component allowing to customize and isolate testing configuration
+// testBackstageObject it is a helper object to simplify testing model component
+// allowing to customize and isolate testing configuration.
 // usual sequence of creating testBackstageObject contains such a steps:
 // createBackstageTest(bsv1.Backstage).
 // withDefaultConfig(useDef bool)
@@ -49,18 +50,19 @@ func (b *testBackstageObject) withLocalDb() *testBackstageObject {
 }
 
 // tells if object should use default Backstage Deployment/Service configuration from ./testdata/default-config or not
-func (b *testBackstageObject) withDefaultConfig(useDef bool) *testBackstageObject {
-	if useDef {
-		// here we have default-config folder
-		_ = os.Setenv("LOCALBIN", "./testdata")
-	} else {
-		_ = os.Setenv("LOCALBIN", ".")
-	}
+func (b *testBackstageObject) withDefaultConfig( /* useDef bool */ ) *testBackstageObject {
+	// if useDef {
+	//	// here we have default-config folder
+	_ = os.Setenv("LOCALBIN", "./testdata")
+	// } else {
+	//	_ = os.Setenv("LOCALBIN", ".")
+	// }
 	return b
 }
 
 // adds particular part of configuration pointing to configuration key
-// where key is configuration key (such as "deployment.yaml" and fileName is a name of additional conf file in ./testdata
+// where key is configuration key (such as "deployment.yaml")
+// and fileName is a name of additional conf file in ./testdata
 func (b *testBackstageObject) addToDefaultConfig(key string, fileName string) *testBackstageObject {
 
 	yaml, err := readTestYamlFile(fileName)

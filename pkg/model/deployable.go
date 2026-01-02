@@ -30,7 +30,7 @@ type Deployable interface {
 	SetEmpty()
 }
 
-//const unsupportedType = "unsupported deployable type: "
+// const unsupportedType = "unsupported deployable type: "
 
 // CreateDeployable creates a new Deployable object
 func CreateDeployable(obj runtime.Object) (Deployable, error) {

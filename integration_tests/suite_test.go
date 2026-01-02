@@ -45,7 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	//+kubebuilder:scaffold:imports
+	// +kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -64,7 +64,7 @@ type TestBackstageReconciler struct {
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
-	//testOnExistingCluster, _ = strconv.ParseBool(os.Getenv("TEST_ON_EXISTING_CLUSTER"))
+	// testOnExistingCluster, _ = strconv.ParseBool(os.Getenv("TEST_ON_EXISTING_CLUSTER"))
 }
 
 func TestAPIs(t *testing.T) {
@@ -74,14 +74,17 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	//logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	// logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	logf.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		BinaryAssetsDirectory: getFirstFoundEnvTestBinaryDir(),
-		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases"), filepath.Join("..", "config", "crd", "external")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "config", "crd", "bases"),
+			filepath.Join("..", "config", "crd", "external"),
+		},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -122,7 +125,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	utilruntime.Must(openshift.Install(scheme.Scheme))
 
-	//+kubebuilder:scaffold:scheme
+	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())

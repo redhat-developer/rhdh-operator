@@ -16,16 +16,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-//it relies on implementation where dynamic-plugin initContainer
-//uses specified ConfigMap for producing app-config with dynamic-plugins
-//For this implementation:
-//- backstage contaier and dynamic-plugin initContainer must share a volume
-//  where initContainer writes and backstage container reads produced app-config
-//- app-config path should be set as a --config parameter of backstage container
-//in the deployment manifest
+// it relies on implementation where dynamic-plugin initContainer
+// uses specified ConfigMap for producing app-config with dynamic-plugins
+// For this implementation:
+// - backstage contaier and dynamic-plugin initContainer must share a volume
+//   where initContainer writes and backstage container reads produced app-config
+// - app-config path should be set as a --config parameter of backstage container
+// in the deployment manifest
 
-//it creates a volume with dynamic-plugins ConfigMap (there should be a key named "dynamic-plugins.yaml")
-//and mount it to the dynamic-plugin initContainer's WorkingDir (what if not specified?)
+// it creates a volume with dynamic-plugins ConfigMap (there should be a key named "dynamic-plugins.yaml")
+// and mount it to the dynamic-plugin initContainer's WorkingDir (what if not specified?)
 
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
@@ -81,9 +81,9 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (p *DynamicPlugins) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
+// func (p *DynamicPlugins) EmptyObject() client.Object {
+// 	return &corev1.ConfigMap{}
+// }
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
@@ -103,7 +103,8 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 }
 
 // implementation of RuntimeObject interface
-// ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
+// ConfigMap name must be the same as
+// (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
 func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
 
 	_, initContainer := p.getInitContainer()
@@ -111,8 +112,10 @@ func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
 		return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
 	}
 	if backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "" {
-		if err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
-			p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data)); err != nil {
+		if err := p.model.backstageDeployment.mountFilesFrom(
+			containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
+			p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true,
+			maps.Keys(p.ConfigMap.Data)); err != nil {
 			return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)
 		}
 	}
@@ -147,13 +150,16 @@ func (p *DynamicPlugins) addExternalConfig(spec bsv1.BackstageSpec) error {
 				return fmt.Errorf("failed to merge dynamic plugins config: %w", err)
 			}
 			p.ConfigMap.Data[DynamicPluginsFile] = mergedData
-			err = p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
-				p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
+			err = p.model.backstageDeployment.mountFilesFrom(
+				containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
+				p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true,
+				maps.Keys(p.ConfigMap.Data))
 			if err != nil {
 				return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)
 			}
 		} else {
-			err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
+			err := p.model.backstageDeployment.mountFilesFrom(
+				containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
 				dp.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
 			if err != nil {
 				return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)

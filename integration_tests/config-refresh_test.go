@@ -24,10 +24,15 @@ import (
 
 // TODO make it with test matrix to not to repeat code
 
+const conf = `
+organization:
+  name: "my org"
+`
+
 var appConfig = "app-config1"
 var secretEnv = "secret-env1"
 
-//var secretFile = "secret1"
+// var secretFile = "secret1"
 
 var bsSpec = bsv1.BackstageSpec{
 	Application: &bsv1.Application{
@@ -71,15 +76,10 @@ var _ = When("create backstage with external configuration", func() {
 			Skip("Skipped for not real controller")
 		}
 
-		//appConfig1 := "app-config1"
-		//secretEnv1 := "secret-env1"
+		// appConfig1 := "app-config1"
+		// secretEnv1 := "secret-env1"
 
 		backstageName := generateRandName("")
-
-		conf := `
-organization:
-  name: "my org"
-`
 
 		generateConfigMap(ctx, k8sClient, appConfig, ns, map[string]string{"appconfig11": conf}, nil, nil)
 		generateSecret(ctx, k8sClient, secretEnv, ns, map[string]string{"sec11": "val11"}, nil, nil)
@@ -95,19 +95,14 @@ organization:
 			Skip("Skipped for not real cluster")
 		}
 
-		//if !useExistingController {
-		//	Skip("Skipped for not real controller")
-		//}
+		// if !useExistingController {
+		// 	Skip("Skipped for not real controller")
+		// }
 
 		appConfig1 := "app-config1"
 		secretFile1 := "secret1"
 
 		backstageName := generateRandName("")
-
-		conf := `
-organization:
-  name: "my org"
-`
 
 		generateConfigMap(ctx, k8sClient, appConfig1, ns, map[string]string{"appconfig11": conf}, nil, nil)
 		generateSecret(ctx, k8sClient, secretFile1, ns, map[string]string{"sec11": "val11"}, nil, nil)
@@ -136,17 +131,20 @@ organization:
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			podList := &corev1.PodList{}
-			err = k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+			err = k8sClient.List(ctx, podList, client.InNamespace(ns),
+				client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			g.Expect(len(podList.Items)).To(Equal(1))
+			g.Expect(podList.Items).To(HaveLen(1))
 			podName = podList.Items[0].Name
 
-			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/appconfig/appconfig11")
-			g.Expect(err).ShouldNot(HaveOccurred())
+			out, stderr, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name,
+				"cat /my/appconfig/appconfig11")
+			g.Expect(err).ShouldNot(HaveOccurred(), fmt.Sprintf("stdout: %s\n\n, stderr: %s", out, stderr))
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(conf))
 
-			_, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/secret/sec11")
+			_, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name,
+				"cat /my/secret/sec11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 4*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
@@ -169,7 +167,8 @@ organization:
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// no need to re-ask pod name, it is not recreated, just use what we've got
-			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/appconfig/appconfig11")
+			out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name,
+				"cat /my/appconfig/appconfig11")
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// let's checkMountWSubpath, just in case (it is k8s job to refresh it :)
 			g.Expect(strings.ReplaceAll(out, "\r", "")).To(Equal(newData))
@@ -188,15 +187,10 @@ organization:
 			Skip("Skipped for not real controller")
 		}
 
-		//appConfig1 := "app-config1"
-		//secretEnv1 := "secret-env1"
+		// appConfig1 := "app-config1"
+		// secretEnv1 := "secret-env1"
 
 		backstageName := generateRandName("")
-
-		conf := `
-organization:
-  name: "my org"
-`
 
 		generateConfigMap(ctx, k8sClient, appConfig, ns, map[string]string{"appconfig11": conf}, nil, nil)
 		generateSecret(ctx, k8sClient, secretEnv, ns, map[string]string{"sec11": "val11"}, nil, nil)
@@ -211,7 +205,13 @@ organization:
 
 })
 
-func checkMountWSubpath(g Gomega, ctx context.Context, k8sClient client.Client, bs bsv1.BackstageSpec, ns, backstageName, conf string) {
+func checkMountWSubpath(
+	_ Gomega,
+	ctx context.Context,
+	k8sClient client.Client,
+	bs bsv1.BackstageSpec,
+	ns, backstageName, conf string,
+) {
 
 	createAndReconcileBackstage(ctx, ns, bs, backstageName)
 
@@ -220,17 +220,20 @@ func checkMountWSubpath(g Gomega, ctx context.Context, k8sClient client.Client, 
 		g.Expect(err).ShouldNot(HaveOccurred())
 
 		podList := &corev1.PodList{}
-		err = k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+		err = k8sClient.List(ctx, podList, client.InNamespace(ns),
+			client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
 		g.Expect(err).ShouldNot(HaveOccurred())
 
-		g.Expect(len(podList.Items)).To(Equal(1))
+		g.Expect(podList.Items).To(HaveLen(1))
 		podName := podList.Items[0].Name
-		out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/mount/path/appconfig11")
+		out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name,
+			"cat /my/mount/path/appconfig11")
 		g.Expect(err).ShouldNot(HaveOccurred())
 		out = strings.ReplaceAll(out, "\r", "")
 		g.Expect(out).To(Equal(conf))
 
-		out, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "echo $sec11")
+		out, _, err = executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name,
+			"echo $sec11")
 		g.Expect(err).ShouldNot(HaveOccurred())
 		g.Expect("val11\r\n").To(Equal(out))
 
@@ -267,11 +270,13 @@ organization:
 
 		// Pod replaced so have to re-ask
 		podList := &corev1.PodList{}
-		err = k8sClient.List(ctx, podList, client.InNamespace(ns), client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+		err = k8sClient.List(ctx, podList, client.InNamespace(ns),
+			client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
 		g.Expect(err).ShouldNot(HaveOccurred())
 
 		podName := podList.Items[0].Name
-		out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "cat /my/mount/path/appconfig11")
+		out, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name,
+			"cat /my/mount/path/appconfig11")
 		g.Expect(err).ShouldNot(HaveOccurred())
 		// TODO nicer method to compare file content with added '\r'
 		// NOTE: it does not work well on envtest, real controller needed
@@ -280,7 +285,8 @@ organization:
 		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretEnv}, sec)
 		g.Expect(err).ShouldNot(HaveOccurred())
 
-		out2, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name, "echo $sec11")
+		out2, _, err := executeRemoteCommand(ctx, ns, podName, backstageContainer(*deploy.PodSpec()).Name,
+			"echo $sec11")
 		g.Expect(err).ShouldNot(HaveOccurred())
 		// NOTE: it does not work well on envtest, real controller needed
 		g.Expect(fmt.Sprintf("%s%s", newEnv, "\r\n")).To(Equal(out2))
