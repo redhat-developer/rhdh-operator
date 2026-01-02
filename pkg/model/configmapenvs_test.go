@@ -168,7 +168,12 @@ func doCheckSpecifiedEnvsWithContainers(t *testing.T, envType string) {
 	assert.Equal(t, 0, len(cont.Env))
 
 	// check *
-	bs.Spec.Application.ExtraEnvs.ConfigMaps[0].Containers = []string{"*"}
+	switch envType {
+	case "cm":
+		bs.Spec.Application.ExtraEnvs.ConfigMaps[0].Containers = []string{"*"}
+	case "secret":
+		bs.Spec.Application.ExtraEnvs.Secrets[0].Containers = []string{"*"}
+	}
 
 	testObj = createBackstageTest(bs).withDefaultConfig().
 		addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
