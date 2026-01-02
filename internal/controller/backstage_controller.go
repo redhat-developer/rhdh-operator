@@ -235,7 +235,8 @@ func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	b := ctrl.NewControllerManagedBy(mgr).
-		For(&bs.Backstage{})
+		For(&bs.Backstage{}).
+		Named("backstage")
 
 	if err := r.addWatchers(b); err != nil {
 		return err

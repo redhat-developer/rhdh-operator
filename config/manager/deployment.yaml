@@ -52,8 +52,6 @@ spec:
             - /manager
           args:
             - --health-probe-bind-address=:8081
-            - --metrics-bind-address=:8443
-            - --metrics-secure=true
             - --leader-elect
           image: controller:latest
           name: manager
