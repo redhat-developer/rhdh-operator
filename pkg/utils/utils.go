@@ -1,17 +1,12 @@
 package utils
 
 import (
-	//"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
-
-	//"io"
 	"os"
 	"path/filepath"
-
-	//"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -62,7 +57,8 @@ func AddAnnotation(object client.Object, name string, value string) {
 	object.GetAnnotations()[name] = value
 }
 
-// GenerateRuntimeObjectName generates name using BackstageCR name and objectType which is ConfigObject Key without '.yaml' (like 'deployment')
+// GenerateRuntimeObjectName generates name using BackstageCR name and objectType
+// which is ConfigObject Key without '.yaml' (like 'deployment')
 func GenerateRuntimeObjectName(backstageCRName string, objectType string) string {
 	return fmt.Sprintf("%s-%s", objectType, backstageCRName)
 }
@@ -90,7 +86,9 @@ func BackstageDbAppLabelValue(backstageName string) string {
 // platformPatch - yaml content with platform specific patch, to be merged with manifest if exists
 // templ - template object to create new objects
 // scheme - runtime.Scheme
-//func ReadYamls(manifest []byte, platformPatch []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
+//
+//nolint:lll
+// func ReadYamls(manifest, platformPatch []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
 //
 //	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
 //
@@ -130,7 +128,7 @@ func BackstageDbAppLabelValue(backstageName string) string {
 //	}
 //
 //	return objects, nil
-//}
+// }
 
 func ReadYamls(manifest []byte, platformPatch []byte, scheme runtime.Scheme) ([]client.Object, error) {
 	sep := regexp.MustCompile(`(?m)^---\s*$`)
@@ -199,7 +197,6 @@ func ReadYamlFiles(path string, scheme runtime.Scheme, platformExt string) ([]cl
 	if err != nil {
 		return nil, fmt.Errorf("failed to read platform patch: %w", err)
 	}
-	//return ReadYamls(conf, pp, templ, scheme)
 	return ReadYamls(conf, pp, scheme)
 }
 
@@ -227,7 +224,8 @@ func checkObjectKind(object client.Object, scheme *runtime.Scheme) error {
 		}
 	}
 
-	return fmt.Errorf("GroupVersionKind not match, found: %v, expected: %v", object.GetObjectKind().GroupVersionKind(), gvks)
+	return fmt.Errorf(
+		"GroupVersionKind not match, found: %v, expected: %v", object.GetObjectKind().GroupVersionKind(), gvks)
 
 }
 
@@ -303,7 +301,7 @@ func ParseCommaSeparated(input string) []string {
 	return result
 }
 
-//func FilterContainers(allContainers []string, filter string) []string {
+// func FilterContainers(allContainers []string, filter string) []string {
 //	if filter == "*" {
 //		return allContainers
 //	} else if filter == "" {
@@ -319,4 +317,4 @@ func ParseCommaSeparated(input string) []string {
 //		}
 //	}
 //	return filtered
-//}
+// }

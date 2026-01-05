@@ -90,9 +90,9 @@ func (b *BackstageRoute) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (b *BackstageRoute) EmptyObject() client.Object {
-//	return &openshift.Route{}
-//}
+// func (b *BackstageRoute) EmptyObject() client.Object {
+// 	return &openshift.Route{}
+// }
 
 // implementation of RuntimeObject interface
 func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
@@ -144,12 +144,14 @@ func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 }
 
 // updateAppConfigWithBaseUrls tries to set the baseUrl in the default app-config.
-// Note that this is purposely done on a best effort basis. So it is not considered an issue if the cluster ingress domain
-// could not be determined, since the user can always set it explicitly in their custom app-config.
+// Note that this is purposely done on a best effort basis.
+// So it is not considered an issue if the cluster ingress domain could not be determined,
+// since the user can always set it explicitly in their custom app-config.
 func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstage bsv1.Backstage) {
 	if m.appConfig == nil || m.appConfig.ConfigMap == nil {
 		klog.V(1).Infof(
-			"Default app-config ConfigMap not initialized yet - skipping automatic population of base URLS in the default app-config for Backstage %s",
+			"Default app-config ConfigMap not initialized yet - "+
+				"skipping automatic population of base URLS in the default app-config for Backstage %s",
 			backstage.Name)
 		return
 	}

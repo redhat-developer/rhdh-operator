@@ -45,13 +45,19 @@ var _ = When("create backstage with CR configured", func() {
 		Eventually(func(g Gomega) {
 			By("creating Deployment with database.enableLocalDb=true by default")
 
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &appsv1.StatefulSet{})
+			ssName := types.NamespacedName{
+				Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}
+			err := k8sClient.Get(ctx, ssName, &appsv1.StatefulSet{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &corev1.Service{})
+			svcName := types.NamespacedName{
+				Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}
+			err = k8sClient.Get(ctx, svcName, &corev1.Service{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-secret-%s", backstageName)}, &corev1.Secret{})
+			secretName := types.NamespacedName{
+				Namespace: ns, Name: fmt.Sprintf("backstage-psql-secret-%s", backstageName)}
+			err = k8sClient.Get(ctx, secretName, &corev1.Secret{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
 		}, time.Minute, time.Second).Should(Succeed())
@@ -71,17 +77,23 @@ var _ = When("create backstage with CR configured", func() {
 
 		Eventually(func(g Gomega) {
 			By("deleting Local Db StatefulSet, Service and Secret")
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &appsv1.StatefulSet{})
+			ssName := types.NamespacedName{
+				Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}
+			err = k8sClient.Get(ctx, ssName, &appsv1.StatefulSet{})
 			g.Expect(err).To(HaveOccurred())
-			g.Expect(errors.IsNotFound(err))
+			g.Expect(errors.IsNotFound(err)).To(BeTrue())
 
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, &corev1.Service{})
+			svcName := types.NamespacedName{
+				Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}
+			err = k8sClient.Get(ctx, svcName, &corev1.Service{})
 			g.Expect(err).To(HaveOccurred())
-			g.Expect(errors.IsNotFound(err))
+			g.Expect(errors.IsNotFound(err)).To(BeTrue())
 
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-secret-%s", backstageName)}, &corev1.Secret{})
+			secretName := types.NamespacedName{
+				Namespace: ns, Name: fmt.Sprintf("backstage-psql-secret-%s", backstageName)}
+			err = k8sClient.Get(ctx, secretName, &corev1.Secret{})
 			g.Expect(err).To(HaveOccurred())
-			g.Expect(errors.IsNotFound(err))
+			g.Expect(errors.IsNotFound(err)).To(BeTrue())
 		}, time.Minute, time.Second).Should(Succeed())
 
 	})
@@ -100,7 +112,7 @@ var _ = When("create backstage with CR configured", func() {
 				types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)},
 				&appsv1.StatefulSet{})
 			g.Expect(err).Should(HaveOccurred())
-			g.Expect(errors.IsNotFound(err))
+			g.Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			By("Checking if Deployment was successfully created in the reconciliation")
 			_, err = backstageDeployment(ctx, k8sClient, ns, backstageName)
@@ -121,7 +133,7 @@ var _ = When("create backstage with CR configured", func() {
 				types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)},
 				&appsv1.StatefulSet{})
 			g.Expect(err).Should(HaveOccurred())
-			g.Expect(errors.IsNotFound(err))
+			g.Expect(errors.IsNotFound(err)).To(BeTrue())
 
 			By("Checking if Deployment was successfully created in the reconciliation")
 			_, err = backstageDeployment(ctx, k8sClient, ns, backstageName)

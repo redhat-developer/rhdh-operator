@@ -34,7 +34,7 @@ func TestDefaultRoute(t *testing.T) {
 	}
 	assert.True(t, bs.Spec.IsRouteEnabled())
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("route.yaml", "raw-route.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 
@@ -64,7 +64,7 @@ func TestSpecifiedRoute(t *testing.T) {
 				Route: &bsv1.Route{
 					Enabled: ptr.To(true),
 					Host:    "TestSpecifiedRoute",
-					//TLS:     nil,
+					// TLS:     nil,
 				},
 			},
 		},
@@ -73,7 +73,7 @@ func TestSpecifiedRoute(t *testing.T) {
 	assert.True(t, bs.Spec.IsRouteEnabled())
 
 	// Test w/o default route configured
-	testObjNoDef := createBackstageTest(bs).withDefaultConfig(true)
+	testObjNoDef := createBackstageTest(bs).withDefaultConfig()
 	model, err := InitObjects(context.TODO(), bs, testObjNoDef.externalConfig, platform.OpenShift, testObjNoDef.scheme)
 
 	assert.NoError(t, err)
@@ -110,20 +110,20 @@ func TestDisabledRoute(t *testing.T) {
 				Route: &bsv1.Route{
 					Enabled: ptr.To(false),
 					Host:    "TestSpecifiedRoute",
-					//TLS:     nil,
+					// TLS:     nil,
 				},
 			},
 		},
 	}
 
 	// With def route config
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("route.yaml", "raw-route.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.Nil(t, model.route)
 
 	// W/o def route config
-	testObj = createBackstageTest(bs).withDefaultConfig(true)
+	testObj = createBackstageTest(bs).withDefaultConfig()
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.Nil(t, model.route)
@@ -137,18 +137,18 @@ func TestExcludedRoute(t *testing.T) {
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		//Spec: bsv1.BackstageSpec{ //	//Application: &bsv1.Application{},
-		//},
+		// Spec: bsv1.BackstageSpec{ //	//Application: &bsv1.Application{},
+		// },
 	}
 
 	// With def route config - create default route
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("route.yaml", "raw-route.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.route)
 
 	// W/o def route config - do not create route
-	testObj = createBackstageTest(bs).withDefaultConfig(true)
+	testObj = createBackstageTest(bs).withDefaultConfig()
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.Nil(t, model.route)
@@ -169,13 +169,13 @@ func TestEnabledRoute(t *testing.T) {
 	}
 
 	// With def route config
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("route.yaml", "raw-route.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.route)
 
 	// W/o def route config
-	testObj = createBackstageTest(bs).withDefaultConfig(true)
+	testObj = createBackstageTest(bs).withDefaultConfig()
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.route)
@@ -422,15 +422,15 @@ organization:
 					assert.Equal(t, expected, v["backend"].(map[string]any)["cors"].(map[string]any)["origin"].(string))
 				}
 
-				//The other fields defined in the default app-config should still be present
+				// The other fields defined in the default app-config should still be present
 				assert.Equal(t, "My Awesome App",
 					res["my-default-app-config-1.yaml"]["app"].(map[string]any)["title"].(string))
 				assert.NotNil(t, res["my-default-app-config-1.yaml"]["plugin1"].(map[string]any))
 
 				assert.Equal(t, "My Company",
 					res["my-default-app-config-2.yaml"]["organization"].(map[string]any)["name"].(string))
-				assert.True(t,
-					res["my-default-app-config-2.yaml"]["backend"].(map[string]any)["auth"].(map[string]any)["dangerouslyDisableDefaultAuthPolicy"].(bool))
+				authPolicy := res["my-default-app-config-2.yaml"]["backend"].(map[string]any)["auth"].(map[string]any)
+				assert.True(t, authPolicy["dangerouslyDisableDefaultAuthPolicy"].(bool))
 				assert.True(t,
 					res["my-default-app-config-2.yaml"]["backend"].(map[string]any)["cors"].(map[string]any)["credentials"].(bool))
 			},

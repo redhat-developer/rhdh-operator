@@ -47,12 +47,14 @@ var _ = When("create default backstage", func() {
 			secretName := fmt.Sprintf("backstage-psql-secret-%s", backstageName)
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: secretName}, secret)
 			g.Expect(err).ShouldNot(HaveOccurred(), controllerMessage())
-			g.Expect(len(secret.Data)).To(Equal(5))
+			g.Expect(secret.Data).To(HaveLen(5))
 			g.Expect(secret.Data).To(HaveKeyWithValue("POSTGRES_USER", []uint8("postgres")))
 
 			By("creating a StatefulSet for the Database")
 			ss := &appsv1.StatefulSet{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, ss)
+			ssName := types.NamespacedName{
+				Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}
+			err = k8sClient.Get(ctx, ssName, ss)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			By("injecting default DB Secret as an env var for Db container")
@@ -60,7 +62,9 @@ var _ = When("create default backstage", func() {
 			g.Expect(ss.GetOwnerReferences()).To(HaveLen(1))
 
 			By("creating a Service for the Database")
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}, &corev1.Service{})
+			svcName := types.NamespacedName{
+				Name: fmt.Sprintf("backstage-psql-%s", backstageName), Namespace: ns}
+			err = k8sClient.Get(ctx, svcName, &corev1.Service{})
 			g.Expect(err).To(Not(HaveOccurred()))
 
 			By("creating Deployment")
@@ -75,7 +79,9 @@ var _ = When("create default backstage", func() {
 
 			By("creating default app-config")
 			appConfig := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, appConfig)
+			appConfigName := types.NamespacedName{
+				Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}
+			err = k8sClient.Get(ctx, appConfigName, appConfig)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			By("mounting Volume defined in default app-config")

@@ -32,7 +32,7 @@ var dbStatefulSetBackstage = &bsv1.Backstage{
 // test default StatefulSet
 func TestDefault(t *testing.T) {
 	bs := *dbStatefulSetBackstage.DeepCopy()
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -47,7 +47,7 @@ func TestOverrideDbImage(t *testing.T) {
 
 	bs.Spec.Database.EnableLocalDb = ptr.To(false)
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).
+	testObj := createBackstageTest(bs).withDefaultConfig().
 		addToDefaultConfig("db-statefulset.yaml", "janus-db-statefulset.yaml").withLocalDb()
 
 	_ = os.Setenv(LocalDbImageEnvVar, "dummy")
@@ -59,40 +59,40 @@ func TestOverrideDbImage(t *testing.T) {
 }
 
 // test bs.Spec.Application.ImagePullSecrets shared with StatefulSet
-//func TestImagePullSecretSpec(t *testing.T) {
-//	//bs := *dbStatefulSetBackstage.DeepCopy()
-//	//bs.Spec.Application.ImagePullSecrets = []string{"my-secret1", "my-secret2"}
-//	//
-//	//testObj := createBackstageTest(bs).withDefaultConfig(true)
-//	//model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
-//	//assert.NoError(t, err)
-//	//
-//	//assert.Equal(t, 2, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
-//	//assert.Equal(t, "my-secret1", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets[0].Name)
-//	//assert.Equal(t, "my-secret2", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets[1].Name)
+// func TestImagePullSecretSpec(t *testing.T) {
+// 	//bs := *dbStatefulSetBackstage.DeepCopy()
+// 	//bs.Spec.Application.ImagePullSecrets = []string{"my-secret1", "my-secret2"}
+// 	//
+// 	//testObj := createBackstageTest(bs).withDefaultConfig()
+// 	//model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+// 	//assert.NoError(t, err)
+// 	//
+// 	//assert.Equal(t, 2, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
+// 	//assert.Equal(t, "my-secret1", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets[0].Name)
+// 	//assert.Equal(t, "my-secret2", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets[1].Name)
 //
-//	// no image pull secrets specified
-//	bs := *dbStatefulSetBackstage.DeepCopy()
-//	testObj := createBackstageTest(bs).withDefaultConfig(true).
-//		addToDefaultConfig("db-statefulset.yaml", "ips-db-statefulset.yaml")
+// 	// no image pull secrets specified
+// 	bs := *dbStatefulSetBackstage.DeepCopy()
+// 	testObj := createBackstageTest(bs).withDefaultConfig().
+// 		addToDefaultConfig("db-statefulset.yaml", "ips-db-statefulset.yaml")
 //
-//	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
-//	if assert.NoError(t, err) {
-//		// if imagepullsecrets not defined - default used
-//		assert.Equal(t, 2, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
-//		assert.Equal(t, "ips-db1", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets[0].Name)
-//		assert.Equal(t, "ips-db2", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets[1].Name)
-//	}
+// 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+// 	if assert.NoError(t, err) {
+// 		// if imagepullsecrets not defined - default used
+// 		assert.Equal(t, 2, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
+// 		assert.Equal(t, "ips-db1", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets[0].Name)
+// 		assert.Equal(t, "ips-db2", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets[1].Name)
+// 	}
 //
-//	// empty list of image pull secrets
-//	//bs = *dbStatefulSetBackstage.DeepCopy()
-//	//bs.Spec.Application.ImagePullSecrets = []string{}
-//	//
-//	//testObj = createBackstageTest(bs).withDefaultConfig(true).
-//	//	addToDefaultConfig("db-statefulset.yaml", "ips-db-statefulset.yaml")
-//	//
-//	//model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
-//	//if assert.NoError(t, err) {
-//	//	assert.Equal(t, 0, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
-//	//}
-//}
+// 	// empty list of image pull secrets
+// 	//bs = *dbStatefulSetBackstage.DeepCopy()
+// 	//bs.Spec.Application.ImagePullSecrets = []string{}
+// 	//
+// 	//testObj = createBackstageTest(bs).withDefaultConfig().
+// 	//	addToDefaultConfig("db-statefulset.yaml", "ips-db-statefulset.yaml")
+// 	//
+// 	//model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+// 	//if assert.NoError(t, err) {
+// 	//	assert.Equal(t, 0, len(model.localDbStatefulSet.statefulSet.Spec.Template.Spec.ImagePullSecrets))
+// 	//}
+// }

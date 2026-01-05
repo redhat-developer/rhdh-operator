@@ -39,7 +39,8 @@ func TestDefaultSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretFilesObjectKey, "raw-secret-files.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig(SecretFilesObjectKey, "raw-secret-files.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -66,7 +67,8 @@ func TestDefaultMultiSecretFiles(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
+	testObj := createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
 		addToDefaultConfig(SecretFilesObjectKey, "raw-multi-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -95,12 +97,13 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	// https://issues.redhat.com/browse/RHIDP-2246 - mounting secret/CM with dot in the name
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret.dot", Key: "conf3.yaml"})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraFileSecretKeys["secret1"] = NewDataObjectKeys(nil, nil)
 	testObj.externalConfig.ExtraFileSecretKeys["secret2"] = NewDataObjectKeys(map[string]string{"conf.yaml": "data"}, nil)
-	testObj.externalConfig.ExtraFileSecretKeys["secret.dot"] = NewDataObjectKeys(nil, map[string][]byte{"conf3.yaml": []byte("data")})
+	testObj.externalConfig.ExtraFileSecretKeys["secret.dot"] = NewDataObjectKeys(
+		nil, map[string][]byte{"conf3.yaml": []byte("data")})
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -135,7 +138,7 @@ func TestFailedValidation(t *testing.T) {
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1"})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.ErrorContains(t, err, "key or mountPath has to be specified for secret secret1")
 
@@ -146,9 +149,10 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
-	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(map[string]string{"conf.yaml": ""}, nil)}
+	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{
+		"secret1": NewDataObjectKeys(map[string]string{"conf.yaml": ""}, nil)}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -169,9 +173,10 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
-	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(nil, map[string][]byte{"conf.yaml": []byte("")})}
+	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{
+		"secret1": NewDataObjectKeys(nil, map[string][]byte{"conf.yaml": []byte("")})}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -193,11 +198,15 @@ func TestSpecifiedSecretFilesWithContainers(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf1.yaml", Containers: []string{"install-dynamic-plugins", "another-container"}})
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
+	*sf = append(*sf, bsv1.FileObjectRef{
+		Name: "secret1", Key: "conf1.yaml",
+		Containers: []string{"install-dynamic-plugins", "another-container"}})
+	*sf = append(*sf, bsv1.FileObjectRef{
+		Name: "secret2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret3", MountPath: "rel", Containers: []string{"*"}})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
 
 	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraFileSecretKeys["secret1"] = NewDataObjectKeys(map[string]string{"conf1.yaml": "data"}, nil)
@@ -232,7 +241,7 @@ func TestSecretFilesWithNonExistedContainerFailed(t *testing.T) {
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -246,9 +255,11 @@ func TestReplaceSecretFiles(t *testing.T) {
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", MountPath: DefaultMountDir})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig().
+		addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
-	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(map[string]string{"dynamic-plugins321.yaml": "new"}, nil)}
+	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{
+		"secret1": NewDataObjectKeys(map[string]string{"dynamic-plugins321.yaml": "new"}, nil)}
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -259,6 +270,6 @@ func TestReplaceSecretFiles(t *testing.T) {
 
 	// secret1 is replacing secret from default
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
-	//assert.Equal(t, DefaultMountDir+"/dynamic-plugins321.yaml", deployment.container().VolumeMounts[0].MountPath)
+	// assert.Equal(t, DefaultMountDir+"/dynamic-plugins321.yaml", deployment.container().VolumeMounts[0].MountPath)
 
 }

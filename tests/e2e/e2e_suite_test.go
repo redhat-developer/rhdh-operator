@@ -53,7 +53,9 @@ func installRhdhOperatorManifest(operatorManifest string) {
 
 func installRhdhOperator(flavor string) (podLabel string) {
 	Expect(helper.IsOpenShift()).Should(BeTrue(), "install RHDH script works only on OpenShift clusters!")
-	cmd := exec.Command(filepath.Join(".rhdh", "scripts", "install-rhdh-catalog-source.sh"), "--"+flavor, "--install-operator", "rhdh")
+	cmd := exec.Command(
+		filepath.Join(".rhdh", "scripts", "install-rhdh-catalog-source.sh"),
+		"--"+flavor, "--install-operator", "rhdh")
 	_, err := helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	podLabel = "app=rhdh-operator"
@@ -64,7 +66,7 @@ func installRhdhOperatorAirgapped() (podLabel string) {
 	Expect(helper.IsOpenShift()).Should(BeTrue(), "airgap preparation script for RHDH works only on OpenShift clusters!")
 	indexImg, ok := os.LookupEnv("BACKSTAGE_OPERATOR_TESTS_AIRGAP_INDEX_IMAGE")
 	if !ok {
-		//TODO(rm3l): find a way to pass the right OCP version and arch
+		// TODO(rm3l): find a way to pass the right OCP version and arch
 		indexImg = "quay.io/rhdh/iib:latest-v4.14-x86_64"
 	}
 	operatorVersion, ok := os.LookupEnv("BACKSTAGE_OPERATOR_TESTS_AIRGAP_OPERATOR_VERSION")
@@ -117,20 +119,24 @@ spec:
 	return podLabel
 }
 
+func isEnvEnabled(env string) bool {
+	return os.Getenv(env) == "true"
+}
+
 func installOperatorWithMakeDeploy(withOlm bool) {
 	img, err := helper.Run(exec.Command("make", "--no-print-directory", "show-img"))
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	operatorImage := strings.TrimSpace(string(img))
 	imgArg := fmt.Sprintf("IMG=%s", operatorImage)
 
-	if os.Getenv("BACKSTAGE_OPERATOR_TESTS_BUILD_IMAGES") == "true" {
+	if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_BUILD_IMAGES") {
 		By("building the manager(Operator) image")
 		cmd := exec.Command("make", "image-build", imgArg)
 		_, err = helper.Run(cmd)
 		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	}
 
-	if os.Getenv("BACKSTAGE_OPERATOR_TESTS_PUSH_IMAGES") == "true" {
+	if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_PUSH_IMAGES") {
 		By("building the manager(Operator) image")
 		cmd := exec.Command("make", "image-push", imgArg)
 		_, err = helper.Run(cmd)
@@ -170,7 +176,7 @@ func installOperatorWithMakeDeploy(withOlm bool) {
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
-	//runs *only* on process #1
+	// runs *only* on process #1
 	_start = time.Now()
 	GinkgoWriter.Println("isOpenshift:", helper.IsOpenShift())
 
@@ -192,15 +198,16 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 
 	By("validating that the controller-manager pod is running as expected")
-	EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).WithArguments(managerPodLabel).Should(Succeed())
+	EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).
+		WithArguments(managerPodLabel).Should(Succeed())
 
 	return nil
 }, func(_ []byte) {
-	//runs on *all* processes
+	// runs on *all* processes
 })
 
 var _ = SynchronizedAfterSuite(func() {
-	//runs on *all* processes
+	// runs on *all* processes
 },
 	// the function below *only* on process #1
 	func() {
@@ -318,7 +325,8 @@ func uninstallOperator() {
 }
 
 func uninstallRhdhOperator(withAirgap bool) {
-	cmd := exec.Command(helper.GetPlatformTool(), "delete", "subscription", "rhdh", "-n", _namespace, "--ignore-not-found=true")
+	cmd := exec.Command(
+		helper.GetPlatformTool(), "delete", "subscription", "rhdh", "-n", _namespace, "--ignore-not-found=true")
 	_, err := helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
@@ -326,7 +334,9 @@ func uninstallRhdhOperator(withAirgap bool) {
 	if withAirgap {
 		cs = "rhdh-disconnected-install"
 	}
-	cmd = exec.Command(helper.GetPlatformTool(), "delete", "catalogsource", cs, "-n", "openshift-marketplace", "--ignore-not-found=true")
+	cmd = exec.Command(
+		helper.GetPlatformTool(), "delete", "catalogsource", cs,
+		"-n", "openshift-marketplace", "--ignore-not-found=true")
 	_, err = helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 

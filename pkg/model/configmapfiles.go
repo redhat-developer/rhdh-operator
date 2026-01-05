@@ -34,7 +34,8 @@ func (p *ConfigMapFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 	for _, specCm := range spec.Application.ExtraFiles.ConfigMaps {
 
-		mp, wSubpath := p.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.ExtraFiles.MountPath)
+		mp, wSubpath := p.model.backstageDeployment.mountPath(
+			specCm.MountPath, specCm.Key, spec.Application.ExtraFiles.MountPath)
 		keys := p.model.ExternalConfig.ExtraFileConfigMapKeys[specCm.Name].All()
 		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: specCm.Containers}, ConfigMapObjectKind,
 			specCm.Name, mp, specCm.Key, wSubpath, keys)
@@ -58,9 +59,9 @@ func (p *ConfigMapFiles) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (p *ConfigMapFiles) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
+// func (p *ConfigMapFiles) EmptyObject() client.Object {
+// 	return &corev1.ConfigMap{}
+// }
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
@@ -76,7 +77,9 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 func (p *ConfigMapFiles) updateAndValidate(_ bsv1.Backstage) error {
 
 	keys := append(maps.Keys(p.ConfigMap.Data), maps.Keys(p.ConfigMap.BinaryData)...)
-	err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: p.ConfigMap.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
+	annotation := p.ConfigMap.GetAnnotations()[ContainersAnnotation]
+	err := p.model.backstageDeployment.mountFilesFrom(
+		containersFilter{annotation: annotation}, ConfigMapObjectKind,
 		p.ConfigMap.Name, p.model.backstageDeployment.defaultMountPath(), "", true, keys)
 
 	if err != nil {

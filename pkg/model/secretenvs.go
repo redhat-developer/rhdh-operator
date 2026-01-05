@@ -35,7 +35,8 @@ func (p *SecretEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
 	}
 
 	for _, specSec := range spec.Application.ExtraEnvs.Secrets {
-		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{names: specSec.Containers}, SecretObjectKind, specSec.Name, specSec.Key)
+		err := p.model.backstageDeployment.addEnvVarsFrom(
+			containersFilter{names: specSec.Containers}, SecretObjectKind, specSec.Name, specSec.Key)
 		if err != nil {
 			return fmt.Errorf("failed to add env vars on secret %s: %w", specSec.Name, err)
 		}
@@ -57,9 +58,9 @@ func (p *SecretEnvs) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (p *SecretEnvs) EmptyObject() client.Object {
-//	return &corev1.Secret{}
-//}
+// func (p *SecretEnvs) EmptyObject() client.Object {
+// 	return &corev1.Secret{}
+// }
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
@@ -79,7 +80,9 @@ func (p *SecretEnvs) updateAndValidate(_ bsv1.Backstage) error {
 		if !ok {
 			return fmt.Errorf("payload is not Secret kind: %T", item)
 		}
-		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind, item.GetName(), "")
+		annotation := item.GetAnnotations()[ContainersAnnotation]
+		err := p.model.backstageDeployment.addEnvVarsFrom(
+			containersFilter{annotation: annotation}, SecretObjectKind, item.GetName(), "")
 		if err != nil {
 			return fmt.Errorf("failed to add env vars from secret %s: %w", item.GetName(), err)
 		}

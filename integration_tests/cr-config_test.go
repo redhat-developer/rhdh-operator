@@ -40,25 +40,40 @@ var _ = When("create backstage with CR configured", func() {
 
 	It("creates Backstage with external configuration", func() {
 
-		appConfig1 := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
-		appConfig2 := generateConfigMap(ctx, k8sClient, "app-config2", ns, map[string]string{"key21": "app:", "key22": "app:"}, nil, nil)
-		appConfig3 := generateConfigMap(ctx, k8sClient, "app-config3.dot", ns, map[string]string{"key.31": "app31:"}, nil, nil)
+		appConfig1 := generateConfigMap(ctx, k8sClient, "app-config1", ns,
+			map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
+		appConfig2 := generateConfigMap(ctx, k8sClient, "app-config2", ns,
+			map[string]string{"key21": "app:", "key22": "app:"}, nil, nil)
+		appConfig3 := generateConfigMap(ctx, k8sClient, "app-config3.dot", ns,
+			map[string]string{"key.31": "app31:"}, nil, nil)
 
-		cmFile1 := generateConfigMap(ctx, k8sClient, "cm-file1", ns, map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
-		cmFile2 := generateConfigMap(ctx, k8sClient, "cm-file2", ns, map[string]string{"cm21": "21", "cm22": "22"}, nil, nil)
-		cmFile3 := generateConfigMap(ctx, k8sClient, "cm-file3.dot", ns, map[string]string{"cm.31": "31"}, nil, nil)
-		cmFileWithPath := generateConfigMap(ctx, k8sClient, "cm-file-withpath", ns, map[string]string{"cm": "withpath"}, nil, nil)
+		cmFile1 := generateConfigMap(ctx, k8sClient, "cm-file1", ns,
+			map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
+		cmFile2 := generateConfigMap(ctx, k8sClient, "cm-file2", ns,
+			map[string]string{"cm21": "21", "cm22": "22"}, nil, nil)
+		cmFile3 := generateConfigMap(ctx, k8sClient, "cm-file3.dot", ns,
+			map[string]string{"cm.31": "31"}, nil, nil)
+		cmFileWithPath := generateConfigMap(ctx, k8sClient, "cm-file-withpath", ns,
+			map[string]string{"cm": "withpath"}, nil, nil)
 
-		secretFile1 := generateSecret(ctx, k8sClient, "secret-file1", ns, map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
-		secretFile2 := generateSecret(ctx, k8sClient, "secret-file2", ns, map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
-		secretFile3 := generateSecret(ctx, k8sClient, "secret-file3.dot", ns, map[string]string{"sec.31": "val31", "sec.32": "val22"}, nil, nil)
-		secretFileWithPath := generateSecret(ctx, k8sClient, "secret-file-withpath", ns, map[string]string{"secret": "withpath"}, nil, nil)
+		secretFile1 := generateSecret(ctx, k8sClient, "secret-file1", ns,
+			map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
+		secretFile2 := generateSecret(ctx, k8sClient, "secret-file2", ns,
+			map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
+		secretFile3 := generateSecret(ctx, k8sClient, "secret-file3.dot", ns,
+			map[string]string{"sec.31": "val31", "sec.32": "val22"}, nil, nil)
+		secretFileWithPath := generateSecret(ctx, k8sClient, "secret-file-withpath", ns,
+			map[string]string{"secret": "withpath"}, nil, nil)
 
-		cmEnv1 := generateConfigMap(ctx, k8sClient, "cm-env1", ns, map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
-		cmEnv2 := generateConfigMap(ctx, k8sClient, "cm-env2", ns, map[string]string{"cm21": "21", "cm22": "22"}, nil, nil)
+		cmEnv1 := generateConfigMap(ctx, k8sClient, "cm-env1", ns,
+			map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
+		cmEnv2 := generateConfigMap(ctx, k8sClient, "cm-env2", ns,
+			map[string]string{"cm21": "21", "cm22": "22"}, nil, nil)
 
-		secretEnv1 := generateSecret(ctx, k8sClient, "secret-env1", ns, map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
-		_ = generateSecret(ctx, k8sClient, "secret-env2", ns, map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
+		secretEnv1 := generateSecret(ctx, k8sClient, "secret-env1", ns,
+			map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
+		_ = generateSecret(ctx, k8sClient, "secret-env2", ns,
+			map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
 
 		patch, _ := yaml.YAMLToJSON([]byte(`
 spec:
@@ -189,7 +204,8 @@ spec:
 
 	It("generates label and annotation", func() {
 
-		appConfig := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
+		appConfig := generateConfigMap(
+			ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
 
 		bs := bsv1.BackstageSpec{
 			Application: &bsv1.Application{

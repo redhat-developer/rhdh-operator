@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const statefulSet = "StatefulSet"
+
 var deploymentTestBackstage = bsv1.Backstage{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "bs",
@@ -34,7 +36,7 @@ var deploymentTestBackstage = bsv1.Backstage{
 func TestWorkingDirMount(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).
+	testObj := createBackstageTest(bs).withDefaultConfig().
 		addToDefaultConfig("deployment.yaml", "working-dir-mount.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -56,7 +58,7 @@ func TestOverrideBackstageImage(t *testing.T) {
 
 	bs := *deploymentTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).
+	testObj := createBackstageTest(bs).withDefaultConfig().
 		addToDefaultConfig("deployment.yaml", "sidecar-deployment.yaml")
 
 	t.Setenv(BackstageImageEnvVar, "dummy")
@@ -74,7 +76,7 @@ func TestOverrideBackstageImage(t *testing.T) {
 func TestSpecImagePullSecrets(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).
+	testObj := createBackstageTest(bs).withDefaultConfig().
 		addToDefaultConfig("deployment.yaml", "ips-deployment.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
@@ -84,16 +86,16 @@ func TestSpecImagePullSecrets(t *testing.T) {
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().ImagePullSecrets))
 	assert.Equal(t, "ips1", model.backstageDeployment.podSpec().ImagePullSecrets[0].Name)
 
-	//bs.Spec.Application.ImagePullSecrets = []string{}
+	// bs.Spec.Application.ImagePullSecrets = []string{}
 	//
-	//testObj = createBackstageTest(bs).withDefaultConfig(true).
-	//	addToDefaultConfig("deployment.yaml", "ips-deployment.yaml")
+	// testObj = createBackstageTest(bs).withDefaultConfig().
+	// 	addToDefaultConfig("deployment.yaml", "ips-deployment.yaml")
 	//
-	//model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
-	//assert.NoError(t, err)
+	// model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	// assert.NoError(t, err)
 	//
-	//// if explicitly set empty slice - they are empty
-	//assert.Equal(t, 0, len(model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets))
+	// // if explicitly set empty slice - they are empty
+	// assert.Equal(t, 0, len(model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets))
 
 }
 
@@ -130,7 +132,7 @@ spec:
 `),
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).
+	testObj := createBackstageTest(bs).withDefaultConfig().
 		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
@@ -154,7 +156,8 @@ spec:
 	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
 	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.podSpec().Volumes[0].Name)
 	// overrides StorageClassName
-	assert.Equal(t, "special", *model.backstageDeployment.podSpec().Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
+	storageClassName := model.backstageDeployment.podSpec().Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName
+	assert.Equal(t, "special", *storageClassName)
 	// adds new volume
 	assert.Equal(t, "my-vol", model.backstageDeployment.podSpec().Volumes[3].Name)
 }
@@ -175,7 +178,7 @@ spec:
 
 	t.Setenv(BackstageImageEnvVar, "envvar-image")
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	model, err := InitObjects(context.TODO(), bsv1.Backstage{}, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
@@ -205,7 +208,7 @@ spec:
 `),
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -258,7 +261,7 @@ spec:
 		},
 	}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -275,19 +278,19 @@ func TestDeploymentKind(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
 	depPodSpec := model.backstageDeployment.podSpec()
 
-	bs.Spec.Deployment.Kind = "StatefulSet"
-	testObj = createBackstageTest(bs).withDefaultConfig(true)
+	bs.Spec.Deployment.Kind = statefulSet
+	testObj = createBackstageTest(bs).withDefaultConfig()
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "StatefulSet", model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
+	assert.Equal(t, statefulSet, model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
 
 	ssPodSpec := model.backstageDeployment.podSpec()
 	assert.Equal(t, depPodSpec, ssPodSpec)
@@ -296,19 +299,19 @@ func TestDeploymentKind(t *testing.T) {
 func TestPatchedStatefulSet(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
-	bs.Spec.Deployment.Kind = "StatefulSet"
+	bs.Spec.Deployment.Kind = statefulSet
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
 		Raw: []byte(`
 spec:
  serviceName: my-service
 `),
 	}
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig()
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "StatefulSet", model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
+	assert.Equal(t, statefulSet, model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
 
 	ss, ok := model.backstageDeployment.deployable.GetObject().(*appv1.StatefulSet)
 	assert.True(t, ok)
