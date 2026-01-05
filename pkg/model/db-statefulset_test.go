@@ -48,7 +48,7 @@ func TestOverrideDbImage(t *testing.T) {
 	bs.Spec.Database.EnableLocalDb = ptr.To(false)
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
-		addToDefaultConfig("db-statefulset.yaml", "janus-db-statefulset.yaml").withLocalDb()
+		addToDefaultConfig("db-statefulset.yaml", "rhdh-db-statefulset.yaml").withLocalDb()
 
 	_ = os.Setenv(LocalDbImageEnvVar, "dummy")
 

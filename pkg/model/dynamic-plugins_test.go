@@ -55,7 +55,7 @@ func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
@@ -70,14 +70,14 @@ func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 
 }
 
-// Janus specific test
+// RHDH specific test
 func TestDefaultDynamicPlugins(t *testing.T) {
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -110,7 +110,7 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
@@ -142,7 +142,7 @@ func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
 	bs.Spec.Application.DynamicPluginsConfigMapName = "dplugin"
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "dplugin"},
@@ -205,7 +205,7 @@ func TestWithDynamicPluginsDeps(t *testing.T) {
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	yamlData := `"dynamic-plugins.yaml": |
 plugins:
@@ -256,7 +256,7 @@ func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -278,10 +278,10 @@ func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
 func TestCatalogIndexImageOverridesDefaultConfig(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
-	// janus-deployment.yaml has CATALOG_INDEX_IMAGE set (like the real default-config)
+	// rhdh-deployment.yaml has CATALOG_INDEX_IMAGE set (like the real default-config)
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	// Set RELATED_IMAGE_catalog_index to a DIFFERENT value - this should override the default config
 	t.Setenv(CatalogIndexImageEnvVar, "quay.io/fake-reg/img:1.2.3")
@@ -321,7 +321,7 @@ spec:
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	// Set RELATED_IMAGE_catalog_index - but user's patch should take precedence
 	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:related-image")
@@ -352,7 +352,7 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	// Set the RELATED_IMAGE_catalog_index env var (simulating operator environment)
 	// This should NOT override the user's extraEnvs value
