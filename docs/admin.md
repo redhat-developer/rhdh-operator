@@ -75,3 +75,65 @@ See also https://docs.openshift.com/container-platform/4.14/operators/admin/olm-
 
 ### Installing Operator on Openshift cluster
 https://docs.openshift.com/container-platform/4.15/operators/admin/olm-adding-operators-to-cluster.html 
+
+## Memory Optimization for Large Clusters
+
+The Backstage Operator watches Secrets and ConfigMaps to detect changes to external configuration referenced by Backstage CRs. While the controller uses predicates to filter which resources trigger reconciliation events, the underlying controller-runtime cache loads metadata for ALL Secrets and ConfigMaps in the cluster regardless of labels. On large clusters with tens of thousands of Secrets/ConfigMaps, this metadata-only cache can consume significant memory, even though only a small fraction of these resources are actually used by Backstage instances.
+To address this, the Backstage Operator supports an optional cache-level label filtering mechanism. 
+This allows the operator to only cache Secrets and ConfigMaps that are explicitly labeled for use with Backstage, significantly reducing memory consumption on clusters with many unused resources.
+
+**NOTE: Enabling cache label filtering is a breaking change. Once enabled, any Secret or ConfigMap that should be visible to the operator must be labeled accordingly. Existing Backstage instances that reference unlabeled resources will fail to function correctly until those resources are labeled.**
+
+#### Configuration
+
+Cache-level label filtering can be enabled through the `--enable-cache-label-filter` command-line flag. When enabled, the manager's cache is configured to only store Secrets and ConfigMaps that have the label `rhdh.redhat.com/external-config=true`. This happens at the cache initialization level, preventing unwanted resources from ever being loaded into memory, rather than just filtering events after caching.
+
+**For OLM-based deployments:**
+
+Edit the Subscription or CSV to add the argument:
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        args:
+        - --enable-cache-label-filter
+```
+
+**For direct deployments (kustomize):**
+
+Edit `config/manager/manager.yaml`:
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        args:
+        - --enable-cache-label-filter
+```
+
+Then deploy:
+```bash
+make deploy
+```
+
+**For local testing:**
+
+```bash
+make run ARGS="--enable-cache-label-filter"
+```
+
+#### Labeling Resources
+
+When cache label filtering is enabled, you must label any Secret or ConfigMap that should be visible to the operator. In particular all the ConfigMaps and Secrets referenced in a Backstage CR spec.application, such as those used for app-config, external configuration, database credentials, etc should be labeled:
+
+```yaml
+metadata:
+  name: my-backstage-secret
+  namespace: my-namespace
+  labels:
+    rhdh.redhat.com/external-config: "true"
+...
+```
