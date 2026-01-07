@@ -230,7 +230,7 @@ build: manifests generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	mkdir -p $(LOCALBIN)/default-config/ &&	rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config/
 	mkdir -p $(LOCALBIN)/plugin-deps/ &&	rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps/ 2>/dev/null || :
-	go run -C $(LOCALBIN) ../cmd/main.go
+	go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
