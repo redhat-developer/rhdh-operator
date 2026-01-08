@@ -653,6 +653,27 @@ spec:
                   claimName: dynamic-plugins-root
 ```
 
+##### Handling Discriminated Unions
+
+When patching Kubernetes resources that contain **discriminated unions** (fields where one field determines which other fields are valid), you may need to use the `$patch: delete` directive to remove conflicting fields.
+
+A common example is changing the Deployment strategy from `RollingUpdate` to `Recreate`. The `strategy.type` field acts as a discriminator:
+- When `type: RollingUpdate`, the `rollingUpdate` field is valid
+- When `type: Recreate`, the `rollingUpdate` field must not be present
+
+To change from RollingUpdate to Recreate strategy, use the `$patch: delete` directive:
+
+```yaml
+spec:
+  deployment:
+    patch:
+      spec:
+        strategy:
+          type: Recreate
+          rollingUpdate:
+            $patch: delete
+```
+
 ### Database Configuration
 
 Backstage uses PostgreSQL as a storage solution. The Operator can:

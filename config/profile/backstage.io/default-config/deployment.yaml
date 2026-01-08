@@ -7,6 +7,12 @@ spec:
   selector:
     matchLabels:
       app: backstage
+  # important: keep strategy type (even if default) to allow patching it
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
   template:
     metadata:
       labels:
