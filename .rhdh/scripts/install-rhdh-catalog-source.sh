@@ -647,7 +647,7 @@ See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-you
   fi
 fi
 
-OCP_VER="v4.16"
+OCP_VER="v4.21"
 OCP_ARCH="x86_64"
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   # log into your OCP cluster before running this or you'll get null values for OCP vars!
