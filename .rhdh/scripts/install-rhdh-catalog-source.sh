@@ -539,6 +539,8 @@ metadata:
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 3600
+  parallelism: 1
+  completions: 1
   template:
     spec:
       containers:
@@ -574,6 +576,12 @@ spec:
             path: config.json
 EOF
 
+  # RHDHBUGS-2478: the job pod might not be scheduled right away after job creation
+  if ! invoke_cluster_cli -n "${namespace}" wait "job/${kanikoJobName}" --for=jsonpath='{.status.active}'=1 --timeout=300s >&2; then
+    errorf "unable to get Kaniko job active. Something might be preventing Jobs from being scheduled properly in this cluster"
+    invoke_cluster_cli -n "${namespace}" describe job "${kanikoJobName}" >&2
+    return 1
+  fi
   kanikoPod=$(invoke_cluster_cli -n "${namespace}" get pods --selector=job-name="${kanikoJobName}" -o jsonpath='{.items[0].metadata.name}')
   if [ -z "$kanikoPod" ]; then
     errorf "unable to determine the Kaniko Pod"
@@ -647,7 +655,7 @@ See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-you
   fi
 fi
 
-OCP_VER="v4.16"
+OCP_VER="v4.21"
 OCP_ARCH="x86_64"
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   # log into your OCP cluster before running this or you'll get null values for OCP vars!
