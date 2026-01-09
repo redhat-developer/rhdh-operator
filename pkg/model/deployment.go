@@ -279,7 +279,7 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 func (b *BackstageDeployment) setImage(image *string) {
 	if image != nil {
 		b.container().Image = *image
-		// this is a workaround for RHDH/Janus configuration
+		// this is a workaround for RHDH configuration
 		// it is not a fact that all the containers should be updated
 		// in general case need something smarter
 		// to mark/recognize containers for update
