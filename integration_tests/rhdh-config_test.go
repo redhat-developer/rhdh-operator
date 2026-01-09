@@ -83,6 +83,10 @@ var _ = When("create default rhdh", func() {
 					SubPath:   "dynamic-plugins.yaml",
 				},
 				{
+					Name:      "extensions-catalog",
+					MountPath: "/extensions",
+				},
+				{
 					Name:      "temp",
 					MountPath: "/tmp",
 					SubPath:   "",
@@ -106,7 +110,7 @@ var _ = When("create default rhdh", func() {
 			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
 			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
 
-			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(7))
+			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(8))
 			g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
 			mainCont := backstageContainer(*deploy.PodSpec())
 			g.Expect(mainCont.Args).To(HaveLen(4))
@@ -123,6 +127,9 @@ var _ = When("create default rhdh", func() {
 				{
 					MountPath: "/opt/app-root/src/default.app-config.yaml",
 					SubPath:   "default.app-config.yaml",
+				},
+				{
+					MountPath: "/extensions",
 				},
 				{
 					MountPath: "/tmp",
