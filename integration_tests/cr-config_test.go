@@ -4,9 +4,13 @@ import (
 	"context"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -295,6 +299,59 @@ spec:
 		_, err := createBackstage(ctx, bs2.Spec, ns, "")
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("spec.deployment.kind: Unsupported value"))
+
+	})
+
+	It("changes strategy from RollingUpdate to Recreate", func() {
+
+		if !*testEnv.UseExistingCluster {
+			Skip("Skipped for not real cluster")
+		}
+
+		bs := bsv1.BackstageSpec{}
+		backstageName := createAndReconcileBackstage(ctx, ns, bs, "")
+		Eventually(func(g Gomega) {
+
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			depl := deploy.GetObject().(*appsv1.Deployment)
+
+			// initially should be RollingUpdate
+			g.Expect(depl.Spec.Strategy.Type).To(Equal(appsv1.RollingUpdateDeploymentStrategyType))
+		}, 10*time.Second, time.Second).Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			patch, _ := yaml.YAMLToJSON([]byte(`
+spec:
+  strategy:
+    type: Recreate
+    rollingUpdate:
+      $patch: delete
+`))
+
+			backstage := &bsv1.Backstage{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      backstageName,
+					Namespace: ns,
+				},
+				Spec: bsv1.BackstageSpec{
+					Deployment: &bsv1.BackstageDeployment{
+						Patch: &apiextensionsv1.JSON{Raw: patch},
+					},
+				},
+			}
+
+			err := k8sClient.Patch(ctx, backstage, client.Merge)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			depl := deploy.GetObject().(*appsv1.Deployment)
+			g.Expect(depl.Spec.Strategy.Type).To(Equal(appsv1.RecreateDeploymentStrategyType))
+
+		}, 20*time.Second, time.Second).Should(Succeed())
 
 	})
 

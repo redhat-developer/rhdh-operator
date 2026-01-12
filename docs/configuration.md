@@ -529,7 +529,7 @@ MY_VAR = my-value - to install-dynamic-plugins container only
 
 #### Dynamic Plugins
 
-The Operator can configure [Dynamic Plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/default-config/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
+The Operator can configure [Dynamic Plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
 
 For example, the **dynamic-plugins-config** ConfigMap contains a simple Dynamic Plugins configuration, which includes predefined default plugins in **dynamic-plugins.default.yaml** and the GitHub plugin provided in the package located at `./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic`.
   
@@ -651,6 +651,27 @@ spec:
                 name: dynamic-plugins-root
                 persistentVolumeClaim:
                   claimName: dynamic-plugins-root
+```
+
+##### Handling Discriminated Unions
+
+When patching Kubernetes resources that contain **discriminated unions** (fields where one field determines which other fields are valid), you may need to use the `$patch: delete` directive to remove conflicting fields.
+
+A common example is changing the Deployment strategy from `RollingUpdate` to `Recreate`. The `strategy.type` field acts as a discriminator:
+- When `type: RollingUpdate`, the `rollingUpdate` field is valid
+- When `type: Recreate`, the `rollingUpdate` field must not be present
+
+To change from RollingUpdate to Recreate strategy, use the `$patch: delete` directive:
+
+```yaml
+spec:
+  deployment:
+    patch:
+      spec:
+        strategy:
+          type: Recreate
+          rollingUpdate:
+            $patch: delete
 ```
 
 ### Database Configuration

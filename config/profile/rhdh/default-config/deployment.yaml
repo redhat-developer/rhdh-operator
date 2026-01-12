@@ -7,6 +7,12 @@ spec:
   selector:
     matchLabels:
       rhdh.redhat.com/app: # placeholder for 'backstage-<cr-name>'
+  # important: keep strategy type (even if default) to allow patching it
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
   template:
     metadata:
       labels:
