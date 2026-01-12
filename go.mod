@@ -7,7 +7,7 @@ toolchain go1.24.6
 require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/openshift/api v0.0.0-20260112003852-92b92bfb5020
+	github.com/openshift/api v0.0.0-20260112104441-900e7e5b58ab
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.71.2
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
