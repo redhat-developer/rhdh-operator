@@ -131,7 +131,7 @@ spec:
 	}
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
-		addToDefaultConfig("deployment.yaml", "janus-deployment.yaml")
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
