@@ -114,7 +114,7 @@ jobs:
 
       - name: Upload SARIF file
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: github/codeql-action/upload-sarif@bffd034ab1518ad839a542b8a7356e13a240e076 # v3
+        uses: github/codeql-action/upload-sarif@4bdb89f48054571735e3792627da6195c57459e2 # v3
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: gosec.sarif
