@@ -83,6 +83,10 @@ var _ = When("create default rhdh", func() {
 					SubPath:   "dynamic-plugins.yaml",
 				},
 				{
+					Name:      "extensions-catalog",
+					MountPath: "/extensions",
+				},
+				{
 					Name:      "temp",
 					MountPath: "/tmp",
 					SubPath:   "",
@@ -106,7 +110,7 @@ var _ = When("create default rhdh", func() {
 			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
 			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
 
-			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(7))
+			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(8))
 			g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
 			mainCont := backstageContainer(*deploy.PodSpec())
 			g.Expect(mainCont.Args).To(HaveLen(4))
@@ -117,16 +121,21 @@ var _ = When("create default rhdh", func() {
 
 			mainContainerExpectedVolumeMounts := []corev1.VolumeMount{
 				{
+					Name:      "dynamic-plugins-root",
 					MountPath: "/opt/app-root/src/dynamic-plugins-root",
-					SubPath:   "",
 				},
 				{
+					Name:      model.AppConfigDefaultName(backstageName),
 					MountPath: "/opt/app-root/src/default.app-config.yaml",
 					SubPath:   "default.app-config.yaml",
 				},
 				{
+					Name:      "extensions-catalog",
+					MountPath: "/extensions",
+				},
+				{
+					Name:      "temp",
 					MountPath: "/tmp",
-					SubPath:   "",
 				},
 			}
 
@@ -137,7 +146,7 @@ var _ = When("create default rhdh", func() {
 				for _, vm := range mainCont.VolumeMounts {
 					if evm.MountPath == vm.MountPath {
 						found = true
-						g.Expect(vm.MountPath).To(Equal(evm.MountPath))
+						g.Expect(vm.Name).To(Equal(evm.Name))
 						g.Expect(vm.SubPath).To(Equal(evm.SubPath))
 					}
 				}
