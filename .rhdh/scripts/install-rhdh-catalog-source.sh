@@ -108,80 +108,6 @@ function invoke_cluster_cli() {
   fi
 }
 
-function ocp_install_regular_cluster() {
-  set -euo pipefail
-
-  # A regular cluster should support ImageContentSourcePolicy/ImageDigestMirrorSet resources
-  ICSP_URL="quay.io/rhdh/"
-  ICSP_URL_PRE=${ICSP_URL%%/*}
-
-  # for 1.4+, use IDMS instead of ICSP
-  # TODO https://issues.redhat.com/browse/RHIDP-4188 if we onboard 1.3 to Konflux, use IDMS for latest too
-  if [[ "$IIB_IMAGE" == *"next"* ]]; then
-    debugf "Adding ImageDigestMirrorSet to resolve unreleased images on registry.redhat.io from quay.io" >&2
-    echo "---
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: ${ICSP_URL_PRE//./-}
-spec:
-  imageDigestMirrors:
-  - source: registry.redhat.io/rhdh/rhdh-hub-rhel9
-    mirrors:
-      - ${ICSP_URL}rhdh-hub-rhel9
-  - source: registry.redhat.io/rhdh/rhdh-rhel9-operator
-    mirrors:
-      - ${ICSP_URL}rhdh-rhel9-operator
-  - source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-operator-bundle
-    mirrors:
-      - ${ICSP_URL}rhdh-operator-bundle
-  " > "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageDigestMirrorSet_${ICSP_URL_PRE}.yml" >&2
-  else
-    debugf "Adding ImageContentSourcePolicy to resolve references to images not on quay.io as if from quay.io" >&2
-    # debugf "${ICSP_URL_PRE}, ${ICSP_URL_PRE//./-}, ${ICSP_URL}"
-    echo "---
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
-metadata:
-  name: ${ICSP_URL_PRE//./-}
-spec:
-  repositoryDigestMirrors:
-  ## 1. add mappings for Developer Hub bundle, operator, hub
-  - mirrors:
-    - ${ICSP_URL}rhdh-operator-bundle
-    source: registry.redhat.io/rhdh/rhdh-operator-bundle
-  - mirrors:
-    - ${ICSP_URL}rhdh-operator-bundle
-    source: registry.stage.redhat.io/rhdh/rhdh-operator-bundle
-  - mirrors:
-    - ${ICSP_URL}rhdh-operator-bundle
-    source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-operator-bundle
-
-  - mirrors:
-    - ${ICSP_URL}rhdh-rhel9-operator
-    source: registry.redhat.io/rhdh/rhdh-rhel9-operator
-  - mirrors:
-    - ${ICSP_URL}rhdh-rhel9-operator
-    source: registry.stage.redhat.io/rhdh/rhdh-rhel9-operator
-  - mirrors:
-    - ${ICSP_URL}rhdh-rhel9-operator
-    source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-rhel9-operator
-
-  - mirrors:
-    - ${ICSP_URL}rhdh-hub-rhel9
-    source: registry.redhat.io/rhdh/rhdh-hub-rhel9
-  - mirrors:
-    - ${ICSP_URL}rhdh-hub-rhel9
-    source: registry.stage.redhat.io/rhdh/rhdh-hub-rhel9
-  - mirrors:
-    - ${ICSP_URL}rhdh-hub-rhel9
-    source: registry-proxy.engineering.redhat.com/rh-osbs/rhdh-rhdh-hub-rhel9
-  " > "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" && oc apply -f "$TMPDIR/ImageContentSourcePolicy_${ICSP_URL_PRE}.yml" >&2
-  fi
-
-  printf "%s" "${IIB_IMAGE}"
-}
-
 function render_iib() {
   set -euo pipefail
 
@@ -277,11 +203,17 @@ function update_refs_in_iib_bundles() {
   opm generate dockerfile rhdh/rhdh
 }
 
-function ocp_install_hosted_control_plane_cluster() {
+function ocp_install() {
   # Clusters with an hosted control plane do not propagate ImageContentSourcePolicy/ImageDigestMirrorSet resources
   # to the underlying nodes, causing an issue mirroring internal images effectively.
+  # Also, ImageContentSourcePolicy/ImageDigestMirrorSet only works when the images are pulled by the underlying Kubelet,
+  # not if the images need to be pulled inside a container (as is the case with the RHDH init container that needs to
+  # pull images like the catalog index image).
   # This function works around this by locally modifying the bundles (replacing all refs to the internal registries
   # with their mirrors on quay.io), rebuilding and pushing the images to the internal cluster registry.
+  # TODO: this will work by replacing the catalog index image ref in the operator bundle, but we may need to do the same
+  # type of replacement for the plugin references that are mentioned in the catalog index image itself (and rebuild it).
+
   set -euo pipefail
 
   render_iib >&2
@@ -783,18 +715,16 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
 
   if [[ "${IS_HOSTED_CONTROL_PLANE}" = "true" ]]; then
     infof "Detected an OpenShift cluster with a hosted control plane"
-    if ! command -v umoci &> /dev/null; then
-      errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
-      exit 1
-    fi
-    if ! command -v opm &> /dev/null; then
-      errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
-      exit 1
-    fi
-    newIIBImage=$(ocp_install_hosted_control_plane_cluster)
-  else
-    newIIBImage=$(ocp_install_regular_cluster)
   fi
+  if ! command -v umoci &> /dev/null; then
+    errorf "Please install umoci 0.4+. See https://github.com/opencontainers/umoci?tab=readme-ov-file#install"
+    exit 1
+  fi
+  if ! command -v opm &> /dev/null; then
+    errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
+    exit 1
+  fi
+  newIIBImage=$(ocp_install)
 else
   # K8s cluster with OLM installed
   infof "Detected a Kubernetes cluster"
