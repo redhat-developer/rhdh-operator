@@ -121,19 +121,21 @@ var _ = When("create default rhdh", func() {
 
 			mainContainerExpectedVolumeMounts := []corev1.VolumeMount{
 				{
+					Name:      "dynamic-plugins-root",
 					MountPath: "/opt/app-root/src/dynamic-plugins-root",
-					SubPath:   "",
 				},
 				{
+					Name:      model.AppConfigDefaultName(backstageName),
 					MountPath: "/opt/app-root/src/default.app-config.yaml",
 					SubPath:   "default.app-config.yaml",
 				},
 				{
+					Name:      "extensions-catalog",
 					MountPath: "/extensions",
 				},
 				{
+					Name:      "temp",
 					MountPath: "/tmp",
-					SubPath:   "",
 				},
 			}
 
@@ -144,7 +146,7 @@ var _ = When("create default rhdh", func() {
 				for _, vm := range mainCont.VolumeMounts {
 					if evm.MountPath == vm.MountPath {
 						found = true
-						g.Expect(vm.MountPath).To(Equal(evm.MountPath))
+						g.Expect(vm.Name).To(Equal(evm.Name))
 						g.Expect(vm.SubPath).To(Equal(evm.SubPath))
 					}
 				}
