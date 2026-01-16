@@ -2,5 +2,4 @@ apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: bs1
-  annotations:
-    rhdh.redhat.com/flavor: "ai"
+
