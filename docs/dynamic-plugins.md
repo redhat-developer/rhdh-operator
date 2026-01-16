@@ -47,8 +47,17 @@ TODO: Dynamic plugins can be configured to use container registries for authenti
 
 The operator supports loading default plugin configurations from an OCI container image (catalog index). For general information about how the catalog index works, see [Using a Catalog Index Image for Default Plugin Configurations](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-a-catalog-index-image-for-default-plugin-configurations).
 
-By default, the `rhdh` profile of operator [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable in the RHDH `install-dynamic-plugins` init containers.
+By default, the `rhdh` profile of operator [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable in the RHDH `install-dynamic-plugins` init container.
 To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for a complete example.
+
+### Extensions Catalog Entities
+
+Starting from version 1.9, the `rhdh` profile of the operator instructs the RHDH `install-dynamic-plugins` init container to extract catalog entities from the catalog index image to a new `/extensions` volume mount by default.
+This allows the extensions backend providers to automatically discover plugin metadata for display in the RHDH Extensions UI.
+
+The extraction directory can be configured via the `CATALOG_ENTITIES_EXTRACT_DIR` environment variable in the `install-dynamic-plugins` init container.
+
+More details in [Catalog Entities Extraction](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#catalog-entities-extraction).
 
 ## Dynamic plugins dependency management
 

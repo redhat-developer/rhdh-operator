@@ -248,7 +248,6 @@ func initContainer(model *BackstageModel) *corev1.Container {
 	return nil
 }
 
-
 // TestCatalogIndexImageFromDefaultConfig verifies that the operator sets CATALOG_INDEX_IMAGE
 // on the install-dynamic-plugins init container from the default config by default
 func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
