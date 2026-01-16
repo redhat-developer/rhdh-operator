@@ -94,8 +94,14 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		setStatusCondition(&backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonInProgress, "Deployment process started")
 	}
 
-	// 1. Preliminary read and prepare external config objects from the specs (configMaps, Secrets)
-	// 2. Make some validation to fail fast
+	// Discover namespaced config (user-provided defaults via labels)
+	namespacedConfig, err := r.discoverNamespacedConfig(ctx, backstage.Namespace, backstage.Spec.Flavor)
+	if err != nil {
+		return ctrl.Result{}, errorAndStatus(&backstage, "failed to discover namespaced config", err)
+	}
+
+	// Preliminary read and prepare external config objects from the specs (configMaps, Secrets)
+	// Make some validation to fail fast
 	externalConfig, err := r.preprocessSpec(ctx, backstage)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to preprocess backstage spec", err)
@@ -106,8 +112,8 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply ServiceMonitor", err)
 	}
 
-	// This creates array of model objects to be reconsiled
-	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
+	// This creates array of model objects to be reconciled
+	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, namespacedConfig, r.Platform, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
 	}
@@ -229,6 +235,30 @@ func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object
 		return fmt.Errorf("failed to delete %s: %w", name, err)
 	}
 	return nil
+}
+
+// discoverNamespacedConfig finds user-provided resources in the namespace via labels
+// Returns secrets with label rhdh.redhat.com/default-config="" (generic) or matching flavor
+func (r *BackstageReconciler) discoverNamespacedConfig(ctx context.Context, namespace string, flavor string) (model.NamespacedConfig, error) {
+
+	namespacedConfig := model.NewNamespacedConfig()
+
+	// List all secrets with default-config label (any value)
+	secretList := &corev1.SecretList{}
+	if err := r.List(ctx, secretList, namespacedConfig.ListOptions(namespace)); err != nil {
+		return namespacedConfig, fmt.Errorf("failed to list default config secrets: %w", err)
+	}
+
+	for _, secret := range secretList.Items {
+
+		labelValue := secret.Labels[model.DefaultConfigLabel]
+		// Include if generic (empty value) or matches flavor
+		if labelValue == "" || labelValue == flavor {
+			namespacedConfig.EnvSecrets = append(namespacedConfig.EnvSecrets, &secret)
+		}
+	}
+
+	return namespacedConfig, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

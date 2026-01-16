@@ -41,7 +41,7 @@ func TestDynamicPluginsValidationFailed(t *testing.T) {
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml")
 
-	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	//"failed object validation, reason: failed to find initContainer named install-dynamic-plugins")
 	assert.Error(t, err)
@@ -62,7 +62,7 @@ func TestDynamicPluginsInvalidKeyName(t *testing.T) {
 		Data:       map[string]string{"WrongKeyName.yml": "tt"},
 	}
 
-	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.Error(t, err)
 	//assert.Contains(t, err.Error(), "expects exactly one Data key named 'dynamic-plugins.yaml'")
@@ -79,7 +79,7 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageDeployment)
@@ -117,7 +117,7 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 		Data:       map[string]string{DynamicPluginsFile: "dynamic-plugins.yaml: | \n plugins: []"},
 	}
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -149,7 +149,7 @@ func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
 		Data:       map[string]string{DynamicPluginsFile: "dynamic-plugins.yaml: | \n plugins: []"},
 	}
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -176,7 +176,7 @@ func TestDynamicPluginsFailOnArbitraryDepl(t *testing.T) {
 	testObj := createBackstageTest(*bs).withDefaultConfig(true).
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml")
 
-	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	_, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.Error(t, err)
 }
@@ -188,7 +188,7 @@ func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
 
 	testObj := createBackstageTest(*bs).withDefaultConfig(true)
 
-	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	for _, obj := range m.RuntimeObjects {
@@ -221,7 +221,7 @@ plugins:
 		Data:       map[string]string{DynamicPluginsFile: yamlData},
 	}
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -248,7 +248,6 @@ func initContainer(model *BackstageModel) *corev1.Container {
 	return nil
 }
 
-
 // TestCatalogIndexImageFromDefaultConfig verifies that the operator sets CATALOG_INDEX_IMAGE
 // on the install-dynamic-plugins init container from the default config by default
 func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
@@ -258,7 +257,7 @@ func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageDeployment)
 
@@ -286,7 +285,7 @@ func TestCatalogIndexImageOverridesDefaultConfig(t *testing.T) {
 	// Set RELATED_IMAGE_catalog_index to a DIFFERENT value - this should override the default config
 	t.Setenv(CatalogIndexImageEnvVar, "quay.io/fake-reg/img:1.2.3")
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageDeployment)
 
@@ -326,7 +325,7 @@ spec:
 	// Set RELATED_IMAGE_catalog_index - but user's patch should take precedence
 	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:related-image")
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageDeployment)
 
@@ -358,7 +357,7 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 	// This should NOT override the user's extraEnvs value
 	t.Setenv(CatalogIndexImageEnvVar, "quay.io/rhdh/plugin-catalog-index:related-image")
 
-	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.backstageDeployment)
 

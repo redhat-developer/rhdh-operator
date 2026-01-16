@@ -30,4 +30,19 @@ spec:
               value: quay.io/rhdh-community/rhdh:next
             - name: RELATED_IMAGE_catalog_index
               value: quay.io/rhdh/plugin-catalog-index:1.9
-
+          # flavor volume mounts
+          volumeMounts:
+              - mountPath: /default-config/flavors/orchestrator
+                name: flavor-orchestrator
+              - mountPath: /default-config/flavors/ai
+                name: flavor-ai
+        # flavor volumes
+      volumes:
+        - name: flavor-orchestrator
+          configMap:
+            name: flavor-orchestrator
+            optional: true
+        - name: flavor-ai
+          configMap:
+            name: flavor-ai
+            optional: true

@@ -36,7 +36,7 @@ func TestDefaultRoute(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 
 	assert.NoError(t, err)
 
@@ -74,7 +74,7 @@ func TestSpecifiedRoute(t *testing.T) {
 
 	// Test w/o default route configured
 	testObjNoDef := createBackstageTest(bs).withDefaultConfig(true)
-	model, err := InitObjects(context.TODO(), bs, testObjNoDef.externalConfig, platform.OpenShift, testObjNoDef.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObjNoDef.externalConfig, testObjNoDef.namespacedConfig, platform.OpenShift, testObjNoDef.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model.route)
@@ -85,7 +85,7 @@ func TestSpecifiedRoute(t *testing.T) {
 
 	// Test with default route configured
 	testObjWithDef := testObjNoDef.addToDefaultConfig("route.yaml", "raw-route.yaml")
-	model, err = InitObjects(context.TODO(), bs, testObjWithDef.externalConfig, platform.OpenShift, testObjWithDef.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObjWithDef.externalConfig, testObjWithDef.namespacedConfig, platform.OpenShift, testObjWithDef.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model.route)
@@ -118,13 +118,13 @@ func TestDisabledRoute(t *testing.T) {
 
 	// With def route config
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.Nil(t, model.route)
 
 	// W/o def route config
 	testObj = createBackstageTest(bs).withDefaultConfig(true)
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.Nil(t, model.route)
 
@@ -143,13 +143,13 @@ func TestExcludedRoute(t *testing.T) {
 
 	// With def route config - create default route
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.route)
 
 	// W/o def route config - do not create route
 	testObj = createBackstageTest(bs).withDefaultConfig(true)
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.Nil(t, model.route)
 }
@@ -170,13 +170,13 @@ func TestEnabledRoute(t *testing.T) {
 
 	// With def route config
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.route)
 
 	// W/o def route config
 	testObj = createBackstageTest(bs).withDefaultConfig(true)
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model.route)
 

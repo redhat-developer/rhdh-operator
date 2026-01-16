@@ -239,8 +239,31 @@ func GetObjectKind(object client.Object, scheme *runtime.Scheme) *schema.GroupVe
 	return &gvks[0]
 }
 
-func DefFile(key string) string {
-	return filepath.Join(os.Getenv("LOCALBIN"), "default-config", key)
+func DefFile(key string, flavor string) (string, error) {
+	localBin := os.Getenv("LOCALBIN")
+	if localBin == "" {
+		localBin = "."
+	}
+
+	if flavor != "" {
+		// Check flavor directory exists
+		flavorDir := filepath.Join(localBin, "default-config", "flavors", flavor)
+		if _, err := os.Stat(flavorDir); err != nil {
+			if os.IsNotExist(err) {
+				return "", fmt.Errorf("flavor '%s' does not exist: directory not found at %s", flavor, flavorDir)
+			}
+			return "", fmt.Errorf("failed to check flavor directory '%s': %w", flavor, err)
+		}
+
+		// Try flavor file first
+		flavorPath := filepath.Join(flavorDir, key)
+		if _, err := os.Stat(flavorPath); err == nil {
+			return flavorPath, nil
+		}
+	}
+
+	// Fallback to default-config
+	return filepath.Join(localBin, "default-config", key), nil
 }
 
 func GeneratePassword(length int) (string, error) {

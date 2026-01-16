@@ -25,9 +25,10 @@ import (
 // withDefaultConfig(useDef bool)
 // addToDefaultConfig(key, fileName)
 type testBackstageObject struct {
-	backstage      bsv1.Backstage
-	externalConfig ExternalConfig
-	scheme         *runtime.Scheme
+	backstage        bsv1.Backstage
+	externalConfig   ExternalConfig
+	namespacedConfig NamespacedConfig
+	scheme           *runtime.Scheme
 }
 
 // initialises testBackstageObject object
@@ -35,7 +36,9 @@ func createBackstageTest(bs bsv1.Backstage) *testBackstageObject {
 	ec := ExternalConfig{
 		RawConfig: map[string]string{},
 	}
-	b := &testBackstageObject{backstage: bs, externalConfig: ec, scheme: runtime.NewScheme()}
+	nc := NewNamespacedConfig()
+
+	b := &testBackstageObject{backstage: bs, externalConfig: ec, namespacedConfig: nc, scheme: runtime.NewScheme()}
 	utilruntime.Must(bsv1.AddToScheme(b.scheme))
 	utilruntime.Must(clientgoscheme.AddToScheme(b.scheme))
 	utilruntime.Must(openshift.Install(b.scheme))

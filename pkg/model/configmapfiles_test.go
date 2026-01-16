@@ -37,7 +37,7 @@ func TestDefaultConfigMapFiles(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 
@@ -64,7 +64,7 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 	testObj.externalConfig.ExtraFileConfigMapKeys["cm2"] = NewDataObjectKeys(map[string]string{"conf2.yaml": "data"}, nil)
 	testObj.externalConfig.ExtraFileConfigMapKeys["cm3"] = NewDataObjectKeys(map[string]string{"conf3.yaml": "data"}, nil)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -100,7 +100,7 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraFileConfigMapKeys[appConfigTestCm.Name] = NewDataObjectKeys(nil, map[string][]byte{"conf1.yaml": []byte("data")})
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -125,7 +125,7 @@ func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
 	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraFileConfigMapKeys["cm1"] = NewDataObjectKeys(nil, map[string][]byte{"conf1.yaml": []byte("data")})
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -154,7 +154,7 @@ func TestSpecifiedCMFilesWithContainers(t *testing.T) {
 	testObj.externalConfig.ExtraFileConfigMapKeys["cm2"] = NewDataObjectKeys(map[string]string{"conf2.yaml": "data"}, nil)
 	testObj.externalConfig.ExtraFileConfigMapKeys["cm3"] = NewDataObjectKeys(map[string]string{"conf3.yaml": "data"}, nil)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -184,7 +184,7 @@ func TestCMFilesWithNonExistedContainerFailed(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.ErrorContains(t, err, "not found")
 
@@ -201,7 +201,7 @@ func TestReplaceFiles(t *testing.T) {
 	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraFileConfigMapKeys[appConfigTestCm.Name] = NewDataObjectKeys(nil, map[string][]byte{"dynamic-plugins123.yaml": []byte("data")})
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 

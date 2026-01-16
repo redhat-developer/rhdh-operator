@@ -65,7 +65,7 @@ func TestDefaultAppConfig(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Kubernetes, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Kubernetes, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -97,8 +97,7 @@ func TestSpecifiedAppConfig(t *testing.T) {
 	testObj.externalConfig.AppConfigKeys = map[string][]string{appConfigTestCm.Name: maps.Keys(appConfigTestCm.Data),
 		appConfigTestCm2.Name: maps.Keys(appConfigTestCm2.Data), appConfigTestCm3.Name: maps.Keys(appConfigTestCm3.Data)}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig,
-		platform.Kubernetes, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Kubernetes, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)
@@ -131,7 +130,7 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 
 	testObj.externalConfig.AppConfigKeys = map[string][]string{appConfigTestCm.Name: maps.Keys(appConfigTestCm.Data)}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.True(t, len(model.RuntimeObjects) > 0)

@@ -30,6 +30,16 @@ func init() {
 }
 
 func (p *SecretEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
+
+	// namespaced config secrets first (all keys as env vars)
+	for _, secret := range p.model.NamespacedConfig.EnvSecrets {
+		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{}, SecretObjectKind, secret.Name, "")
+		if err != nil {
+			return fmt.Errorf("failed to add namespaced config secret env vars %s: %w", secret.Name, err)
+		}
+	}
+
+	// spec defined secrets
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.Secrets == nil {
 		return nil
 	}

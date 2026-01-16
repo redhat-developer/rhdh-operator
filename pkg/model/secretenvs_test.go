@@ -35,7 +35,7 @@ func TestDefaultSecretEnvFrom(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretEnvsObjectKey, "raw-sec-envs.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -55,7 +55,7 @@ func TestDefaultMultiSecretEnv(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
 		addToDefaultConfig(SecretEnvsObjectKey, "raw-multi-secret.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -85,7 +85,7 @@ func TestSpecifiedSecretEnvs(t *testing.T) {
 	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvConfigMapKeys["secName"] = NewDataObjectKeys(map[string]string{"secName": "ENV1"}, nil)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -118,7 +118,7 @@ func TestSpecifiedSecretEnvsWithContainers(t *testing.T) {
 	testObj.externalConfig.ExtraEnvSecretKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvSecretKeys["secName"] = NewDataObjectKeys(map[string]string{"secName": "ENV1"}, nil)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -146,7 +146,7 @@ func TestSpecifiedSecretEnvsWithContainers(t *testing.T) {
 	testObj.externalConfig.ExtraEnvSecretKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvSecretKeys["secName"] = NewDataObjectKeys(map[string]string{"secName": "ENV1"}, nil)
 
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -175,7 +175,7 @@ func TestSecretEnvsWithNonExistedContainerFailed(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.ErrorContains(t, err, "not found")
 

@@ -14,8 +14,8 @@ resources:
 
 images:
 - name: controller
-  newName: quay.io/rhdh/rhdh-rhel9-operator
-  newTag: "1.9"
+  newName: quay.io/rhdh-community/operator
+  newTag: next
 
 patches:
 - path: patches/deployment-patch.yaml
@@ -46,3 +46,10 @@ configMapGenerator:
   - plugin-deps/argocd.yaml
   - plugin-deps/tekton.yaml
   name: plugin-deps
+- files:
+  - default-config/flavors/orchestrator/dynamic-plugins.yaml
+  name: flavor-orchestrator
+- files:
+  - default-config/flavors/ai/dynamic-plugins.yaml
+  - default-config/flavors/ai/app-config.yaml
+  name: flavor-ai
