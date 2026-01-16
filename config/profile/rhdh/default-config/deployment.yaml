@@ -40,6 +40,8 @@ spec:
             defaultMode: 416
             optional: true
             secretName: dynamic-plugins-registry-auth
+        - name: extensions-catalog
+          emptyDir: {}
         - emptyDir: {}
           name: npmcacache
         - name: temp
@@ -69,9 +71,13 @@ spec:
             # CATALOG_INDEX_IMAGE will be replaced by the value of the `RELATED_IMAGE_catalog_index` env var, if set
             - name: CATALOG_INDEX_IMAGE
               value: "quay.io/rhdh/plugin-catalog-index:1.9"
+            - name: CATALOG_ENTITIES_EXTRACT_DIR
+              value: '/extensions'
           volumeMounts:
             - mountPath: /dynamic-plugins-root
               name: dynamic-plugins-root
+            - name: extensions-catalog
+              mountPath: /extensions
             # TODO Configuring dynamic plugins registry auth this way is deprecated and supported only for documentation backward compatibility.
             - mountPath: /opt/app-root/src/.config/containers
               name: dynamic-plugins-registry-auth
@@ -155,6 +161,8 @@ spec:
           volumeMounts:
             - mountPath: /opt/app-root/src/dynamic-plugins-root
               name: dynamic-plugins-root
+            - name: extensions-catalog
+              mountPath: /extensions
             - mountPath: /tmp
               name: temp
           resources:
