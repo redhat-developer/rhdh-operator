@@ -1318,6 +1318,12 @@ spec:
                       Optional.
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
+              flavor:
+                description: |-
+                  Flavor specifies a pre-configured template for Backstage deployment (e.g., "orchestrator", "ai").
+                  When specified, operator loads default configuration from the flavor template instead of standard defaults.
+                  Optional.
+                type: string
               monitoring:
                 default:
                   enabled: false

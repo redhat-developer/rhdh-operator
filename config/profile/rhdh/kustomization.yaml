@@ -14,8 +14,8 @@ resources:
 
 images:
 - name: controller
-  newName: quay.io/rhdh-community/operator
-  newTag: next
+  newName: quay.io/rhdh/rhdh-rhel9-operator
+  newTag: "1.9"
 
 patches:
 - path: patches/deployment-patch.yaml
