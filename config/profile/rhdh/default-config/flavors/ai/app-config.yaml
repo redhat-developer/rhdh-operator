@@ -1,0 +1,204 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-app-config
+data:
+  default.app-config.yaml: |
+   app:
+     title: AI Rolling Demo Developer Hub
+     baseUrl: "${RHDH_BASE_URL}"
+     analytics:
+       adoptionInsights:
+         maxBufferSize: 20
+         flushInterval: 5000
+         debug: false
+         licensedUsers: 50
+   auth:
+     environment: production
+     session:
+       secret: "${BACKEND_SECRET}"
+     providers:
+       oidc:
+         production:
+           metadataUrl: "${KEYCLOAK_METADATA_URL}"
+           clientId: "${KEYCLOAK_CLIENT_ID}"
+           clientSecret: "${KEYCLOAK_CLIENT_SECRET}"
+           callbackUrl: "${RHDH_CALLBACK_URL}"
+           prompt: auto
+           signIn:
+             resolvers:
+               - resolver: preferredUsernameMatchingUserEntityName
+         development:
+           metadataUrl: "${KEYCLOAK_METADATA_URL}"
+           clientId: "${KEYCLOAK_CLIENT_ID}"
+           clientSecret: "${KEYCLOAK_CLIENT_SECRET}"
+           callbackUrl: "${RHDH_CALLBACK_URL}"
+           prompt: auto
+           signIn:
+             resolvers:
+               - resolver: preferredUsernameMatchingUserEntityName
+   backend:
+     actions:
+       pluginSources:
+         - 'software-catalog-mcp-tool'
+         - 'techdocs-mcp-tool'
+     auth:
+       externalAccess:
+         - type: static
+           options:
+             token: ${ADMIN_TOKEN}
+             subject: admin-curl-access
+         - type: static
+           options:
+             token: ${MCP_TOKEN}
+             subject: mcp-clients
+       keys:
+         - secret: "${BACKEND_SECRET}"
+     baseUrl: "${RHDH_BASE_URL}"
+     database:
+       connection:
+         password: ${POSTGRESQL_ADMIN_PASSWORD}
+         user: postgres
+     cors:
+       origin: "${RHDH_BASE_URL}"
+     # AI Experience config
+     csp:
+       upgrade-insecure-requests: false
+       img-src:
+         - "'self'"
+         - "data:"
+         - https://img.freepik.com
+         - https://cdn.dribbble.com
+         - https://upload.wikimedia.org
+         - https://podman-desktop.io
+         - https://argo-cd.readthedocs.io
+         - https://instructlab.ai
+         - https://quay.io
+         - https://news.mit.edu
+       script-src:
+         - "'self'"
+         - "'unsafe-eval'"
+         - https://cdn.jsdelivr.net
+     reading:
+       allow:
+         - host: example.com
+         - host: '*.mozilla.org'
+         - host: '*.openshift.com'
+         - host: '*.openshiftapps.com'
+         - host: '10.*:9090'
+         - host: '127.0.0.1:9090'
+         - host: '127.0.0.1:8888'
+         - host: '127.0.0.1:7070'
+         - host: 'localhost:9090'
+         - host: 'localhost:8888'
+         - host: 'localhost:7070'
+   signInPage: oidc
+   catalog:
+     rules:
+       - allow: [User, Group, System, Domain, Component, Resource, Location, Template, API]
+     locations:
+       - target: https://github.com/benwilcock/rhdh-techdocs/blob/main/rhdh-catalog-info.yaml
+         rules:
+           - allow: [Component, System]
+         type: url
+       - target: https://github.com/redhat-ai-dev/ai-lab-template/blob/ai-rolling-demo-1_8/all.yaml
+         type: url
+     providers:
+       modelCatalog:
+         development:
+           baseUrl: http://localhost:9090
+       github:
+         providerId:
+           organization: "ai-rolling-demo"
+           schedule:
+             frequency:
+               minutes: 15
+             initialDelay:
+               seconds: 15
+             timeout:
+               minutes: 15
+       githubOrg:
+         githubUrl: https://github.com
+         orgs: ["ai-rolling-demo"]
+         schedule:
+           frequency:
+             minutes: 15
+           initialDelay:
+             seconds: 15
+           timeout:
+             minutes: 15
+       keycloakOrg:
+         default:
+           baseUrl: "${KEYCLOAK_BASE_URL}"
+           loginRealm: "${KEYCLOAK_REALM}"
+           realm: "${KEYCLOAK_REALM}"
+           clientId: "${KEYCLOAK_CLIENT_ID}"
+           clientSecret: "${KEYCLOAK_CLIENT_SECRET}"
+           schedule:
+             frequency: { minutes: 1 }
+             timeout: { minutes: 1 }
+             initialDelay: { seconds: 15 }
+           signIn:
+             resolvers:
+               - resolver: emailMatchingUserEntityProfileEmail
+   lightspeed:
+     mcpServers:
+       - name: mcp-integration-tools
+         token: ${MCP_TOKEN}
+   integrations:
+     github:
+       - apps:
+           - appId: ${GITHUB_APP_APP_ID}
+             clientId: ${GITHUB_APP_CLIENT_ID}
+             clientSecret: ${GITHUB_APP_CLIENT_SECRET}
+             webhookUrl: ${GITHUB_APP_WEBHOOK_URL}
+             webhookSecret: ${GITHUB_APP_WEBHOOK_SECRET}
+             privateKey: |
+               ${GITHUB_APP_PRIVATE_KEY}
+         host: github.com
+   kubernetes:
+     clusterLocatorMethods:
+       - clusters:
+           - authProvider: serviceAccount
+             name: default
+             serviceAccountToken: ${K8S_CLUSTER_TOKEN}
+             skipTLSVerify: true
+             url: https://kubernetes.default.svc
+         type: config
+     customResources:
+       - apiVersion: v1beta1
+         group: tekton.dev
+         plural: pipelines
+       - apiVersion: v1beta1
+         group: tekton.dev
+         plural: pipelineruns
+       - apiVersion: v1beta1
+         group: tekton.dev
+         plural: taskruns
+       - apiVersion: v1
+         group: route.openshift.io
+         plural: routes
+     serviceLocatorMethod:
+       type: multiTenant
+   argocd:
+     username: ${ARGOCD_USER}
+     password: ${ARGOCD_PASSWORD}
+     waitCycles: 25
+     appLocatorMethods:
+       - type: 'config'
+         instances:
+           - name: default
+             url: https://${ARGOCD_HOSTNAME}
+             token: ${ARGOCD_API_TOKEN}
+   proxy:
+     endpoints:
+       "/developer-hub":
+         target: https://raw.githubusercontent.com
+         pathRewrite:
+           "^/api/proxy/developer-hub/learning-paths": "/redhat-developer/rhdh-plugins/refs/heads/main/workspaces/ai-integrations/plugins/ai-experience/src/learning-paths/data.json"
+         changeOrigin: true
+         secure: false
+       "/ai-rssfeed":
+         target: "https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml"
+         changeOrigin: true
+         followRedirects: true

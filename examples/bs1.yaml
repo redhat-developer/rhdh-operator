@@ -2,3 +2,4 @@ apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: bs1
+

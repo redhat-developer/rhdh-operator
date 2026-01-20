@@ -23,6 +23,12 @@ type BackstageSpec struct {
 	// Configuration for Backstage. Optional.
 	Application *Application `json:"application,omitempty"`
 
+	// Flavor specifies a pre-configured template for Backstage deployment (e.g., "orchestrator", "ai").
+	// When specified, operator loads default configuration from the flavor template instead of standard defaults.
+	// Optional.
+	// +optional
+	Flavor string `json:"flavor,omitempty"`
+
 	// Raw Runtime RuntimeObjects configuration. For Advanced scenarios.
 	RawRuntimeConfig *RuntimeConfig `json:"rawRuntimeConfig,omitempty"`
 

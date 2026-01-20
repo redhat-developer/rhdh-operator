@@ -1,0 +1,533 @@
+apiVersion: v1
+data:
+  app-config.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: ai-app-config
+    data:
+      default.app-config.yaml: |
+       app:
+         title: AI Rolling Demo Developer Hub
+         baseUrl: "${RHDH_BASE_URL}"
+         analytics:
+           adoptionInsights:
+             maxBufferSize: 20
+             flushInterval: 5000
+             debug: false
+             licensedUsers: 50
+       auth:
+         environment: production
+         session:
+           secret: "${BACKEND_SECRET}"
+         providers:
+           oidc:
+             production:
+               metadataUrl: "${KEYCLOAK_METADATA_URL}"
+               clientId: "${KEYCLOAK_CLIENT_ID}"
+               clientSecret: "${KEYCLOAK_CLIENT_SECRET}"
+               callbackUrl: "${RHDH_CALLBACK_URL}"
+               prompt: auto
+               signIn:
+                 resolvers:
+                   - resolver: preferredUsernameMatchingUserEntityName
+             development:
+               metadataUrl: "${KEYCLOAK_METADATA_URL}"
+               clientId: "${KEYCLOAK_CLIENT_ID}"
+               clientSecret: "${KEYCLOAK_CLIENT_SECRET}"
+               callbackUrl: "${RHDH_CALLBACK_URL}"
+               prompt: auto
+               signIn:
+                 resolvers:
+                   - resolver: preferredUsernameMatchingUserEntityName
+       backend:
+         actions:
+           pluginSources:
+             - 'software-catalog-mcp-tool'
+             - 'techdocs-mcp-tool'
+         auth:
+           externalAccess:
+             - type: static
+               options:
+                 token: ${ADMIN_TOKEN}
+                 subject: admin-curl-access
+             - type: static
+               options:
+                 token: ${MCP_TOKEN}
+                 subject: mcp-clients
+           keys:
+             - secret: "${BACKEND_SECRET}"
+         baseUrl: "${RHDH_BASE_URL}"
+         database:
+           connection:
+             password: ${POSTGRESQL_ADMIN_PASSWORD}
+             user: postgres
+         cors:
+           origin: "${RHDH_BASE_URL}"
+         # AI Experience config
+         csp:
+           upgrade-insecure-requests: false
+           img-src:
+             - "'self'"
+             - "data:"
+             - https://img.freepik.com
+             - https://cdn.dribbble.com
+             - https://upload.wikimedia.org
+             - https://podman-desktop.io
+             - https://argo-cd.readthedocs.io
+             - https://instructlab.ai
+             - https://quay.io
+             - https://news.mit.edu
+           script-src:
+             - "'self'"
+             - "'unsafe-eval'"
+             - https://cdn.jsdelivr.net
+         reading:
+           allow:
+             - host: example.com
+             - host: '*.mozilla.org'
+             - host: '*.openshift.com'
+             - host: '*.openshiftapps.com'
+             - host: '10.*:9090'
+             - host: '127.0.0.1:9090'
+             - host: '127.0.0.1:8888'
+             - host: '127.0.0.1:7070'
+             - host: 'localhost:9090'
+             - host: 'localhost:8888'
+             - host: 'localhost:7070'
+       signInPage: oidc
+       catalog:
+         rules:
+           - allow: [User, Group, System, Domain, Component, Resource, Location, Template, API]
+         locations:
+           - target: https://github.com/benwilcock/rhdh-techdocs/blob/main/rhdh-catalog-info.yaml
+             rules:
+               - allow: [Component, System]
+             type: url
+           - target: https://github.com/redhat-ai-dev/ai-lab-template/blob/ai-rolling-demo-1_8/all.yaml
+             type: url
+         providers:
+           modelCatalog:
+             development:
+               baseUrl: http://localhost:9090
+           github:
+             providerId:
+               organization: "ai-rolling-demo"
+               schedule:
+                 frequency:
+                   minutes: 15
+                 initialDelay:
+                   seconds: 15
+                 timeout:
+                   minutes: 15
+           githubOrg:
+             githubUrl: https://github.com
+             orgs: ["ai-rolling-demo"]
+             schedule:
+               frequency:
+                 minutes: 15
+               initialDelay:
+                 seconds: 15
+               timeout:
+                 minutes: 15
+           keycloakOrg:
+             default:
+               baseUrl: "${KEYCLOAK_BASE_URL}"
+               loginRealm: "${KEYCLOAK_REALM}"
+               realm: "${KEYCLOAK_REALM}"
+               clientId: "${KEYCLOAK_CLIENT_ID}"
+               clientSecret: "${KEYCLOAK_CLIENT_SECRET}"
+               schedule:
+                 frequency: { minutes: 1 }
+                 timeout: { minutes: 1 }
+                 initialDelay: { seconds: 15 }
+               signIn:
+                 resolvers:
+                   - resolver: emailMatchingUserEntityProfileEmail
+       lightspeed:
+         mcpServers:
+           - name: mcp-integration-tools
+             token: ${MCP_TOKEN}
+       integrations:
+         github:
+           - apps:
+               - appId: ${GITHUB_APP_APP_ID}
+                 clientId: ${GITHUB_APP_CLIENT_ID}
+                 clientSecret: ${GITHUB_APP_CLIENT_SECRET}
+                 webhookUrl: ${GITHUB_APP_WEBHOOK_URL}
+                 webhookSecret: ${GITHUB_APP_WEBHOOK_SECRET}
+                 privateKey: |
+                   ${GITHUB_APP_PRIVATE_KEY}
+             host: github.com
+       kubernetes:
+         clusterLocatorMethods:
+           - clusters:
+               - authProvider: serviceAccount
+                 name: default
+                 serviceAccountToken: ${K8S_CLUSTER_TOKEN}
+                 skipTLSVerify: true
+                 url: https://kubernetes.default.svc
+             type: config
+         customResources:
+           - apiVersion: v1beta1
+             group: tekton.dev
+             plural: pipelines
+           - apiVersion: v1beta1
+             group: tekton.dev
+             plural: pipelineruns
+           - apiVersion: v1beta1
+             group: tekton.dev
+             plural: taskruns
+           - apiVersion: v1
+             group: route.openshift.io
+             plural: routes
+         serviceLocatorMethod:
+           type: multiTenant
+       argocd:
+         username: ${ARGOCD_USER}
+         password: ${ARGOCD_PASSWORD}
+         waitCycles: 25
+         appLocatorMethods:
+           - type: 'config'
+             instances:
+               - name: default
+                 url: https://${ARGOCD_HOSTNAME}
+                 token: ${ARGOCD_API_TOKEN}
+       proxy:
+         endpoints:
+           "/developer-hub":
+             target: https://raw.githubusercontent.com
+             pathRewrite:
+               "^/api/proxy/developer-hub/learning-paths": "/redhat-developer/rhdh-plugins/refs/heads/main/workspaces/ai-integrations/plugins/ai-experience/src/learning-paths/data.json"
+             changeOrigin: true
+             secure: false
+           "/ai-rssfeed":
+             target: "https://news.mit.edu/topic/mitartificial-intelligence2-rss.xml"
+             changeOrigin: true
+             followRedirects: true
+  dynamic-plugins.yaml: |+
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: default-dynamic-plugins
+    data:
+      dynamic-plugins.yaml: |
+        includes:
+        - "dynamic-plugins.default.yaml"
+        plugins:
+        - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-dynamic-home-page
+          disabled: true
+        - package: oci://quay.io/tpetkos/customized-sign-in-page:v0.1.0!red-hat-developer-hub-backstage-plugin-customized-sign-in-page
+          disabled: false
+          pluginConfig:
+            dynamicPlugins:
+              frontend:
+                red-hat-developer-hub.backstage-plugin-customized-sign-in-page:
+                  signInPage:
+                    importName: CustomizedSignInPage
+        - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-global-header
+          disabled: false
+          pluginConfig:
+            dynamicPlugins:
+              frontend:
+                default.main-menu-items:
+                  menuItems:
+                    default.create:
+                      title: ''
+                    default.admin:
+                      title: Administration
+                      textKey: menuItem.administration
+                      icon: admin
+                red-hat-developer-hub.backstage-plugin-global-header:
+                  mountPoints:
+                    - mountPoint: application/header
+                      importName: GlobalHeader
+                      config:
+                        position: above-main-content # above-main-content | below-main-content
+
+                    - mountPoint: global.header/component
+                      importName: SearchComponent
+                      config:
+                        priority: 100
+
+                    - mountPoint: global.header/component
+                      importName: Spacer
+                      config:
+                        priority: 99
+                        props:
+                          growFactor: 0
+
+                    - mountPoint: global.header/component
+                      importName: HeaderIconButton
+                      config:
+                        priority: 90
+                        props:
+                          title: Create...
+                          icon: add
+                          to: create
+
+                    - mountPoint: global.header/component
+                      importName: StarredDropdown
+                      config:
+                        priority: 85
+
+                    - mountPoint: global.header/component
+                      importName: ApplicationLauncherDropdown
+                      config:
+                        priority: 82
+
+                    - mountPoint: global.header/component
+                      importName: SupportButton
+                      config:
+                        priority: 80
+
+                    - mountPoint: global.header/component
+                      importName: NotificationButton
+                      config:
+                        priority: 70
+
+                    - mountPoint: global.header/component
+                      importName: Divider
+                      config:
+                        priority: 50
+
+                    - mountPoint: global.header/component
+                      importName: ProfileDropdown
+                      config:
+                        priority: 10
+
+                    - mountPoint: global.header/profile
+                      importName: MenuItemLink
+                      config:
+                        priority: 100
+                        props:
+                          title: Settings
+                          link: /settings
+                          icon: manageAccounts
+
+                    - mountPoint: global.header/profile
+                      importName: LogoutButton
+                      config:
+                        priority: 10
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Red Hat AI
+                        sectionLink: https://www.redhat.com/en/products/ai
+                        sectionLinkLabel: Read more
+                        priority: 200
+                        props:
+                          title: Podman Desktop
+                          icon: https://podman-desktop.io/img/logo.svg
+                          link: https://podman-desktop.io/
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Red Hat AI
+                        sectionLinkLabel: Read more
+                        priority: 170
+                        props:
+                          title: OpenShift AI
+                          icon: https://upload.wikimedia.org/wikipedia/commons/d/d8/Red_Hat_logo.svg
+                          link: https://rhods-dashboard-redhat-ods-applications.apps.rosa.redhat-ai-dev.m6no.p3.openshiftapps.com/
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Red Hat AI
+                        sectionLinkLabel: Read more
+                        priority: 160
+                        props:
+                          title: RHEL AI
+                          icon: https://upload.wikimedia.org/wikipedia/commons/d/d8/Red_Hat_logo.svg
+                          link: https://www.redhat.com/en/products/ai/enterprise-linux-ai
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Red Hat AI
+                        sectionLinkLabel: Read more
+                        priority: 150
+                        props:
+                          title: Instructlab
+                          icon: https://instructlab.ai/logo.png
+                          link: https://instructlab.ai/
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Quick Links
+                        priority: 150
+                        props:
+                          title: MCP Tools Guide
+                          icon: https://upload.wikimedia.org/wikipedia/commons/0/01/Google_Docs_logo_%282014-2020%29.svg
+                          link: https://docs.google.com/document/d/1o9qRYCAszGzTwW2mRjC4c9wFwJIx8J3XF1kGPFy5F1s/edit?tab=t.0
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Quick Links
+                        priority: 150
+                        props:
+                          title: Quay.io
+                          icon: https://quay.io/static/img/quay_favicon.png
+                          link: https://quay.io
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Quick Links
+                        priority: 140
+                        props:
+                          title: Slack
+                          icon: https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg
+                          link: https://slack.com/
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Quick Links
+                        priority: 130
+                        props:
+                          title: ArgoCD
+                          icon: https://argo-cd.readthedocs.io/en/stable/assets/logo.png
+                          link: https://argo-cd.readthedocs.io/en/stable/
+
+                    - mountPoint: global.header/application-launcher
+                      importName: MenuItemLink
+                      config:
+                        section: Quick Links
+                        priority: 120
+                        props:
+                          title: Openshift
+                          icon: https://upload.wikimedia.org/wikipedia/commons/d/d8/Red_Hat_logo.svg
+                          link: https://www.redhat.com/en/technologies/cloud-computing/openshift
+        - package: oci://quay.io/karthik_jk/ai-experience:1.6.1!red-hat-developer-hub-backstage-plugin-ai-experience
+          disabled: false
+          pluginConfig:
+            dynamicPlugins:
+              frontend:
+                red-hat-developer-hub.backstage-plugin-ai-experience:
+                  appIcons:
+                    - name: aiNewsIcon
+                      importName: AiNewsIcon
+                  dynamicRoutes:
+                    - path: /
+                      importName: AiExperiencePage
+                    - path: /ai-news
+                      importName: AiNewsPage
+                      menuItem:
+                        icon: aiNewsIcon
+                        text: AI News
+        - package: oci://quay.io/karthik_jk/ai-experience:1.6.1!red-hat-developer-hub-backstage-plugin-ai-experience-backend-dynamic
+          disabled: false
+        - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes-backend-dynamic
+          disabled: false
+        - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes
+          disabled: false
+        - package:  ./dynamic-plugins/dist/backstage-community-plugin-catalog-backend-module-keycloak-dynamic
+          disabled: false
+        - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
+          disabled: false
+          pluginConfig:
+            dynamicPlugins:
+              frontend:
+                backstage-community.plugin-redhat-argocd:
+                  mountPoints:
+                    - mountPoint: entity.page.overview/cards
+                      importName: ArgocdDeploymentSummary
+                      config:
+                        layout:
+                          gridColumnEnd:
+                            lg: "span 8"
+                            xs: "span 12"
+                        if:
+                          allOf:
+                            - isArgocdConfigured
+                    - mountPoint: entity.page.cd/cards
+                      importName: ArgocdDeploymentLifecycle
+                      config:
+                        layout:
+                          gridColumn: '1 / -1'
+                        if:
+                          allOf:
+                            - isArgocdConfigured
+        - disabled: false
+          package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd-backend-dynamic
+        - disabled: false
+          package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-argocd-dynamic
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-plugin-techdocs
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-community-plugin-topology
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-org-dynamic
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-plugin-scaffolder-backend-module-github-dynamic
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-plugin-scaffolder-backend-module-gitlab-dynamic
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-gitlab-dynamic
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-gitlab-org-dynamic
+        - disabled: false
+          package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed:bs_1.42.5__1.0.3!red-hat-developer-hub-backstage-plugin-lightspeed
+          pluginConfig:
+            dynamicPlugins:
+              frontend:
+                red-hat-developer-hub.backstage-plugin-lightspeed:
+                  translationResources:
+                    - importName: lightspeedTranslations
+                      module: Alpha
+                      ref: lightspeedTranslationRef
+                  appIcons:
+                    - name: LightspeedIcon
+                      module: LightspeedPlugin
+                      importName: LightspeedIcon
+                  dynamicRoutes:
+                    - path: /lightspeed
+                      importName: LightspeedPage
+                      module: LightspeedPlugin
+                      menuItem:
+                        icon: LightspeedIcon
+                        text: Lightspeed
+        - disabled: false
+          package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.42.5__1.0.3!red-hat-developer-hub-backstage-plugin-lightspeed-backend
+        - disabled: false
+          package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-mcp-actions-backend:next__0.1.2!backstage-plugin-mcp-actions-backend
+        - disabled: false
+          package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-software-catalog-mcp-tool:bs_1.42.5__0.2.3!red-hat-developer-hub-backstage-plugin-software-catalog-mcp-tool
+        - disabled: false
+          package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-techdocs-mcp-tool:bs_1.42.5__0.3.0!red-hat-developer-hub-backstage-plugin-techdocs-mcp-tool
+        - disabled: true
+          package: ./dynamic-plugins/dist/backstage-community-plugin-analytics-provider-segment
+        - disabled: false
+          package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog:bs_1.42.5__0.7.0!red-hat-developer-hub-backstage-plugin-catalog-backend-module-model-catalog
+        - disabled: false
+          package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-catalog-techdoc-url-reader-backend:bs_1.42.5__0.3.0!red-hat-developer-hub-backstage-plugin-catalog-techdoc-url-reader-backend
+        - disabled: false
+          package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
+          pluginConfig:
+            dynamicPlugins:
+              frontend:
+                backstage-community.plugin-tekton:
+                  mountPoints:
+                    - config:
+                        if:
+                          allOf:
+                            - isTektonCIAvailable
+                        layout:
+                          gridColumn: 1 / -1
+                          gridRowStart: 1
+                      importName: TektonCI
+                      mountPoint: entity.page.ci/cards
+
+kind: ConfigMap
+metadata:
+  name: rhdh-flavor-ai

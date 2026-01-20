@@ -31,7 +31,7 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-envs.yaml", "raw-cm-envs.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -71,7 +71,7 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvConfigMapKeys["mapName"] = NewDataObjectKeys(map[string]string{"mapName": "ENV1"}, nil)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -111,7 +111,7 @@ func TestDefaultAndSpecifiedConfigMapEnvFrom(t *testing.T) {
 	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvConfigMapKeys["mapName"] = NewDataObjectKeys(map[string]string{"mapName": "ENV1"}, nil)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -143,7 +143,7 @@ func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
 	testObj.externalConfig.ExtraEnvSecretKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvSecretKeys["cmName"] = NewDataObjectKeys(map[string]string{"cmName": "ENV1"}, nil)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -171,7 +171,7 @@ func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
 	testObj.externalConfig.ExtraEnvSecretKeys = map[string]DataObjectKeys{}
 	testObj.externalConfig.ExtraEnvSecretKeys["cmName"] = NewDataObjectKeys(map[string]string{"cmName": "ENV1"}, nil)
 
-	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
@@ -200,7 +200,7 @@ func TestCMEnvsWithNonExistedContainerFailed(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.ErrorContains(t, err, "not found")
 

@@ -25,10 +25,13 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
-const BackstageAppLabel = "rhdh.redhat.com/app"
-const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
-const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
-const ContainersAnnotation = "rhdh.redhat.com/containers"
+const (
+	BackstageAppLabel          = "rhdh.redhat.com/app"
+	ConfiguredNameAnnotation   = "rhdh.redhat.com/configured-name"
+	DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
+	ContainersAnnotation       = "rhdh.redhat.com/containers"
+	DefaultConfigLabel         = "rhdh.redhat.com/default-config"
+)
 
 // Backstage configuration scaffolding with empty BackstageObjects.
 // There are all possible objects for configuration
@@ -53,6 +56,8 @@ type BackstageModel struct {
 	RuntimeObjects []RuntimeObject
 
 	ExternalConfig ExternalConfig
+
+	NamespacedConfig NamespacedConfig
 }
 
 func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
@@ -98,7 +103,7 @@ func registerConfig(key string, factory ObjectFactory, multiple bool) {
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
-func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, platform platform.Platform, scheme *runtime.Scheme) (*BackstageModel, error) {
+func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, namespacedConfig NamespacedConfig, platform platform.Platform, scheme *runtime.Scheme) (*BackstageModel, error) {
 
 	// 3 phases of Backstage configuration:
 	// 1- load from Operator defaults, modify metadata (labels, selectors..) and namespace as needed
@@ -109,7 +114,17 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 	lg := log.FromContext(ctx)
 	lg.V(1)
 
-	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: platform.IsOpenshift(), DynamicPlugins: DynamicPlugins{}}
+	flavor := backstage.Spec.Flavor
+	if flavor != "" {
+		lg.Info("initializing with flavor", "flavor", flavor)
+	}
+
+	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0),
+		ExternalConfig:   externalConfig,
+		NamespacedConfig: namespacedConfig,
+		localDbEnabled:   backstage.Spec.IsLocalDbEnabled(),
+		isOpenshift:      platform.IsOpenshift(),
+		DynamicPlugins:   DynamicPlugins{}}
 
 	ecs := make([]ExternalConfigContributor, 0)
 	// looping through the registered runtimeConfig objects initializing the model
@@ -118,8 +133,12 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		//var templ = backstageObject.EmptyObject()
-		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), *scheme, platform.Extension); err != nil {
+		defFile, err := utils.DefFile(conf.Key, flavor)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get config file path: %w", err)
+		}
+
+		if objs, err := utils.ReadYamlFiles(defFile, *scheme, platform.Extension); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}

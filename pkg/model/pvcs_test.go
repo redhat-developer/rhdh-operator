@@ -40,7 +40,7 @@ func TestDefaultPvcs(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("pvcs.yaml", "multi-pvc.yaml")
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
@@ -72,7 +72,7 @@ func TestMultiContainersPvc(t *testing.T) {
 	}
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").addToDefaultConfig("pvcs.yaml", "multi-pvc-containers.yaml")
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 	assert.Equal(t, 4, len(model.backstageDeployment.allContainers()))
@@ -115,7 +115,7 @@ func TestSpecifiedPvcs(t *testing.T) {
 
 	testObj.externalConfig.ExtraPvcKeys = []string{"my-pvc1", "my-pvc2"}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 	d := model.backstageDeployment
@@ -155,7 +155,7 @@ func TestSpecifiedPvcsWithContainers(t *testing.T) {
 
 	testObj.externalConfig.ExtraPvcKeys = []string{"my-pvc1", "my-pvc2"}
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 	d := model.backstageDeployment
@@ -183,7 +183,7 @@ func TestPvcsWithNonExistedContainerFailed(t *testing.T) {
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, testObj.namespacedConfig, platform.Default, testObj.scheme)
 
 	assert.ErrorContains(t, err, "not found")
 
