@@ -1,0 +1,49 @@
+# RHDH Operator RPM dependencies
+# after editing, run (https://github.com/konflux-ci/rpm-lockfile-prototype):
+#   rpm-lockfile-prototype -f .rhdh/docker/Dockerfile rpms.in.yaml
+# to regenerate rpms.lock.yaml
+#
+# Note that the repoid values are special, and must be from here:
+# https://github.com/release-engineering/rhtap-ec-policy/blob/main/data/known_rpm_repositories.yml
+
+allowerasing: true
+contentOrigin:
+repos:
+  - repoid: ubi-9-for-$basearch-appstream-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/os/
+  - repoid: ubi-9-for-$basearch-appstream-source-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/source/SRPMS
+  - repoid: ubi-9-for-$basearch-baseos-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/os/
+  - repoid: ubi-9-for-$basearch-baseos-source-rpms
+    baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/source/SRPMS
+
+packages:
+  # Required for FIPS support in the operator runtime
+  - openssl
+  - openssl-libs
+  - openssl-fips-provider
+  - openssl-fips-provider-so
+  # Base dependencies pulled in by openssl
+  - ca-certificates
+  - crypto-policies
+  - crypto-policies-scripts
+  - glibc
+  - glibc-common
+  - glibc-minimal-langpack
+  - keyutils-libs
+  - krb5-libs
+  - libcom_err
+  - libgcc
+  - libselinux
+  - libstdc++
+  - libtasn1
+  - libunistring
+  - libxcrypt
+  - ncurses-base
+  - ncurses-libs
+  - p11-kit
+  - p11-kit-trust
+  - pcre2
+  - readline
+  - zlib
