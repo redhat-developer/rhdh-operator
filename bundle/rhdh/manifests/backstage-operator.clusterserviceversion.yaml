@@ -38,8 +38,8 @@ metadata:
     capabilities: Seamless Upgrades
     categories: Developer Tools
     certified: "true"
-    containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.9
-    createdAt: "2026-01-16T15:03:30Z"
+    containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.10
+    createdAt: "2026-01-21T13:34:28Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -59,12 +59,12 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <1.9.0'
+    skipRange: '>=1.0.0 <1.10.0'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.arm64: supported
-  name: rhdh-operator.v1.9.0
+  name: rhdh-operator.v1.10.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -104,7 +104,7 @@ spec:
 
     ## Telemetry data collection
 
-    The telemetry data collection feature is enabled by default. Red Hat Developer Hub sends telemetry data to Red Hat by using the `backstage-plugin-analytics-provider-segment` plugin. To disable this and to learn what data is being collected, see [Red Hat Developer Hub documentation on telemetry data collection](https://access.redhat.com/documentation/en-us/red_hat_developer_hub/1.9/html-single/administration_guide_for_red_hat_developer_hub/index#assembly-rhdh-telemetry_admin-rhdh).
+    The telemetry data collection feature is enabled by default. Red Hat Developer Hub sends telemetry data to Red Hat by using the `backstage-plugin-analytics-provider-segment` plugin. To disable this and to learn what data is being collected, see [Red Hat Developer Hub documentation on telemetry data collection](https://access.redhat.com/documentation/en-us/red_hat_developer_hub/1.10/html-single/administration_guide_for_red_hat_developer_hub/index#assembly-rhdh-telemetry_admin-rhdh).
 
     ## More Information
 
@@ -340,7 +340,7 @@ spec:
                   value: quay.io/rhdh-community/rhdh:next
                 - name: RELATED_IMAGE_catalog_index
                   value: quay.io/rhdh/plugin-catalog-index:1.9
-                image: quay.io/rhdh/rhdh-rhel9-operator:1.9
+                image: quay.io/rhdh/rhdh-rhel9-operator:1.10
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -463,5 +463,5 @@ spec:
     name: backstage
   - image: quay.io/rhdh/plugin-catalog-index:1.9
     name: catalog-index
-  replaces: rhdh-operator.v1.8.0
-  version: 1.9.0
+  replaces: rhdh-operator.v1.9.0
+  version: 1.10.0
