@@ -2928,7 +2928,7 @@ spec:
           value: quay.io/rhdh-community/rhdh:next
         - name: RELATED_IMAGE_catalog_index
           value: quay.io/rhdh/plugin-catalog-index:1.9
-        image: quay.io/rhdh/rhdh-rhel9-operator:1.9
+        image: quay.io/rhdh/rhdh-rhel9-operator:1.10
         livenessProbe:
           httpGet:
             path: /healthz

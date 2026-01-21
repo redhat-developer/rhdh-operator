@@ -35,13 +35,13 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-01-16T15:03:29Z"
+    createdAt: "2026-01-21T13:34:27Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   labels:
     operatorframework.io/arch.amd64: supported
-  name: backstage-operator.v0.9.0
+  name: backstage-operator.v0.10.0
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -235,7 +235,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/rhdh-community/operator:0.9.0
+                image: quay.io/rhdh-community/operator:0.10.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
