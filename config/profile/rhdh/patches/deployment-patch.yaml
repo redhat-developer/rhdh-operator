@@ -27,7 +27,7 @@ spec:
             - name: RELATED_IMAGE_postgresql
               value: quay.io/fedora/postgresql-15:latest
             - name: RELATED_IMAGE_backstage
-              value: quay.io/rhdh-community/rhdh:next
+              value: quay.io/rhdh-community/rhdh:next-1.9
             - name: RELATED_IMAGE_catalog_index
               value: quay.io/rhdh/plugin-catalog-index:1.9
 
