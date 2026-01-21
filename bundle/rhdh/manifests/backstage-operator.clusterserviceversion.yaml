@@ -39,7 +39,7 @@ metadata:
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.9
-    createdAt: "2026-01-16T15:03:30Z"
+    createdAt: "2026-01-21T13:33:21Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -337,7 +337,7 @@ spec:
                 - name: RELATED_IMAGE_postgresql
                   value: quay.io/fedora/postgresql-15:latest
                 - name: RELATED_IMAGE_backstage
-                  value: quay.io/rhdh-community/rhdh:next
+                  value: quay.io/rhdh-community/rhdh:next-1.9
                 - name: RELATED_IMAGE_catalog_index
                   value: quay.io/rhdh/plugin-catalog-index:1.9
                 image: quay.io/rhdh/rhdh-rhel9-operator:1.9
@@ -459,7 +459,7 @@ spec:
   relatedImages:
   - image: quay.io/fedora/postgresql-15:latest
     name: postgresql
-  - image: quay.io/rhdh-community/rhdh:next
+  - image: quay.io/rhdh-community/rhdh:next-1.9
     name: backstage
   - image: quay.io/rhdh/plugin-catalog-index:1.9
     name: catalog-index
