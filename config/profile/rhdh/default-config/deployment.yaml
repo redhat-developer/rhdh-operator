@@ -52,7 +52,7 @@ spec:
             - ./install-dynamic-plugins.sh
             - /dynamic-plugins-root
           # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-          image: quay.io/rhdh-community/rhdh:next
+          image: quay.io/rhdh-community/rhdh:next-1.9
           imagePullPolicy: IfNotPresent
           securityContext:
             readOnlyRootFilesystem: true
@@ -98,7 +98,7 @@ spec:
       containers:
         - name: backstage-backend
           # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-          image: quay.io/rhdh-community/rhdh:next
+          image: quay.io/rhdh-community/rhdh:next-1.9
           imagePullPolicy: IfNotPresent
           args:
             - "--config"
