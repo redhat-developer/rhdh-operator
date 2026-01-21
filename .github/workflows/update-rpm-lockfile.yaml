@@ -12,7 +12,7 @@ on:
     paths:
       - 'rpms.in.yaml'
       - '.rhdh/docker/Dockerfile'
-      - 'Dockerfile'
+      - '.github/workflows/update-rpm-lockfile.yaml'
 
 permissions:
   contents: write
