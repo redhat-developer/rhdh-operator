@@ -106,7 +106,7 @@ jobs:
 
       - name: Add /lgtm and /approved comment
         if: steps.check-lockfile-changes.outputs.changes == 'true' && steps.create-pull-request.outputs.pull-request-number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           github-token: ${{ secrets.RHDH_BOT_TOKEN }}
           script: |
