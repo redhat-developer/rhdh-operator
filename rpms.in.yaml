@@ -21,29 +21,3 @@ contentOrigin:
 packages:
   # Required for FIPS support in the operator runtime
   - openssl
-  - openssl-libs
-  - openssl-fips-provider
-  - openssl-fips-provider-so
-  # Base dependencies pulled in by openssl
-  - ca-certificates
-  - crypto-policies
-  - crypto-policies-scripts
-  - glibc
-  - glibc-common
-  - glibc-minimal-langpack
-  - keyutils-libs
-  - krb5-libs
-  - libcom_err
-  - libgcc
-  - libselinux
-  - libstdc++
-  - libtasn1
-  - libunistring
-  - libxcrypt
-  - ncurses-base
-  - ncurses-libs
-  - p11-kit
-  - p11-kit-trust
-  - pcre2
-  - readline
-  - zlib
