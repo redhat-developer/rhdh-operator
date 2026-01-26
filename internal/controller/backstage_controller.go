@@ -60,6 +60,7 @@ type BackstageReconciler struct {
 //+kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
 //+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
 //+kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get
+//+kubebuilder:rbac:groups="image.openshift.io",resources=imagestreams,verbs=get;watch;create;update;list;delete;patch
 //+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;update;patch;delete
 
@@ -110,6 +111,11 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
+	}
+
+	// Apply ImageStreams for OCP registry.redhat.io access (OCP only)
+	if err := r.applyImageStreams(ctx, backstage); err != nil {
+		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply imagestreams", err)
 	}
 
 	// Apply the plugin dependencies

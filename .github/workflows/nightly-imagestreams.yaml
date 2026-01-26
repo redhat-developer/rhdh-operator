@@ -1,0 +1,343 @@
+name: Generate ImageStream Manifests
+
+on:
+  # Run nightly at 2:00 AM UTC
+  schedule:
+    - cron: "0 2 * * *"
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode - do not create PR'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  # Default catalog index image registry
+  CATALOG_INDEX_REGISTRY: quay.io/rhdh/plugin-catalog-index
+  # Registry that requires ImageStreams for OCP auth
+  TARGET_REGISTRY: registry.redhat.io
+
+jobs:
+  generate-imagestreams:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - main
+          - release-1.9
+          - release-1.8
+    name: 'Generate ImageStreams for ${{ matrix.branch }}'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          ref: ${{ matrix.branch }}
+          fetch-depth: 0
+
+      - name: Determine catalog index tag
+        id: catalog-tag
+        run: |
+          branch="${{ matrix.branch }}"
+          if [[ "${branch}" == "main" ]]; then
+            # For main, find the latest 1.x tag
+            # Query quay.io for available tags and get the latest
+            LATEST_TAG=$(skopeo list-tags "docker://${CATALOG_INDEX_REGISTRY}" 2>/dev/null | jq -r '.Tags | map(select(test("^[0-9]+\\.[0-9]+$"))) | sort_by(split(".") | map(tonumber)) | last // "1.9"')
+            echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+            echo "Using latest catalog index tag: ${LATEST_TAG}"
+          else
+            # For release-1.x branches, extract the version
+            version="${branch#release-}"
+            echo "tag=${version}" >> $GITHUB_OUTPUT
+            echo "Using catalog index tag from branch: ${version}"
+          fi
+
+      - name: Check if catalog index image exists
+        id: check-image
+        run: |
+          IMAGE="${CATALOG_INDEX_REGISTRY}:${{ steps.catalog-tag.outputs.tag }}"
+          if skopeo inspect "docker://${IMAGE}" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Catalog index image ${IMAGE} exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "::warning ::Catalog index image ${IMAGE} not found. Skipping ImageStream generation for ${{ matrix.branch }}."
+          fi
+
+      - name: Extract dynamic-plugins.default.yaml from catalog index
+        if: steps.check-image.outputs.exists == 'true'
+        id: extract
+        run: |
+          IMAGE="${CATALOG_INDEX_REGISTRY}:${{ steps.catalog-tag.outputs.tag }}"
+          TEMP_DIR=$(mktemp -d)
+          
+          echo "Extracting catalog index from ${IMAGE}..."
+          skopeo copy "docker://${IMAGE}" "dir:${TEMP_DIR}/oci"
+          
+          # Get the manifest and find the layer
+          MANIFEST="${TEMP_DIR}/oci/manifest.json"
+          LAYER_DIGEST=$(jq -r '.layers[0].digest' "${MANIFEST}")
+          LAYER_FILE="${TEMP_DIR}/oci/${LAYER_DIGEST#sha256:}"
+          
+          # Extract the layer
+          mkdir -p "${TEMP_DIR}/extracted"
+          tar -xf "${LAYER_FILE}" -C "${TEMP_DIR}/extracted"
+          
+          # Copy the dynamic-plugins.default.yaml
+          if [[ -f "${TEMP_DIR}/extracted/dynamic-plugins.default.yaml" ]]; then
+            cp "${TEMP_DIR}/extracted/dynamic-plugins.default.yaml" /tmp/dynamic-plugins.default.yaml
+            echo "Successfully extracted dynamic-plugins.default.yaml"
+            echo "extracted=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error ::dynamic-plugins.default.yaml not found in catalog index image"
+            echo "extracted=false" >> $GITHUB_OUTPUT
+          fi
+          
+          rm -rf "${TEMP_DIR}"
+
+      - name: Generate ImageStream manifests
+        if: steps.extract.outputs.extracted == 'true'
+        run: |
+          IMAGESTREAMS_DIR="config/profile/rhdh/plugin-deps/imagestreams"
+          mkdir -p "${IMAGESTREAMS_DIR}"
+          
+          # Clear existing imagestreams
+          rm -f "${IMAGESTREAMS_DIR}"/*.yaml
+          
+          CATALOG_TAG="${{ steps.catalog-tag.outputs.tag }}"
+          
+          # Generate ImageStream for the catalog index itself
+          cat > "${IMAGESTREAMS_DIR}/catalog-index.yaml" << EOF
+          apiVersion: image.openshift.io/v1
+          kind: ImageStream
+          metadata:
+            name: rhdh-plugin-catalog-index
+            namespace: "{{backstage-ns}}"
+            labels:
+              app.kubernetes.io/managed-by: rhdh-operator
+              rhdh.redhat.com/imagestream: "true"
+          spec:
+            tags:
+              - name: "${CATALOG_TAG}"
+                from:
+                  kind: DockerImage
+                  name: "${TARGET_REGISTRY}/rhdh/rhdh-plugin-index-catalog:${CATALOG_TAG}"
+                importPolicy:
+                  scheduled: true
+                referencePolicy:
+                  type: Local
+          EOF
+          
+          echo "Generated ImageStream for catalog index"
+          
+          # Parse the dynamic-plugins.default.yaml and extract OCI image references
+          # that point to registry.redhat.io
+          python3 << 'PYTHON_SCRIPT'
+          import yaml
+          import os
+          import re
+          
+          TARGET_REGISTRY = os.environ.get('TARGET_REGISTRY', 'registry.redhat.io')
+          CATALOG_TAG = "${{ steps.catalog-tag.outputs.tag }}"
+          IMAGESTREAMS_DIR = "config/profile/rhdh/plugin-deps/imagestreams"
+          
+          def extract_image_refs(yaml_file):
+              """Extract OCI image references from dynamic-plugins.default.yaml"""
+              with open(yaml_file, 'r') as f:
+                  content = yaml.safe_load(f)
+              
+              image_refs = set()
+              
+              plugins = content.get('plugins', [])
+              for plugin in plugins:
+                  package = plugin.get('package', '')
+                  # Match oci:// references
+                  if package.startswith('oci://'):
+                      # Remove oci:// prefix and plugin path (after !)
+                      image_ref = package[6:]  # Remove 'oci://'
+                      if '!' in image_ref:
+                          image_ref = image_ref.split('!')[0]
+                      
+                      # Only process images from target registry
+                      if image_ref.startswith(TARGET_REGISTRY):
+                          image_refs.add(image_ref)
+              
+              return image_refs
+          
+          def parse_image_ref(image_ref):
+              """Parse an image reference into components"""
+              # Remove tag or digest
+              tag = 'latest'
+              if '@' in image_ref:
+                  base, tag = image_ref.rsplit('@', 1)
+              elif ':' in image_ref.split('/')[-1]:
+                  parts = image_ref.rsplit(':', 1)
+                  base = parts[0]
+                  tag = parts[1]
+              else:
+                  base = image_ref
+              
+              # Extract registry and repository
+              parts = base.split('/', 1)
+              if len(parts) == 2 and ('.' in parts[0] or ':' in parts[0]):
+                  registry = parts[0]
+                  repository = parts[1]
+              else:
+                  registry = 'docker.io'
+                  repository = base
+              
+              return registry, repository, tag
+          
+          def generate_imagestream_name(image_ref):
+              """Generate a valid K8s name from image reference"""
+              # Get the last part of the repository path
+              _, repository, _ = parse_image_ref(image_ref)
+              name = repository.split('/')[-1]
+              
+              # Sanitize for K8s naming
+              name = re.sub(r'[^a-z0-9-]', '-', name.lower())
+              name = re.sub(r'-+', '-', name)
+              name = name.strip('-')
+              
+              return name[:63]  # Max K8s name length
+          
+          def generate_imagestream_manifest(image_ref, output_dir):
+              """Generate an ImageStream manifest for the given image reference"""
+              registry, repository, tag = parse_image_ref(image_ref)
+              name = generate_imagestream_name(image_ref)
+              
+              manifest = f'''apiVersion: image.openshift.io/v1
+          kind: ImageStream
+          metadata:
+            name: {name}
+            namespace: "{{{{backstage-ns}}}}"
+            labels:
+              app.kubernetes.io/managed-by: rhdh-operator
+              rhdh.redhat.com/imagestream: "true"
+          spec:
+            tags:
+              - name: "{tag}"
+                from:
+                  kind: DockerImage
+                  name: "{registry}/{repository}:{tag}"
+                importPolicy:
+                  scheduled: true
+                referencePolicy:
+                  type: Local
+          '''
+              
+              output_file = os.path.join(output_dir, f'{name}.yaml')
+              with open(output_file, 'w') as f:
+                  f.write(manifest)
+              
+              print(f"Generated ImageStream for {name} -> {registry}/{repository}:{tag}")
+          
+          # Main execution
+          try:
+              image_refs = extract_image_refs('/tmp/dynamic-plugins.default.yaml')
+              print(f"Found {len(image_refs)} OCI images from {TARGET_REGISTRY}")
+              
+              for image_ref in sorted(image_refs):
+                  generate_imagestream_manifest(image_ref, IMAGESTREAMS_DIR)
+              
+              print(f"\nGenerated {len(image_refs)} ImageStream manifests")
+          except Exception as e:
+              print(f"Error: {e}")
+              exit(1)
+          PYTHON_SCRIPT
+          
+          echo ""
+          echo "Generated ImageStream manifests:"
+          ls -la "${IMAGESTREAMS_DIR}/"
+
+      - name: Update kustomization.yaml
+        if: steps.extract.outputs.extracted == 'true'
+        run: |
+          IMAGESTREAMS_DIR="config/profile/rhdh/plugin-deps/imagestreams"
+          KUSTOMIZATION="config/profile/rhdh/kustomization.yaml"
+          
+          # Check if imagestreams are already in kustomization
+          if ! grep -q "plugin-deps/imagestreams" "${KUSTOMIZATION}"; then
+            echo "Adding imagestreams to kustomization.yaml..."
+            
+            # Find all imagestream files and add them to plugin-deps configmap
+            IMAGESTREAM_FILES=""
+            for f in "${IMAGESTREAMS_DIR}"/*.yaml; do
+              if [[ -f "$f" ]]; then
+                filename=$(basename "$f")
+                IMAGESTREAM_FILES="${IMAGESTREAM_FILES}  - plugin-deps/imagestreams/${filename}\n"
+              fi
+            done
+            
+            # Update the plugin-deps configMapGenerator to include imagestream files
+            # This is done by appending to the files list
+            if [[ -n "${IMAGESTREAM_FILES}" ]]; then
+              echo "Imagestream files to add: ${IMAGESTREAM_FILES}"
+            fi
+          fi
+
+      - name: Check for changes
+        if: steps.extract.outputs.extracted == 'true'
+        id: check-changes
+        run: |
+          git add config/profile/rhdh/plugin-deps/imagestreams/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes detected in ImageStream manifests"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in ImageStream manifests"
+            git diff --cached --name-only
+          fi
+
+      - name: Create Pull Request
+        if: steps.check-changes.outputs.changed == 'true' && github.event.inputs.dry_run != 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update ImageStream manifests for ${{ matrix.branch }}"
+          title: "[Automated] Update ImageStream manifests for ${{ matrix.branch }}"
+          body: |
+            This PR was automatically generated by the nightly ImageStream generation workflow.
+            
+            ## Changes
+            - Updated ImageStream manifests based on the catalog index image `${{ env.CATALOG_INDEX_REGISTRY }}:${{ steps.catalog-tag.outputs.tag }}`
+            - ImageStreams enable OCP clusters to pull images from `${{ env.TARGET_REGISTRY }}` using the cluster's pull secret
+            
+            ## Background
+            On OpenShift, the kubelet can pull images from `registry.redhat.io` using the cluster's pull secret.
+            However, `skopeo` running inside the init container cannot access these credentials.
+            ImageStreams allow the OCP internal registry to mirror these images, which the init container can then access.
+            
+            ## Review
+            Please verify that:
+            - [ ] All expected plugins are represented
+            - [ ] No plugins have been incorrectly removed
+            - [ ] The catalog index ImageStream is present
+          branch: "automated/imagestreams-${{ matrix.branch }}"
+          base: ${{ matrix.branch }}
+          labels: |
+            automated
+            imagestreams
+          delete-branch: true
+
+      - name: Dry run summary
+        if: github.event.inputs.dry_run == 'true' && steps.check-changes.outputs.changed == 'true'
+        run: |
+          echo "## Dry Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The following ImageStream manifests would be created/updated:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -la config/profile/rhdh/plugin-deps/imagestreams/ >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Changes:" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          git diff --cached >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -59,6 +59,56 @@ The extraction directory can be configured via the `CATALOG_ENTITIES_EXTRACT_DIR
 
 More details in [Catalog Entities Extraction](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#catalog-entities-extraction).
 
+### OpenShift Registry Access via ImageStreams
+
+When running on OpenShift, the operator automatically enables ImageStream-based registry access for `registry.redhat.io` images. This solves the authentication problem where the init container (using `skopeo`) cannot access the cluster's pull secret that the kubelet uses for image pulls.
+
+**How it works:**
+
+1. **ImageStream Creation**: The operator creates ImageStream resources in the Backstage namespace for each plugin image from `registry.redhat.io`.
+
+2. **Image Import**: OpenShift's internal registry automatically imports these images using the cluster's pull secret.
+
+3. **Registry Redirect**: The init container is configured to redirect `registry.redhat.io` requests to the OCP internal registry (`image-registry.openshift-image-registry.svc:5000`).
+
+4. **Transparent Access**: The init container pulls images from the internal registry, which already has the images imported via ImageStreams.
+
+**Environment Variables:**
+
+The following environment variables are automatically injected on OpenShift:
+
+- `OCP_INTERNAL_REGISTRY_URL`: URL of the OCP internal registry (default: `image-registry.openshift-image-registry.svc:5000`)
+- `OCP_REGISTRY_NAMESPACE`: Namespace where ImageStreams are created (set from pod's namespace)
+
+**Overriding the Default Behavior:**
+
+To disable the registry redirect or use a custom registry URL, you can override these environment variables via `extraEnvs`:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    extraEnvs:
+      envs:
+        # Disable registry redirect
+        - name: REGISTRY_REDIRECT_ENABLED
+          value: "false"
+          containers:
+            - install-dynamic-plugins
+        # Or use a custom registry URL
+        - name: OCP_INTERNAL_REGISTRY_URL
+          value: "my-custom-registry.example.com:5000"
+          containers:
+            - install-dynamic-plugins
+```
+
+**Non-OpenShift Clusters:**
+
+For non-OpenShift Kubernetes clusters, you must configure registry authentication manually. See the [Container registry](#container-registry) section above for details.
+
 ## Dynamic plugins dependency management
 
 ### Overview

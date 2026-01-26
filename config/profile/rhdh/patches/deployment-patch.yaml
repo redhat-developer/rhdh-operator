@@ -24,6 +24,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            # LOCALBIN points to the parent directory where default-config is mounted
+            # default-config is mounted at /default-config, so LOCALBIN should be /
+            - name: LOCALBIN
+              value: "/"
             - name: RELATED_IMAGE_postgresql
               value: quay.io/fedora/postgresql-15:latest
             - name: RELATED_IMAGE_backstage

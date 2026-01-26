@@ -33,6 +33,16 @@ const CatalogIndexImageEnvVar = "RELATED_IMAGE_catalog_index"
 const DefaultMountDir = "/opt/app-root/src"
 const ExtConfigHashAnnotation = "rhdh.redhat.com/ext-config-hash"
 
+// OCP Internal Registry configuration constants
+const (
+	// OCPInternalRegistryEnvVar is the env var name for the internal registry URL
+	OCPInternalRegistryEnvVar = "OCP_INTERNAL_REGISTRY_URL"
+	// OCPRegistryNamespaceEnvVar is the env var name for the registry namespace
+	OCPRegistryNamespaceEnvVar = "OCP_REGISTRY_NAMESPACE"
+	// DefaultOCPInternalRegistry is the default OCP internal registry service URL
+	DefaultOCPInternalRegistry = "image-registry.openshift-image-registry.svc:5000"
+)
+
 type BackstageDeploymentFactory struct{}
 
 type ObjectKind string
@@ -117,6 +127,16 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 		if i, _ := DynamicPluginsInitContainer(b.podSpec().InitContainers); i >= 0 {
 			b.setOrAppendEnvVar(&b.podSpec().InitContainers[i], "CATALOG_INDEX_IMAGE", catalogIndexImage)
 		}
+	}
+
+	// Configure OCP internal registry redirect for registry.redhat.io images (OCP only)
+	// This enables the init container to pull images via ImageStreams from the internal registry
+	// instead of directly from registry.redhat.io which requires explicit auth
+	fmt.Fprintf(os.Stderr, "DEBUG: calling configureOCPRegistryRedirect with isOpenshift=%v\n", model.isOpenshift)
+	b.configureOCPRegistryRedirect(model.isOpenshift)
+	fmt.Fprintf(os.Stderr, "DEBUG: after configureOCPRegistryRedirect, initContainers=%d\n", len(b.podSpec().InitContainers))
+	if len(b.podSpec().InitContainers) > 0 {
+		fmt.Fprintf(os.Stderr, "DEBUG: initContainer[0].Env=%v\n", b.podSpec().InitContainers[0].Env)
 	}
 
 	if err := b.setDeployment(backstage); err != nil {
@@ -320,6 +340,44 @@ func (b *BackstageDeployment) setOrAppendEnvVar(container *corev1.Container, nam
 		}
 	}
 	container.Env = append(container.Env, corev1.EnvVar{Name: name, Value: value})
+}
+
+// setOrAppendEnvVarFromFieldRef sets an env var on a container from a field ref, replacing if exists or appending
+func (b *BackstageDeployment) setOrAppendEnvVarFromFieldRef(container *corev1.Container, name, fieldPath string) {
+	envVar := corev1.EnvVar{
+		Name: name,
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: fieldPath,
+			},
+		},
+	}
+	for i, existingEnv := range container.Env {
+		if existingEnv.Name == name {
+			container.Env[i] = envVar
+			return
+		}
+	}
+	container.Env = append(container.Env, envVar)
+}
+
+// configureOCPRegistryRedirect configures the init container to use the OCP internal registry
+// for registry.redhat.io images. This is only done when running on OpenShift.
+func (b *BackstageDeployment) configureOCPRegistryRedirect(isOpenShift bool) {
+	if !isOpenShift {
+		return
+	}
+
+	i, ic := DynamicPluginsInitContainer(b.podSpec().InitContainers)
+	if i < 0 || ic == nil {
+		return
+	}
+
+	// Set the internal registry URL
+	b.setOrAppendEnvVar(&b.podSpec().InitContainers[i], OCPInternalRegistryEnvVar, DefaultOCPInternalRegistry)
+
+	// Set the namespace from downward API (pod's namespace)
+	b.setOrAppendEnvVarFromFieldRef(&b.podSpec().InitContainers[i], OCPRegistryNamespaceEnvVar, "metadata.namespace")
 }
 
 // MountFilesFrom adds Volume to specified podSpec and related VolumeMounts to specified belonging to this podSpec container
