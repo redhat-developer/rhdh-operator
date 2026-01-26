@@ -1583,6 +1583,18 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - monitoring.coreos.com
   resources:
   - servicemonitors
@@ -2062,6 +2074,17 @@ data:
                   value: "quay.io/rhdh/plugin-catalog-index:1.9"
                 - name: CATALOG_ENTITIES_EXTRACT_DIR
                   value: '/extensions'
+                # OCP_INTERNAL_REGISTRY_URL enables ImageStream-based registry redirect for registry.redhat.io
+                # This is set by the operator on OpenShift clusters to allow the init container to pull
+                # images from the internal registry (which mirrors registry.redhat.io via ImageStreams)
+                # instead of directly from registry.redhat.io which requires explicit auth.
+                # The operator will inject this value dynamically on OCP clusters.
+                # - name: OCP_INTERNAL_REGISTRY_URL
+                #   value: "image-registry.openshift-image-registry.svc:5000"
+                # - name: OCP_REGISTRY_NAMESPACE
+                #   valueFrom:
+                #     fieldRef:
+                #       fieldPath: metadata.namespace
               volumeMounts:
                 - mountPath: /dynamic-plugins-root
                   name: dynamic-plugins-root
@@ -2922,6 +2945,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: LOCALBIN
+          value: /
         - name: RELATED_IMAGE_postgresql
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
