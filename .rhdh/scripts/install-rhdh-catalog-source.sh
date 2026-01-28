@@ -174,13 +174,15 @@ function update_refs_in_iib_bundles() {
       umoci unpack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked" --rootless
 
       # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
-      debugf "Replacing refs to internal registry in bundle image $bundleImg..."
+      debugf "Replacing refs to internal registries in bundle image $bundleImg to handle the case of potentially unreleased images..."
       for folder in manifests metadata; do
         for file in "./bundles/${digest}/unpacked/rootfs/${folder}"/*; do
           if [ -f "$file" ]; then
             debugf "replacing refs to internal registries in file '${file}'"
             sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file"
             sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file"
+            sed -i 's#registry.access.redhat.com/rhdh#quay.io/rhdh#g' "$file"
+            sed -i 's#registry.access.stage.redhat.com/rhdh#quay.io/rhdh#g' "$file"
             sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file"
           fi
         done
