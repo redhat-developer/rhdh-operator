@@ -8,14 +8,14 @@ data:
       - dynamic-plugins.default.yaml
     plugins:
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator@1.8.2"
+        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator:bs_1.45.3__5.1.0!red-hat-developer-hub-backstage-plugin-orchestrator"
       - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.8.2"
+        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend:bs_1.45.3__8.3.0!red-hat-developer-hub-backstage-plugin-orchestrator-backend"
         dependencies:
           - ref: sonataflow
-      - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.8.2"
+      - package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:bs_1.45.3__1.3.1!red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator"
         disabled: false
-      - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.8.2"
+      - package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:bs_1.45.3__1.2.0!red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets"
         disabled: false
       - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
         disabled: false
