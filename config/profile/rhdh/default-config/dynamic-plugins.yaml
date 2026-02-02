@@ -29,55 +29,13 @@ data:
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - disabled: true
-        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator:bs_1.45.3__5.1.0!red-hat-developer-hub-backstage-plugin-orchestrator"
-        integrity: sha512-rnUA6iZ2JVAyASfwS4P9HeFmpqCgH6FQouzzg4s6lCPAsYUFvu6tifJ3df5lThXPUTJ2cDvvQgamU+4DiHP2jw==
-        pluginConfig:
-          dynamicPlugins:
-              frontend:
-                red-hat-developer-hub.backstage-plugin-orchestrator:
-                  appIcons:
-                    - importName: OrchestratorIcon
-                      name: orchestratorIcon
-                  dynamicRoutes:
-                    - importName: OrchestratorPage
-                      menuItem:
-                        icon: orchestratorIcon
-                        text: Orchestrator
-                      path: /orchestrator
-                  entityTabs:
-                    - path: /workflows
-                      title: Workflows
-                      mountPoint: entity.page.workflows
-                  mountPoints:
-                    - mountPoint: entity.page.workflows/cards
-                      importName: OrchestratorCatalogTab
-                      config:
-                        layout:
-                          gridColumn: '1 / -1'
-                          if:
-                            anyOf:
-                              - IsOrchestratorCatalogTabAvailable
-      - disabled: true
-        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend:bs_1.45.3__8.3.0!red-hat-developer-hub-backstage-plugin-orchestrator-backend"
-        integrity: sha512-6G0YguzCM5nCDpOrIGJpLTXVMr6EBdIVqSXtsLH9RvBH25RTuFpfJ7q6eEp26DqveaiqUCfBpJ51smdjcsEzFQ==
-        pluginConfig:
-          orchestrator:
-            dataIndexService:
-              url: http://sonataflow-platform-data-index-service
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+        disabled: true
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+        disabled: true
         dependencies:
           - ref: sonataflow
-      - disabled: true
-        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:bs_1.45.3__1.3.1!red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator"
-        integrity: sha512-N2hCn9RI/QVEoK56FAkGkSDbvfQCOIzVsJTwDX0kf//npO++2crRSJpB1Lr/m2UtYxfaXZX53p8sPcK3g8yWkQ==
-        pluginConfig:
-          orchestrator:
-            dataIndexService:
-              url: http://sonataflow-platform-data-index-service               
-      - disabled: true
-        package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:bs_1.45.3__1.2.0!red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets"
-        integrity: sha512-Pe0dn3g+YTK3jbl36E8nt4zdyH/3w+MWgRyFWPc2B0eV4/L/aRfRC4KxcktmHPdamRGXTIaXL6cFae8TZl8Htw==
-        pluginConfig:
-          dynamicPlugins:
-            frontend:
-              red-hat-developer-hub.backstage-plugin-orchestrator-form-widgets: { }
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+        disabled: true
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+        disabled: true

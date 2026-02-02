@@ -80,16 +80,16 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-       - package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator:bs_1.45.3__5.1.0!red-hat-developer-hub-backstage-plugin-orchestrator"
-         disabled: false
-       - package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend:bs_1.45.3__8.3.0!red-hat-developer-hub-backstage-plugin-orchestrator-backend"
-         disabled: false
-         dependencies:
-            - ref: sonataflow
-       - package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:bs_1.45.3__1.3.1!red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator"
-         disabled: false
-       - package: "oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:bs_1.45.3__1.2.0!red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets"
-         disabled: false  
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+        disabled: false
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+        disabled: false
+        dependencies:
+          - ref: sonataflow
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+        disabled: false
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+        disabled: false
 ```
 
 See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin. 
