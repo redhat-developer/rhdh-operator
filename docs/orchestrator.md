@@ -80,15 +80,15 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+      - package: 'oci://quay.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
         disabled: false
-      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+      - package: 'oci://quay.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
         disabled: false
         dependencies:
           - ref: sonataflow
-      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+      - package: 'oci://quay.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
         disabled: false
-      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+      - package: 'oci://quay.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
         disabled: false
 ```
 
