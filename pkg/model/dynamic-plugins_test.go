@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -587,6 +588,38 @@ includes:
 	assert.NotContains(t, string(marshalledE), "integrity", "The string should not contain 'integrity:'")
 	// Validate that the marshalled string always includes disabled field
 	assert.Contains(t, string(marshalledE), "disabled", "The string should not contain 'disabled:'")
+}
+
+func TestRemoveDefaultInclude(t *testing.T) {
+	modelData := `
+includes:
+  - "include-1"
+`
+	defDynamicPlugins := &DynamicPlugins{
+		ConfigMap: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: DynamicPluginsDefaultName("test-backstage"),
+			},
+			Data: map[string]string{
+				DynamicPluginsFile: modelData,
+			},
+		},
+	}
+
+	specData := `
+plugins:
+  - package: "plugin-a"
+includes: []
+`
+	// Call the function
+	mergedData, err := defDynamicPlugins.mergeWith(specData)
+
+	// Assertions
+	assert.NoError(t, err)
+	assert.NotNil(t, mergedData)
+
+	fmt.Println(string(mergedData))
+
 }
 
 func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {

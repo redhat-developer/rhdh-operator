@@ -250,17 +250,22 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 		mergedPluginsConfig.Plugins = append(mergedPluginsConfig.Plugins, plugin)
 	}
 
-	// Merge Includes (ensure uniqueness)
-	includeSet := make(map[string]struct{})
-	for _, include := range modelPluginsConfig.Includes {
-		includeSet[include] = struct{}{}
-	}
-	for _, include := range specPluginsConfig.Includes {
-		includeSet[include] = struct{}{}
-	}
-	mergedPluginsConfig.Includes = make([]string, 0, len(includeSet))
-	for include := range includeSet {
-		mergedPluginsConfig.Includes = append(mergedPluginsConfig.Includes, include)
+	if specPluginsConfig.Includes != nil && len(specPluginsConfig.Includes) == 0 {
+		// if includes is empty explicitly, clean it
+		mergedPluginsConfig.Includes = make([]string, 0)
+	} else {
+		// otherwise merge ensuring uniqueness
+		includeSet := make(map[string]struct{})
+		for _, include := range modelPluginsConfig.Includes {
+			includeSet[include] = struct{}{}
+		}
+		for _, include := range specPluginsConfig.Includes {
+			includeSet[include] = struct{}{}
+		}
+		mergedPluginsConfig.Includes = make([]string, 0, len(includeSet))
+		for include := range includeSet {
+			mergedPluginsConfig.Includes = append(mergedPluginsConfig.Includes, include)
+		}
 	}
 
 	// Marshal the merged data back to YAML
