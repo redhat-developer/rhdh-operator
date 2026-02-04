@@ -5,15 +5,15 @@ metadata:
 data:
   dynamic-plugins.yaml: |
     plugins:
-      - package: 'oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
         disabled: false
-      - package: 'oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
         disabled: false
         dependencies:
           - ref: sonataflow
-      - package: 'oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
         disabled: false
-      - package: 'oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
         disabled: false
 ---
 apiVersion: v1

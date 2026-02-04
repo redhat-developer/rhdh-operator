@@ -2205,15 +2205,15 @@ data:
         includes:
           - dynamic-plugins.default.yaml
         plugins:
-          - package: 'oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
             disabled: true
-          - package: 'oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
             disabled: true
             dependencies:
               - ref: sonataflow
-          - package: 'oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
             disabled: true
-          - package: 'oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
             disabled: true
   route.yaml: |-
     apiVersion: route.openshift.io/v1
