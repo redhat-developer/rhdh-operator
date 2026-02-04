@@ -387,7 +387,8 @@ data:
     kind: ConfigMap
     metadata:
       name: default-dynamic-plugins
-    data:orchestrator
+    data:
+      dynamic-plugins.yaml: |
         includes:
           - dynamic-plugins.default.yaml
         plugins:
