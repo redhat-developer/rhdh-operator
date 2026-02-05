@@ -842,7 +842,7 @@ function mirror_plugins_from_dir() {
   if [[ -f "$existing_summary" ]] && [[ -d "${FROM_DIR}/catalog-index" ]]; then
     # Look for catalog index mapping in summary (format: "oci://...plugin-catalog-index:... → ...")
     local original_url
-    original_url=$(grep "plugin-catalog-index" "$existing_summary" | head -n1 | sed -E 's/^(oci:[^ ]+).*/\1/')
+    original_url=$(grep "plugin-catalog-index" "$existing_summary" | head -n1 | sed -E 's/^(oci:[^ ]+).*/\1/' || true)
     if [[ -n "$original_url" ]]; then
       PLUGIN_INDEX="$original_url"
       debugf "Restored original catalog index URL: $PLUGIN_INDEX"
