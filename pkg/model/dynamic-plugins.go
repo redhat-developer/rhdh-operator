@@ -278,7 +278,9 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 }
 func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.podSpec().InitContainers)
-
+	if initContainer == nil {
+		return i, nil
+	}
 	// override image with env var
 	if os.Getenv(BackstageImageEnvVar) != "" {
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
@@ -287,11 +289,10 @@ func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 }
 
 // returns initContainer supposed to initialize DynamicPlugins
-// TODO consider to use a label to identify instead
 func DynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev1.Container) {
-	for i, ic := range initContainers {
-		if ic.Name == dynamicPluginInitContainerName {
-			return i, &ic
+	for i := range initContainers {
+		if initContainers[i].Name == dynamicPluginInitContainerName {
+			return i, &initContainers[i]
 		}
 	}
 	return -1, nil
