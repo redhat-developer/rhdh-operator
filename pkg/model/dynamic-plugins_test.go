@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -618,8 +617,10 @@ includes: []
 	assert.NoError(t, err)
 	assert.NotNil(t, mergedData)
 
-	fmt.Println(string(mergedData))
-
+	var mergedConfig DynaPluginsConfig
+	err = yaml.Unmarshal([]byte(mergedData), &mergedConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(mergedConfig.Includes))
 }
 
 func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {
