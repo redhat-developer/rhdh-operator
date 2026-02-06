@@ -589,6 +589,40 @@ includes:
 	assert.Contains(t, string(marshalledE), "disabled", "The string should not contain 'disabled:'")
 }
 
+func TestRemoveDefaultInclude(t *testing.T) {
+	modelData := `
+includes:
+  - "include-1"
+`
+	defDynamicPlugins := &DynamicPlugins{
+		ConfigMap: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: DynamicPluginsDefaultName("test-backstage"),
+			},
+			Data: map[string]string{
+				DynamicPluginsFile: modelData,
+			},
+		},
+	}
+
+	specData := `
+plugins:
+  - package: "plugin-a"
+includes: []
+`
+	// Call the function
+	mergedData, err := defDynamicPlugins.mergeWith(specData)
+
+	// Assertions
+	assert.NoError(t, err)
+	assert.NotNil(t, mergedData)
+
+	var mergedConfig DynaPluginsConfig
+	err = yaml.Unmarshal([]byte(mergedData), &mergedConfig)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(mergedConfig.Includes))
+}
+
 func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {
 	for _, plugin := range plugins {
 		if plugin.Package == packageName {
