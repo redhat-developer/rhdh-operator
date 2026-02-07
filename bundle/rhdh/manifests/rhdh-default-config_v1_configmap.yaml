@@ -360,46 +360,48 @@ data:
           securityContext:
             # any group id
             fsGroup: 1001
-  dynamic-plugins.yaml: "#apiVersion: v1\n#kind: ConfigMap\n#metadata:\n#  name: default-dynamic-plugins
-    #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name\n#data:\n#
-    \ \"dynamic-plugins.yaml\": |\n#    ###########################################################################################################\n#
-    \   # /!\\ WARNING\n#    #\n#    # This is the default dynamic plugins configuration
-    file created and managed by the Operator for your CR.\n#    # Do NOT edit this
-    manually in the Cluster, as your changes will be overridden by the Operator upon
-    the\n#    # next reconciliation.\n#    # If you want to customize the dynamic
-    plugins, you should create your own dynamic-plugins ConfigMap\n#    # and reference
-    it in your CR.\n#    # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/installing_and_viewing_plugins_in_red_hat_developer_hub/rhdh-installing-rhdh-plugins_title-plugins-rhdh-about#proc-config-dynamic-plugins-rhdh-operator_rhdh-installing-rhdh-plugins\n#
-    \   # for more details or https://github.com/redhat-developer/rhdh-operator/blob/main/examples/rhdh-cr.yaml\n#
-    \   # for an example.\n#    ###########################################################################################################\n#
-    \   includes:\n#      - dynamic-plugins.default.yaml\n#    plugins: []\n#---\napiVersion:
-    v1\nkind: ConfigMap\nmetadata:\n  name: default-dynamic-plugins\ndata:\n  dynamic-plugins.yaml:
-    |\n    includes:\n      - dynamic-plugins.default.yaml\n    plugins:\n      -
-    disabled: true\n        package: \"@redhat/backstage-plugin-orchestrator@1.8.2\"\n
-    \       integrity: sha512-rnUA6iZ2JVAyASfwS4P9HeFmpqCgH6FQouzzg4s6lCPAsYUFvu6tifJ3df5lThXPUTJ2cDvvQgamU+4DiHP2jw==\n
-    \       pluginConfig:\n          dynamicPlugins:\n              frontend:\n                red-hat-developer-hub.backstage-plugin-orchestrator:\n
-    \                 appIcons:\n                    - importName: OrchestratorIcon\n
-    \                     name: orchestratorIcon\n                  dynamicRoutes:\n
-    \                   - importName: OrchestratorPage\n                      menuItem:\n
-    \                       icon: orchestratorIcon\n                        text:
-    Orchestrator\n                      path: /orchestrator\n                  entityTabs:\n
-    \                   - path: /workflows\n                      title: Workflows\n
-    \                     mountPoint: entity.page.workflows\n                  mountPoints:\n
-    \                   - mountPoint: entity.page.workflows/cards\n                      importName:
-    OrchestratorCatalogTab\n                      config:\n                        layout:\n
-    \                         gridColumn: '1 / -1'\n                          if:\n
-    \                           anyOf:\n                              - IsOrchestratorCatalogTabAvailable\n
-    \     - disabled: true\n        package: \"@redhat/backstage-plugin-orchestrator-backend-dynamic@1.8.2\"\n
-    \       integrity: sha512-6G0YguzCM5nCDpOrIGJpLTXVMr6EBdIVqSXtsLH9RvBH25RTuFpfJ7q6eEp26DqveaiqUCfBpJ51smdjcsEzFQ==\n
-    \       pluginConfig:\n          orchestrator:\n            dataIndexService:\n
-    \             url: http://sonataflow-platform-data-index-service\n        dependencies:\n
-    \         - ref: sonataflow\n      - disabled: true\n        package: \"@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.8.2\"\n
-    \       integrity: sha512-N2hCn9RI/QVEoK56FAkGkSDbvfQCOIzVsJTwDX0kf//npO++2crRSJpB1Lr/m2UtYxfaXZX53p8sPcK3g8yWkQ==\n
-    \       pluginConfig:\n          orchestrator:\n            dataIndexService:\n
-    \             url: http://sonataflow-platform-data-index-service               \n
-    \     - disabled: true\n        package: \"@redhat/backstage-plugin-orchestrator-form-widgets@1.8.2\"\n
-    \       integrity: sha512-Pe0dn3g+YTK3jbl36E8nt4zdyH/3w+MWgRyFWPc2B0eV4/L/aRfRC4KxcktmHPdamRGXTIaXL6cFae8TZl8Htw==\n
-    \       pluginConfig:\n          dynamicPlugins:\n            frontend:\n              red-hat-developer-hub.backstage-plugin-orchestrator-form-widgets:
-    { }"
+  dynamic-plugins.yaml: |
+    #apiVersion: v1
+    #kind: ConfigMap
+    #metadata:
+    #  name: default-dynamic-plugins #  must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.configMap.name
+    #data:
+    #  "dynamic-plugins.yaml": |
+    #    ###########################################################################################################
+    #    # /!\ WARNING
+    #    #
+    #    # This is the default dynamic plugins configuration file created and managed by the Operator for your CR.
+    #    # Do NOT edit this manually in the Cluster, as your changes will be overridden by the Operator upon the
+    #    # next reconciliation.
+    #    # If you want to customize the dynamic plugins, you should create your own dynamic-plugins ConfigMap
+    #    # and reference it in your CR.
+    #    # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/installing_and_viewing_plugins_in_red_hat_developer_hub/rhdh-installing-rhdh-plugins_title-plugins-rhdh-about#proc-config-dynamic-plugins-rhdh-operator_rhdh-installing-rhdh-plugins
+    #    # for more details or https://github.com/redhat-developer/rhdh-operator/blob/main/examples/rhdh-cr.yaml
+    #    # for an example.
+    #    ###########################################################################################################
+    #    includes:
+    #      - dynamic-plugins.default.yaml
+    #    plugins: []
+    #---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: default-dynamic-plugins
+    data:
+      dynamic-plugins.yaml: |
+        includes:
+          - dynamic-plugins.default.yaml
+        plugins:
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+            disabled: true
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+            disabled: true
+            dependencies:
+              - ref: sonataflow
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+            disabled: true
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+            disabled: true
   route.yaml: |-
     apiVersion: route.openshift.io/v1
     kind: Route
