@@ -250,17 +250,22 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 		mergedPluginsConfig.Plugins = append(mergedPluginsConfig.Plugins, plugin)
 	}
 
-	// Merge Includes (ensure uniqueness)
-	includeSet := make(map[string]struct{})
-	for _, include := range modelPluginsConfig.Includes {
-		includeSet[include] = struct{}{}
-	}
-	for _, include := range specPluginsConfig.Includes {
-		includeSet[include] = struct{}{}
-	}
-	mergedPluginsConfig.Includes = make([]string, 0, len(includeSet))
-	for include := range includeSet {
-		mergedPluginsConfig.Includes = append(mergedPluginsConfig.Includes, include)
+	if specPluginsConfig.Includes != nil && len(specPluginsConfig.Includes) == 0 {
+		// if includes is empty explicitly, clean it
+		mergedPluginsConfig.Includes = make([]string, 0)
+	} else {
+		// otherwise merge ensuring uniqueness
+		includeSet := make(map[string]struct{})
+		for _, include := range modelPluginsConfig.Includes {
+			includeSet[include] = struct{}{}
+		}
+		for _, include := range specPluginsConfig.Includes {
+			includeSet[include] = struct{}{}
+		}
+		mergedPluginsConfig.Includes = make([]string, 0, len(includeSet))
+		for include := range includeSet {
+			mergedPluginsConfig.Includes = append(mergedPluginsConfig.Includes, include)
+		}
 	}
 
 	// Marshal the merged data back to YAML
@@ -273,7 +278,9 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 }
 func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.podSpec().InitContainers)
-
+	if initContainer == nil {
+		return i, nil
+	}
 	// override image with env var
 	if os.Getenv(BackstageImageEnvVar) != "" {
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
@@ -282,11 +289,10 @@ func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 }
 
 // returns initContainer supposed to initialize DynamicPlugins
-// TODO consider to use a label to identify instead
 func DynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev1.Container) {
-	for i, ic := range initContainers {
-		if ic.Name == dynamicPluginInitContainerName {
-			return i, &ic
+	for i := range initContainers {
+		if initContainers[i].Name == dynamicPluginInitContainerName {
+			return i, &initContainers[i]
 		}
 	}
 	return -1, nil
