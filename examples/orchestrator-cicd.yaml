@@ -7,16 +7,17 @@ data:
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator@1.8.2"
-      - disabled: false
-        package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.8.2"
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+        disabled: false
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+        disabled: false
         dependencies:
           - ref: sonataflow
-      - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.8.2"
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
         disabled: false
-      - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.8.2"
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
         disabled: false
+    # TODO These should be changed to the OCI references
       - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
         disabled: false
         dependencies:

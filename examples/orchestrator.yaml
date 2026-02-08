@@ -5,21 +5,16 @@ metadata:
 data:
   dynamic-plugins.yaml: |
     plugins:
-      - package: "@redhat/backstage-plugin-orchestrator@1.8.2"
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
         disabled: false
-      - package: "@redhat/backstage-plugin-orchestrator-backend-dynamic@1.8.2"
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
         disabled: false
         dependencies:
           - ref: sonataflow
-      - package: "@redhat/backstage-plugin-scaffolder-backend-module-orchestrator-dynamic@1.8.2"
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
         disabled: false
-      - package: "@redhat/backstage-plugin-orchestrator-form-widgets@1.8.2"
+      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
         disabled: false
-    # Enable Bulk import plugins.
-#      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-bulk-import-backend-dynamic
-#        disabled: false
-#      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-bulk-import
-#        disabled: false
 ---
 apiVersion: v1
 kind: ConfigMap
