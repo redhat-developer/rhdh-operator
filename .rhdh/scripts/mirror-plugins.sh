@@ -303,9 +303,10 @@ function mirror_image() {
   fi
   
   # Try to copy from the original source, capturing error output for diagnostics
+  # Use || true to prevent set -e from exiting before we can check the exit code
   local error_output
-  error_output=$(skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" 2>&1)
-  local exit_code=$?
+  local exit_code
+  error_output=$(skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" 2>&1) && exit_code=0 || exit_code=$?
   
   if [[ $exit_code -eq 0 ]]; then
     return 0
@@ -313,10 +314,12 @@ function mirror_image() {
   
   # If the source is registry.access.redhat.com/rhdh, try falling back to quay.io/rhdh
   # This handles unreleased RHDH plugins that are only available on quay.io
-  # Only attempt fallback for "not found" errors (manifest unknown), not for network/auth issues
-  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* && "$error_output" == *"manifest unknown"* ]]; then
+  # Only attempt fallback for "not found" errors, not for network issues
+  # Note: registries may return "unauthorized" for non-existent repos (security measure)
+  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]] && \
+     [[ "$error_output" == *"manifest unknown"* || "$error_output" == *"unauthorized"* || "$error_output" == *"not found"* ]]; then
     local fallback_ref="${docker_ref/${PRIMARY_SOURCE_REGISTRY}/${FALLBACK_SOURCE_REGISTRY}}"
-    warnf "Image not found in ${PRIMARY_SOURCE_REGISTRY} (manifest unknown), trying fallback: ${FALLBACK_SOURCE_REGISTRY}..."
+    warnf "Image not accessible in ${PRIMARY_SOURCE_REGISTRY}, trying fallback: ${FALLBACK_SOURCE_REGISTRY}..."
     debugf "Fallback reference: $fallback_ref"
     
     if skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$fallback_ref" "$dest"; then
