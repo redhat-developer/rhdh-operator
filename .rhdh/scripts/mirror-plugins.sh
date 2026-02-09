@@ -268,8 +268,15 @@ function extract_last_two_elements() {
   fi
 }
 
+# Fallback registry for unreleased plugins
+# When plugins reference registry.access.redhat.com/rhdh but aren't released yet,
+# fall back to quay.io/rhdh where development builds are available
+FALLBACK_SOURCE_REGISTRY="quay.io"
+PRIMARY_SOURCE_REGISTRY="registry.access.redhat.com"
+
 # Copy OCI image using skopeo
 # Supports both registry (docker://) and directory (dir://) destinations
+# Falls back to quay.io/rhdh if registry.access.redhat.com/rhdh fails (unreleased plugins)
 function mirror_image() {
   local src_image="$1"
   local dest="$2"
@@ -295,8 +302,29 @@ function mirror_image() {
     debugf "Saving $src_image to ${dest#dir:}..."
   fi
   
-  skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" || return 1
-  return 0
+  # Try to copy from the original source
+  if skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" 2>/dev/null; then
+    return 0
+  fi
+  
+  # If the source is registry.access.redhat.com, try falling back to quay.io
+  # This handles unreleased plugins that are only available on quay.io
+  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/"* ]]; then
+    local fallback_ref="${docker_ref/${PRIMARY_SOURCE_REGISTRY}/${FALLBACK_SOURCE_REGISTRY}}"
+    warnf "Failed to pull from ${PRIMARY_SOURCE_REGISTRY}, trying fallback: ${FALLBACK_SOURCE_REGISTRY}..."
+    debugf "Fallback reference: $fallback_ref"
+    
+    if skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$fallback_ref" "$dest"; then
+      infof "Successfully mirrored using fallback registry: ${FALLBACK_SOURCE_REGISTRY}"
+      return 0
+    else
+      errorf "Failed to mirror from both ${PRIMARY_SOURCE_REGISTRY} and ${FALLBACK_SOURCE_REGISTRY}"
+      return 1
+    fi
+  fi
+  
+  # For other registries, just report the failure
+  return 1
 }
 
 function push_image_from_archive() {
