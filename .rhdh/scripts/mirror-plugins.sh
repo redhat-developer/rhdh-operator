@@ -304,12 +304,12 @@ function mirror_image() {
   
   # Try to copy from the original source
   if skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" 2>/dev/null; then
-    return 0
+  return 0
   fi
   
-  # If the source is registry.access.redhat.com, try falling back to quay.io
-  # This handles unreleased plugins that are only available on quay.io
-  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/"* ]]; then
+  # If the source is registry.access.redhat.com/rhdh, try falling back to quay.io/rhdh
+  # This handles unreleased RHDH plugins that are only available on quay.io
+  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]]; then
     local fallback_ref="${docker_ref/${PRIMARY_SOURCE_REGISTRY}/${FALLBACK_SOURCE_REGISTRY}}"
     warnf "Failed to pull from ${PRIMARY_SOURCE_REGISTRY}, trying fallback: ${FALLBACK_SOURCE_REGISTRY}..."
     debugf "Fallback reference: $fallback_ref"
