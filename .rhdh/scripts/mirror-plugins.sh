@@ -285,28 +285,26 @@ function mirror_image() {
   local docker_ref="${src_image%!*}"
   docker_ref="${docker_ref#oci://}"
   
-  # Add appropriate flags based on destination type
-  local dest_flags=""
-  local preserve_digests_flag=""
+  # Build skopeo flags as arrays to prevent word-splitting issues
+  local -a skopeo_flags=(--remove-signatures --all)
   
   if [[ "$dest" == docker://* ]]; then
-    dest_flags="--dest-tls-verify=false"
+    skopeo_flags+=(--dest-tls-verify=false)
     # Don't preserve digests for registry destinations to allow format conversion
     # This ensures compatibility with registries that require manifest format conversion
     # (e.g., OpenShift internal registry requiring OCI format)
-    preserve_digests_flag=""
     infof "Mirroring $src_image to ${dest#docker://}..."
   else
     # Preserve digests for directory destinations (offline transfer integrity)
-    preserve_digests_flag="--preserve-digests"
+    skopeo_flags+=(--preserve-digests)
     debugf "Saving $src_image to ${dest#dir:}..."
   fi
   
   # Try to copy from the original source, capturing error output for diagnostics
-  # Use || true to prevent set -e from exiting before we can check the exit code
+  # Use &&/|| to prevent set -e from exiting before we can check the exit code
   local error_output
   local exit_code
-  error_output=$(skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" 2>&1) && exit_code=0 || exit_code=$?
+  error_output=$(skopeo copy "${skopeo_flags[@]}" "docker://$docker_ref" "$dest" 2>&1) && exit_code=0 || exit_code=$?
   
   if [[ $exit_code -eq 0 ]]; then
     return 0
@@ -315,14 +313,20 @@ function mirror_image() {
   # If the source is registry.access.redhat.com/rhdh, try falling back to quay.io/rhdh
   # This handles unreleased RHDH plugins that are only available on quay.io
   # Only attempt fallback for "not found" errors, not for network issues
-  # Note: registries may return "unauthorized" for non-existent repos (security measure)
   if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]] && \
      [[ "$error_output" == *"manifest unknown"* || "$error_output" == *"unauthorized"* || "$error_output" == *"not found"* ]]; then
     local fallback_ref="${docker_ref/${PRIMARY_SOURCE_REGISTRY}/${FALLBACK_SOURCE_REGISTRY}}"
-    warnf "Image not accessible in ${PRIMARY_SOURCE_REGISTRY}, trying fallback: ${FALLBACK_SOURCE_REGISTRY}..."
+    
+    # Emit specific warning for "unauthorized" - could be credentials issue or non-existent repo
+    if [[ "$error_output" == *"unauthorized"* ]]; then
+      warnf "Got 'unauthorized' from ${PRIMARY_SOURCE_REGISTRY} - this may indicate missing credentials OR an unreleased image"
+      warnf "If fallback fails, verify your registry credentials are configured correctly"
+    fi
+    
+    warnf "Trying fallback registry: ${FALLBACK_SOURCE_REGISTRY}..."
     debugf "Fallback reference: $fallback_ref"
     
-    if skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$fallback_ref" "$dest"; then
+    if skopeo copy "${skopeo_flags[@]}" "docker://$fallback_ref" "$dest"; then
       infof "Successfully mirrored using fallback registry: ${FALLBACK_SOURCE_REGISTRY}"
       return 0
     else
@@ -331,7 +335,7 @@ function mirror_image() {
     fi
   fi
   
-  # For all other errors (network, auth, etc.), report the original failure with details
+  # For all other errors (network, TLS, etc.), report the original failure with details
   errorf "Failed to mirror $docker_ref: $error_output"
   return 1
 }
