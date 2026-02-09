@@ -20,3 +20,12 @@ Please explain the changes you made here.
 <!--
 Detailed instructions may help reviewers test this PR quickly and provide quicker feedback.
 -->
+
+## Building Container Images for Testing
+
+Need to test container images from this PR?
+
+**For Maintainers:** Comment `/build-images` to trigger image builds
+**For Contributors:** Ask a maintainer to run `/build-images`
+
+Images will be built and pushed to Quay with links posted in comments.
