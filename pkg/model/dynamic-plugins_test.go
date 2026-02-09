@@ -623,6 +623,51 @@ includes: []
 	assert.Equal(t, 0, len(mergedConfig.Includes))
 }
 
+func TestClearDeps(t *testing.T) {
+	// Sample model (default) ConfigMap
+	modelData := `
+plugins:
+ - package: "plugin-a"
+   disabled: true
+   pluginConfig:
+     key1: "value1"
+   dependencies:
+     - ref: "dependency-1"
+`
+
+	defDynamicPlugins := &DynamicPlugins{
+		ConfigMap: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: DynamicPluginsDefaultName("test-backstage"),
+			},
+			Data: map[string]string{
+				DynamicPluginsFile: modelData,
+			},
+		},
+	}
+
+	// Sample spec data, remove default deps and override plugin-a to be enabled
+	specData := `
+plugins:
+ - package: "plugin-a"
+   pluginConfig:
+     key1: "overridden"
+   dependencies: []
+`
+	mergedData, err := defDynamicPlugins.mergeWith(specData)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, mergedData)
+
+	var mergedConfig DynaPluginsConfig
+	err = yaml.Unmarshal([]byte(mergedData), &mergedConfig)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(mergedConfig.Plugins))
+	assert.Equal(t, 0, len(mergedConfig.Plugins[0].Dependencies))
+
+}
+
 func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {
 	for _, plugin := range plugins {
 		if plugin.Package == packageName {
