@@ -302,16 +302,21 @@ function mirror_image() {
     debugf "Saving $src_image to ${dest#dir:}..."
   fi
   
-  # Try to copy from the original source
-  if skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" 2>/dev/null; then
-  return 0
+  # Try to copy from the original source, capturing error output for diagnostics
+  local error_output
+  error_output=$(skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" 2>&1)
+  local exit_code=$?
+  
+  if [[ $exit_code -eq 0 ]]; then
+    return 0
   fi
   
   # If the source is registry.access.redhat.com/rhdh, try falling back to quay.io/rhdh
   # This handles unreleased RHDH plugins that are only available on quay.io
-  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]]; then
+  # Only attempt fallback for "not found" errors (manifest unknown), not for network/auth issues
+  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* && "$error_output" == *"manifest unknown"* ]]; then
     local fallback_ref="${docker_ref/${PRIMARY_SOURCE_REGISTRY}/${FALLBACK_SOURCE_REGISTRY}}"
-    warnf "Failed to pull from ${PRIMARY_SOURCE_REGISTRY}, trying fallback: ${FALLBACK_SOURCE_REGISTRY}..."
+    warnf "Image not found in ${PRIMARY_SOURCE_REGISTRY} (manifest unknown), trying fallback: ${FALLBACK_SOURCE_REGISTRY}..."
     debugf "Fallback reference: $fallback_ref"
     
     if skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$fallback_ref" "$dest"; then
@@ -323,7 +328,8 @@ function mirror_image() {
     fi
   fi
   
-  # For other registries, just report the failure
+  # For all other errors (network, auth, etc.), report the original failure with details
+  errorf "Failed to mirror $docker_ref: $error_output"
   return 1
 }
 
