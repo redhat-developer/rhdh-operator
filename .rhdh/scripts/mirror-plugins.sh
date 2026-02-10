@@ -323,7 +323,7 @@ function mirror_image() {
       warnf "If fallback fails, verify your registry credentials are configured correctly"
     fi
     
-    warnf "Trying fallback registry: ${FALLBACK_SOURCE_REGISTRY}..."
+    infof "Trying fallback registry: ${FALLBACK_SOURCE_REGISTRY}..."
     debugf "Fallback reference: $fallback_ref"
     
     if skopeo copy "${skopeo_flags[@]}" "docker://$fallback_ref" "$dest"; then
