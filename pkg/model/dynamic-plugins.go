@@ -233,8 +233,13 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 			if plugin.PluginConfig != nil {
 				existingPlugin.PluginConfig = plugin.PluginConfig
 			}
-			if len(plugin.Dependencies) > 0 {
-				existingPlugin.Dependencies = plugin.Dependencies
+			if plugin.Dependencies != nil {
+				if len(plugin.Dependencies) > 0 {
+					existingPlugin.Dependencies = plugin.Dependencies
+				} else {
+					// if dependencies is explicitly set to empty, clear it
+					existingPlugin.Dependencies = []PluginDependency{}
+				}
 			}
 			if plugin.Integrity != "" {
 				existingPlugin.Integrity = plugin.Integrity
