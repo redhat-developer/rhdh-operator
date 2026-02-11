@@ -40,8 +40,12 @@ trap "rm -rf ${TEMP_DIR}" EXIT
 echo "Extracting dynamic-plugins.default.yaml from image..."
 cd "${TEMP_DIR}"
 
+echo "CD..."
+
 # Save and extract the image
 docker save "${IMAGE}" -o image.tar
+
+echo "Save..."
 tar -xf image.tar
 rm image.tar
 
