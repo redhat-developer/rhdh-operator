@@ -9,6 +9,40 @@
 #    requests:
 #      storage: 2Gi
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dynamic-plugins
+data:
+  dynamic-plugins.yaml: |
+    includes:
+      - dynamic-plugins.default.yaml
+    plugins:
+      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
+        disabled: true
+        pluginConfig:
+          catalog:
+            providers:
+              github:
+                myorg:
+                  organization: 'MyOrg'
+                  schedule:
+                    # supports cron, ISO duration, "human duration" (used below)
+                    frequency: { minutes: 30}
+                    # supports ISO duration, "human duration (used below)
+                    timeout: { minutes: 3}
+                    initialDelay: { seconds: 15}
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
+        disabled: true
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs
+        disabled: false
+      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-module-addons-contrib
+        disabled: true
+      
+      # Homepage
+      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-dynamic-home-page
+        disabled: false
+---
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
