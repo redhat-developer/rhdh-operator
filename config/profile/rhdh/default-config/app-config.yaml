@@ -15,13 +15,8 @@ data:
     # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/configuring/provisioning-and-using-your-custom-configuration#provisioning-your-custom-configuration
     # for more details.
     ###########################################################################################################
-    backend:
-      auth:
-        externalAccess:
-          - type: legacy
-            options:
-              subject: legacy-default-config
-              # This is a default value, which you should change by providing your own app-config
-              secret: "pl4s3Ch4ng3M3"
     auth:
-      providers: {}
+      environment: development
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
