@@ -5,14 +5,15 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
-      - rhdh-1.[0-9]+
-      - 1.[0-9]+.x
       - release-1.[0-9]+
 
 jobs:
   pr-validate:
     name: PR Validate
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
@@ -37,13 +38,6 @@ jobs:
             **/*.adoc
             .rhdh/**
 
-      - name: List all changed files (for troubleshooting)
-        env:
-          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: |
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file was changed"
-          done
 
       - name: Setup Go
         if: steps.changed-files.outputs.any_changed == 'true'
