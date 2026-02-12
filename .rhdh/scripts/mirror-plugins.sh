@@ -274,6 +274,10 @@ function extract_last_two_elements() {
 FALLBACK_SOURCE_REGISTRY="quay.io"
 PRIMARY_SOURCE_REGISTRY="registry.access.redhat.com"
 
+# Global variables set by get_effective_registry_ref
+EFFECTIVE_REF=""
+USED_FALLBACK=0
+
 # Check if an image exists in a registry using skopeo inspect
 # Returns 0 if image exists, 1 otherwise
 # This is more reliable than parsing error strings from skopeo copy
@@ -284,15 +288,17 @@ function check_image_exists() {
 }
 
 # Get the effective registry reference, trying fallback if primary doesn't exist
-# Returns the working registry reference (either primary or fallback)
-# Sets USED_FALLBACK=1 if fallback was used
+# Sets global EFFECTIVE_REF to the working registry reference
+# Sets global USED_FALLBACK=1 if fallback was used
+# Returns 0 on success, 1 on failure
 function get_effective_registry_ref() {
   local docker_ref="$1"
+  EFFECTIVE_REF=""
   USED_FALLBACK=0
   
   # Check if the image exists at the primary location
   if check_image_exists "$docker_ref"; then
-    echo "$docker_ref"
+    EFFECTIVE_REF="$docker_ref"
     return 0
   fi
   
@@ -303,8 +309,8 @@ function get_effective_registry_ref() {
     
     if check_image_exists "$fallback_ref"; then
       warnf "Image not found at ${PRIMARY_SOURCE_REGISTRY}, using fallback: ${FALLBACK_SOURCE_REGISTRY}"
+      EFFECTIVE_REF="$fallback_ref"
       USED_FALLBACK=1
-      echo "$fallback_ref"
       return 0
     fi
     
@@ -329,11 +335,11 @@ function mirror_image() {
   docker_ref="${docker_ref#oci://}"
   
   # Check if image exists and get effective registry reference (with fallback if needed)
-  local effective_ref
-  if ! effective_ref=$(get_effective_registry_ref "$docker_ref"); then
+  if ! get_effective_registry_ref "$docker_ref"; then
     errorf "Failed to find image: $docker_ref"
     return 1
   fi
+  local effective_ref="$EFFECTIVE_REF"
   
   # Build skopeo flags as arrays to prevent word-splitting issues
   local -a skopeo_flags=(--remove-signatures --all)
@@ -386,11 +392,11 @@ function resolve_plugin_index() {
     debugf "Extracting plugin catalog index image: $registry_ref"
     
     # Check if catalog index exists and get effective registry reference (with fallback if needed)
-    local effective_ref
-    if ! effective_ref=$(get_effective_registry_ref "$registry_ref"); then
+    if ! get_effective_registry_ref "$registry_ref"; then
       errorf "Failed to find catalog index image: $registry_ref"
       return 1
     fi
+    local effective_ref="$EFFECTIVE_REF"
     
     # Create temporary directory for extracting the catalog index
     local temp_dir
@@ -507,11 +513,11 @@ function mirror_catalog_index() {
   debugf "Original registry: $original_registry, Catalog: $catalog_name, Tag: $catalog_tag"
   
   # Check if catalog index exists and get effective registry reference (with fallback if needed)
-  local effective_ref
-  if ! effective_ref=$(get_effective_registry_ref "$registry_ref"); then
+  if ! get_effective_registry_ref "$registry_ref"; then
     errorf "Failed to find catalog index image: $registry_ref"
     return 1
   fi
+  local effective_ref="$EFFECTIVE_REF"
   
   # Create temporary directory for catalog index work
   local temp_dir
