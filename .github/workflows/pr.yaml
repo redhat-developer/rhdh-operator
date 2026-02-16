@@ -1,38 +1,24 @@
 name: PR Test operator
 
 on:
-  pull_request_target:
-      types: [opened, synchronize, reopened, ready_for_review]
-      branches: 
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
       - main
-      - rhdh-1.[0-9]+
-      - 1.[0-9]+.x
       - release-1.[0-9]+
-jobs:
-  authorize:
-    # The 'external' environment is configured with the repo maintainers team as required reviewers.
-    # All the subsequent jobs in this workflow 'need' this job, which will require manual approval for PRs coming from external forks.
-    # see list of approvers in OWNERS file
-    environment:
-      ${{ (github.event.pull_request.head.repo.full_name == github.repository ||
-        contains(fromJSON('["gazarenkov","nickboldt","rm3l","kim-tsao","kadel","Fortune-Ndlovu","subhashkhileri","zdrapela","openshift-cherrypick-robot", "OpinionatedHeron"]'), github.event.pull_request.user.login)) && 'internal' || 'external' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: approved
-        run: |
-          echo "✓"
 
+jobs:
   pr-validate:
     name: PR Validate
     runs-on: ubuntu-latest
-    needs: authorize
+    timeout-minutes: 45
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           fetch-depth: 0
-          repository: ${{github.event.pull_request.head.repo.full_name}}
-          ref: ${{ github.event.pull_request.head.sha }}
 
       # check changes in this commit for regex include and exclude matches
       - name: Get changed files
@@ -50,15 +36,8 @@ jobs:
           files_ignore: |
             **/*.md
             **/*.adoc
-            .rhdh/** 
+            .rhdh/**
 
-      - name: List all changed files (for troubleshooting)
-        env:
-          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: |
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file was changed"
-          done
 
       - name: Setup Go
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -76,7 +55,6 @@ jobs:
         run: make lint
 
       - name: Test
-        # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make test
 
@@ -88,7 +66,6 @@ jobs:
           ignore_failed_clean: true
 
       - name: Run Controller
-        # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
         run: |
           # Need to 'make install' first, so that the necessary tool binaries (like controller-gen) can be downloaded locally.
@@ -98,23 +75,16 @@ jobs:
           make run &
 
       - name: Generic Integration test
-        # run this stage only if there are changes that match the includes and not the excludes
         # perform it on backstage.io for speed
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: RHDH specific Integration test
-        # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make integration-test ARGS='--focus "create default rhdh"' USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
 
       - name: Run Gosec Security Scanner
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make gosec
-
-      - name: Upload SARIF file
-        if: steps.changed-files.outputs.any_changed == 'true'
-        uses: github/codeql-action/upload-sarif@45cbd0c69e560cd9e7cd7f8c32362050c9b7ded2 # v4
-        with:
-          # Path to SARIF file relative to the root of the repository
-          sarif_file: gosec.sarif
+        # Gosec results are available in workflow logs
+        # SonarCloud provides Code Scanning integration in the Security tab

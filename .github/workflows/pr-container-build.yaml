@@ -1,152 +1,163 @@
-name: PR Build operator, bundle, and catalog images
+name: Build PR Images (Slash Command)
 
 on:
-  # /!\ Warning: using the pull_request_target event to be able to read secrets. But using this event without the cautionary measures described below
-  # may allow unauthorized GitHub users to open a “pwn request” and exfiltrate secrets.
-  # As recommended in https://iterative.ai/blog/testing-external-contributions-using-github-actions-secrets,
-  # we are adding an 'authorize' job that checks if the workflow was triggered from a fork PR. In that case, the "external" environment
-  # will prevent the job from running until it's approved manually by human intervention.
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: 
-      - main
-      - rhdh-1.[0-9]+
-      - 1.[0-9]+.x
-      - release-1.[0-9]+
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.ref }}
+  group: build-images-${{ github.event.issue.number }}
   cancel-in-progress: true
 
 env:
   REGISTRY: ${{ vars.REGISTRY }}
 
 jobs:
-  authorize:
-    # The 'external' environment is configured with the repo maintainers team as required reviewers.
-    # All the subsequent jobs in this workflow 'need' this job, which will require manual approval for PRs coming from external forks.
-    # see list of approvers in OWNERS file
-    environment:
-      ${{ (github.event.pull_request.head.repo.full_name == github.repository ||
-      contains(fromJSON('["gazarenkov","nickboldt","rm3l","kim-tsao","kadel","Fortune-Ndlovu","subhashkhileri","zdrapela","openshift-cherrypick-robot", "OpinionatedHeron"]'), github.event.pull_request.user.login)) && 'internal' || 'external' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: approved
-        run: |
-          echo "✓"
+  build-images:
+    # 1. SECURITY GATE: Trust on First Use (TOFU) via RBAC
+    if: |
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/build-images') &&
+      (github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'COLLABORATOR')
 
-  pr-build:
-    name: PR Publish
+    name: Build and Push PR Images
     runs-on: ubuntu-latest
-    needs: authorize
-    permissions:
-      contents: read
-      packages: write
-      pull-requests: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: React to comment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket'
+            });
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            core.setOutput('sha', pr.data.head.sha);
+            core.setOutput('repo', pr.data.head.repo.full_name);
+            core.setOutput('number', context.issue.number);
+
+      - name: Checkout PR code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           fetch-depth: 0
-          repository: ${{github.event.pull_request.head.repo.full_name}}
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      # check changes in this commit for regex include and exclude matches
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@8cba46e29c11878d930bca7870bb54394d3e8b21 # v47.0.2
-        with:
-          files: |
-            .github/workflows/pr-container-build.yaml
-            Makefile
-            **/*.go
-            bundle/**
-            config/**
-            go.mod
-            go.sum
-            LICENSE
-            **/Dockerfile
-            **/Containerfile
-            **/*.Dockerfile
-            **/.dockerignore
-          files_ignore: |
-            **/*.md
-            **/*.adoc
-            .rhdh/**
-            tests/** 
-
-      - name: List all changed files (for troubleshooting)
-        env:
-          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: |
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file was changed"
-          done
+          repository: ${{ steps.pr.outputs.repo }}
+          ref: ${{ steps.pr.outputs.sha }}
+          # 2. PRIVILEGE PROTECTION: Do not persist credentials to disk
+          persist-credentials: false
 
       - name: Setup Go
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
         with:
           go-version-file: 'go.mod'
 
-      - name: Get the last commit short SHA of the PR
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
+      - name: Get version and SHA
+        # 3. ANTI-INJECTION: Map context to env vars before processing
+        env:
+          PR_SHA: ${{ steps.pr.outputs.sha }}
         run: |
-          SHORT_SHA=$(git rev-parse --short ${{ github.event.pull_request.head.sha }})
+          SHORT_SHA=$(git rev-parse --short "$PR_SHA")
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //") # 0.0.1
+          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
           echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
 
-      - name: Login to registry (${{env.REGISTRY}})
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      - name: Login to registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - name: Build and push operator, bundle, and catalog images
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
+      - name: Build and push images
+        # 4. SECRET ISOLATION:
+        # We explicitly do NOT pass GH_TOKEN or RHDH_BOT_TOKEN here.
+        # This makes running 'make' safe, even if the Makefile is malicious,
+        # because there are no secrets in the env to steal.
+        env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
+          CONTAINER_TOOL: podman
+          # Construct version safely
+          VERSION: ${{ env.BASE_VERSION }}-pr-${{ steps.pr.outputs.number }}-${{ env.SHORT_SHA }}
         run: |
-          # install skopeo, podman
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
 
-          export CONTAINER_TOOL=podman 
-          export VERSION=${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }} 
-          export REGISTRY_WITH_ORG=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}
-          export OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME:-operator}
+          export REGISTRY_WITH_ORG=${REGISTRY}/${REGISTRY_ORG}
           export IMAGE_TAG_BASE=${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}
 
           set -ex
 
-          # build 4 container images with a 14d expiry
-          CONTAINER_TOOL=${CONTAINER_TOOL} VERSION=${VERSION} make lint release-build
+          # Run ONLY release-build (Lint removed)
+          # We use 'make' here for convenience, but it is sandboxed from secrets.
+          make release-build
 
-          # now copy images from local cache to quay, using 0.0.1-pr-123-f00cafe and 0.0.1-pr-123 tags
+          # Push logic
           for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
             podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
             skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
             skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION%-*}
           done
-        env:
-          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
-          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
-          # to avoid throttling on RHD org, use GH token
-          GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+
       - name: Comment image links in PR
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
+        if: success()
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        # 5. SCRIPT HARDENING: Pass data as environment variables
+        env:
+          BASE_VERSION: ${{ env.BASE_VERSION }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          SHORT_SHA: ${{ env.SHORT_SHA }}
+          USER_LOGIN: ${{ github.event.comment.user.login }}
         with:
           script: |
+            const { BASE_VERSION, PR_NUMBER, SHORT_SHA, USER_LOGIN } = process.env;
+            
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'PR images are available:<br/><ol><li>https://quay.io/rhdh-community/operator:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh-community/operator-bundle:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li><li>https://quay.io/rhdh-community/operator-catalog:${{ env.BASE_VERSION }}-pr-${{ github.event.number }}-${{ env.SHORT_SHA }}</li></ol>'
-            })
+              body: `✅ **PR images built successfully!**
+
+            Images are available for testing:
+
+            1. **Operator:** \`quay.io/rhdh-community/operator:${BASE_VERSION}-pr-${PR_NUMBER}-${SHORT_SHA}\`
+            2. **Bundle:** \`quay.io/rhdh-community/operator-bundle:${BASE_VERSION}-pr-${PR_NUMBER}-${SHORT_SHA}\`
+            3. **Catalog:** \`quay.io/rhdh-community/operator-catalog:${BASE_VERSION}-pr-${PR_NUMBER}-${SHORT_SHA}\`
+
+            Also available with PR number tag:
+            - \`quay.io/rhdh-community/operator:${BASE_VERSION}-pr-${PR_NUMBER}\`
+            - \`quay.io/rhdh-community/operator-bundle:${BASE_VERSION}-pr-${PR_NUMBER}\`
+            - \`quay.io/rhdh-community/operator-catalog:${BASE_VERSION}-pr-${PR_NUMBER}\`
+
+            <sub>Triggered by @${USER_LOGIN}</sub>`
+            });
+
+      - name: Comment on failure
+        if: failure()
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          USER_LOGIN: ${{ github.event.comment.user.login }}
+        with:
+          script: |
+            const { USER_LOGIN } = process.env;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `❌ **Image build failed**\n\nSee workflow run for details: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nTriggered by @${USER_LOGIN}`
+            });

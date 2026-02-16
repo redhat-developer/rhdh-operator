@@ -1,0 +1,60 @@
+name: PR Dockerfile Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - release-1.[0-9]+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-dockerfile:
+    name: Validate Dockerfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@e0021407031f5be11a464abee9a0776171c79891 # v47.0.1
+        with:
+          files: |
+            .github/workflows/pr-dockerbuild-validation.yaml
+            Makefile
+            **/*.go
+            bundle/**
+            config/**
+            go.mod
+            go.sum
+            LICENSE
+            **/Dockerfile
+            **/Containerfile
+            **/*.Dockerfile
+            **/.dockerignore
+          files_ignore: |
+            **/*.md
+            **/*.adoc
+            .rhdh/**
+            tests/**
+
+      - name: Setup Go
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Test build Dockerfile (no push)
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          make image-build IMG=localhost/operator:validate
