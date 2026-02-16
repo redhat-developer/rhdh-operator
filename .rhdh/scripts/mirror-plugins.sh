@@ -268,8 +268,64 @@ function extract_last_two_elements() {
   fi
 }
 
+# Fallback registry for unreleased plugins
+# When plugins reference registry.access.redhat.com/rhdh but aren't released yet,
+# fall back to quay.io/rhdh where development builds are available
+FALLBACK_SOURCE_REGISTRY="quay.io"
+PRIMARY_SOURCE_REGISTRY="registry.access.redhat.com"
+
+# Global variables set by get_effective_registry_ref
+EFFECTIVE_REF=""
+USED_FALLBACK=0
+
+# Check if an image exists in a registry using skopeo inspect
+# Returns 0 if image exists, 1 otherwise
+# This is more reliable than parsing error strings from skopeo copy
+function check_image_exists() {
+  local docker_ref="$1"
+  skopeo inspect "docker://$docker_ref" &>/dev/null
+  return $?
+}
+
+# Get the effective registry reference, trying fallback if primary doesn't exist
+# Sets global EFFECTIVE_REF to the working registry reference
+# Sets global USED_FALLBACK=1 if fallback was used
+# Returns 0 on success, 1 on failure
+function get_effective_registry_ref() {
+  local docker_ref="$1"
+  EFFECTIVE_REF=""
+  USED_FALLBACK=0
+  
+  # Check if the image exists at the primary location
+  if check_image_exists "$docker_ref"; then
+    EFFECTIVE_REF="$docker_ref"
+    return 0
+  fi
+  
+  # If the source is registry.access.redhat.com/rhdh, try fallback to quay.io/rhdh
+  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]]; then
+    local fallback_ref="${docker_ref/${PRIMARY_SOURCE_REGISTRY}/${FALLBACK_SOURCE_REGISTRY}}"
+    debugf "Primary registry image not found, checking fallback: $fallback_ref"
+    
+    if check_image_exists "$fallback_ref"; then
+      warnf "Image not found at ${PRIMARY_SOURCE_REGISTRY}, using fallback: ${FALLBACK_SOURCE_REGISTRY}"
+      EFFECTIVE_REF="$fallback_ref"
+      USED_FALLBACK=1
+      return 0
+    fi
+    
+    # Neither primary nor fallback exists
+    errorf "Image not found at both ${PRIMARY_SOURCE_REGISTRY} and ${FALLBACK_SOURCE_REGISTRY}"
+    return 1
+  fi
+  
+  # For non-RHDH registries, just report the failure
+  return 1
+}
+
 # Copy OCI image using skopeo
 # Supports both registry (docker://) and directory (dir://) destinations
+# Falls back to quay.io/rhdh if registry.access.redhat.com/rhdh doesn't exist (unreleased plugins)
 function mirror_image() {
   local src_image="$1"
   local dest="$2"
@@ -278,25 +334,38 @@ function mirror_image() {
   local docker_ref="${src_image%!*}"
   docker_ref="${docker_ref#oci://}"
   
-  # Add appropriate flags based on destination type
-  local dest_flags=""
-  local preserve_digests_flag=""
+  # Check if image exists and get effective registry reference (with fallback if needed)
+  if ! get_effective_registry_ref "$docker_ref"; then
+    errorf "Failed to find image: $docker_ref"
+    return 1
+  fi
+  local effective_ref="$EFFECTIVE_REF"
+  
+  # Build skopeo flags as arrays to prevent word-splitting issues
+  local -a skopeo_flags=(--remove-signatures --all)
   
   if [[ "$dest" == docker://* ]]; then
-    dest_flags="--dest-tls-verify=false"
+    skopeo_flags+=(--dest-tls-verify=false)
     # Don't preserve digests for registry destinations to allow format conversion
     # This ensures compatibility with registries that require manifest format conversion
     # (e.g., OpenShift internal registry requiring OCI format)
-    preserve_digests_flag=""
     infof "Mirroring $src_image to ${dest#docker://}..."
   else
     # Preserve digests for directory destinations (offline transfer integrity)
-    preserve_digests_flag="--preserve-digests"
+    skopeo_flags+=(--preserve-digests)
     debugf "Saving $src_image to ${dest#dir:}..."
   fi
   
-  skopeo copy $preserve_digests_flag --remove-signatures --all $dest_flags "docker://$docker_ref" "$dest" || return 1
-  return 0
+  # Copy using the effective reference (primary or fallback)
+  if skopeo copy "${skopeo_flags[@]}" "docker://$effective_ref" "$dest"; then
+    if [[ "$USED_FALLBACK" -eq 1 ]]; then
+      infof "Successfully mirrored using fallback registry: ${FALLBACK_SOURCE_REGISTRY}"
+    fi
+    return 0
+  else
+    errorf "Failed to mirror $effective_ref"
+    return 1
+  fi
 }
 
 function push_image_from_archive() {
@@ -322,6 +391,13 @@ function resolve_plugin_index() {
     
     debugf "Extracting plugin catalog index image: $registry_ref"
     
+    # Check if catalog index exists and get effective registry reference (with fallback if needed)
+    if ! get_effective_registry_ref "$registry_ref"; then
+      errorf "Failed to find catalog index image: $registry_ref"
+      return 1
+    fi
+    local effective_ref="$EFFECTIVE_REF"
+    
     # Create temporary directory for extracting the catalog index
     local temp_dir
     temp_dir=$(mktemp -d)
@@ -330,10 +406,14 @@ function resolve_plugin_index() {
     # shellcheck disable=SC2064
     trap "rm -rf '$temp_dir'" RETURN
     
-    # Extract the catalog index image
-    if ! skopeo copy "docker://$registry_ref" "dir:$temp_dir/catalog-index" 2>/dev/null; then
-      errorf "Failed to extract catalog index image: $registry_ref"
+    # Extract the catalog index image using effective reference
+    if ! skopeo copy "docker://$effective_ref" "dir:$temp_dir/catalog-index" 2>/dev/null; then
+      errorf "Failed to extract catalog index image: $effective_ref"
       return 1
+    fi
+    
+    if [[ "$USED_FALLBACK" -eq 1 ]]; then
+      infof "Using catalog index from fallback registry: ${FALLBACK_SOURCE_REGISTRY}"
     fi
     
     # Extract all layers to find index.json
@@ -432,17 +512,28 @@ function mirror_catalog_index() {
   
   debugf "Original registry: $original_registry, Catalog: $catalog_name, Tag: $catalog_tag"
   
+  # Check if catalog index exists and get effective registry reference (with fallback if needed)
+  if ! get_effective_registry_ref "$registry_ref"; then
+    errorf "Failed to find catalog index image: $registry_ref"
+    return 1
+  fi
+  local effective_ref="$EFFECTIVE_REF"
+  
   # Create temporary directory for catalog index work
   local temp_dir
   temp_dir=$(mktemp -d)
   # shellcheck disable=SC2064
   trap "rm -rf '$temp_dir'" RETURN
   
-  # Extract the catalog index image
+  # Extract the catalog index image using effective reference
   infof "Extracting catalog index image..."
-  if ! skopeo copy "docker://$registry_ref" "dir:$temp_dir/catalog-index" 2>/dev/null; then
-    errorf "Failed to extract catalog index image: $registry_ref"
+  if ! skopeo copy "docker://$effective_ref" "dir:$temp_dir/catalog-index" 2>/dev/null; then
+    errorf "Failed to extract catalog index image: $effective_ref"
     return 1
+  fi
+  
+  if [[ "$USED_FALLBACK" -eq 1 ]]; then
+    infof "Using catalog index from fallback registry: ${FALLBACK_SOURCE_REGISTRY}"
   fi
   
   # Extract layers to find and modify index.json
