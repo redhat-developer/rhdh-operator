@@ -124,4 +124,7 @@ data:
 
 In this example, both example-dep1.yaml and example-dep1.yaml will be picked and operator create the resources described in the files. 
 
+Same as other plugin configuration options, the dependencies can be defined in the default configuration for the profile or in the ConfigMap referenced in the Backstage CR. If a dependency is defined in both places, the operator will replace the one defined in the default configuration with the one defined in the Backstage CR.
+So if you want to define dependencies in CR, you need to redefine all of them in the CR, even if some of them are already defined in the default configuration. In a case if you want to clean up the dependencies defined in the default configuration, you can set `dependencies: []` in the CR.
+
 See also [Orchestrator plugin dependencies](orchestrator.md#plugin-dependencies) as an example.
