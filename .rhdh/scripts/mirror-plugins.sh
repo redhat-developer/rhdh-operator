@@ -135,12 +135,21 @@ Examples:
     --plugin-list /path/to/plugins.txt \\
     --to-registry registry.example.com
 
+  # Mirror plugins from a 3-level registry (e.g., ghcr.io) to OCP internal registry
+  # The script automatically flattens 3-level paths to 2-level paths for OCP compatibility.
+  # e.g., ghcr.io/org/sub/image -> ocp-registry/sub/image
+  $0 \\
+    --plugins 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-community-plugin-scaffolder-backend-module-quay:bs_1.45.3__2.14.0' \\
+    --to-registry default-route-openshift-image-registry.apps.example.com
+
   Example plugins.txt content:
     # Red Hat Developer Hub Plugin List
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.7
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.8
     oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-dynatrace:1.8.0--10.6.0!backstage-community-plugin-dynatrace
+    # 3-level ghcr.io references are also supported
+    oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-community-plugin-scaffolder-backend-module-quay:bs_1.45.3__2.14.0
 "
 }
 
@@ -253,7 +262,10 @@ fi
 pushd "${TMPDIR}" >/dev/null
 debugf "Working directory: $TMPDIR"
 
-# Extract the last two path elements from an image URL (e.g., org/image from registry.io/org/image)
+# Extract the last two path elements from an image URL (e.g., org/image from registry.io/org/image).
+# This ensures compatibility with OCP internal registry which only supports 2-level paths (namespace/image).
+# For 3-level sources like ghcr.io/org/sub/image, this returns sub/image.
+# For 2-level sources like registry.access.redhat.com/org/image, this returns org/image (unchanged).
 function extract_last_two_elements() {
   local input="$1"
   local IFS='/'
@@ -509,7 +521,13 @@ function mirror_catalog_index() {
     warnf "Could not parse catalog index reference, will mirror as-is: $registry_ref"
     catalog_tag="latest"
   fi
-  
+
+  # Flatten catalog_name to last 2 path elements for OCP internal registry compatibility
+  # e.g., org/sub/plugin-catalog-index -> sub/plugin-catalog-index
+  if [[ -n "$catalog_name" ]]; then
+    catalog_name=$(extract_last_two_elements "$catalog_name")
+  fi
+
   debugf "Original registry: $original_registry, Catalog: $catalog_name, Tag: $catalog_tag"
   
   # Check if catalog index exists and get effective registry reference (with fallback if needed)
@@ -582,13 +600,14 @@ function mirror_catalog_index() {
     infof "Updating plugin registry references in index.json..."
     
     # Use jq to update all registryReference values
-    # Replace the registry domain (first component before /) with target registry
+    # Keep only the last 2 path elements to ensure compatibility with OCP internal
+    # registry (2-level paths). Works for both 2-level and 3-level source paths.
     if ! jq --arg target_reg "$target_registry" '
       . | with_entries(
         .value.registryReference |= (
           if . then
-            # Remove everything up to and including first slash, then prepend target registry
-            . | sub("^[^/]+/"; $target_reg + "/")
+            (split("/") | .[-2:] | join("/")) as $last_two |
+            ($target_reg + "/" + $last_two)
           else
             .
           end
@@ -607,18 +626,19 @@ function mirror_catalog_index() {
     # Update OCI references in dynamic-plugins.default.yaml
     infof "Updating OCI references in dynamic-plugins.default.yaml..."
     if [[ -f "$catalog_data_dir/dynamic-plugins.default.yaml" ]]; then
-      # Replace OCI registry references (preserves path and tag)
-      # Pattern: oci://REGISTRY/PATH:TAG -> oci://NEW_REGISTRY/PATH:TAG
-      sed -i -E "s|oci://[^/]+/|oci://$target_registry/|g" "$catalog_data_dir/dynamic-plugins.default.yaml"
+      # Replace OCI registry references, keeping only the last 2 path elements
+      # to ensure compatibility with OCP internal registry (2-level paths).
+      # Pattern: oci://REG/[extra/]ns/image:TAG -> oci://NEW_REGISTRY/ns/image:TAG
+      sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$target_registry\2|g" "$catalog_data_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
     fi
-    
+
     # Update OCI references in all catalog-entities YAML files
     infof "Updating OCI references in catalog-entities..."
     local yaml_count=0
     while IFS= read -r yaml_file; do
       if [[ -n "$yaml_file" && -f "$yaml_file" ]]; then
-        sed -i -E "s|oci://[^/]+/|oci://$target_registry/|g" "$yaml_file"
+        sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$target_registry\2|g" "$yaml_file"
         ((yaml_count++)) || true
       fi
     done < <(find "$catalog_data_dir/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
@@ -1033,7 +1053,10 @@ function mirror_plugins_from_dir() {
       catalog_name="rhdh/plugin-catalog-index"
       catalog_tag="latest"
     fi
-    
+
+    # Flatten catalog_name to last 2 path elements for OCP internal registry compatibility
+    catalog_name=$(extract_last_two_elements "$catalog_name")
+
     debugf "Rebuilding catalog index: $catalog_name:$catalog_tag"
     
     # Check for saved index.json
@@ -1050,8 +1073,9 @@ function mirror_plugins_from_dir() {
       . | with_entries(
         .value.registryReference |= (
           if . then
-            # Remove everything up to and including first slash, then prepend target registry
-            . | sub("^[^/]+/"; $target_reg + "/")
+            # Keep only the last 2 path elements for OCP internal registry compatibility
+            (split("/") | .[-2:] | join("/")) as $last_two |
+            ($target_reg + "/" + $last_two)
           else
             .
           end
@@ -1068,16 +1092,17 @@ function mirror_plugins_from_dir() {
     # Update OCI references in dynamic-plugins.default.yaml
     infof "Updating OCI references in dynamic-plugins.default.yaml..."
     if [[ -f "$catalog_dir/dynamic-plugins.default.yaml" ]]; then
-      sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$catalog_dir/dynamic-plugins.default.yaml"
+      # Keep only the last 2 path elements for OCP internal registry compatibility
+      sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$TO_REGISTRY\2|g" "$catalog_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
     fi
-    
+
     # Update OCI references in all catalog-entities YAML files
     infof "Updating OCI references in catalog-entities..."
     local yaml_count=0
     while IFS= read -r yaml_file; do
       if [[ -n "$yaml_file" && -f "$yaml_file" ]]; then
-        sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$yaml_file"
+        sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$TO_REGISTRY\2|g" "$yaml_file"
         ((yaml_count++)) || true
       fi
     done < <(find "$catalog_dir/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
@@ -1204,7 +1229,10 @@ function generate_mapping_file() {
           catalog_name="rhdh/plugin-catalog-index"
           catalog_tag="latest"
         fi
-        
+
+        # Flatten catalog_name to last 2 path elements for OCP internal registry compatibility
+        catalog_name=$(extract_last_two_elements "$catalog_name")
+
         echo "$PLUGIN_INDEX → oci://${TO_REGISTRY}/${catalog_name}:${catalog_tag}" >> "$output_file"
       fi
     elif [[ "$mode" == "directory" ]] && [[ -d "${TO_DIR}/catalog-index" ]]; then
