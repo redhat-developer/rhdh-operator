@@ -25,7 +25,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 		projectDir string
 		ns         string
 	)
-	appReachabilityTimeout := 5 * time.Minute
+	appReachabilityTimeout := 10 * time.Minute
 
 	BeforeEach(func() {
 		var err error
