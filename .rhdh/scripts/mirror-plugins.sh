@@ -432,22 +432,20 @@ function resolve_plugin_index() {
     local catalog_data_dir="$temp_dir/catalog-data"
     mkdir -p "$catalog_data_dir"
     
-    # Extract each layer until we find index.json
+    # Extract all layers to get all catalog content (index.json, dynamic-plugins, catalog-entities, etc.)
     local found_index=false
     for layer in "$temp_dir/catalog-index"/*; do
       if [[ -f "$layer" ]] && [[ ! "$layer" =~ (manifest\.json|version)$ ]]; then
         debugf "Extracting layer: $(basename "$layer")"
-        if tar -xf "$layer" -C "$catalog_data_dir" 2>/dev/null; then
-          # Check if index.json exists after extracting this layer
-          if [[ -f "$catalog_data_dir/index.json" ]]; then
-            found_index=true
-            debugf "Found index.json in layer: $(basename "$layer")"
-            break
-          fi
-        fi
+        tar -xf "$layer" -C "$catalog_data_dir" 2>/dev/null || true
       fi
     done
-    
+
+    if [[ -f "$catalog_data_dir/index.json" ]]; then
+      found_index=true
+      debugf "Found index.json in extracted catalog data"
+    fi
+
     if [[ "$found_index" != "true" ]]; then
       errorf "No index.json found in catalog index image"
       return 1
@@ -559,21 +557,20 @@ function mirror_catalog_index() {
   mkdir -p "$catalog_data_dir"
   
   local found_index=false
-  local index_layer=""
-  
+
+  # Extract all layers to get all catalog content (index.json, dynamic-plugins, catalog-entities, etc.)
   for layer in "$temp_dir/catalog-index"/*; do
     if [[ -f "$layer" ]] && [[ ! "$layer" =~ (manifest\.json|version)$ ]]; then
-      if tar -xf "$layer" -C "$catalog_data_dir" 2>/dev/null; then
-        if [[ -f "$catalog_data_dir/index.json" ]]; then
-          found_index=true
-          index_layer=$(basename "$layer")
-          debugf "Found index.json in layer: $index_layer"
-          break
-        fi
-      fi
+      debugf "Extracting layer: $(basename "$layer")"
+      tar -xf "$layer" -C "$catalog_data_dir" 2>/dev/null || true
     fi
   done
-  
+
+  if [[ -f "$catalog_data_dir/index.json" ]]; then
+    found_index=true
+    debugf "Found index.json in extracted catalog data"
+  fi
+
   if [[ "$found_index" != "true" ]]; then
     warnf "No index.json found in catalog index, mirroring as-is without modifications"
     # Mirror the original catalog index without modifications
@@ -631,6 +628,11 @@ function mirror_catalog_index() {
       # Pattern: oci://REG/[extra/]ns/image:TAG -> oci://NEW_REGISTRY/ns/image:TAG
       sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$target_registry\2|g" "$catalog_data_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
+      infof "=== dynamic-plugins.default.yaml after update ==="
+      cat "$catalog_data_dir/dynamic-plugins.default.yaml"
+      infof "=== end dynamic-plugins.default.yaml ==="
+    else
+      infof "dynamic-plugins.default.yaml NOT FOUND in $catalog_data_dir"
     fi
 
     # Update OCI references in all catalog-entities YAML files
@@ -1095,6 +1097,9 @@ function mirror_plugins_from_dir() {
       # Keep only the last 2 path elements for OCP internal registry compatibility
       sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$TO_REGISTRY\2|g" "$catalog_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
+      infof "=== dynamic-plugins.default.yaml after update ==="
+      cat "$catalog_dir/dynamic-plugins.default.yaml"
+      infof "=== end dynamic-plugins.default.yaml ==="
     fi
 
     # Update OCI references in all catalog-entities YAML files
