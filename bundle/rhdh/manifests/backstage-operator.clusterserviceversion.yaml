@@ -69,11 +69,11 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <1.8.4'
+    skipRange: '>=1.0.0 <1.8.5'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
-  name: rhdh-operator.v1.8.4
+  name: rhdh-operator.v1.8.5
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -480,4 +480,4 @@ spec:
   - image: quay.io/rhdh/rhdh-hub-rhel9:1.8
     name: backstage
   replaces: rhdh-operator.v1.8.0
-  version: 1.8.4
+  version: 1.8.5
