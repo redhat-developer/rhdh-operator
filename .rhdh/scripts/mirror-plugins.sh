@@ -18,6 +18,7 @@ PLUGIN_URLS=()
 PLUGIN_IMAGES=()
 
 TO_REGISTRY=""
+INTERNAL_REGISTRY=""
 TO_DIR=""
 FROM_DIR=""
 
@@ -91,6 +92,10 @@ Options:
                                            Note: URLs containing '!' must be quoted (e.g., 'oci://...:tag!subpath')
   --to-registry <registry_url>           : Mirror the plugins to the specified registry
                                            (assumes you are already logged in)
+  --internal-registry <registry_url>     : Registry URL used inside the catalog index for plugin references.
+                                           Use this when the push registry differs from the in-cluster address.
+                                           For OCP internal registry, use: image-registry.openshift-image-registry.svc:5000
+                                           Defaults to the --to-registry value if not specified.
   --to-dir </absolute/path/to/dir>       : Mirror plugins to the specified directory (for fully disconnected environments)
                                            This directory can be transferred to a disconnected network
   --from-dir </absolute/path/to/dir>     : Load plugins from the specified directory and push to registry
@@ -135,12 +140,13 @@ Examples:
     --plugin-list /path/to/plugins.txt \\
     --to-registry registry.example.com
 
-  # Mirror plugins from a 3-level registry (e.g., ghcr.io) to OCP internal registry
-  # The script automatically flattens 3-level paths to 2-level paths for OCP compatibility.
-  # e.g., ghcr.io/org/sub/image -> ocp-registry/sub/image
+  # Mirror plugins to OCP internal registry with in-cluster address for catalog references
+  # --to-registry is the external route used for pushing images
+  # --internal-registry is the in-cluster service address that RHDH uses to pull plugins
   $0 \\
-    --plugins 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-community-plugin-scaffolder-backend-module-quay:bs_1.45.3__2.14.0' \\
-    --to-registry default-route-openshift-image-registry.apps.example.com
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \\
+    --to-registry default-route-openshift-image-registry.apps.example.com \\
+    --internal-registry image-registry.openshift-image-registry.svc:5000
 
   Example plugins.txt content:
     # Red Hat Developer Hub Plugin List
@@ -175,6 +181,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   '--to-registry')
     TO_REGISTRY="$2"
+    shift 1
+    ;;
+  '--internal-registry')
+    INTERNAL_REGISTRY="$2"
     shift 1
     ;;
   '--to-dir')
@@ -244,6 +254,13 @@ fi
 if [[ -n "${FROM_DIR}" && ! -d "${FROM_DIR}" ]]; then
   errorf "Directory not found: ${FROM_DIR}"
   exit 1
+fi
+
+# Default INTERNAL_REGISTRY to TO_REGISTRY if not specified
+# INTERNAL_REGISTRY is the address used inside catalog index references (what RHDH sees in-cluster).
+# TO_REGISTRY is the address used for pushing images (the external route).
+if [[ -z "${INTERNAL_REGISTRY}" && -n "${TO_REGISTRY}" ]]; then
+  INTERNAL_REGISTRY="${TO_REGISTRY}"
 fi
 
 # Setup working directory
@@ -491,6 +508,7 @@ function mirror_catalog_index() {
   local index_url="$1"
   local target_registry="$2"
   local target_dir="$3"
+  local internal_registry="${4:-$target_registry}"
   
   infof "Preparing catalog index for mirroring: $index_url"
   
@@ -599,7 +617,7 @@ function mirror_catalog_index() {
     # Use jq to update all registryReference values
     # Keep only the last 2 path elements to ensure compatibility with OCP internal
     # registry (2-level paths). Works for both 2-level and 3-level source paths.
-    if ! jq --arg target_reg "$target_registry" '
+    if ! jq --arg target_reg "$internal_registry" '
       . | with_entries(
         .value.registryReference |= (
           if . then
@@ -614,25 +632,23 @@ function mirror_catalog_index() {
       errorf "Failed to update index.json with new registry references"
       return 1
     fi
-    
+
     debugf "Updated $(jq '. | length' "$updated_index") plugin references in index.json"
-    
+
     # Replace the original index.json with updated version
     cp "$updated_index" "$catalog_data_dir/index.json"
-    
+
     # Update OCI references in dynamic-plugins.default.yaml
     infof "Updating OCI references in dynamic-plugins.default.yaml..."
     if [[ -f "$catalog_data_dir/dynamic-plugins.default.yaml" ]]; then
       # Replace OCI registry references, keeping only the last 2 path elements
       # to ensure compatibility with OCP internal registry (2-level paths).
-      # Pattern: oci://REG/[extra/]ns/image:TAG -> oci://NEW_REGISTRY/ns/image:TAG
-      sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$target_registry\2|g" "$catalog_data_dir/dynamic-plugins.default.yaml"
+      # Pattern: oci://REG/[extra/]ns/image:TAG -> oci://INTERNAL_REGISTRY/ns/image:TAG
+      sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$internal_registry\2|g" "$catalog_data_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
       infof "=== dynamic-plugins.default.yaml after update ==="
       cat "$catalog_data_dir/dynamic-plugins.default.yaml"
       infof "=== end dynamic-plugins.default.yaml ==="
-    else
-      infof "dynamic-plugins.default.yaml NOT FOUND in $catalog_data_dir"
     fi
 
     # Update OCI references in all catalog-entities YAML files
@@ -640,15 +656,15 @@ function mirror_catalog_index() {
     local yaml_count=0
     while IFS= read -r yaml_file; do
       if [[ -n "$yaml_file" && -f "$yaml_file" ]]; then
-        sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$target_registry\2|g" "$yaml_file"
+        sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$internal_registry\2|g" "$yaml_file"
         ((yaml_count++)) || true
       fi
     done < <(find "$catalog_data_dir/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
-    
+
     if [[ $yaml_count -gt 0 ]]; then
       debugf "Updated OCI references in $yaml_count catalog-entity YAML files"
     fi
-    
+
     # Rebuild the layer with updated index.json
     infof "Rebuilding catalog index image with updated references..."
     local new_layer="$temp_dir/new-layer.tar"
@@ -904,7 +920,7 @@ function mirror_plugins() {
     infof ""
     infof "Mirroring catalog index..."
     if [[ -n "$TO_REGISTRY" ]]; then
-      if ! mirror_catalog_index "$PLUGIN_INDEX" "$TO_REGISTRY" ""; then
+      if ! mirror_catalog_index "$PLUGIN_INDEX" "$TO_REGISTRY" "" "$INTERNAL_REGISTRY"; then
         warnf "Failed to mirror catalog index, but plugins were mirrored successfully"
         warnf "You may need to manually configure the catalog index in your deployment"
       fi
@@ -1071,7 +1087,7 @@ function mirror_plugins_from_dir() {
     local updated_index="$catalog_dir/index-updated.json"
     infof "Updating plugin registry references in index.json..."
     
-    if ! jq --arg target_reg "$TO_REGISTRY" '
+    if ! jq --arg target_reg "$INTERNAL_REGISTRY" '
       . | with_entries(
         .value.registryReference |= (
           if . then
@@ -1087,19 +1103,16 @@ function mirror_plugins_from_dir() {
       warnf "Failed to update index.json with new registry references"
       return 0
     fi
-    
+
     # Replace index.json with updated version
     cp "$updated_index" "$catalog_dir/index.json"
-    
+
     # Update OCI references in dynamic-plugins.default.yaml
     infof "Updating OCI references in dynamic-plugins.default.yaml..."
     if [[ -f "$catalog_dir/dynamic-plugins.default.yaml" ]]; then
       # Keep only the last 2 path elements for OCP internal registry compatibility
-      sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$TO_REGISTRY\2|g" "$catalog_dir/dynamic-plugins.default.yaml"
+      sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$INTERNAL_REGISTRY\2|g" "$catalog_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
-      infof "=== dynamic-plugins.default.yaml after update ==="
-      cat "$catalog_dir/dynamic-plugins.default.yaml"
-      infof "=== end dynamic-plugins.default.yaml ==="
     fi
 
     # Update OCI references in all catalog-entities YAML files
@@ -1107,7 +1120,7 @@ function mirror_plugins_from_dir() {
     local yaml_count=0
     while IFS= read -r yaml_file; do
       if [[ -n "$yaml_file" && -f "$yaml_file" ]]; then
-        sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$TO_REGISTRY\2|g" "$yaml_file"
+        sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$INTERNAL_REGISTRY\2|g" "$yaml_file"
         ((yaml_count++)) || true
       fi
     done < <(find "$catalog_dir/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
@@ -1238,7 +1251,7 @@ function generate_mapping_file() {
         # Flatten catalog_name to last 2 path elements for OCP internal registry compatibility
         catalog_name=$(extract_last_two_elements "$catalog_name")
 
-        echo "$PLUGIN_INDEX → oci://${TO_REGISTRY}/${catalog_name}:${catalog_tag}" >> "$output_file"
+        echo "$PLUGIN_INDEX → oci://${INTERNAL_REGISTRY}/${catalog_name}:${catalog_tag}" >> "$output_file"
       fi
     elif [[ "$mode" == "directory" ]] && [[ -d "${TO_DIR}/catalog-index" ]]; then
       echo "$PLUGIN_INDEX → ${TO_DIR}/catalog-index/" >> "$output_file"
@@ -1257,17 +1270,17 @@ function generate_mapping_file() {
       if [[ "$img_no_prefix" == *"@sha256:"* ]]; then
         local imgDigest="${img_no_prefix##*@sha256:}"
         lastTwo=$(extract_last_two_elements "${img_no_prefix%@*}")
-        targetImg="${TO_REGISTRY}/${lastTwo}@sha256:${imgDigest}"
+        targetImg="${INTERNAL_REGISTRY}/${lastTwo}@sha256:${imgDigest}"
       elif [[ "$img_no_prefix" == *":"* ]]; then
         local imgTag="${img_no_prefix##*:}"
         lastTwo=$(extract_last_two_elements "${img_no_prefix%:*}")
         local clean_tag="${imgTag%%!*}"
-        targetImg="${TO_REGISTRY}/${lastTwo}:$clean_tag"
+        targetImg="${INTERNAL_REGISTRY}/${lastTwo}:$clean_tag"
       else
         lastTwo=$(extract_last_two_elements "${img_no_prefix}")
-        targetImg="${TO_REGISTRY}/${lastTwo}:latest"
+        targetImg="${INTERNAL_REGISTRY}/${lastTwo}:latest"
       fi
-      
+
       echo "$img → oci://$targetImg" >> "$output_file"
     done
     
@@ -1353,7 +1366,10 @@ elif [[ -n "${TO_REGISTRY}" ]]; then
   infof ""
   infof "You can now configure your RHDH deployment to use these mirrored plugins."
   if [[ -n "${PLUGIN_INDEX}" ]]; then
-    infof "The catalog index is available at: ${TO_REGISTRY}/rhdh/plugin-catalog-index"
+    infof "The catalog index is available at: ${INTERNAL_REGISTRY}/rhdh/plugin-catalog-index"
+  fi
+  if [[ "${INTERNAL_REGISTRY}" != "${TO_REGISTRY}" ]]; then
+    infof "Catalog index references point to in-cluster registry: ${INTERNAL_REGISTRY}"
   fi
   infof "Refer to the RHDH documentation for instructions on configuring dynamic plugins"
   infof "in airgapped environments for both operator and helm deployments."
