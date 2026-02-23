@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,7 +26,7 @@ func init() {
 	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, false)
 }
 
-func (p *ConfigMapEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (p *ConfigMapEnvs) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.ConfigMaps == nil {
 		return nil
 	}
@@ -58,7 +58,7 @@ func (p *ConfigMapEnvs) setObject(obj runtime.Object) {
 //}
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
 	p.model = model
 	if p.ConfigMap != nil {
 		model.setRuntimeObject(p)
@@ -68,7 +68,7 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage bsv1.Backsta
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) updateAndValidate(backstage bsv1.Backstage) error {
+func (p *ConfigMapEnvs) updateAndValidate(backstage api.Backstage) error {
 	if p.ConfigMap != nil {
 		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{annotation: p.ConfigMap.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
 			p.ConfigMap.Name, "")
@@ -80,7 +80,7 @@ func (p *ConfigMapEnvs) updateAndValidate(backstage bsv1.Backstage) error {
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (p *ConfigMapEnvs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	p.ConfigMap.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs"))
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }

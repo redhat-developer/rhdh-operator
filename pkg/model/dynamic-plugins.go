@@ -10,7 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +86,7 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 //}
 
 // implementation of RuntimeObject interface
-func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (p *DynamicPlugins) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	p.model = model
 	if p.ConfigMap == nil {
 		return false, nil
@@ -104,7 +104,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
+func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage) error {
 
 	_, initContainer := p.getInitContainer()
 	if initContainer == nil {
@@ -121,12 +121,12 @@ func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
 }
 
 // implementation of RuntimeObject interface
-func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (p *DynamicPlugins) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	p.ConfigMap.SetName(DynamicPluginsDefaultName(backstage.Name))
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
-func (p *DynamicPlugins) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (p *DynamicPlugins) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application != nil && spec.Application.DynamicPluginsConfigMapName != "" {
 
 		_, initContainer := p.getInitContainer()

@@ -51,7 +51,7 @@ metadata:
 data:
   dynamic-plugins.yaml: "includes: []\nplugins: []\n"
 ---
-apiVersion: rhdh.redhat.com/v1alpha5
+apiVersion: rhdh.redhat.com/v1alpha6
 kind: Backstage
 metadata:
   name: my-rhdh-envs

@@ -21,7 +21,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
@@ -32,7 +32,7 @@ import (
 
 func TestDefaultPvcs(t *testing.T) {
 
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pvc",
 		},
@@ -65,7 +65,7 @@ func TestDefaultPvcs(t *testing.T) {
 }
 
 func TestMultiContainersPvc(t *testing.T) {
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pvc",
 		},
@@ -90,14 +90,14 @@ func TestMultiContainersPvc(t *testing.T) {
 }
 
 func TestSpecifiedPvcs(t *testing.T) {
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pvc",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
-					Pvcs: []bsv1.PvcRef{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
+					Pvcs: []api.PvcRef{
 						{
 							Name: "my-pvc1",
 						},
@@ -128,14 +128,14 @@ func TestSpecifiedPvcs(t *testing.T) {
 }
 
 func TestSpecifiedPvcsWithContainers(t *testing.T) {
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pvc",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
-					Pvcs: []bsv1.PvcRef{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
+					Pvcs: []api.PvcRef{
 						{
 							Name:       "my-pvc1",
 							Containers: []string{"*"},
@@ -170,9 +170,9 @@ func TestSpecifiedPvcsWithContainers(t *testing.T) {
 
 func TestPvcsWithNonExistedContainerFailed(t *testing.T) {
 	bs := *configMapFilesTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraFiles: &bsv1.ExtraFiles{
-			Pvcs: []bsv1.PvcRef{
+	bs.Spec.Application = &api.Application{
+		ExtraFiles: &api.ExtraFiles{
+			Pvcs: []api.PvcRef{
 				{
 					Name:       "pvcName",
 					Containers: []string{"another-container"},

@@ -6,7 +6,7 @@ import (
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,7 +34,7 @@ func AppConfigDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-appconfig")
 }
 
-func (b *AppConfig) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (b *AppConfig) addExternalConfig(spec api.BackstageSpec) error {
 
 	if spec.Application == nil || spec.Application.AppConfig == nil || spec.Application.AppConfig.ConfigMaps == nil {
 		return nil
@@ -62,12 +62,7 @@ func (b *AppConfig) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (b *AppConfig) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
-
-// implementation of RuntimeObject interface
-func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (b *AppConfig) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	b.model = model
 	if b.ConfigMap != nil {
 		model.appConfig = b
@@ -78,13 +73,13 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(_ bsv1.Backstage) error {
+func (b *AppConfig) updateAndValidate(_ api.Backstage) error {
 	updatePodWithAppConfig(b.model.backstageDeployment, b.ConfigMap.Name,
 		b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
 	return nil
 }
 
-func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *AppConfig) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.ConfigMap.SetName(AppConfigDefaultName(backstage.Name))
 	setMetaInfo(b.ConfigMap, backstage, scheme)
 }

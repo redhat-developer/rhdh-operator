@@ -1,7 +1,7 @@
 package model
 
 import (
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -30,15 +30,15 @@ type RuntimeObject interface {
 	setObject(object runtime.Object)
 	// adds runtime object to the model
 	// returns false if the object was not added to the model (not configured)
-	addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error)
+	addToModel(model *BackstageModel, backstage api.Backstage) (bool, error)
 	// at this stage all the information is added to the model
 	// this step is for updating the final references and validate the object
-	updateAndValidate(backstage bsv1.Backstage) error
+	updateAndValidate(backstage api.Backstage) error
 	// sets object name, labels and other necessary meta information
-	setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme)
+	setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme)
 }
 
 type ExternalConfigContributor interface {
 	// addExternalConfig adds external configuration to deployment
-	addExternalConfig(spec bsv1.BackstageSpec) error
+	addExternalConfig(spec api.BackstageSpec) error
 }

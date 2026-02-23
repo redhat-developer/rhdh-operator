@@ -16,27 +16,27 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 )
 
 // testBackstageObject it is a helper object to simplify testing model component allowing to customize and isolate testing configuration
 // usual sequence of creating testBackstageObject contains such a steps:
-// createBackstageTest(bsv1.Backstage).
+// createBackstageTest(api.Backstage).
 // withDefaultConfig(useDef bool)
 // addToDefaultConfig(key, fileName)
 type testBackstageObject struct {
-	backstage      bsv1.Backstage
+	backstage      api.Backstage
 	externalConfig ExternalConfig
 	scheme         *runtime.Scheme
 }
 
 // initialises testBackstageObject object
-func createBackstageTest(bs bsv1.Backstage) *testBackstageObject {
+func createBackstageTest(bs api.Backstage) *testBackstageObject {
 	ec := ExternalConfig{
 		RawConfig: map[string]string{},
 	}
 	b := &testBackstageObject{backstage: bs, externalConfig: ec, scheme: runtime.NewScheme()}
-	utilruntime.Must(bsv1.AddToScheme(b.scheme))
+	utilruntime.Must(api.AddToScheme(b.scheme))
 	utilruntime.Must(clientgoscheme.AddToScheme(b.scheme))
 	utilruntime.Must(openshift.Install(b.scheme))
 	return b

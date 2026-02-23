@@ -33,7 +33,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -73,8 +73,8 @@ var _ = When("create backstage PVCs configured", func() {
 		pvcCm := generateConfigMap(ctx, k8sClient, "pvc-conf", ns,
 			map[string]string{"pvcs.yaml": readTestYamlFile("raw-pvcs.yaml")}, nil, nil)
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			RawRuntimeConfig: &bsv1.RuntimeConfig{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			RawRuntimeConfig: &api.RuntimeConfig{
 				BackstageConfigName: pvcCm,
 			},
 		}, "")
@@ -169,8 +169,8 @@ var _ = When("create backstage PVCs configured", func() {
 		pvcCm := generateConfigMap(ctx, k8sClient, "pvc-conf", ns,
 			map[string]string{"pvcs.yaml": readTestYamlFile("raw-pvcs2.yaml")}, nil, nil)
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			RawRuntimeConfig: &bsv1.RuntimeConfig{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			RawRuntimeConfig: &api.RuntimeConfig{
 				BackstageConfigName: pvcCm,
 			},
 		}, "")
@@ -253,10 +253,10 @@ var _ = When("create backstage PVCs configured", func() {
 		pvcCm := generateConfigMap(ctx, k8sClient, "pvc-conf", ns,
 			map[string]string{"pvcs.yaml": readTestYamlFile("raw-pvcs.yaml")}, nil, nil)
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
-					Pvcs: []bsv1.PvcRef{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
+					Pvcs: []api.PvcRef{
 						{
 							Name: "my-pvc1",
 						},
@@ -267,7 +267,7 @@ var _ = When("create backstage PVCs configured", func() {
 					},
 				},
 			},
-			RawRuntimeConfig: &bsv1.RuntimeConfig{
+			RawRuntimeConfig: &api.RuntimeConfig{
 				BackstageConfigName: pvcCm,
 			},
 		}, "")

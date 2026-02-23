@@ -20,7 +20,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
@@ -98,7 +98,7 @@ func registerConfig(key string, factory ObjectFactory, multiple bool) {
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
-func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, platform platform.Platform, scheme *runtime.Scheme) (*BackstageModel, error) {
+func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig ExternalConfig, platform platform.Platform, scheme *runtime.Scheme) (*BackstageModel, error) {
 
 	// 3 phases of Backstage configuration:
 	// 1- load from Operator defaults, modify metadata (labels, selectors..) and namespace as needed
@@ -185,7 +185,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 }
 
 // Every RuntimeObject.setMetaInfo should as minimum call this
-func setMetaInfo(clientObj client.Object, backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func setMetaInfo(clientObj client.Object, backstage api.Backstage, scheme *runtime.Scheme) {
 
 	clientObj.SetNamespace(backstage.Namespace)
 	clientObj.SetLabels(utils.SetKubeLabels(clientObj.GetLabels(), backstage.Name))

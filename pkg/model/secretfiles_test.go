@@ -11,7 +11,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -19,16 +19,16 @@ import (
 )
 
 var (
-	secretFilesTestBackstage = bsv1.Backstage{
+	secretFilesTestBackstage = api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
 					MountPath: "/my/path",
-					Secrets:   []bsv1.FileObjectRef{},
+					Secrets:   []api.FileObjectRef{},
 				},
 			},
 		},
@@ -55,12 +55,12 @@ func TestDefaultSecretFiles(t *testing.T) {
 
 func TestDefaultMultiSecretFiles(t *testing.T) {
 
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bs",
 		},
-		Spec: bsv1.BackstageSpec{
-			Database: &bsv1.Database{
+		Spec: api.BackstageSpec{
+			Database: &api.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
@@ -90,10 +90,10 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	// 0 - expected subPath="conf.yaml", expected defaultMountPath=/
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret2", MountPath: "/custom/path"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret2", MountPath: "/custom/path"})
 	// https://issues.redhat.com/browse/RHIDP-2246 - mounting secret/CM with dot in the name
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret.dot", Key: "conf3.yaml"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret.dot", Key: "conf3.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -133,7 +133,7 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 func TestFailedValidation(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -145,7 +145,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
 	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(map[string]string{"conf.yaml": ""}, nil)}
@@ -168,7 +168,7 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
 	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(nil, map[string][]byte{"conf.yaml": []byte("")})}
@@ -193,9 +193,9 @@ func TestSpecifiedSecretFilesWithContainers(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf1.yaml", Containers: []string{"install-dynamic-plugins", "another-container"}})
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret3", MountPath: "rel", Containers: []string{"*"}})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", Key: "conf1.yaml", Containers: []string{"install-dynamic-plugins", "another-container"}})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret3", MountPath: "rel", Containers: []string{"*"}})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
 
@@ -221,9 +221,9 @@ func TestSpecifiedSecretFilesWithContainers(t *testing.T) {
 
 func TestSecretFilesWithNonExistedContainerFailed(t *testing.T) {
 	bs := *configMapFilesTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraFiles: &bsv1.ExtraFiles{
-			ConfigMaps: []bsv1.FileObjectRef{
+	bs.Spec.Application = &api.Application{
+		ExtraFiles: &api.ExtraFiles{
+			ConfigMaps: []api.FileObjectRef{
 				{
 					Name:       "secretName",
 					Containers: []string{"another-container"},
@@ -244,7 +244,7 @@ func TestReplaceSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", MountPath: DefaultMountDir})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", MountPath: DefaultMountDir})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 

@@ -18,7 +18,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
@@ -89,7 +89,7 @@ func (b *BackstageDeployment) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
 	if b.deployable.GetObject() == nil {
 		return false, fmt.Errorf("backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
 	}
@@ -127,7 +127,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error {
+func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage) error {
 
 	//DbSecret
 	var err error
@@ -144,7 +144,7 @@ func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error 
 	return nil
 }
 
-func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *BackstageDeployment) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.deployable.GetObject().SetName(DeploymentName(backstage.Name))
 	utils.GenerateLabel(&b.deployable.PodObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
 
@@ -220,7 +220,7 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 
 // setDeployment sets the deployment object from the backstage configuration
 // it merges the deployment object with the patch from the backstage configuration
-func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
+func (b *BackstageDeployment) setDeployment(backstage api.Backstage) error {
 
 	// set from backstage.Spec.Deployment
 	if backstage.Spec.Deployment != nil {
@@ -294,7 +294,7 @@ func (b *BackstageDeployment) setImage(image *string) {
 
 // adds environment from source to the Backstage Container
 // If an env var with the same name already exists, it will be replaced (not duplicated)
-func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
+func (b *BackstageDeployment) addExtraEnvs(extraEnvs *api.ExtraEnvs) error {
 	if extraEnvs == nil {
 		return nil
 	}

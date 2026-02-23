@@ -11,7 +11,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,7 +30,7 @@ var _ = When("create default rhdh", func() {
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
@@ -193,7 +193,7 @@ var _ = When("create default rhdh", func() {
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		bs2 := &bsv1.Backstage{}
+		bs2 := &api.Backstage{}
 
 		err := readYamlFile("testdata/rhdh-replace-dynaplugin-root.yaml", bs2)
 		Expect(err).To(Not(HaveOccurred()))
@@ -240,10 +240,10 @@ var _ = When("create default rhdh", func() {
 		ns := createNamespace(ctx)
 		npmrcSecret := generateSecret(ctx, k8sClient, "my-dynamic-plugins-npmrc", ns, map[string]string{".npmrc": "new-npmrc"}, nil, nil)
 
-		bsSpec := bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
-					Secrets: []bsv1.FileObjectRef{
+		bsSpec := api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
+					Secrets: []api.FileObjectRef{
 						{
 							Name:      npmrcSecret,
 							MountPath: "/opt/app-root/src/.npmrc.dynamic-plugins",

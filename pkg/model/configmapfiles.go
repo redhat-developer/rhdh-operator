@@ -6,7 +6,7 @@ import (
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +27,7 @@ func init() {
 	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false)
 }
 
-func (p *ConfigMapFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (p *ConfigMapFiles) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
 		return nil
 	}
@@ -63,7 +63,7 @@ func (p *ConfigMapFiles) setObject(obj runtime.Object) {
 //}
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	p.model = model
 	if p.ConfigMap != nil {
 		model.setRuntimeObject(p)
@@ -73,7 +73,7 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapFiles) updateAndValidate(_ bsv1.Backstage) error {
+func (p *ConfigMapFiles) updateAndValidate(_ api.Backstage) error {
 
 	keys := append(maps.Keys(p.ConfigMap.Data), maps.Keys(p.ConfigMap.BinaryData)...)
 	err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: p.ConfigMap.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
@@ -85,7 +85,7 @@ func (p *ConfigMapFiles) updateAndValidate(_ bsv1.Backstage) error {
 	return nil
 }
 
-func (p *ConfigMapFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (p *ConfigMapFiles) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	p.ConfigMap.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files"))
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }

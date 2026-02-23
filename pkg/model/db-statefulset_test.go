@@ -11,21 +11,21 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var dbStatefulSetBackstage = &bsv1.Backstage{
+var dbStatefulSetBackstage = &api.Backstage{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "bs",
 		Namespace: "ns123",
 	},
-	Spec: bsv1.BackstageSpec{
-		Database:    &bsv1.Database{},
-		Application: &bsv1.Application{},
+	Spec: api.BackstageSpec{
+		Database:    &api.Database{},
+		Application: &api.Application{},
 	},
 }
 

@@ -24,7 +24,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,7 +70,7 @@ type BackstageReconciler struct {
 func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	lg := log.FromContext(ctx)
 
-	backstage := bs.Backstage{}
+	backstage := api.Backstage{}
 	if err := r.Get(ctx, req.NamespacedName, &backstage); err != nil {
 		if errors.IsNotFound(err) {
 			lg.Info("backstage gone from the namespace")
@@ -80,7 +80,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// This update will make sure the status is always updated in case of any errors or successful result
-	defer func(bs *bs.Backstage) {
+	defer func(bs *api.Backstage) {
 		if err := r.Client.Status().Update(ctx, bs); err != nil {
 			if errors.IsConflict(err) {
 				lg.V(1).Info("Backstage object modified, retry syncing status", "Backstage Object", bs)
@@ -91,7 +91,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}(&backstage)
 
 	if len(backstage.Status.Conditions) == 0 {
-		setStatusCondition(&backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonInProgress, "Deployment process started")
+		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Deployment process started")
 	}
 
 	// 1. Preliminary read and prepare external config objects from the specs (configMaps, Secrets)
@@ -131,8 +131,8 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func errorAndStatus(backstage *bs.Backstage, msg string, err error) error {
-	setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, fmt.Sprintf("%s %s", msg, err))
+func errorAndStatus(backstage *api.Backstage, msg string, err error) error {
+	setStatusCondition(backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonFailed, fmt.Sprintf("%s %s", msg, err))
 	return fmt.Errorf("%s: %w", msg, err)
 }
 
@@ -187,7 +187,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 	return nil
 }
 
-func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Backstage) error {
+func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage api.Backstage) error {
 
 	const failedToCleanup = "failed to cleanup runtime"
 	// check if local database disabled, respective objects have to deleted/unowned
@@ -235,7 +235,7 @@ func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	b := ctrl.NewControllerManagedBy(mgr).
-		For(&bs.Backstage{})
+		For(&api.Backstage{})
 
 	if err := r.addWatchers(b); err != nil {
 		return err

@@ -221,7 +221,7 @@ spec:
 The desired state of resources created by the Backstage Operator is defined in the Backstage Custom Resource Spec. Here’s an example of a simple Backstage CR:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha5
+apiVersion: rhdh.redhat.com/v1alpha6
 kind: Backstage
 metadata:
   name: mybackstage

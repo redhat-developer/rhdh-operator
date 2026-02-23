@@ -5,7 +5,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"sigs.k8s.io/yaml"
@@ -30,7 +30,7 @@ func RouteName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage")
 }
 
-func (b *BackstageRoute) setRoute(specified *bsv1.Route) {
+func (b *BackstageRoute) setRoute(specified *api.Route) {
 
 	if len(specified.Host) > 0 {
 		b.route.Spec.Host = specified.Host
@@ -95,7 +95,7 @@ func (b *BackstageRoute) setObject(obj runtime.Object) {
 //}
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (b *BackstageRoute) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
 
 	b.model = model
 	// not Openshift
@@ -132,13 +132,13 @@ func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backst
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) updateAndValidate(backstage bsv1.Backstage) error {
+func (b *BackstageRoute) updateAndValidate(backstage api.Backstage) error {
 	b.route.Spec.To.Name = b.model.backstageService.service.Name
 	b.updateAppConfigWithBaseUrls(b.model, backstage)
 	return nil
 }
 
-func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *BackstageRoute) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.route.SetName(RouteName(backstage.Name))
 	setMetaInfo(b.route, backstage, scheme)
 }
@@ -146,7 +146,7 @@ func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 // updateAppConfigWithBaseUrls tries to set the baseUrl in the default app-config.
 // Note that this is purposely done on a best effort basis. So it is not considered an issue if the cluster ingress domain
 // could not be determined, since the user can always set it explicitly in their custom app-config.
-func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstage bsv1.Backstage) {
+func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstage api.Backstage) {
 	if m.appConfig == nil || m.appConfig.ConfigMap == nil {
 		klog.V(1).Infof(
 			"Default app-config ConfigMap not initialized yet - skipping automatic population of base URLS in the default app-config for Backstage %s",
@@ -205,7 +205,7 @@ func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstag
 
 // buildBaseUrl returns the base URL that should be considered as default on OpenShift,
 // per the cluster ingress domain and the Route spec.
-func buildBaseUrl(model *BackstageModel, backstage bsv1.Backstage) string {
+func buildBaseUrl(model *BackstageModel, backstage api.Backstage) string {
 	host := fmt.Sprintf("%s-%s", RouteName(backstage.Name), backstage.Namespace)
 	appendIngressDomain := true
 	if backstage.Spec.Application != nil && backstage.Spec.Application.Route != nil {
