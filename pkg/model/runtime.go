@@ -118,7 +118,6 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		//var templ = backstageObject.EmptyObject()
 		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), *scheme, platform.Extension); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
