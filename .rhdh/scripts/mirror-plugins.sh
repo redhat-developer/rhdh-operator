@@ -314,32 +314,33 @@ function check_image_exists() {
 
 # Get the effective registry reference, trying fallback if primary doesn't exist
 # Outputs: "0|<ref>" for primary registry, "1|<ref>" for fallback registry
-# Returns 0 on success, 1 on failure (image not found anywhere)
+# Returns 0 on success (always returns 0 - skopeo copy will fail later if image doesn't exist)
 # Note: This function outputs only the result to stdout; callers handle logging
+#
+# Only performs existence check for registry.access.redhat.com/rhdh images to determine
+# whether to use the primary or fallback registry. For all other registries, returns
+# immediately without network calls.
 function get_effective_registry_ref() {
   local docker_ref="$1"
   
-  # Check if the image exists at the primary location
+  # For non-RHDH registries, return immediately without existence check
+  # skopeo copy will fail later if the image doesn't exist
+  if [[ "$docker_ref" != "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]]; then
+    echo "0|$docker_ref"
+    return 0
+  fi
+  
+  # For RHDH images, check if it exists at the primary location
   if check_image_exists "$docker_ref"; then
     echo "0|$docker_ref"
     return 0
   fi
   
-  # If the source is registry.access.redhat.com/rhdh, try fallback to quay.io/rhdh
-  if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]]; then
-    local fallback_ref="${docker_ref/${PRIMARY_SOURCE_REGISTRY}/${FALLBACK_SOURCE_REGISTRY}}"
-    
-    if check_image_exists "$fallback_ref"; then
-      echo "1|$fallback_ref"
-      return 0
-    fi
-    
-    # Neither primary nor fallback exists
-    return 1
-  fi
-  
-  # For non-RHDH registries, just report the failure
-  return 1
+  # Primary doesn't exist, use fallback (quay.io/rhdh)
+  # Don't check existence - skopeo copy will fail later if it doesn't exist
+  local fallback_ref="${docker_ref/${PRIMARY_SOURCE_REGISTRY}/${FALLBACK_SOURCE_REGISTRY}}"
+  echo "1|$fallback_ref"
+  return 0
 }
 
 # Copy OCI image using skopeo
@@ -353,16 +354,9 @@ function mirror_image() {
   local docker_ref="${src_image%!*}"
   docker_ref="${docker_ref#oci://}"
   
-  # Check if image exists and get effective registry reference (with fallback if needed)
+  # Get effective registry reference (with fallback for RHDH images if needed)
   local registry_result
-  if ! registry_result=$(get_effective_registry_ref "$docker_ref"); then
-    if [[ "$docker_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]]; then
-      errorf "Image not found at both ${PRIMARY_SOURCE_REGISTRY} and ${FALLBACK_SOURCE_REGISTRY}: $docker_ref"
-    else
-      errorf "Failed to find image: $docker_ref"
-    fi
-    return 1
-  fi
+  registry_result=$(get_effective_registry_ref "$docker_ref")
   local used_fallback="${registry_result%%|*}"
   local effective_ref="${registry_result#*|}"
   
@@ -417,16 +411,9 @@ function resolve_plugin_index() {
     
     debugf "Extracting plugin catalog index image: $registry_ref"
     
-    # Check if catalog index exists and get effective registry reference (with fallback if needed)
+    # Get effective registry reference (with fallback for RHDH images if needed)
     local registry_result
-    if ! registry_result=$(get_effective_registry_ref "$registry_ref"); then
-      if [[ "$registry_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]]; then
-        errorf "Catalog index not found at both ${PRIMARY_SOURCE_REGISTRY} and ${FALLBACK_SOURCE_REGISTRY}: $registry_ref"
-      else
-        errorf "Failed to find catalog index image: $registry_ref"
-      fi
-      return 1
-    fi
+    registry_result=$(get_effective_registry_ref "$registry_ref")
     local used_fallback="${registry_result%%|*}"
     local effective_ref="${registry_result#*|}"
     
@@ -553,16 +540,9 @@ function mirror_catalog_index() {
 
   debugf "Original registry: $original_registry, Catalog: $catalog_name, Tag: $catalog_tag"
   
-  # Check if catalog index exists and get effective registry reference (with fallback if needed)
+  # Get effective registry reference (with fallback for RHDH images if needed)
   local registry_result
-  if ! registry_result=$(get_effective_registry_ref "$registry_ref"); then
-    if [[ "$registry_ref" == "${PRIMARY_SOURCE_REGISTRY}/rhdh/"* ]]; then
-      errorf "Catalog index not found at both ${PRIMARY_SOURCE_REGISTRY} and ${FALLBACK_SOURCE_REGISTRY}: $registry_ref"
-    else
-      errorf "Failed to find catalog index image: $registry_ref"
-    fi
-    return 1
-  fi
+  registry_result=$(get_effective_registry_ref "$registry_ref")
   local used_fallback="${registry_result%%|*}"
   local effective_ref="${registry_result#*|}"
   
@@ -1100,6 +1080,11 @@ function mirror_plugins_from_dir() {
     local updated_index="$catalog_dir/index-updated.json"
     infof "Updating plugin registry references in index.json..."
     
+    if [[ -z "$INTERNAL_REGISTRY" ]]; then
+      warnf "INTERNAL_REGISTRY not set, skipping index.json update"
+      return 0
+    fi
+    
     if ! jq --arg target_reg "$INTERNAL_REGISTRY" '
       . | with_entries(
         .value.registryReference |= (
@@ -1112,7 +1097,7 @@ function mirror_plugins_from_dir() {
           end
         )
       )
-    ' "$catalog_dir/index.json" > "$updated_index" 2>/dev/null || [[ ! -s "$updated_index" ]]; then
+    ' "$catalog_dir/index.json" > "$updated_index" || [[ ! -s "$updated_index" ]]; then
       warnf "Failed to update index.json with new registry references"
       return 0
     fi
