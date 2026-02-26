@@ -23,7 +23,7 @@ type DbSecret struct {
 }
 
 func init() {
-	registerConfig("db-secret.yaml", DbSecretFactory{}, false)
+	registerConfig("db-secret.yaml", DbSecretFactory{}, false, FlavourMergePolicyNoFlavour)
 }
 
 func DbSecretDefaultName(backstageName string) string {

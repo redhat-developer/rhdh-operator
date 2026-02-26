@@ -24,7 +24,7 @@ type ConfigMapFiles struct {
 }
 
 func init() {
-	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false)
+	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false, FlavourMergePolicyNoFlavour)
 }
 
 func (p *ConfigMapFiles) addExternalConfig(spec api.BackstageSpec) error {
@@ -56,11 +56,6 @@ func (p *ConfigMapFiles) setObject(obj runtime.Object) {
 		p.ConfigMap = obj.(*corev1.ConfigMap)
 	}
 }
-
-// implementation of RuntimeObject interface
-//func (p *ConfigMapFiles) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {

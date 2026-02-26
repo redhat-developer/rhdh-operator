@@ -26,7 +26,7 @@ type SecretEnvs struct {
 }
 
 func init() {
-	registerConfig(SecretEnvsObjectKey, SecretEnvsFactory{}, true)
+	registerConfig(SecretEnvsObjectKey, SecretEnvsFactory{}, true, FlavourMergePolicyNoFlavour)
 }
 
 func (p *SecretEnvs) addExternalConfig(spec api.BackstageSpec) error {
@@ -55,11 +55,6 @@ func (p *SecretEnvs) setObject(obj runtime.Object) {
 		p.secrets = obj.(*multiobject.MultiObject)
 	}
 }
-
-// implementation of RuntimeObject interface
-//func (p *SecretEnvs) EmptyObject() client.Object {
-//	return &corev1.Secret{}
-//}
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {

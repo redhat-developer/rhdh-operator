@@ -23,7 +23,7 @@ type ConfigMapEnvs struct {
 }
 
 func init() {
-	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, false)
+	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, false, FlavourMergePolicyNoFlavour)
 }
 
 func (p *ConfigMapEnvs) addExternalConfig(spec api.BackstageSpec) error {
@@ -51,11 +51,6 @@ func (p *ConfigMapEnvs) setObject(obj runtime.Object) {
 		p.ConfigMap = obj.(*corev1.ConfigMap)
 	}
 }
-
-// EmptyObject implements RuntimeObject interface
-//func (p *ConfigMapEnvs) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {

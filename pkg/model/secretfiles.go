@@ -29,7 +29,7 @@ type SecretFiles struct {
 }
 
 func init() {
-	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true)
+	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true, FlavourMergePolicyNoFlavour)
 }
 
 func (p *SecretFiles) addExternalConfig(spec api.BackstageSpec) error {
@@ -66,11 +66,6 @@ func (p *SecretFiles) setObject(obj runtime.Object) {
 		p.secrets = obj.(*multiobject.MultiObject)
 	}
 }
-
-// implementation of RuntimeObject interface
-//func (p *SecretFiles) EmptyObject() client.Object {
-//	return &corev1.Secret{}
-//}
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {

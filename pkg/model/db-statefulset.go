@@ -28,7 +28,7 @@ type DbStatefulSet struct {
 }
 
 func init() {
-	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false)
+	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false, FlavourMergePolicyNoFlavour)
 }
 
 func DbStatefulSetName(backstageName string) string {
@@ -72,11 +72,6 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, _ api.Backstage) (bool
 
 	return true, nil
 }
-
-// implementation of RuntimeObject interface
-//func (b *DbStatefulSet) EmptyObject() client.Object {
-//	return &appsv1.StatefulSet{}
-//}
 
 // implementation of RuntimeObject interface
 func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage) error {

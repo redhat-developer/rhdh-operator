@@ -19,7 +19,7 @@ func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
 }
 
 func init() {
-	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true)
+	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true, FlavourMergePolicyNoFlavour)
 }
 
 func (b *BackstagePvcs) addExternalConfig(spec api.BackstageSpec) error {
@@ -61,10 +61,6 @@ func (b *BackstagePvcs) Object() runtime.Object {
 func (b *BackstagePvcs) setObject(object runtime.Object) {
 	b.pvcs = object.(*multiobject.MultiObject)
 }
-
-//func (b *BackstagePvcs) EmptyObject() client.Object {
-//	return &corev1.PersistentVolumeClaim{}
-//}
 
 func (b *BackstagePvcs) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	b.model = model

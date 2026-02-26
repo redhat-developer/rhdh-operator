@@ -23,7 +23,7 @@ type BackstageService struct {
 }
 
 func init() {
-	registerConfig("service.yaml", BackstageServiceFactory{}, false)
+	registerConfig("service.yaml", BackstageServiceFactory{}, false, FlavourMergePolicyNoFlavour)
 }
 
 func ServiceName(backstageName string) string {

@@ -23,7 +23,7 @@ type DbService struct {
 }
 
 func init() {
-	registerConfig("db-service.yaml", DbServiceFactory{}, false)
+	registerConfig("db-service.yaml", DbServiceFactory{}, false, FlavourMergePolicyNoFlavour)
 }
 
 func DbServiceName(backstageName string) string {

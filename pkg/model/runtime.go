@@ -93,8 +93,13 @@ func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
 }
 
 // Registers config object
-func registerConfig(key string, factory ObjectFactory, multiple bool) {
-	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory, Multiple: multiple})
+func registerConfig(key string, factory ObjectFactory, multiple bool, mergePolicy FlavourMergePolicy) {
+	runtimeConfig = append(runtimeConfig, ObjectConfig{
+		Key:                key,
+		ObjectFactory:      factory,
+		Multiple:           multiple,
+		FlavourMergePolicy: mergePolicy,
+	})
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
@@ -111,6 +116,12 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 
 	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: platform.IsOpenshift(), DynamicPlugins: DynamicPlugins{}}
 
+	// Get enabled flavours once for all configs
+	flavours, err := GetEnabledFlavours(backstage.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine enabled flavours: %w", err)
+	}
+
 	ecs := make([]ExternalConfigContributor, 0)
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
@@ -118,11 +129,11 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), *scheme, platform.Extension); err != nil {
+		if objs, err := ReadDefaultConfig(conf, conf.Key, flavours, *scheme, platform.Extension); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}
-		} else {
+		} else if len(objs) > 0 {
 			if obj, err := adjustObject(conf, objs); err != nil {
 				return nil, fmt.Errorf("failed to initialize object: %w", err)
 			} else {
@@ -135,7 +146,6 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {
 			// new object to replace default, not merge
-			// templ = backstageObject.EmptyObject()
 			if objs, err := utils.ReadYamls([]byte(overlay), nil, *scheme); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
 					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
@@ -201,7 +211,9 @@ func adjustObject(objectConfig ObjectConfig, objects []client.Object) (runtime.O
 	if len(objects) == 0 {
 		return nil, nil
 	}
+
 	if !objectConfig.Multiple {
+		// only one object expected
 		if len(objects) > 1 {
 			return nil, fmt.Errorf("multiple objects not expected for: %s", objectConfig.Key)
 		}

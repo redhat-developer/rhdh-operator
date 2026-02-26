@@ -74,7 +74,7 @@ func (b *BackstageRoute) setRoute(specified *api.Route) {
 }
 
 func init() {
-	registerConfig("route.yaml", BackstageRouteFactory{}, false)
+	registerConfig("route.yaml", BackstageRouteFactory{}, false, FlavourMergePolicyNoFlavour)
 }
 
 // implementation of RuntimeObject interface
@@ -88,11 +88,6 @@ func (b *BackstageRoute) setObject(obj runtime.Object) {
 		b.route = obj.(*openshift.Route)
 	}
 }
-
-// implementation of RuntimeObject interface
-//func (b *BackstageRoute) EmptyObject() client.Object {
-//	return &openshift.Route{}
-//}
 
 // implementation of RuntimeObject interface
 func (b *BackstageRoute) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
