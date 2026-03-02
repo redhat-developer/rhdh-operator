@@ -54,7 +54,7 @@ backstage-psql-bs1-0             1/1     Running   0             34m
 ```
 
 4. Port forward Backstage pod/port (destination port is **17007** in this example) and get URL for access Backstage.
-The Backstage pod name follows a pattern: **backstage-<name-of-CR>-<random-sequence>**
+The Backstage pod name follows a pattern: `backstage-<name-of-CR>-<random-sequence>`.
 Taking the previous item as an example, your backstage pod name would be `backstage-bs1-6c98c4dd6d-9wbgg`
 
 ```sh
