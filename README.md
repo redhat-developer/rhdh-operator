@@ -1,7 +1,7 @@
 # Backstage Operator
 
 ## The Goal
-The Goal of [Backstage](https://backstage.io) Operator project is creating Kubernetes Operator for configuring, installing and synchronizing Backstage instance on Kubernetes/OpenShift. 
+The goal of the [Backstage](https://backstage.io) Operator project is to create a Kubernetes Operator for configuring, installing and synchronizing Backstage instances on Kubernetes/OpenShift. 
 The initial target is in support of Red Hat's assemblies of Backstage - specifically supporting [dynamic-plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md) on OpenShift. This includes [Red Hat Developer Hub (RHDH)](https://developers.redhat.com/rhdh) but may be flexible enough to install any compatible Backstage instance on Kubernetes. See additional information under [Configuration](docs/configuration.md).
 The Operator provides clear and flexible configuration options to satisfy a wide range of expectations, from "no configuration for default quick start" to "highly customized configuration for production".
 
@@ -29,39 +29,45 @@ git clone https://github.com/redhat-developer/rhdh-operator
 cd <your-rhdh-operator-project-dir>
 make deploy
 ```
-you can check if the Operator pod is up by running 
+You can check if the Operator pod is up by running:
 ```sh
-kubectl get pods -n backstage-system
+kubectl get pods -n rhdh-operator
+```
 It should be something like:
-NAME                                           READY   STATUS    RESTARTS   AGE
-backstage-controller-manager-cfc44bdfd-xzk8g   2/2     Running   0          32s
+```
+NAME                              READY   STATUS    RESTARTS   AGE
+rhdh-operator-975455fb7-q7xvd     1/1     Running   0          32s
 ```
 3. Create Backstage Custom resource on some namespace (make sure this namespace exists)
 ```sh
 kubectl -n <your-namespace> apply -f examples/bs1.yaml
 ```
-you can check if the Operand pods are up by running
+You can check if the Operand pods are up by running:
 ```sh
 kubectl get pods -n <your-namespace>
+```
 It should be something like:
+```
 NAME                             READY   STATUS    RESTARTS      AGE
 backstage-bs1-6c98c4dd6d-9wbgg   1/1     Running   3 (34m ago)   34m
 backstage-psql-bs1-0             1/1     Running   0             34m
-
 ```
 
-5. Port forward Backstage pod/port (destination port is **17007** in this example) and get URL for access Backstage.
-Backstage-pod-name has a following pattern: **backstage-<name-of-CR>-<random-sequence>**
-Taking previous item, your backstage-pod-name would be `backstage-bs1-6c98c4dd6d-9wbgg`
+4. Port forward Backstage pod/port (destination port is **17007** in this example) and get URL for access Backstage.
+The Backstage pod name follows a pattern: **backstage-<name-of-CR>-<random-sequence>**
+Taking the previous item as an example, your backstage pod name would be `backstage-bs1-6c98c4dd6d-9wbgg`
 
 ```sh
 minikube service -n <your-namespace> backstage --url
 kubectl port-forward -n <your-namespace> <backstage-pod-name> 17007:7007
+```
 
 Output:
+```
 Forwarding from 127.0.0.1:17007 -> 7007
 Forwarding from [::1]:17007 -> 7007
 ```
+
 5. Access your Backstage instance in a browser using http://localhost:17007
 
 ## More documentation
