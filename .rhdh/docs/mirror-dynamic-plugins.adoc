@@ -29,6 +29,8 @@ bash mirror-plugins.sh \
     --to-registry registry.example.com
 ----
 
+NOTE: The script automatically falls back to `quay.io/rhdh` if plugins are not yet available in `registry.access.redhat.com/rhdh`. This is normal for unreleased or development builds. You may see warning messages indicating fallback usage.
+
 [#_fully_disconnected_workflow]
 ==== Mirroring to a fully disconnected environment
 
@@ -85,6 +87,10 @@ Create a text file listing the plugins to mirror (one per line):
 oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-quay:1.8.0--1.22.1!backstage-community-plugin-quay
 oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-github-actions:1.8.0--0.11.1!backstage-community-plugin-github-actions
 oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-azure-devops:1.8.0--0.8.2!backstage-community-plugin-azure-devops
+oci://quay.io/rhdh-plugin-catalog/backstage-community-plugin-dynatrace:1.8.0--10.6.0!backstage-community-plugin-dynatrace
+
+# 3-level registry paths (e.g., ghcr.io) are also supported
+oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-community-plugin-scaffolder-backend-module-quay:bs_1.45.3__2.14.0
 ----
 
 Mirror the plugins from the file:
@@ -110,8 +116,48 @@ bash mirror-plugins.sh \
     --to-registry registry.example.com
 ----
 
+[#_ocp_internal_registry]
+==== Mirroring to OpenShift Container Platform internal registry
+
+When mirroring to OpenShift Container Platform (OCP), you may need to specify different registry addresses for pushing images versus the in-cluster address that RHDH uses to pull plugins. Use `--to-registry` for the external route (used for pushing) and `--internal-registry` for the in-cluster service address (used in catalog index references).
+
+[source,console]
+----
+bash mirror-plugins.sh \
+    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --to-registry default-route-openshift-image-registry.apps.example.com \
+    --internal-registry image-registry.openshift-image-registry.svc:5000
+----
+
+NOTE: The `--internal-registry` option is only needed when the push registry differs from the in-cluster address. If not specified, it defaults to the `--to-registry` value. The script automatically updates the catalog index with the correct in-cluster registry references.
+
 === Using mirrored plugins
 
 After mirroring completes, the script generates a `rhdh-plugin-mirroring-summary.txt` file containing mappings of all mirrored plugins. Use this file to reference the correct mirrored plugin URLs when configuring your RHDH deployment.
 
+IMPORTANT: When mirroring from a catalog index, the script automatically rebuilds the catalog index image with updated registry references pointing to your mirrored location. This ensures the catalog index works correctly in your disconnected environment. The mirrored catalog index is available at the same path as the original, but with your target registry.
+
 For Operator deployments, configure the `Backstage` Custom Resource with the mirrored plugin references. For Helm deployments, update your values file with the mirrored plugin references. See link:https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.8/html/installing_and_viewing_plugins_in_red_hat_developer_hub/assembly-third-party-plugins#proc-load-plugin-oci-image_assembly-install-third-party-plugins-rhdh[Red Hat Developer Hub Documentation] for configuration details.
+
+=== Additional features
+
+==== Automatic registry fallback
+
+The script automatically falls back to `quay.io/rhdh` when plugins are not yet available in `registry.access.redhat.com/rhdh`. This is useful for:
+* Unreleased plugins that are only available in development registries
+* Testing with pre-release builds
+
+You may see warning messages like:
+----
+[WARN] Image not found at registry.access.redhat.com, using fallback: quay.io
+----
+
+This is expected behavior and indicates the script is using the fallback registry.
+
+==== Registry path compatibility
+
+The script automatically handles different registry path formats:
+* 2-level paths: `registry.io/namespace/image` (e.g., `quay.io/rhdh/plugin`)
+* 3-level paths: `registry.io/org/sub/image` (e.g., `ghcr.io/redhat-developer/rhdh-plugin-export-overlays/plugin`)
+
+For OpenShift Container Platform internal registries (which only support 2-level paths), the script automatically flattens 3-level paths to 2-level paths by keeping only the last two path elements.
