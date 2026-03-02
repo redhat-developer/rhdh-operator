@@ -914,7 +914,7 @@ EOF
     nbExtraImgs=${#EXTRA_IMAGES[@]}
     if [ "$nbExtraImgs" -ge 1 ]; then
       cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
-      additionalImages:
+  additionalImages:
 EOF
       for extraImg in "${EXTRA_IMAGES[@]}"; do
         cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
