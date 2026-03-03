@@ -237,7 +237,7 @@ func DynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev
 	return -1, nil
 }
 
-func MergePluginsData(firstData string, secondData string) (string, error) {
+func MergePluginsData(firstData, secondData string) (string, error) {
 
 	if firstData == "" {
 		return secondData, nil
@@ -248,15 +248,13 @@ func MergePluginsData(firstData string, secondData string) (string, error) {
 	}
 
 	var firstPluginsConfig, secondPluginsConfig, mergedPluginsConfig DynaPluginsConfig
-	if firstData != "" {
-		if err := yaml.Unmarshal([]byte(firstData), &firstPluginsConfig); err != nil {
-			return "", fmt.Errorf("failed to unmarshal first ConfigMap data: %w", err)
-		}
+
+	if err := yaml.Unmarshal([]byte(firstData), &firstPluginsConfig); err != nil {
+		return "", fmt.Errorf("failed to unmarshal first ConfigMap data: %w", err)
 	}
-	if secondData != "" {
-		if err := yaml.Unmarshal([]byte(secondData), &secondPluginsConfig); err != nil {
-			return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
-		}
+
+	if err := yaml.Unmarshal([]byte(secondData), &secondPluginsConfig); err != nil {
+		return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
 	}
 
 	// Merge Plugins by package field
