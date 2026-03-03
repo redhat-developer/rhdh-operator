@@ -27,7 +27,8 @@ type Flavour struct {
 	Name string `json:"name"`
 
 	// Enabled controls whether this flavour is active.
-	// When true, the flavour's configuration files are loaded and merged.
+	// Defaults to true when not specified.
+	// Set to false to explicitly disable a flavour (including default flavours).
 	// +optional
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
@@ -58,8 +59,11 @@ type BackstageSpec struct {
 	// Flavours specifies which pre-configured templates to enable.
 	// Flavours are variations of the default configuration that extend and override
 	// base defaults with domain-specific customizations.
-	// If not specified, flavours with enabledByDefault: true in their metadata are used.
-	// Empty array disables all flavours (base defaults only).
+	//
+	// If not specified (nil), flavours with enabledByDefault: true in their metadata are used.
+	// If specified as empty array ([]), default flavours are still used.
+	// To disable a default flavour, explicitly list it with enabled: false.
+	//
 	// Multiple flavours can be enabled - configs are merged in the order specified.
 	// +optional
 	Flavours []Flavour `json:"flavours,omitempty"`

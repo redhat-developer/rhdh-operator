@@ -24,7 +24,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha6"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
@@ -34,7 +34,7 @@ import (
 
 // Add additional details to the Backstage Spec helping in making Backstage RuntimeObjects Model
 // Validates Backstage Spec and fails fast if something not correct
-func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1.Backstage) (model.ExternalConfig, error) {
+func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage api.Backstage) (model.ExternalConfig, error) {
 	//lg := log.FromContext(ctx)
 
 	bsSpec := backstage.Spec
@@ -75,7 +75,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	}
 
 	if bsSpec.Application == nil {
-		bsSpec.Application = &bsv1.Application{}
+		bsSpec.Application = &api.Application{}
 	}
 
 	// Process AppConfigs
@@ -222,7 +222,7 @@ func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj clien
 	return nil
 }
 
-func addToWatch(fileObjectRef bsv1.FileObjectRef) bool {
+func addToWatch(fileObjectRef api.FileObjectRef) bool {
 	// it will contain subPath either as specified key or as a list of all keys if only mountPath specified
 	if (fileObjectRef.MountPath == "" || fileObjectRef.Key != "") && utils.BoolEnvVar(WatchExtConfig, true) {
 		return true

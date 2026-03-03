@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha6"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func GetPluginDeps(backstage bs.Backstage, plugins DynamicPlugins, scheme *runtime.Scheme) ([]*unstructured.Unstructured, error) {
+func GetPluginDeps(backstage api.Backstage, plugins DynamicPlugins, scheme *runtime.Scheme) ([]*unstructured.Unstructured, error) {
 
 	dir, ok := os.LookupEnv("PLUGIN_DEPS_DIR_backstage")
 	if !ok {

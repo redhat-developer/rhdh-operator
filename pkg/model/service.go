@@ -5,7 +5,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha6"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -43,7 +43,7 @@ func (b *BackstageService) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (b *BackstageService) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	b.model = model
 	if b.service == nil {
 		return false, fmt.Errorf("backstage Service is not initialized, make sure there is service.yaml in default or raw configuration")
@@ -56,11 +56,11 @@ func (b *BackstageService) addToModel(model *BackstageModel, _ bsv1.Backstage) (
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) updateAndValidate(_ bsv1.Backstage) error {
+func (b *BackstageService) updateAndValidate(_ api.Backstage) error {
 	return nil
 }
 
-func (b *BackstageService) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *BackstageService) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.service.SetName(ServiceName(backstage.Name))
 	utils.GenerateLabel(&b.service.Spec.Selector, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
 	setMetaInfo(b.service, backstage, scheme)
