@@ -143,8 +143,11 @@ func TestGetEnabledFlavours(t *testing.T) {
 	originalLocalBin := os.Getenv("LOCALBIN")
 	testDataDir, err := filepath.Abs("testdata")
 	require.NoError(t, err)
-	os.Setenv("LOCALBIN", testDataDir)
-	defer os.Setenv("LOCALBIN", originalLocalBin)
+	err = os.Setenv("LOCALBIN", testDataDir)
+	require.NoError(t, err)
+	defer func() {
+		_ = os.Setenv("LOCALBIN", originalLocalBin)
+	}()
 
 	tests := []struct {
 		name         string
