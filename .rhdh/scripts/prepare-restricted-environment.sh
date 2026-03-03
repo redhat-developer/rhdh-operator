@@ -918,7 +918,7 @@ EOF
 EOF
       for extraImg in "${EXTRA_IMAGES[@]}"; do
         cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
-      - name: "$extraImg"
+  - name: "$extraImg"
 EOF
       done
     fi
