@@ -2,7 +2,6 @@
 # This assumes you have a mirror registry reachable at registry.localhost:5000 from your host (or bastion host) and from your cluster.
 # Feel free to copy this and adapt to your environment.
 #
-# 1. Use the .rhdh/scripts/mirror-plugins.sh to mirror a plugin catalog index image before applying the manifest here:
 # ```
 # .rhdh/scripts/mirror-plugins.sh \
 #    --plugin-index oci://registry.access.redhat.com/rhdh/plugin-catalog-index:<tag> \
