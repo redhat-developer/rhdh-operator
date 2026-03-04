@@ -1,0 +1,74 @@
+###
+# This assumes you have a mirror registry reachable at registry.localhost:5000 from your host and your cluster.
+# But feel free to copy this and adapt to your own registry.
+#
+# Usage: Use the .rhdh/scripts/mirror-plugins.sh to mirror a plugin catalog index image before applying the manifest here:
+# ```
+# .rhdh/scripts/mirror-plugins.sh \
+#    --plugin-index oci://registry.access.redhat.com/rhdh/plugin-catalog-index:<tag> \
+#    --to-registry registry.localhost:5000
+# ```
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-rhdh-mirror-conf
+data:
+  "rhdh-registries.conf": |
+    [[registry]]
+    # GA and TP plugins
+    prefix = "registry.access.redhat.com/rhdh"
+    location = "registry.localhost:5000/rhdh"
+    insecure = true
+    
+    [[registry]]
+    # Some plugins might be available here
+    prefix = "quay.io/rhdh"
+    location = "registry.localhost:5000/rhdh"
+    insecure = true
+
+    [[registry]]
+    # RHDH community plugins
+    prefix = "ghcr.io/redhat-developer/rhdh-plugin-export-overlays"
+    location = "registry.localhost:5000/rhdh-plugin-export-overlays"
+    insecure = true
+
+---
+# NOTE: The `insecureAcceptAnything` policy below is shown for simplicity, but not recommended for production.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-mirror-policy
+data:
+  "policy.json": |
+    {
+      "default": [
+        {
+          "type": "insecureAcceptAnything"
+        }
+      ],
+      "transports": {
+        "docker": {
+          "": [{"type": "insecureAcceptAnything"}]
+        }
+      }
+    }
+
+---
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-rhdh-plugin-mirroring
+spec:
+  application:
+    extraFiles:
+      configMaps:
+        - name: my-rhdh-mirror-conf
+          key: rhdh-registries.conf
+          mountPath: /etc/containers/registries.conf.d
+          containers: [ install-dynamic-plugins ]
+        - name: my-mirror-policy
+          key: policy.json
+          mountPath: /etc/containers
+          containers: [ install-dynamic-plugins ]
