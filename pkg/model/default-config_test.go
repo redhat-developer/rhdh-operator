@@ -237,7 +237,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 				},
 			},
 			wantErr:     true,
-			errContains: "failed to load flavour 'nonexistent'",
+			errContains: "flavour 'nonexistent' not found",
 		},
 	}
 

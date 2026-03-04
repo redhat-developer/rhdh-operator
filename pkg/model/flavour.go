@@ -20,109 +20,87 @@ type FlavourMetadata struct {
 type enabledFlavour struct {
 	name     string
 	basePath string
-	metadata FlavourMetadata
 }
 
 // GetEnabledFlavours determines which flavours should be enabled based on the BackstageSpec.
-// It merges default flavours (enabledByDefault: true) with explicit spec.Flavours:
-// - If spec.Flavours is nil: use all flavours with enabledByDefault: true
-// - If spec.Flavours is provided:
-//   - Explicit enabled flavours are included (even if not default)
-//   - Explicit disabled flavours are excluded (even if default)
-//   - Default flavours not mentioned in spec are included
+// Algorithm:
+// 1. Load all available flavours with their enabledByDefault status from metadata.yaml
+// 2. Override enabled status with values from spec.Flavours (if provided)
+// 3. Return only the enabled flavours
 //
 // This should be called once per Backstage reconciliation and the result reused for all config files.
 func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
 	localBin := os.Getenv("LOCALBIN")
 	flavoursDir := filepath.Join(localBin, "default-config", "flavours")
 
-	// Get all default flavours
-	defaults, err := getDefaultFlavours(flavoursDir)
+	// Step 1: Load all flavours with their default enabled status
+	allFlavours, err := loadAllFlavours(flavoursDir)
 	if err != nil {
 		return nil, err
-	} else if spec.Flavours == nil {
-		return defaults, nil
 	}
 
-	// Merge spec.Flavours with defaults
-	return mergeWithDefaults(spec.Flavours, defaults, flavoursDir)
-}
+	// Step 2: Override enabled status from spec
+	if spec.Flavours != nil {
+		for _, f := range spec.Flavours {
+			flavour, exists := allFlavours[f.Name]
+			if !exists {
+				return nil, fmt.Errorf("flavour '%s' not found in %s", f.Name, flavoursDir)
+			}
+			flavour.enabled = f.Enabled
+			allFlavours[f.Name] = flavour
+		}
+	}
 
-// mergeWithDefaults merges spec.Flavours with default flavours
-// Order: spec flavours (if enabled) first, then defaults not in spec
-func mergeWithDefaults(specFlavours []api.Flavour, defaults []enabledFlavour, flavoursDir string) ([]enabledFlavour, error) {
+	// Step 3: Collect enabled flavours
 	var result []enabledFlavour
-	seen := make(map[string]bool)
-
-	// First, process spec flavours in order
-	for _, f := range specFlavours {
-		seen[f.Name] = true
-
-		// Skip disabled flavours (even if they're default)
-		if !f.Enabled {
-			continue
-		}
-
-		// Check if flavour directory exists
-		flavourPath := filepath.Join(flavoursDir, f.Name)
-		if _, err := os.Stat(flavourPath); os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to load flavour '%s': directory does not exist", f.Name)
-		}
-
-		// Load metadata for enabled flavour
-		metadata, err := loadFlavourMetadata(flavourPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load flavour '%s': %w", f.Name, err)
-		}
-
-		result = append(result, enabledFlavour{
-			name:     f.Name,
-			basePath: flavourPath,
-			metadata: *metadata,
-		})
-	}
-
-	// Then, add default flavours not mentioned in spec
-	for _, defaultFlavour := range defaults {
-		if !seen[defaultFlavour.name] {
-			result = append(result, defaultFlavour)
+	for name, flavour := range allFlavours {
+		if flavour.enabled {
+			result = append(result, enabledFlavour{
+				name:     name,
+				basePath: flavour.basePath,
+			})
 		}
 	}
 
 	return result, nil
 }
 
-// getDefaultFlavours returns all flavours with enabledByDefault: true
-func getDefaultFlavours(flavoursDir string) ([]enabledFlavour, error) {
-	// Check if flavours directory exists
+// flavourInfo holds information about a discovered flavour
+type flavourInfo struct {
+	basePath string
+	enabled  bool
+}
+
+// loadAllFlavours loads all available flavours from the flavours directory
+// Returns a map of flavourName -> flavourInfo (with basePath and default enabled status)
+func loadAllFlavours(flavoursDir string) (map[string]flavourInfo, error) {
 	entries, err := os.ReadDir(flavoursDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// No flavours directory means no default flavours
-			return []enabledFlavour{}, nil
+			// No flavours directory means no flavours available
+			return make(map[string]flavourInfo), nil
 		}
 		return nil, fmt.Errorf("failed to read flavours directory: %w", err)
 	}
 
-	var flavours []enabledFlavour
+	flavours := make(map[string]flavourInfo)
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
-		flavourPath := filepath.Join(flavoursDir, entry.Name())
+		flavourName := entry.Name()
+		flavourPath := filepath.Join(flavoursDir, flavourName)
+
+		// Load metadata to get enabledByDefault
 		metadata, err := loadFlavourMetadata(flavourPath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to load flavour '%s': %w", flavourName, err)
 		}
 
-		// Only include flavours with enabledByDefault: true
-		if metadata.EnabledByDefault {
-			flavours = append(flavours, enabledFlavour{
-				name:     entry.Name(),
-				basePath: flavourPath,
-				metadata: *metadata,
-			})
+		flavours[flavourName] = flavourInfo{
+			basePath: flavourPath,
+			enabled:  metadata.EnabledByDefault,
 		}
 	}
 
