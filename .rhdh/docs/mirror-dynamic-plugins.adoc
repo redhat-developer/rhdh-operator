@@ -178,32 +178,6 @@ data:
     }
 ----
 
-*Example*:
-
-NOTE: The `insecureAcceptAnything` policy below is shown for simplicity, but *not* recommended for production.
-
-[source,yaml]
-----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: my-mirror-policy
-data:
-  policy.json: |
-    {
-      "default": [
-        {
-          "type": "insecureAcceptAnything"
-        }
-      ],
-      "transports": {
-        "docker": {
-          "": [{"type": "insecureAcceptAnything"}]
-        }
-      }
-    }
-----
-
 [#_additional_configuration_options]
 ==== Additional configuration options
 
@@ -232,10 +206,10 @@ spec:
           containers: [ install-dynamic-plugins ]
 
         # OPTIONAL: if you need a policy file
-        - name: my-mirror-policy
-          key: policy.json
-          mountPath: /etc/containers
-          containers: [ install-dynamic-plugins ]
+        # - name: my-mirror-policy
+        #  key: policy.json
+        #  mountPath: /etc/containers
+        #  containers: [ install-dynamic-plugins ]
 ----
 
 Save and wait until the CR is reconciled by the RHDH Operator.
@@ -255,9 +229,10 @@ upstream:
       - name: my-rhdh-mirror-conf
         configMap:
           name: my-rhdh-mirror-conf
-      - name: my-mirror-policy
-        configMap:
-          name: my-mirror-policy
+      # OPTIONAL: if you need a policy file
+      # - name: my-mirror-policy
+      #   configMap:
+      #     name: my-mirror-policy
 
     initContainers:
       # IMPORTANT: Due to a Helm limitation, ensure the install-dynamic-plugins
@@ -273,10 +248,10 @@ upstream:
             readOnly: true
 
           # OPTIONAL: if you need a policy file
-          - name: my-mirror-policy
-            mountPath: /etc/containers/policy.json
-            subPath: policy.json
-            readOnly: true
+          # - name: my-mirror-policy
+          #   mountPath: /etc/containers/policy.json
+          #   subPath: policy.json
+          #   readOnly: true
 ----
 
 Redeploy RHDH from your values file.

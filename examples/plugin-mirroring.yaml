@@ -1,12 +1,14 @@
 ###
-# This assumes you have a mirror registry reachable at registry.localhost:5000 from your host and your cluster.
-# But feel free to copy this and adapt to your own registry.
+# This assumes you have a mirror registry reachable at registry.localhost:5000 from your host (or bastion host) and from your cluster.
+# Feel free to copy this and adapt to your environment.
 #
-# Usage: Use the .rhdh/scripts/mirror-plugins.sh to mirror a plugin catalog index image before applying the manifest here:
+# 1. Use the .rhdh/scripts/mirror-plugins.sh to mirror a plugin catalog index image before applying the manifest here:
 # ```
 # .rhdh/scripts/mirror-plugins.sh \
 #    --plugin-index oci://registry.access.redhat.com/rhdh/plugin-catalog-index:<tag> \
 #    --to-registry registry.localhost:5000
+#
+# kubectl apply -f examples/plugin-mirroring.yaml
 # ```
 
 ---
@@ -16,6 +18,10 @@ metadata:
   name: my-rhdh-mirror-conf
 data:
   "rhdh-registries.conf": |
+    [[registry]]
+    location = "registry.localhost:5000"
+    insecure = true
+
     [[registry]]
     # GA and TP plugins
     prefix = "registry.access.redhat.com/rhdh"
@@ -35,27 +41,6 @@ data:
     insecure = true
 
 ---
-# NOTE: The `insecureAcceptAnything` policy below is shown for simplicity, but not recommended for production.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: my-mirror-policy
-data:
-  "policy.json": |
-    {
-      "default": [
-        {
-          "type": "insecureAcceptAnything"
-        }
-      ],
-      "transports": {
-        "docker": {
-          "": [{"type": "insecureAcceptAnything"}]
-        }
-      }
-    }
-
----
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
@@ -68,7 +53,11 @@ spec:
           key: rhdh-registries.conf
           mountPath: /etc/containers/registries.conf.d
           containers: [ install-dynamic-plugins ]
-        - name: my-mirror-policy
-          key: policy.json
-          mountPath: /etc/containers
-          containers: [ install-dynamic-plugins ]
+
+#    extraEnvs:
+#      envs:
+#        # Set the CATALOG_INDEX_IMAGE env var to your mirrored catalog index image
+#        # if you are using a tag/digest different from the default
+#        - name: CATALOG_INDEX_IMAGE
+#          value: registry.localhost:5000/rhdh/plugin-catalog-index:<tag>
+#          containers: [ install-dynamic-plugins ]
