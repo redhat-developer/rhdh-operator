@@ -181,9 +181,9 @@ data:
 [#_additional_configuration_options]
 ==== Additional configuration options
 
-* *Registry authentication*: See link:https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/administration_guide_for_red_hat_developer_hub/assembly-rhdh-installing-dynamic-plugins#proc-loading-a-packaged-plugin-as-oci-image_assembly-rhdh-installing-dynamic-plugins[Loading a plugin packaged as an OCI image] if your mirror registry requires authentication. You will need to create a Secret for the RHDH init container.
+* *Registry authentication*: See link:https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.8/html/installing_and_viewing_plugins_in_red_hat_developer_hub/assembly-third-party-plugins#proc-load-plugin-oci-image_assembly-install-third-party-plugins-rhdh[Loading a plugin packaged as an OCI image] if your mirror registry requires authentication. You will need to create a Secret for the RHDH init container.
 
-* *Custom certificates*: See link:https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/administration_guide_for_red_hat_developer_hub/assembly-rhdh-installing-dynamic-plugins#proc-install-plugins-oci-registries-custom-certs_assembly-rhdh-installing-dynamic-plugins[Install plugins from OCI registries by using custom certificates] if the target mirror registry uses custom certificates that RHDH should be configured to trust. This requires mounting additional extra files in the RHDH init container.
+* *Custom certificates*: See link:https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.8/html/installing_and_viewing_plugins_in_red_hat_developer_hub/rinstall-plugins-from-oci-registries-by-using-custom-certificates[Install plugins from OCI registries by using custom certificates] if the target mirror registry uses custom certificates that RHDH should be configured to trust. This requires mounting additional extra files in the RHDH init container.
 
 [#_configuring_rhdh_operator]
 ==== Configuring using the RHDH Operator
