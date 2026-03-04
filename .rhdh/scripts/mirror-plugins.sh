@@ -456,28 +456,49 @@ function resolve_plugin_index() {
     # Parse index.json to extract plugin references
     local index_file="$catalog_data_dir/index.json"
     debugf "Parsing index.json for plugin references"
-    
+
     # Check if jq is available
     if ! command -v jq &> /dev/null; then
       errorf "jq is required to parse index.json but is not installed"
       return 1
     fi
-    
+
     # Extract registryReference values from index.json and convert to oci:// format
     local temp_plugin_images=()
-    
+
     while IFS= read -r registry_ref; do
       if [[ -n "$registry_ref" ]]; then
         local oci_url="oci://$registry_ref"
         temp_plugin_images+=("$oci_url")
       fi
     done < <(jq -r '.[] | .registryReference // empty' "$index_file" 2>/dev/null)
-    
+
+    debugf "Found ${#temp_plugin_images[@]} plugin references from index.json"
+
+    # Also extract plugin references from dynamic-plugins.default.yaml if it exists
+    # This file contains additional OCI references in commented lines like:
+    #   # - package: oci://registry.access.redhat.com/rhdh/plugin-name@sha256:...
+    local dynamic_plugins_file="$catalog_data_dir/dynamic-plugins.default.yaml"
+    if [[ -f "$dynamic_plugins_file" ]]; then
+      debugf "Found dynamic-plugins.default.yaml, extracting additional plugin references"
+
+      # Extract OCI references from commented package lines
+      while IFS= read -r oci_ref; do
+        if [[ -n "$oci_ref" ]]; then
+          temp_plugin_images+=("$oci_ref")
+        fi
+      done < <(grep -oE 'oci://[^[:space:]]+' "$dynamic_plugins_file" 2>/dev/null)
+
+      debugf "Total plugin references after parsing dynamic-plugins.default.yaml: ${#temp_plugin_images[@]}"
+    else
+      debugf "No dynamic-plugins.default.yaml found in catalog index"
+    fi
+
     # Remove duplicates and sort
     if [[ ${#temp_plugin_images[@]} -gt 0 ]]; then
       mapfile -t PLUGIN_IMAGES < <(printf "%s\n" "${temp_plugin_images[@]}" | sort -u)
     fi
-    
+
     infof "Found ${#PLUGIN_IMAGES[@]} unique plugins from catalog index"
     
     return 0
