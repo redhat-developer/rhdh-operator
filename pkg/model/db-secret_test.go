@@ -33,7 +33,7 @@ func TestEmptyDbSecret(t *testing.T) {
 	bs := *dbSecretBackstage.DeepCopy()
 
 	// expected generatePassword = false (default db-secret defined) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-empty-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true).addToDefaultConfig("db-secret.yaml", "db-empty-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -52,7 +52,7 @@ func TestDefaultWithGeneratedSecrets(t *testing.T) {
 	bs := *dbSecretBackstage.DeepCopy()
 
 	// expected generatePassword = true (no db-secret defined) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true).addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -73,7 +73,7 @@ func TestSpecifiedSecret(t *testing.T) {
 	bs.Spec.Database.AuthSecretName = "custom-db-secret"
 
 	// expected generatePassword = false (db-secret defined in the spec) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true).addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 

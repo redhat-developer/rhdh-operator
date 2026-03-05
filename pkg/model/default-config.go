@@ -16,81 +16,66 @@ import (
 //
 // It performs the following steps:
 // 1. Collect config file paths from enabled flavours and base
-// 2. Merge configs according to the object's FlavourMergePolicy
-// 3. Fall back to base default-config if no flavours provide the file
-func ReadDefaultConfig(conf ObjectConfig, key string, flavours []enabledFlavour, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+// 2. Merge configs using the object's MergeFunc if provided
+// 3. Fall back to base default-config if no merge function or no flavours
+func ReadDefaultConfig(conf ObjectConfig, flavours []enabledFlavour, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
 
-	basePath := utils.DefFile(key)
+	basePath := utils.DefFile(conf.Key)
 
-	// Step 1: Handle NoFlavour policy - use base config only
-	if conf.FlavourMergePolicy == FlavourMergePolicyNoFlavour {
+	// Step 1: Handle no merge function - use base config only (no flavour support)
+	if conf.MergeFunc == nil {
 		if _, err := os.Stat(basePath); os.IsNotExist(err) {
 			return []client.Object{}, nil
 		}
 		return utils.ReadYamlFiles(basePath, scheme, platformExt)
 	}
 
-	// Step 2: Collect config file paths from flavours and base
-	configPaths := collectConfigPaths(key, basePath, flavours)
+	// Step 2: Collect config sources from flavours and base
+	configSources := collectConfigSources(conf.Key, basePath, flavours)
 
 	// Step 3: If no configs found, return empty array (config file is optional)
-	if len(configPaths) == 0 {
+	if len(configSources) == 0 {
 		return []client.Object{}, nil
 	}
 
-	// Step 4: Merge configs based on the policy
-	switch conf.FlavourMergePolicy {
-	case FlavourMergePolicyArrayMerge:
-		return mergeDynamicPlugins(configPaths, scheme, platformExt)
-
-	case FlavourMergePolicyMultiObject:
-		configSources := collectConfigSources(key, basePath, flavours)
-		return mergeMultiObjectConfigs(configSources, scheme, platformExt)
-	}
-
-	// Unreachable - all policy values handled above
-	return nil, fmt.Errorf("unknown flavour merge policy: %d", conf.FlavourMergePolicy)
+	// Step 4: Merge configs using the provided merge function
+	return conf.MergeFunc(configSources, scheme, platformExt)
 }
 
 // configSource represents a config file with its source (base or flavour)
 type configSource struct {
 	path        string
 	flavourName string // empty string for base config
+	content     []byte // pre-read YAML content
 }
 
-// collectConfigPaths collects all config file paths from enabled flavours and base default-config
-// Returns paths in merge order: base first, then flavours (in spec order)
-// This ensures flavours override base defaults when configs are merged
-func collectConfigPaths(key string, basePath string, flavours []enabledFlavour) []string {
-	sources := collectConfigSources(key, basePath, flavours)
-	paths := make([]string, len(sources))
-	for i, src := range sources {
-		paths[i] = src.path
-	}
-	return paths
-}
-
-// collectConfigSources collects all config file sources with flavour names
+// collectConfigSources collects all config file sources with flavour names and reads their content
 // Returns sources in merge order: base first, then flavours (in spec order)
 func collectConfigSources(key string, basePath string, flavours []enabledFlavour) []configSource {
 	var sources []configSource
 
-	// Add base config if it exists
+	// Read base config if it exists
 	if _, err := os.Stat(basePath); err == nil {
-		sources = append(sources, configSource{
-			path:        basePath,
-			flavourName: "", // empty for base
-		})
+		if content, err := os.ReadFile(basePath); err == nil {
+			sources = append(sources, configSource{
+				path:        basePath,
+				flavourName: "", // empty for base
+				content:     content,
+			})
+		}
 	}
 
-	// Add each flavour config if it exists
+	// Read each flavour config if it exists
 	for _, flavour := range flavours {
 		flavourConfigPath := filepath.Join(flavour.basePath, key)
 		if _, err := os.Stat(flavourConfigPath); err == nil {
-			sources = append(sources, configSource{
-				path:        flavourConfigPath,
-				flavourName: flavour.name,
-			})
+			if content, err := os.ReadFile(flavourConfigPath); err == nil {
+				sources = append(sources, configSource{
+					path:        flavourConfigPath,
+					flavourName: flavour.name,
+					content:     content,
+				})
+			}
 		}
 	}
 
@@ -99,37 +84,39 @@ func collectConfigSources(key string, basePath string, flavours []enabledFlavour
 
 // mergeDynamicPlugins merges dynamic-plugins.yaml files by package name
 // Later entries override earlier entries with the same package name
-func mergeDynamicPlugins(paths []string, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+func mergeDynamicPlugins(sources []configSource, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
 
-	if len(paths) == 0 {
+	if len(sources) == 0 {
 		return []client.Object{}, nil
 	}
 
 	var resultConfigMap *corev1.ConfigMap
 	var mergedData string
 
-	for i := 0; i < len(paths); i++ {
-		path := paths[i]
-
-		objs, err := utils.ReadYamlFiles(path, scheme, platformExt)
+	for _, src := range sources {
+		objs, err := utils.ReadYamls(src.content, nil, scheme)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read dynamic-plugins.yaml from %s: %w", path, err)
+			return nil, fmt.Errorf("failed to parse dynamic-plugins.yaml from %s: %w", src.path, err)
+		}
+
+		if len(objs) == 0 {
+			return nil, fmt.Errorf("no objects found in %s", src.path)
 		}
 
 		// single object expected
 		configMap, ok := objs[0].(*corev1.ConfigMap)
 		if !ok {
-			return nil, fmt.Errorf("no ConfigMap found in %s", path)
+			return nil, fmt.Errorf("no ConfigMap found in %s", src.path)
 		}
 
 		data, ok := configMap.Data[DynamicPluginsFile]
 		if !ok {
-			return nil, fmt.Errorf("no %s key found in ConfigMap from %s", DynamicPluginsFile, path)
+			return nil, fmt.Errorf("no %s key found in ConfigMap from %s", DynamicPluginsFile, src.path)
 		}
 
 		mergedData, err = MergePluginsData(mergedData, data)
 		if err != nil {
-			return nil, fmt.Errorf("failed to merge dynamic-plugins from %s: %w", path, err)
+			return nil, fmt.Errorf("failed to merge dynamic-plugins from %s: %w", src.path, err)
 		}
 		resultConfigMap = configMap
 	}
@@ -152,41 +139,19 @@ func mergeMultiObjectConfigs(sources []configSource, scheme runtime.Scheme, plat
 	var allObjects []client.Object
 
 	for _, src := range sources {
-		// Read the YAML file
-		objs, err := utils.ReadYamlFiles(src.path, scheme, platformExt)
+		objs, err := utils.ReadYamls(src.content, nil, scheme)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read config from %s: %w", src.path, err)
+			return nil, fmt.Errorf("failed to parse config from %s: %w", src.path, err)
 		}
 
-		// Process each object from the file
 		for _, obj := range objs {
-			// If this is a flavour config, prefix the object name
+			// If this is a flavour config, add a source annotation
 			if src.flavourName != "" {
-				if err := prefixObjectName(obj, src.flavourName); err != nil {
-					return nil, fmt.Errorf("failed to prefix object name for flavour %s: %w", src.flavourName, err)
-				}
+				utils.AddAnnotation(obj, SourceAnnotation, fmt.Sprintf("flavour-%s", src.flavourName))
 			}
-
 			allObjects = append(allObjects, obj)
 		}
 	}
 
 	return allObjects, nil
-}
-
-// prefixObjectName adds a flavour prefix to an object's metadata.name
-func prefixObjectName(obj client.Object, flavourName string) error {
-	// Get the current name
-	currentName := obj.GetName()
-	if currentName == "" {
-		return fmt.Errorf("object has no name to prefix")
-	}
-
-	// Create the new name with flavour prefix
-	newName := flavourName + "-" + currentName
-
-	// Set the new name
-	obj.SetName(newName)
-
-	return nil
 }

@@ -26,7 +26,7 @@ type SecretEnvs struct {
 }
 
 func init() {
-	registerConfig(SecretEnvsObjectKey, SecretEnvsFactory{}, true, FlavourMergePolicyNoFlavour)
+	registerConfig(SecretEnvsObjectKey, SecretEnvsFactory{}, true, nil)
 }
 
 func (p *SecretEnvs) addExternalConfig(spec api.BackstageSpec) error {

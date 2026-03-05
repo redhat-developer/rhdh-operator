@@ -29,6 +29,7 @@ const BackstageAppLabel = "rhdh.redhat.com/app"
 const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
 const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
 const ContainersAnnotation = "rhdh.redhat.com/containers"
+const SourceAnnotation = "rhdh.redhat.com/source"
 
 // Backstage configuration scaffolding with empty BackstageObjects.
 // There are all possible objects for configuration
@@ -93,12 +94,12 @@ func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
 }
 
 // Registers config object
-func registerConfig(key string, factory ObjectFactory, multiple bool, mergePolicy FlavourMergePolicy) {
+func registerConfig(key string, factory ObjectFactory, multiple bool, mergeFunc MergeConfigFunc) {
 	runtimeConfig = append(runtimeConfig, ObjectConfig{
-		Key:                key,
-		ObjectFactory:      factory,
-		Multiple:           multiple,
-		FlavourMergePolicy: mergePolicy,
+		Key:           key,
+		ObjectFactory: factory,
+		Multiple:      multiple,
+		MergeFunc:     mergeFunc,
 	})
 }
 
@@ -129,7 +130,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		if objs, err := ReadDefaultConfig(conf, conf.Key, flavours, *scheme, platform.Extension); err != nil {
+		if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}

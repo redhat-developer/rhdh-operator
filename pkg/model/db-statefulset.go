@@ -28,7 +28,7 @@ type DbStatefulSet struct {
 }
 
 func init() {
-	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false, FlavourMergePolicyNoFlavour)
+	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false, nil)
 }
 
 func DbStatefulSetName(backstageName string) string {

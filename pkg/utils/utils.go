@@ -152,15 +152,15 @@ func ReadYamlFiles(path string, scheme runtime.Scheme, platformExt string) ([]cl
 	}
 
 	// Read platform patch if exists
-	pp, err := readPlatformPatch(fpath, platformExt)
+	pp, err := ReadPlatformPatch(fpath, platformExt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read platform patch: %w", err)
 	}
-	//return ReadYamls(conf, pp, templ, scheme)
 	return ReadYamls(conf, pp, scheme)
 }
 
-func readPlatformPatch(path string, platformExt string) ([]byte, error) {
+// ReadPlatformPatch reads the platform-specific patch file if it exists
+func ReadPlatformPatch(path string, platformExt string) ([]byte, error) {
 	fpath := filepath.Clean(path + "." + platformExt)
 	b, err := os.ReadFile(fpath)
 	if err != nil {

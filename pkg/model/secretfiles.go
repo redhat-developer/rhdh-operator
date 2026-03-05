@@ -29,7 +29,7 @@ type SecretFiles struct {
 }
 
 func init() {
-	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true, FlavourMergePolicyNoFlavour)
+	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true, nil)
 }
 
 func (p *SecretFiles) addExternalConfig(spec api.BackstageSpec) error {
@@ -88,7 +88,6 @@ func (p *SecretFiles) updateAndValidate(_ api.Backstage) error {
 
 		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
 		mountPath, subPath := p.model.backstageDeployment.getDefConfigMountPath(item)
-		//containers, err := p.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
 		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
 			item.GetName(), mountPath, "", subPath != "", keys)
 		if err != nil {

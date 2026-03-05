@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openshift "github.com/openshift/api/route/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -43,8 +44,11 @@ func createBackstageTest(bs api.Backstage) *testBackstageObject {
 }
 
 // enables LocalDB
-func (b *testBackstageObject) withLocalDb() *testBackstageObject {
-	b.backstage.Spec.Database.EnableLocalDb = ptr.To(true)
+func (b *testBackstageObject) withLocalDb(enabled bool) *testBackstageObject {
+	if b.backstage.Spec.Database == nil {
+		b.backstage.Spec.Database = &api.Database{}
+	}
+	b.backstage.Spec.Database.EnableLocalDb = ptr.To(enabled)
 	return b
 }
 
@@ -56,6 +60,12 @@ func (b *testBackstageObject) withDefaultConfig(useDef bool) *testBackstageObjec
 	} else {
 		_ = os.Setenv("LOCALBIN", ".")
 	}
+	return b
+}
+
+// sets custom config path by pointing LOCALBIN to the specified path
+func (b *testBackstageObject) withConfigPath(path string) *testBackstageObject {
+	_ = os.Setenv("LOCALBIN", path)
 	return b
 }
 
@@ -90,4 +100,44 @@ func checkIfContainVolumes(volumes []corev1.Volume, name string) bool {
 		}
 	}
 	return false
+}
+
+// Helper functions for test assertions
+
+func findConfigMapByName(items []client.Object, name string) client.Object {
+	for _, item := range items {
+		cm := item.(*corev1.ConfigMap)
+		if cm.Name == name {
+			return item
+		}
+	}
+	return nil
+}
+
+func findConfigMapBySource(items []client.Object, source string) client.Object {
+	for _, item := range items {
+		cm := item.(*corev1.ConfigMap)
+		if cm.Annotations != nil && cm.Annotations[SourceAnnotation] == source {
+			return item
+		}
+	}
+	return nil
+}
+
+func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {
+	for _, plugin := range plugins {
+		if plugin.Package == packageName {
+			return &plugin
+		}
+	}
+	return nil
+}
+
+func findEnvVar(envVars []corev1.EnvVar, name string) *corev1.EnvVar {
+	for i := range envVars {
+		if envVars[i].Name == name {
+			return &envVars[i]
+		}
+	}
+	return nil
 }

@@ -5,10 +5,8 @@ import (
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
-	"golang.org/x/exp/maps"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	"golang.org/x/exp/maps"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 
@@ -45,7 +43,7 @@ var (
 
 	appConfigTestBackstage = api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bs",
+			Name:      "bsName",
 			Namespace: "ns123",
 		},
 		Spec: api.BackstageSpec{
@@ -55,6 +53,7 @@ var (
 					ConfigMaps: []api.FileObjectRef{},
 				},
 			},
+			Database: &api.Database{},
 		},
 	}
 )
@@ -75,7 +74,7 @@ func TestDefaultAppConfig(t *testing.T) {
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
 	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath, deployment.defaultMountPath())
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name, "")), deployment.container().VolumeMounts[0].Name)
 	assert.Equal(t, 2, len(deployment.container().Args))
 	assert.Equal(t, 1, len(deployment.podSpec().Volumes))
 

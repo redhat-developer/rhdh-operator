@@ -19,7 +19,7 @@ func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
 }
 
 func init() {
-	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true, FlavourMergePolicyNoFlavour)
+	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true, nil)
 }
 
 func (b *BackstagePvcs) addExternalConfig(spec api.BackstageSpec) error {

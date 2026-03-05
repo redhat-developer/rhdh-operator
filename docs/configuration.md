@@ -35,21 +35,21 @@ The Default Configuration defines the structure of all Backstage instances withi
 
 ### Default Configuration Files
 
-| Key/File Name                            | Object Kind                             | Object Name                                | Mandatory    | Multi | Version | Notes                                                |
-|------------------------------------------|-----------------------------------------|--------------------------------------------|--------------|-------|---------|------------------------------------------------------|
-| deployment.yaml                          | appsv1.Deployment or appsv1.StatefulSet | backstage-<cr-name>                        | Yes          | No    | >=0.1.x*| Backstage deployment, StatefulSet available from 0.9 |
-| service.yaml                             | corev1.Service                          | backstage-<cr-name>                        | Yes          | No    | >=0.1.x | Backstage Service                                    |
-| db-statefulset.yaml                      | appsv1.StatefulSet                      | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL StatefulSet                               |
-| db-service.yaml                          | corev1.Service                          | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x | PostgreSQL Service                                   |
-| db-secret.yaml                           | corev1.Secret                           | backstage-psql-secret-<cr-name>            | For local DB | No    | >=0.1.x | Secret to connect Backstage to PGSQL                 |
-| route.yaml                               | openshift.Route                         | backstage-<cr-name>                        | No (for OCP) | No    | >=0.1.x | Route exposing Backstage service                     |
-| app-config.yaml                          | corev1.ConfigMap                        | backstage-appconfig-<cr-name>              | No           | No    | >=0.2.x | Backstage app-config.yaml                            |
-| configmap-files.yaml                     | corev1.ConfigMap                        | backstage-files-<cr-name>                  | No           | No    | >=0.2.x | Backstage config file inclusions from configMap      |
-| configmap-envs.yaml                      | corev1.ConfigMap                        | backstage-envs-<cr-name>                   | No           | No    | >=0.2.x | Backstage environment variables from ConfigMap       |
-| secret-files.yaml                        | []corev1.Secret                         | backstage-files-<cr-name>                  | No           | Yes   | >=0.2.x | Backstage config file inclusions from Secret         |
-| secret-envs.yaml                         | []corev1.Secret                         | backstage-envs-<cr-name>                   | No           | Yes   | >=0.2.x | Backstage environment variables from Secret          |
-| [dynamic-plugins.yaml](#dynamic-plugins) | corev1.ConfigMap                        | backstage-dynamic-plugins-<cr-name>        | No           | No    | >=0.2.x | Dynamic plugins configuration                        |
-| pvcs.yaml                                | []corev1.PersistentVolumeClaim          | backstage-&lt;cr-name&gt;-&lt;pvc-name&gt; | No           | Yes   | >=0.4.x | List of PVC objects to be mounted to containers      |
+| Key/File Name                            | Object Kind                             | Object Name                                | Mandatory    | Multi | Version  | Notes                                                |
+|------------------------------------------|-----------------------------------------|--------------------------------------------|--------------|-------|----------|------------------------------------------------------|
+| deployment.yaml                          | appsv1.Deployment or appsv1.StatefulSet | backstage-<cr-name>                        | Yes          | No    | >=0.1.x* | Backstage deployment, StatefulSet available from 0.9 |
+| service.yaml                             | corev1.Service                          | backstage-<cr-name>                        | Yes          | No    | >=0.1.x  | Backstage Service                                    |
+| db-statefulset.yaml                      | appsv1.StatefulSet                      | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x  | PostgreSQL StatefulSet                               |
+| db-service.yaml                          | corev1.Service                          | backstage-psql-<cr-name>                   | For local DB | No    | >=0.1.x  | PostgreSQL Service                                   |
+| db-secret.yaml                           | corev1.Secret                           | backstage-psql-secret-<cr-name>            | For local DB | No    | >=0.1.x  | Secret to connect Backstage to PGSQL                 |
+| route.yaml                               | openshift.Route                         | backstage-<cr-name>                        | No (for OCP) | No    | >=0.1.x  | Route exposing Backstage service                     |
+| app-config.yaml                          | corev1.ConfigMap                        | backstage-appconfig-<cr-name>              | No           | Yes   | >=0.2.x* | Backstage app-config.yaml, multi-object 0.10         |
+| configmap-files.yaml                     | corev1.ConfigMap                        | backstage-files-<cr-name>                  | No           | Yes   | >=0.2.x* | File from configMap, multi-object from 0.10          |
+| configmap-envs.yaml                      | corev1.ConfigMap                        | backstage-envs-<cr-name>                   | No           | Yes   | >=0.2.x  | Env vars from ConfigMap, multi-object from 0.10      |
+| secret-files.yaml                        | []corev1.Secret                         | backstage-files-<cr-name>                  | No           | Yes   | >=0.2.x  | Backstage config file inclusions from Secret         |
+| secret-envs.yaml                         | []corev1.Secret                         | backstage-envs-<cr-name>                   | No           | Yes   | >=0.2.x  | Backstage environment variables from Secret          |
+| [dynamic-plugins.yaml](#dynamic-plugins) | corev1.ConfigMap                        | backstage-dynamic-plugins-<cr-name>        | No           | No    | >=0.2.x  | Dynamic plugins configuration                        |
+| pvcs.yaml                                | []corev1.PersistentVolumeClaim          | backstage-&lt;cr-name&gt;-&lt;pvc-name&gt; | No           | Yes   | >=0.4.x  | List of PVC objects to be mounted to containers      |
 
 **Meanings of "Mandatory" Column:**
 - **Yes** - Must be configured; deployment will fail otherwise.

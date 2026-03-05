@@ -75,11 +75,11 @@ var _ = When("create default backstage", func() {
 
 			By("creating default app-config")
 			appConfig := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, appConfig)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName, "")}, appConfig)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			By("mounting Volume defined in default app-config")
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(model.AppConfigDefaultName(backstageName))).
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(model.AppConfigDefaultName(backstageName, ""))).
 				To(BeAddedAsVolumeToPodSpec(*deploy.PodSpec()))
 
 		}, 5*time.Minute, time.Second).Should(Succeed())

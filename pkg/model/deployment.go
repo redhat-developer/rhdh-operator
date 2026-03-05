@@ -47,7 +47,7 @@ type BackstageDeployment struct {
 }
 
 func init() {
-	registerConfig("deployment.yaml", BackstageDeploymentFactory{}, false, FlavourMergePolicyNoFlavour)
+	registerConfig("deployment.yaml", BackstageDeploymentFactory{}, false, mergeDeployments)
 }
 
 func DeploymentName(backstageName string) string {
@@ -76,11 +76,6 @@ func (b *BackstageDeployment) Object() runtime.Object {
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) setObject(obj runtime.Object) {
 
-	//b.deployable = DeploymentObj{}
-
-	//if obj != nil {
-	//	b.deployable.setObject(obj)
-	//}
 	var err error
 	b.deployable, err = CreateDeployable(obj)
 	if err != nil {
@@ -407,7 +402,6 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // varName - name of env variable
-
 func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, kind ObjectKind, objectName, varName string) error {
 
 	containers, err := containersFilter.getContainers(b)
@@ -456,4 +450,36 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 		}
 	}
 	return nil
+}
+
+// mergeDeployments merges deployment configurations from base and flavours
+// Uses merge2.MergeStrings to merge YAML, then applies platform patch
+func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+	if len(sources) == 0 {
+		return []client.Object{}, nil
+	}
+	mergedYAML := sources[0].content
+
+	// Merge with flavour patches
+	for i := 1; i < len(sources); i++ {
+		mergedStr, err := merge2.MergeStrings(string(sources[i].content), string(mergedYAML), false, kyaml.MergeOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to merge deployment from %s: %w", sources[i].path, err)
+		}
+		mergedYAML = []byte(mergedStr)
+	}
+
+	// Apply platform patch to the merged result
+	platformPatch, err := utils.ReadPlatformPatch(sources[0].path, platformExt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read platform patch: %w", err)
+	}
+
+	// Parse with platform patch applied
+	objs, err := utils.ReadYamls(mergedYAML, platformPatch, scheme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse merged deployment: %w", err)
+	}
+
+	return []client.Object{objs[0]}, nil
 }

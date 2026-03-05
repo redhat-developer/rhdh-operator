@@ -61,7 +61,7 @@ type PluginDependency struct {
 }
 
 func init() {
-	registerConfig("dynamic-plugins.yaml", DynamicPluginsFactory{}, false, FlavourMergePolicyNoFlavour)
+	registerConfig("dynamic-plugins.yaml", DynamicPluginsFactory{}, false, mergeDynamicPlugins)
 }
 
 func DynamicPluginsDefaultName(backstageName string) string {
@@ -79,11 +79,6 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 		p.ConfigMap = obj.(*corev1.ConfigMap)
 	}
 }
-
-// implementation of RuntimeObject interface
-//func (p *DynamicPlugins) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {

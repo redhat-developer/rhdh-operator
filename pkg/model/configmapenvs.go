@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/redhat-developer/rhdh-operator/api"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -14,16 +14,23 @@ import (
 type ConfigMapEnvsFactory struct{}
 
 func (f ConfigMapEnvsFactory) newBackstageObject() RuntimeObject {
-	return &ConfigMapEnvs{}
+	return &ConfigMapEnvs{ConfigMaps: &multiobject.MultiObject{}}
 }
 
 type ConfigMapEnvs struct {
-	ConfigMap *corev1.ConfigMap
-	model     *BackstageModel
+	ConfigMaps *multiobject.MultiObject
+	model      *BackstageModel
 }
 
 func init() {
-	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, false, FlavourMergePolicyNoFlavour)
+	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, true, mergeMultiObjectConfigs)
+}
+
+func ConfigMapEnvsDefaultName(backstageName, src string) string {
+	if src == "" {
+		return "backstage-envs-" + backstageName
+	}
+	return "backstage-envs-" + src + "-" + backstageName
 }
 
 func (p *ConfigMapEnvs) addExternalConfig(spec api.BackstageSpec) error {
@@ -42,20 +49,20 @@ func (p *ConfigMapEnvs) addExternalConfig(spec api.BackstageSpec) error {
 
 // Object implements RuntimeObject interface
 func (p *ConfigMapEnvs) Object() runtime.Object {
-	return p.ConfigMap
+	return p.ConfigMaps
 }
 
 func (p *ConfigMapEnvs) setObject(obj runtime.Object) {
-	p.ConfigMap = nil
+	p.ConfigMaps = nil
 	if obj != nil {
-		p.ConfigMap = obj.(*corev1.ConfigMap)
+		p.ConfigMaps = obj.(*multiobject.MultiObject)
 	}
 }
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
 	p.model = model
-	if p.ConfigMap != nil {
+	if p.ConfigMaps != nil && len(p.ConfigMaps.Items) > 0 {
 		model.setRuntimeObject(p)
 		return true, nil
 	}
@@ -64,11 +71,15 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstag
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) updateAndValidate(backstage api.Backstage) error {
-	if p.ConfigMap != nil {
-		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{annotation: p.ConfigMap.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
-			p.ConfigMap.Name, "")
+	for _, item := range p.ConfigMaps.Items {
+		cm, ok := item.(*corev1.ConfigMap)
+		if !ok {
+			return fmt.Errorf("expected ConfigMap, got %T", item)
+		}
+		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{annotation: cm.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
+			cm.Name, "")
 		if err != nil {
-			return fmt.Errorf("failed to add env vars on configmap %s: %w", p.ConfigMap.Name, err)
+			return fmt.Errorf("failed to add env vars on configmap %s: %w", cm.Name, err)
 		}
 	}
 	return nil
@@ -76,6 +87,9 @@ func (p *ConfigMapEnvs) updateAndValidate(backstage api.Backstage) error {
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	p.ConfigMap.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs"))
-	setMetaInfo(p.ConfigMap, backstage, scheme)
+	for _, item := range p.ConfigMaps.Items {
+		cm := item.(*corev1.ConfigMap)
+		cm.Name = ConfigMapEnvsDefaultName(backstage.Name, cm.Annotations[SourceAnnotation])
+		setMetaInfo(cm, backstage, scheme)
+	}
 }

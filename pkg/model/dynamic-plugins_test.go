@@ -667,12 +667,3 @@ plugins:
 	assert.Equal(t, 0, len(mergedConfig.Plugins[0].Dependencies))
 
 }
-
-func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {
-	for _, plugin := range plugins {
-		if plugin.Package == packageName {
-			return &plugin
-		}
-	}
-	return nil
-}

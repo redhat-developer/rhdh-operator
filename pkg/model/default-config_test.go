@@ -110,13 +110,22 @@ func TestMergeDynamicPluginsFunction(t *testing.T) {
 				"testdata/does-not-exist.yaml",
 			},
 			wantErr:     true,
-			errContains: "failed to read",
+			errContains: "no objects found",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			objs, err := mergeDynamicPlugins(tt.paths, *scheme, "")
+			// Convert paths to configSource (all base configs, no flavours)
+			sources := make([]configSource, len(tt.paths))
+			for i, path := range tt.paths {
+				content, readErr := os.ReadFile(path)
+				if readErr != nil && !tt.wantErr {
+					t.Fatalf("failed to read test file %s: %v", path, readErr)
+				}
+				sources[i] = configSource{path: path, flavourName: "", content: content}
+			}
+			objs, err := mergeDynamicPlugins(sources, *scheme, "")
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -139,9 +148,9 @@ func TestMergeDynamicPluginsFunction(t *testing.T) {
 }
 
 func TestGetEnabledFlavours(t *testing.T) {
-	// Setup: Set LOCALBIN to testdata directory for tests
+	// Setup: Set LOCALBIN to testflavours directory for tests
 	originalLocalBin := os.Getenv("LOCALBIN")
-	testDataDir, err := filepath.Abs("testdata")
+	testDataDir, err := filepath.Abs("testdata/testflavours")
 	require.NoError(t, err)
 	err = os.Setenv("LOCALBIN", testDataDir)
 	require.NoError(t, err)
@@ -159,7 +168,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 		{
 			name:         "nil spec.Flavours returns all defaults",
 			spec:         api.BackstageSpec{Flavours: nil},
-			wantFlavours: []string{"lightspeed", "custom"},
+			wantFlavours: []string{"flavor1", "flavor3"},
 			wantErr:      false,
 		},
 		{
@@ -167,66 +176,66 @@ func TestGetEnabledFlavours(t *testing.T) {
 			spec: api.BackstageSpec{
 				Flavours: []api.Flavour{},
 			},
-			wantFlavours: []string{"lightspeed", "custom"},
+			wantFlavours: []string{"flavor1", "flavor3"},
 			wantErr:      false,
 		},
 		{
 			name: "explicit enabled flavour",
 			spec: api.BackstageSpec{
 				Flavours: []api.Flavour{
-					{Name: "orchestrator", Enabled: true},
+					{Name: "flavor2", Enabled: true},
 				},
 			},
-			// orchestrator (explicit) + defaults (lightspeed, custom)
-			wantFlavours: []string{"orchestrator", "lightspeed", "custom"},
+			// flavor2 (explicit) + defaults (flavor1, flavor3)
+			wantFlavours: []string{"flavor2", "flavor1", "flavor3"},
 			wantErr:      false,
 		},
 		{
 			name: "default enabled flavour disabled explicitly",
 			spec: api.BackstageSpec{
 				Flavours: []api.Flavour{
-					{Name: "lightspeed", Enabled: false},
+					{Name: "flavor1", Enabled: false},
 				},
 			},
-			// lightspeed disabled, only custom (default) remains
-			wantFlavours: []string{"custom"},
+			// flavor1 disabled, only flavor3 (default) remains
+			wantFlavours: []string{"flavor3"},
 			wantErr:      false,
 		},
 		{
 			name: "default disabled flavour enabled explicitly",
 			spec: api.BackstageSpec{
 				Flavours: []api.Flavour{
-					{Name: "orchestrator", Enabled: true},
+					{Name: "flavor2", Enabled: true},
 				},
 			},
-			// orchestrator (explicit enabled) + defaults (lightspeed, custom)
-			wantFlavours: []string{"orchestrator", "lightspeed", "custom"},
+			// flavor2 (explicit enabled) + defaults (flavor1, flavor3)
+			wantFlavours: []string{"flavor2", "flavor1", "flavor3"},
 			wantErr:      false,
 		},
 		{
 			name: "mix of explicit enabled, disabled, and defaults",
 			spec: api.BackstageSpec{
 				Flavours: []api.Flavour{
-					{Name: "orchestrator", Enabled: true}, // default=false, spec=enabled
-					{Name: "lightspeed", Enabled: false},  // default=true, spec=disabled
-					{Name: "custom", Enabled: true},       // default=true, spec=enabled
+					{Name: "flavor2", Enabled: true},  // default=false, spec=enabled
+					{Name: "flavor1", Enabled: false}, // default=true, spec=disabled
+					{Name: "flavor3", Enabled: true},  // default=true, spec=enabled
 				},
 			},
-			// orchestrator (explicit), custom (explicit), no lightspeed (disabled)
-			wantFlavours: []string{"orchestrator", "custom"},
+			// flavor2 (explicit), flavor3 (explicit), no flavor1 (disabled)
+			wantFlavours: []string{"flavor2", "flavor3"},
 			wantErr:      false,
 		},
 		{
 			name: "spec order is preserved for explicit flavours",
 			spec: api.BackstageSpec{
 				Flavours: []api.Flavour{
-					{Name: "custom", Enabled: true},
-					{Name: "orchestrator", Enabled: true},
-					{Name: "lightspeed", Enabled: true},
+					{Name: "flavor3", Enabled: true},
+					{Name: "flavor2", Enabled: true},
+					{Name: "flavor1", Enabled: true},
 				},
 			},
 			// Should be in spec order since all are explicit
-			wantFlavours: []string{"custom", "orchestrator", "lightspeed"},
+			wantFlavours: []string{"flavor3", "flavor2", "flavor1"},
 			wantErr:      false,
 		},
 		{

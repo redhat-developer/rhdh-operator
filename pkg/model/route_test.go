@@ -5,11 +5,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	openshift "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/utils/ptr"
 
@@ -346,9 +348,13 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 						OpenShiftIngressDomain: "my-ocp-apps.example.com",
 					},
 					appConfig: &AppConfig{
-						ConfigMap: &corev1.ConfigMap{
-							Data: map[string]string{
-								"my-default-app-config.yaml": "",
+						ConfigMaps: &multiobject.MultiObject{
+							Items: []client.Object{
+								&corev1.ConfigMap{
+									Data: map[string]string{
+										"my-default-app-config.yaml": "",
+									},
+								},
 							},
 						},
 					},
@@ -378,16 +384,18 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 						OpenShiftIngressDomain: "my-ocp-apps.example.com",
 					},
 					appConfig: &AppConfig{
-						ConfigMap: &corev1.ConfigMap{
-							Data: map[string]string{
-								"my-default-app-config-1.yaml": `---
+						ConfigMaps: &multiobject.MultiObject{
+							Items: []client.Object{
+								&corev1.ConfigMap{
+									Data: map[string]string{
+										"my-default-app-config-1.yaml": `---
 app:
   title: "My Awesome App"
 plugin1:
   config1: [val1, val2]
 ---
 `,
-								"my-default-app-config-2.yaml": `backend:
+										"my-default-app-config-2.yaml": `backend:
   baseUrl: https://app.example.com
   auth:
     # TODO: once plugins have been migrated we can remove this, but right now it
@@ -399,8 +407,10 @@ plugin1:
 
 organization:
   name: My Company
-    
+
 `,
+									},
+								},
 							},
 						},
 					},
@@ -442,8 +452,9 @@ organization:
 			b := &BackstageRoute{}
 			b.updateAppConfigWithBaseUrls(tt.args.model, tt.args.backstage)
 			updatedAppConfigMaps := make(map[string]map[string]any)
-			if tt.args.model.appConfig != nil && tt.args.model.appConfig.ConfigMap != nil {
-				for k, v := range tt.args.model.appConfig.ConfigMap.Data {
+			if tt.args.model.appConfig != nil && tt.args.model.appConfig.ConfigMaps != nil && len(tt.args.model.appConfig.ConfigMaps.Items) > 0 {
+				cm := tt.args.model.appConfig.ConfigMaps.Items[0].(*corev1.ConfigMap)
+				for k, v := range cm.Data {
 					var appConfig map[string]any
 					err := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(v)), 1000).Decode(&appConfig)
 					assert.NoError(t, err)

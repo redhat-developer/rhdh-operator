@@ -4,26 +4,12 @@ import (
 	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// FlavourMergePolicy defines how config files from multiple flavours should be merged
-type FlavourMergePolicy int
-
-const (
-	// FlavourMergePolicyNoFlavour indicates this config should only come from base default-config
-	// Flavours are not expected to provide their own version of this file
-	// Used for core infrastructure configs like deployment.yaml, service.yaml, db-*.yaml
-	FlavourMergePolicyNoFlavour FlavourMergePolicy = iota
-
-	// FlavourMergePolicyArrayMerge merges arrays by a key field (e.g., package name)
-	// Used for dynamic-plugins.yaml where plugins are merged by package name
-	FlavourMergePolicyArrayMerge
-
-	// FlavourMergePolicyMultiObject creates separate objects for each flavour
-	// Used for data files like app-config.yaml, configmap-envs.yaml
-	// Each flavour gets its own ConfigMap/Secret with a flavour-prefixed name
-	FlavourMergePolicyMultiObject
-)
+// MergeConfigFunc defines how config files from multiple sources (base + flavours) should be merged
+// Returns the merged objects or an error
+type MergeConfigFunc func(sources []configSource, scheme runtime.Scheme, platformExt string) ([]client.Object, error)
 
 // Registered Object configuring Backstage runtime model
 type ObjectConfig struct {
@@ -34,8 +20,9 @@ type ObjectConfig struct {
 	Key string
 	// Single or multiple object
 	Multiple bool
-	// FlavourMergePolicy defines how configs from multiple flavours are merged
-	FlavourMergePolicy FlavourMergePolicy
+	// MergeFunc defines how configs from multiple flavours are merged
+	// nil means no flavour merging (base config only)
+	MergeFunc MergeConfigFunc
 }
 
 // Interface for Runtime Objects factory method
