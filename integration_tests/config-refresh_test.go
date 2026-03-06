@@ -14,7 +14,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -29,16 +29,16 @@ var secretEnv = "secret-env1"
 
 //var secretFile = "secret1"
 
-var bsSpec = bsv1.BackstageSpec{
-	Application: &bsv1.Application{
-		AppConfig: &bsv1.AppConfig{
+var bsSpec = api.BackstageSpec{
+	Application: &api.Application{
+		AppConfig: &api.AppConfig{
 			MountPath: "/my/mount/path",
-			ConfigMaps: []bsv1.FileObjectRef{
+			ConfigMaps: []api.FileObjectRef{
 				{Name: appConfig},
 			},
 		},
-		ExtraEnvs: &bsv1.ExtraEnvs{
-			Secrets: []bsv1.EnvObjectRef{
+		ExtraEnvs: &api.ExtraEnvs{
+			Secrets: []api.EnvObjectRef{
 				{Name: secretEnv, Key: "sec11"},
 			},
 		},
@@ -112,16 +112,16 @@ organization:
 		generateConfigMap(ctx, k8sClient, appConfig1, ns, map[string]string{"appconfig11": conf}, nil, nil)
 		generateSecret(ctx, k8sClient, secretFile1, ns, map[string]string{"sec11": "val11"}, nil, nil)
 
-		bs := bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
-					ConfigMaps: []bsv1.FileObjectRef{
+		bs := api.BackstageSpec{
+			Application: &api.Application{
+				AppConfig: &api.AppConfig{
+					ConfigMaps: []api.FileObjectRef{
 						{Name: appConfig1, MountPath: "/my/appconfig"},
 					},
 				},
-				ExtraFiles: &bsv1.ExtraFiles{
+				ExtraFiles: &api.ExtraFiles{
 					MountPath: "/my",
-					Secrets: []bsv1.FileObjectRef{
+					Secrets: []api.FileObjectRef{
 						{Name: secretFile1, MountPath: "secret"},
 					},
 				},
@@ -202,7 +202,7 @@ organization:
 		generateSecret(ctx, k8sClient, secretEnv, ns, map[string]string{"sec11": "val11"}, nil, nil)
 
 		bs := bsSpec
-		bs.Deployment = &bsv1.BackstageDeployment{
+		bs.Deployment = &api.BackstageDeployment{
 			Kind: "StatefulSet",
 		}
 		checkMountWSubpath(NewGomegaWithT(GinkgoT()), ctx, k8sClient, bs, ns, backstageName, conf)
@@ -211,7 +211,7 @@ organization:
 
 })
 
-func checkMountWSubpath(g Gomega, ctx context.Context, k8sClient client.Client, bs bsv1.BackstageSpec, ns, backstageName, conf string) {
+func checkMountWSubpath(g Gomega, ctx context.Context, k8sClient client.Client, bs api.BackstageSpec, ns, backstageName, conf string) {
 
 	createAndReconcileBackstage(ctx, ns, bs, backstageName)
 

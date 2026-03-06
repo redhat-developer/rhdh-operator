@@ -20,7 +20,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
@@ -29,6 +29,7 @@ const BackstageAppLabel = "rhdh.redhat.com/app"
 const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
 const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
 const ContainersAnnotation = "rhdh.redhat.com/containers"
+const SourceAnnotation = "rhdh.redhat.com/source"
 
 // Backstage configuration scaffolding with empty BackstageObjects.
 // There are all possible objects for configuration
@@ -93,12 +94,17 @@ func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
 }
 
 // Registers config object
-func registerConfig(key string, factory ObjectFactory, multiple bool) {
-	runtimeConfig = append(runtimeConfig, ObjectConfig{Key: key, ObjectFactory: factory, Multiple: multiple})
+func registerConfig(key string, factory ObjectFactory, multiple bool, mergeFunc MergeConfigFunc) {
+	runtimeConfig = append(runtimeConfig, ObjectConfig{
+		Key:           key,
+		ObjectFactory: factory,
+		Multiple:      multiple,
+		MergeFunc:     mergeFunc,
+	})
 }
 
 // InitObjects performs a main loop for configuring and making the array of objects to reconcile
-func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig ExternalConfig, platform platform.Platform, scheme *runtime.Scheme) (*BackstageModel, error) {
+func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig ExternalConfig, platform platform.Platform, scheme *runtime.Scheme) (*BackstageModel, error) {
 
 	// 3 phases of Backstage configuration:
 	// 1- load from Operator defaults, modify metadata (labels, selectors..) and namespace as needed
@@ -111,6 +117,17 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 
 	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: platform.IsOpenshift(), DynamicPlugins: DynamicPlugins{}}
 
+	// Get enabled flavours once for all configs
+	flavours, err := GetEnabledFlavours(backstage.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine enabled flavours: %w", err)
+	}
+	if len(flavours) > 0 {
+		for _, flavour := range flavours {
+			lg.Info("found enabled flavour", "flavour:", flavour.name)
+		}
+	}
+
 	ecs := make([]ExternalConfigContributor, 0)
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
@@ -118,12 +135,11 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		//var templ = backstageObject.EmptyObject()
-		if objs, err := utils.ReadYamlFiles(utils.DefFile(conf.Key), *scheme, platform.Extension); err != nil {
+		if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
 			}
-		} else {
+		} else if len(objs) > 0 {
 			if obj, err := adjustObject(conf, objs); err != nil {
 				return nil, fmt.Errorf("failed to initialize object: %w", err)
 			} else {
@@ -136,7 +152,6 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {
 			// new object to replace default, not merge
-			// templ = backstageObject.EmptyObject()
 			if objs, err := utils.ReadYamls([]byte(overlay), nil, *scheme); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
 					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
@@ -185,7 +200,7 @@ func InitObjects(ctx context.Context, backstage bsv1.Backstage, externalConfig E
 }
 
 // Every RuntimeObject.setMetaInfo should as minimum call this
-func setMetaInfo(clientObj client.Object, backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func setMetaInfo(clientObj client.Object, backstage api.Backstage, scheme *runtime.Scheme) {
 
 	clientObj.SetNamespace(backstage.Namespace)
 	clientObj.SetLabels(utils.SetKubeLabels(clientObj.GetLabels(), backstage.Name))
@@ -202,7 +217,9 @@ func adjustObject(objectConfig ObjectConfig, objects []client.Object) (runtime.O
 	if len(objects) == 0 {
 		return nil, nil
 	}
+
 	if !objectConfig.Multiple {
+		// only one object expected
 		if len(objects) > 1 {
 			return nil, fmt.Errorf("multiple objects not expected for: %s", objectConfig.Key)
 		}

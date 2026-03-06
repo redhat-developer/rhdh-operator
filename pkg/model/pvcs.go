@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
@@ -19,10 +19,10 @@ func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
 }
 
 func init() {
-	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true)
+	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true, nil)
 }
 
-func (b *BackstagePvcs) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (b *BackstagePvcs) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Pvcs == nil || len(spec.Application.ExtraFiles.Pvcs) == 0 {
 		return nil
 	}
@@ -62,11 +62,7 @@ func (b *BackstagePvcs) setObject(object runtime.Object) {
 	b.pvcs = object.(*multiobject.MultiObject)
 }
 
-//func (b *BackstagePvcs) EmptyObject() client.Object {
-//	return &corev1.PersistentVolumeClaim{}
-//}
-
-func (b *BackstagePvcs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (b *BackstagePvcs) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	b.model = model
 	if b.pvcs != nil {
 		model.setRuntimeObject(b)
@@ -75,7 +71,7 @@ func (b *BackstagePvcs) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 	return false, nil
 }
 
-func (b *BackstagePvcs) updateAndValidate(_ bsv1.Backstage) error {
+func (b *BackstagePvcs) updateAndValidate(_ api.Backstage) error {
 	for _, o := range b.pvcs.Items {
 		pvc, ok := o.(*corev1.PersistentVolumeClaim)
 		if !ok {
@@ -90,7 +86,7 @@ func (b *BackstagePvcs) updateAndValidate(_ bsv1.Backstage) error {
 	return nil
 }
 
-func (b *BackstagePvcs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *BackstagePvcs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	for _, item := range b.pvcs.Items {
 		pvc := item.(*corev1.PersistentVolumeClaim)
 		utils.AddAnnotation(pvc, ConfiguredNameAnnotation, item.GetName())

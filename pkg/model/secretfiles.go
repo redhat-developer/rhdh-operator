@@ -9,7 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,10 +29,10 @@ type SecretFiles struct {
 }
 
 func init() {
-	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true)
+	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true, nil)
 }
 
-func (p *SecretFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (p *SecretFiles) addExternalConfig(spec api.BackstageSpec) error {
 
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
 		return nil
@@ -68,12 +68,7 @@ func (p *SecretFiles) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (p *SecretFiles) EmptyObject() client.Object {
-//	return &corev1.Secret{}
-//}
-
-// implementation of RuntimeObject interface
-func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (p *SecretFiles) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	p.model = model
 	if p.secrets != nil {
 		model.setRuntimeObject(p)
@@ -83,7 +78,7 @@ func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool,
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
+func (p *SecretFiles) updateAndValidate(_ api.Backstage) error {
 
 	for _, item := range p.secrets.Items {
 		secret, ok := item.(*corev1.Secret)
@@ -93,7 +88,6 @@ func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
 
 		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
 		mountPath, subPath := p.model.backstageDeployment.getDefConfigMountPath(item)
-		//containers, err := p.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
 		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
 			item.GetName(), mountPath, "", subPath != "", keys)
 		if err != nil {
@@ -104,7 +98,7 @@ func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (p *SecretFiles) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 
 	for _, item := range p.secrets.Items {
 		secret := item.(*corev1.Secret)

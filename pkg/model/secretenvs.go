@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
@@ -26,10 +26,10 @@ type SecretEnvs struct {
 }
 
 func init() {
-	registerConfig(SecretEnvsObjectKey, SecretEnvsFactory{}, true)
+	registerConfig(SecretEnvsObjectKey, SecretEnvsFactory{}, true, nil)
 }
 
-func (p *SecretEnvs) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (p *SecretEnvs) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.Secrets == nil {
 		return nil
 	}
@@ -57,12 +57,7 @@ func (p *SecretEnvs) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (p *SecretEnvs) EmptyObject() client.Object {
-//	return &corev1.Secret{}
-//}
-
-// implementation of RuntimeObject interface
-func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (p *SecretEnvs) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	p.model = model
 	if p.secrets != nil {
 		model.setRuntimeObject(p)
@@ -72,7 +67,7 @@ func (p *SecretEnvs) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, 
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) updateAndValidate(_ bsv1.Backstage) error {
+func (p *SecretEnvs) updateAndValidate(_ api.Backstage) error {
 
 	for _, item := range p.secrets.Items {
 		_, ok := item.(*corev1.Secret)
@@ -89,7 +84,7 @@ func (p *SecretEnvs) updateAndValidate(_ bsv1.Backstage) error {
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretEnvs) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (p *SecretEnvs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	for _, item := range p.secrets.Items {
 		secret := item.(*corev1.Secret)
 		utils.AddAnnotation(secret, ConfiguredNameAnnotation, item.GetName())

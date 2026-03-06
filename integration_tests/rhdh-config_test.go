@@ -11,10 +11,11 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,7 +31,7 @@ var _ = When("create default rhdh", func() {
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
@@ -49,7 +50,7 @@ var _ = When("create default rhdh", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			var appConfigCm corev1.ConfigMap
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName, "")}, &appConfigCm)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(1))
@@ -125,7 +126,7 @@ var _ = When("create default rhdh", func() {
 					MountPath: "/opt/app-root/src/dynamic-plugins-root",
 				},
 				{
-					Name:      model.AppConfigDefaultName(backstageName),
+					Name:      model.AppConfigDefaultName(backstageName, ""),
 					MountPath: "/opt/app-root/src/default.app-config.yaml",
 					SubPath:   "default.app-config.yaml",
 				},
@@ -193,7 +194,7 @@ var _ = When("create default rhdh", func() {
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		bs2 := &bsv1.Backstage{}
+		bs2 := &api.Backstage{}
 
 		err := readYamlFile("testdata/rhdh-replace-dynaplugin-root.yaml", bs2)
 		Expect(err).To(Not(HaveOccurred()))
@@ -240,10 +241,10 @@ var _ = When("create default rhdh", func() {
 		ns := createNamespace(ctx)
 		npmrcSecret := generateSecret(ctx, k8sClient, "my-dynamic-plugins-npmrc", ns, map[string]string{".npmrc": "new-npmrc"}, nil, nil)
 
-		bsSpec := bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
-					Secrets: []bsv1.FileObjectRef{
+		bsSpec := api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
+					Secrets: []api.FileObjectRef{
 						{
 							Name:      npmrcSecret,
 							MountPath: "/opt/app-root/src/.npmrc.dynamic-plugins",
@@ -277,5 +278,56 @@ var _ = When("create default rhdh", func() {
 
 		}, 10*time.Second, time.Second).Should(Succeed())
 
+	})
+
+	It("creates Backstage with flavours", func() {
+
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
+		}
+
+		ctx := context.Background()
+		ns := createNamespace(ctx)
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			Flavours: []api.Flavour{
+				{Name: "lightspeed", Enabled: true},
+			},
+		}, "")
+
+		Eventually(func(g Gomega) {
+			By("listing all ConfigMaps to see what was created")
+			cmList := &corev1.ConfigMapList{}
+			err := k8sClient.List(ctx, cmList, client.InNamespace(ns))
+			g.Expect(err).ShouldNot(HaveOccurred())
+			GinkgoWriter.Printf("Found %d ConfigMaps in namespace %s:\n", len(cmList.Items), ns)
+			for _, cm := range cmList.Items {
+				GinkgoWriter.Printf("  - %s (annotations: %v)\n", cm.Name, cm.Annotations)
+			}
+
+			By("creating base app-config ConfigMap")
+			baseAppConfig := &corev1.ConfigMap{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName, "")}, baseAppConfig)
+			g.Expect(err).ShouldNot(HaveOccurred(), "base app-config should exist")
+
+			By("verifying no flavour app-config was created (flavour has no configs yet)")
+			// Since lightspeed flavour only has metadata.yaml and no app-config.yaml,
+			// we should NOT expect a flavour ConfigMap to be created
+			cmList = &corev1.ConfigMapList{}
+			err = k8sClient.List(ctx, cmList, client.InNamespace(ns))
+			g.Expect(err).ShouldNot(HaveOccurred())
+			for _, cm := range cmList.Items {
+				// Verify no flavour ConfigMaps exist (since flavours don't have configs yet)
+				g.Expect(cm.Annotations).NotTo(HaveKeyWithValue(model.SourceAnnotation, "flavour-lightspeed"))
+			}
+
+			By("creating dynamic-plugins ConfigMap")
+			dpConfigMap := &corev1.ConfigMap{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DynamicPluginsDefaultName(backstageName)}, dpConfigMap)
+			g.Expect(err).ShouldNot(HaveOccurred(), "dynamic-plugins ConfigMap should exist")
+			g.Expect(dpConfigMap.Data).To(HaveKey(model.DynamicPluginsFile))
+
+		}, 20*time.Second, time.Second).Should(Succeed())
+
+		deleteNamespace(ctx, ns)
 	})
 })

@@ -5,12 +5,10 @@ import (
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	"golang.org/x/exp/maps"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -43,18 +41,19 @@ var (
 		Data: map[string]string{"conf31.yaml": "", "conf32.yaml": ""},
 	}
 
-	appConfigTestBackstage = bsv1.Backstage{
+	appConfigTestBackstage = api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bs",
+			Name:      "bsName",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				AppConfig: &api.AppConfig{
 					MountPath:  "/my/path",
-					ConfigMaps: []bsv1.FileObjectRef{},
+					ConfigMaps: []api.FileObjectRef{},
 				},
 			},
+			Database: &api.Database{},
 		},
 	}
 )
@@ -75,7 +74,7 @@ func TestDefaultAppConfig(t *testing.T) {
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
 	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath, deployment.defaultMountPath())
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name)), deployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name, "")), deployment.container().VolumeMounts[0].Name)
 	assert.Equal(t, 2, len(deployment.container().Args))
 	assert.Equal(t, 1, len(deployment.podSpec().Volumes))
 
@@ -86,11 +85,11 @@ func TestSpecifiedAppConfig(t *testing.T) {
 	bs := *appConfigTestBackstage.DeepCopy()
 	bs.Spec.Application.AppConfig.MountPath = "/app/src"
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1.FileObjectRef{Name: appConfigTestCm.Name})
+		api.FileObjectRef{Name: appConfigTestCm.Name})
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1.FileObjectRef{Name: appConfigTestCm2.Name, MountPath: "/my/appconfig"})
+		api.FileObjectRef{Name: appConfigTestCm2.Name, MountPath: "/my/appconfig"})
 	bs.Spec.Application.AppConfig.ConfigMaps = append(bs.Spec.Application.AppConfig.ConfigMaps,
-		bsv1.FileObjectRef{Name: appConfigTestCm3.Name, Key: "conf31.yaml"})
+		api.FileObjectRef{Name: appConfigTestCm3.Name, Key: "conf31.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -125,7 +124,7 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 
 	bs := *appConfigTestBackstage.DeepCopy()
 	cms := &bs.Spec.Application.AppConfig.ConfigMaps
-	*cms = append(*cms, bsv1.FileObjectRef{Name: appConfigTestCm.Name})
+	*cms = append(*cms, api.FileObjectRef{Name: appConfigTestCm.Name})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("app-config.yaml", "raw-app-config.yaml")
 

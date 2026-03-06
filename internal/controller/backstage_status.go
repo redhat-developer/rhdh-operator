@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -14,33 +14,33 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *bs.Backstage, backstageModel model.BackstageModel) {
+func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage *api.Backstage, backstageModel model.BackstageModel) {
 	var obj client.Object
-	var resolveState func(client.Object) (bs.BackstageConditionReason, string)
+	var resolveState func(client.Object) (api.BackstageConditionReason, string)
 
 	switch backstageModel.GetDeploymentGVK() {
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSet"):
 		obj = &appsv1.StatefulSet{}
-		resolveState = func(o client.Object) (bs.BackstageConditionReason, string) {
+		resolveState = func(o client.Object) (api.BackstageConditionReason, string) {
 			return statefulSetState(o.(*appsv1.StatefulSet))
 		}
 	default:
 		obj = &appsv1.Deployment{}
-		resolveState = func(o client.Object) (bs.BackstageConditionReason, string) {
+		resolveState = func(o client.Object) (api.BackstageConditionReason, string) {
 			return deploymentState(o.(*appsv1.Deployment))
 		}
 	}
 
 	if err := r.Get(ctx, types.NamespacedName{Name: model.DeploymentName(backstage.Name), Namespace: backstage.GetNamespace()}, obj); err != nil {
-		setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, err.Error())
+		setStatusCondition(backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonFailed, err.Error())
 		return
 	}
 
 	state, msg := resolveState(obj)
-	setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, state, msg)
+	setStatusCondition(backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, state, msg)
 }
 
-func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionType, status metav1.ConditionStatus, reason bs.BackstageConditionReason, msg string) {
+func setStatusCondition(backstage *api.Backstage, condType api.BackstageConditionType, status metav1.ConditionStatus, reason api.BackstageConditionReason, msg string) {
 	meta.SetStatusCondition(&backstage.Status.Conditions, metav1.Condition{
 		Type:               string(condType),
 		Status:             status,
@@ -50,23 +50,23 @@ func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionT
 	})
 }
 
-func deploymentState(deploy *appsv1.Deployment) (state bs.BackstageConditionReason, msg string) {
+func deploymentState(deploy *appsv1.Deployment) (state api.BackstageConditionReason, msg string) {
 	desired := int32(1)
 	if deploy.Spec.Replicas != nil {
 		desired = *deploy.Spec.Replicas
 	}
 	if deploy.Status.ReadyReplicas == desired {
-		return bs.BackstageConditionReasonDeployed, ""
+		return api.BackstageConditionReasonDeployed, ""
 	}
 
 	if len(deploy.Status.Conditions) == 0 {
-		return bs.BackstageConditionReasonInProgress, "no conditions reported yet"
+		return api.BackstageConditionReasonInProgress, "no conditions reported yet"
 	}
 
 	// Prefer explicit failure indicators
 	for _, c := range deploy.Status.Conditions {
 		if c.Type == appsv1.DeploymentReplicaFailure && c.Status == corev1.ConditionTrue {
-			return bs.BackstageConditionReasonFailed, c.Message
+			return api.BackstageConditionReasonFailed, c.Message
 		}
 	}
 
@@ -75,10 +75,10 @@ func deploymentState(deploy *appsv1.Deployment) (state bs.BackstageConditionReas
 	for _, c := range deploy.Status.Conditions {
 		msg += fmt.Sprintf(" %s=%s(%s);", c.Type, c.Status, c.Message)
 	}
-	return bs.BackstageConditionReasonInProgress, msg
+	return api.BackstageConditionReasonInProgress, msg
 }
 
-func statefulSetState(deploy *appsv1.StatefulSet) (state bs.BackstageConditionReason, msg string) {
+func statefulSetState(deploy *appsv1.StatefulSet) (state api.BackstageConditionReason, msg string) {
 	desired := int32(1)
 	if deploy.Spec.Replicas != nil {
 		desired = *deploy.Spec.Replicas
@@ -86,11 +86,11 @@ func statefulSetState(deploy *appsv1.StatefulSet) (state bs.BackstageConditionRe
 
 	//if deploy.Status.ReadyReplicas == desired {
 	if deploy.Status.ReadyReplicas == desired && deploy.Status.CurrentReplicas == deploy.Status.UpdatedReplicas {
-		return bs.BackstageConditionReasonDeployed, ""
+		return api.BackstageConditionReasonDeployed, ""
 	}
 
 	if len(deploy.Status.Conditions) == 0 {
-		return bs.BackstageConditionReasonInProgress, "no conditions reported yet"
+		return api.BackstageConditionReasonInProgress, "no conditions reported yet"
 	}
 
 	// Fallback: aggregate condition info as in-progress
@@ -98,5 +98,5 @@ func statefulSetState(deploy *appsv1.StatefulSet) (state bs.BackstageConditionRe
 	for _, c := range deploy.Status.Conditions {
 		msg += fmt.Sprintf(" %s=%s(%s);", c.Type, c.Status, c.Message)
 	}
-	return bs.BackstageConditionReasonInProgress, msg
+	return api.BackstageConditionReasonInProgress, msg
 }

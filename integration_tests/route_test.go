@@ -13,7 +13,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -39,12 +39,12 @@ var _ = When("create default backstage", func() {
 
 	for _, tt := range []struct {
 		name                   string
-		desiredRoute           bsv1.Route
+		desiredRoute           api.Route
 		expectedBaseUrlMatcher func() any
 	}{
 		{
 			name: "route disabled",
-			desiredRoute: bsv1.Route{
+			desiredRoute: api.Route{
 				Enabled: ptr.To(false),
 			},
 			expectedBaseUrlMatcher: func() any {
@@ -53,7 +53,7 @@ var _ = When("create default backstage", func() {
 		},
 		{
 			name: "route with subdomain",
-			desiredRoute: bsv1.Route{
+			desiredRoute: api.Route{
 				//Host:      "localhost",
 				//Enabled:   ptr.To(true),
 				Subdomain: "test",
@@ -64,7 +64,7 @@ var _ = When("create default backstage", func() {
 		},
 		{
 			name: "route with host",
-			desiredRoute: bsv1.Route{
+			desiredRoute: api.Route{
 				Host:      "host.example.com",
 				Subdomain: "test",
 			},
@@ -80,14 +80,14 @@ var _ = When("create default backstage", func() {
 				Skip("Skipped for non-Openshift cluster")
 			}
 
-			backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-				Application: &bsv1.Application{
+			backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+				Application: &api.Application{
 					Route: &tt.desiredRoute,
 				},
 			}, "")
 
 			Eventually(func() error {
-				found := &bsv1.Backstage{}
+				found := &api.Backstage{}
 				return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
@@ -109,7 +109,7 @@ var _ = When("create default backstage", func() {
 
 				By("updating the baseUrls in the default app-config CM, per the desired route settings (RHIDP-6192)")
 				var appConfigCm corev1.ConfigMap
-				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, &appConfigCm)
+				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName, "")}, &appConfigCm)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(appConfigCm).To(HaveAppConfigBaseUrl(tt.expectedBaseUrlMatcher()))
 			}, 5*time.Minute, time.Second).Should(Succeed())
