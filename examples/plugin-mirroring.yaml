@@ -11,32 +11,40 @@
 # ```
 
 ---
+# NOTE: Refer to this manual for more details about the registries.conf format
+# https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: my-rhdh-mirror-conf
 data:
   "rhdh-registries.conf": |
+    # See https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md
+
     [[registry]]
     location = "registry.localhost:5000"
+    # Omit or set 'insecure = false` for production registries
     insecure = true
 
     [[registry]]
-    # GA and TP plugins
+    ## GA and TP plugins
     prefix = "registry.access.redhat.com/rhdh"
     location = "registry.localhost:5000/rhdh"
+    # Omit or set 'insecure = false` for production registries
     insecure = true
     
     [[registry]]
-    # Some plugins might be available here
+    ## Some plugins might be available here
     prefix = "quay.io/rhdh"
     location = "registry.localhost:5000/rhdh"
+    # Omit or set 'insecure = false` for production registries
     insecure = true
 
     [[registry]]
-    # RHDH community plugins
+    ## RHDH community plugins
     prefix = "ghcr.io/redhat-developer/rhdh-plugin-export-overlays"
     location = "registry.localhost:5000/rhdh-plugin-export-overlays"
+    # Omit or set 'insecure = false` for production registries
     insecure = true
 
 ---
@@ -53,10 +61,25 @@ spec:
           mountPath: /etc/containers/registries.conf.d
           containers: [ install-dynamic-plugins ]
 
+#      secrets:
+#        # If your mirror registry requires auth, you should mount the credentials inside the init container.
+#
+#        # "oc create secret docker-registry" produces key ".dockerconfigjson".
+#        # No per-item mountPath → file lands at extraFiles.mountPath/.dockerconfigjson
+#        # i.e. /opt/app-root/src/.dockerconfigjson (working dir, always exists).
+#        - name: internal-registry-auth
+#          key: .dockerconfigjson
+#          containers: [ install-dynamic-plugins ]
+
 #    extraEnvs:
 #      envs:
 #        # Set the CATALOG_INDEX_IMAGE env var to your mirrored catalog index image
-#        # if you are using a tag/digest different from the default
+#        # if you are using a tag/digest different from the default, e.g.:
 #        - name: CATALOG_INDEX_IMAGE
 #          value: registry.localhost:5000/rhdh/plugin-catalog-index:<tag>
+#          containers: [ install-dynamic-plugins ]
+
+#        # If your mirror registry requires auth, tell skopeo where to find the auth file
+#        - name: REGISTRY_AUTH_FILE
+#          value: /opt/app-root/src/.dockerconfigjson
 #          containers: [ install-dynamic-plugins ]

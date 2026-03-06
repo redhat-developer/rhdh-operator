@@ -119,12 +119,12 @@ bash mirror-plugins.sh \
 
 After mirroring completes, the script generates a `rhdh-plugin-mirroring-summary.txt` file containing mappings of the plugin catalog index image (if specified) and all mirrored plugins.
 
-To use the mirrored plugins in RHDH, you need to configure container registry mirroring so that RHDH transparently pulls plugins from your mirror registry instead of the original source registries. This is done by mounting a custom `registries.conf` (and `policy.json` if needed) as extra files into the RHDH init container, as depicted in the sections below.
+To use the mirrored plugins in RHDH, you need to configure container registry mirroring so that RHDH transparently pulls plugins from your mirror registry instead of the original source registries. This is done by mounting a custom `registries.conf` (and `policy.json` if needed) as extra files into the RHDH init container, as depicted in the sections below. See link:../../examples/plugin-mirroring.yaml[examples/plugin-mirroring.yaml] for a CR example.
 
 [#_creating_registry_mirroring_configmap]
 ==== Creating the registry mirroring ConfigMap
 
-Create a ConfigMap containing the mirroring configuration. See link:https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md[Configuring registries] for more information.
+Create a ConfigMap containing the mirroring configuration. See link:https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md[Configuring registries] for more information about the format.
 
 NOTE: While GA and Technical Preview plugins can be pulled from `registry.access.redhat.com`, Dev Preview and Community-supported ones may be available from other registries like `ghcr.io` or `quay.io`. You may want to configure mirroring for those registries as well. Also make sure to adjust the `location` paths accordingly, depending on your target mirror registry.
 
@@ -147,7 +147,7 @@ data:
 
     [[registry]]
     prefix = "ghcr.io/redhat-developer/rhdh-plugin-export-overlays"
-    location = "my-registry.example.com/rhdh"
+    location = "my-registry.example.com/rhdh-plugin-export-overlays"
 ----
 
 [#_creating_policy_configmap]
