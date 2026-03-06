@@ -122,6 +122,11 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine enabled flavours: %w", err)
 	}
+	if len(flavours) > 0 {
+		for _, flavour := range flavours {
+			lg.Info("found enabled flavour", "flavour:", flavour.name)
+		}
+	}
 
 	ecs := make([]ExternalConfigContributor, 0)
 	// looping through the registered runtimeConfig objects initializing the model
