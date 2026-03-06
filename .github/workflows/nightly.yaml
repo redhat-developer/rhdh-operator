@@ -16,7 +16,6 @@ jobs:
           - main
           - release-1.9
           - release-1.8
-          - release-1.7
     name: 'Nightly Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
@@ -31,25 +30,10 @@ jobs:
 
       - name: Set env vars
         run: |
-          branch=${{ matrix.branch }}
-          distLocation="dist/rhdh/install.yaml"
-          OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
-          proto="file://"
-          if [[ "${branch}" != "main" ]]; then
-            version="${branch#release-}"
-            major=$(echo $version | cut -d. -f1)
-            minor=$(echo $version | cut -d. -f2)
-            OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
-            # TODO(rm3l): remove this once 1.6 is the minimal supported version
-            if [[ $major -ge 1 && $minor -ge 6 ]]; then
-              OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${branch}/${distLocation}"
-              proto=""
-            fi
-          fi
+          OPERATOR_MANIFEST="${{ github.workspace }}/dist/rhdh/install.yaml"
           echo "OPERATOR_MANIFEST=${OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          OPERATOR_IMAGE=$(curl -s "${proto}${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          OPERATOR_IMAGE=$(curl -s "file://${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> $GITHUB_ENV
-          echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
 
       - name: Check if operator image exists in remote registry
         id: operator-image-existence-checker
