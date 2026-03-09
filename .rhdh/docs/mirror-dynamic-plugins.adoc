@@ -153,7 +153,7 @@ data:
 [#_creating_policy_configmap]
 ==== (Optional) Creating a policy ConfigMap
 
-Depending on your target mirror registry, you may need to configure a policy file. For production environments, you should use a more restrictive policy that verifies image signatures. See link:https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/building_running_and_managing_containers/signing-container-images_assembly_signing-container-images[Signing container images] for more details.
+Depending on your target mirror registry, you may need to configure a policy file. For production environments, you should use a more restrictive policy that verifies image signatures. See link:https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/building_running_and_managing_containers/assembly_signing-container-images_building-running-and-managing-containers[Signing container images] for more details.
 
 [source,yaml]
 ----
