@@ -86,7 +86,7 @@ func collectConfigSources(key string, basePath string, flavours []enabledFlavour
 
 // mergeDynamicPlugins merges dynamic-plugins.yaml files by package name
 // Later entries override earlier entries with the same package name
-func mergeDynamicPlugins(sources []configSource, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+func mergeDynamicPlugins(sources []configSource, scheme runtime.Scheme, _ string) ([]client.Object, error) {
 
 	if len(sources) == 0 {
 		return []client.Object{}, nil
@@ -133,7 +133,7 @@ func mergeDynamicPlugins(sources []configSource, scheme runtime.Scheme, platform
 // Each flavour creates its own object with a unique name.
 // Base config objects keep their original names.
 // Flavour config objects are prefixed with the flavour name (e.g., "lightspeed-app-config").
-func mergeMultiObjectConfigs(sources []configSource, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+func mergeMultiObjectConfigs(sources []configSource, scheme runtime.Scheme, _ string) ([]client.Object, error) {
 	if len(sources) == 0 {
 		return []client.Object{}, nil
 	}
