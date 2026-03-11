@@ -53,7 +53,7 @@ func (p *ConfigMapEnvs) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
+func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	p.model = model
 	if p.ConfigMaps != nil && len(p.ConfigMaps.Items) > 0 {
 		model.setRuntimeObject(p)
@@ -63,7 +63,7 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstag
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) updateAndValidate(backstage api.Backstage) error {
+func (p *ConfigMapEnvs) updateAndValidate(_ api.Backstage) error {
 	for _, item := range p.ConfigMaps.Items {
 		cm, ok := item.(*corev1.ConfigMap)
 		if !ok {
