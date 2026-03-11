@@ -74,7 +74,7 @@ func TestDefaultAppConfig(t *testing.T) {
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
 	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath, deployment.defaultMountPath())
-	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(AppConfigDefaultName(bs.Name, "")), deployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(DefaultMultiObjectName("appconfig", bs.Name, "my-backstage-config-cm1")), deployment.container().VolumeMounts[0].Name)
 	assert.Equal(t, 2, len(deployment.container().Args))
 	assert.Equal(t, 1, len(deployment.podSpec().Volumes))
 

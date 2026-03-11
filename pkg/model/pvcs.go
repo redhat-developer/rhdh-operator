@@ -50,10 +50,6 @@ type BackstagePvcs struct {
 	model *BackstageModel
 }
 
-func PvcsName(backstageName, originalName string) string {
-	return fmt.Sprintf("%s-%s", utils.GenerateRuntimeObjectName(backstageName, "backstage"), originalName)
-}
-
 func (b *BackstagePvcs) Object() runtime.Object {
 	return b.pvcs
 }
@@ -87,12 +83,7 @@ func (b *BackstagePvcs) updateAndValidate(_ api.Backstage) error {
 }
 
 func (b *BackstagePvcs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	for _, item := range b.pvcs.Items {
-		pvc := item.(*corev1.PersistentVolumeClaim)
-		utils.AddAnnotation(pvc, ConfiguredNameAnnotation, item.GetName())
-		pvc.Name = PvcsName(backstage.Name, pvc.Name)
-		setMetaInfo(pvc, backstage, scheme)
-	}
+	setMultiObjectConfigMetaInfo(b.pvcs, "pvcs", backstage, scheme)
 }
 
 func addPvc(bsd *BackstageDeployment, pvcName, mountPath, subPath string, filter containersFilter) error {

@@ -32,6 +32,7 @@ var _ = When("create default rhdh", func() {
 		ctx := context.Background()
 		ns := createNamespace(ctx)
 		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
+		defAppConfigName := model.DefaultMultiObjectName("appconfig", backstageName, "default-appconfig")
 
 		Eventually(func(g Gomega) {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
@@ -50,10 +51,14 @@ var _ = When("create default rhdh", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			var appConfigCm corev1.ConfigMap
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName, "")}, &appConfigCm)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: defAppConfigName}, &appConfigCm)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(1))
+			//g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(1))
+
+			// with lightspeed
+			g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(2))
+
 			_, initCont := model.DynamicPluginsInitContainer(deploy.PodSpec().InitContainers)
 
 			initContainerExpectedVolumeMounts := []corev1.VolumeMount{
@@ -63,7 +68,7 @@ var _ = When("create default rhdh", func() {
 					SubPath:   "",
 				},
 				{
-					Name:      utils.GenerateRuntimeObjectName(backstageName, "backstage-files"),
+					Name:      model.DefaultMultiObjectName("files", backstageName, "dynamic-plugins-npmrc"),
 					MountPath: "/opt/app-root/src/.npmrc.dynamic-plugins",
 					SubPath:   "",
 				},
@@ -105,14 +110,21 @@ var _ = When("create default rhdh", func() {
 						g.Expect(vm.SubPath).To(Equal(evm.SubPath))
 					}
 				}
+				if !found {
+					fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>> ", evm.Name)
+				}
 				g.Expect(found).To(BeTrue())
 			}
 
 			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
 			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
 
-			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(8))
-			g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
+			//			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(8))
+			//			g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
+
+			// including lightspeed flavour
+			g.Expect(deploy.PodSpec().Volumes).To(HaveLen(13))
+			g.Expect(deploy.PodSpec().Containers).To(HaveLen(7))
 			mainCont := backstageContainer(*deploy.PodSpec())
 			g.Expect(mainCont.Args).To(HaveLen(4))
 			g.Expect(mainCont.Args[0]).To(Equal("--config"))
@@ -126,7 +138,7 @@ var _ = When("create default rhdh", func() {
 					MountPath: "/opt/app-root/src/dynamic-plugins-root",
 				},
 				{
-					Name:      model.AppConfigDefaultName(backstageName, ""),
+					Name:      model.DefaultMultiObjectName("appconfig", backstageName, "default-appconfig"),
 					MountPath: "/opt/app-root/src/default.app-config.yaml",
 					SubPath:   "default.app-config.yaml",
 				},
@@ -264,7 +276,10 @@ var _ = When("create default rhdh", func() {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+			//g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+			// with lightspeed
+			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(2))
+
 			initCont := deploy.PodSpec().InitContainers[0]
 			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
 			found := 0
@@ -306,7 +321,7 @@ var _ = When("create default rhdh", func() {
 
 			By("creating base app-config ConfigMap")
 			baseAppConfig := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName, "")}, baseAppConfig)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("appconfig", backstageName, "default-appconfig")}, baseAppConfig)
 			g.Expect(err).ShouldNot(HaveOccurred(), "base app-config should exist")
 
 			By("verifying no flavour app-config was created (flavour has no configs yet)")
@@ -315,10 +330,12 @@ var _ = When("create default rhdh", func() {
 			cmList = &corev1.ConfigMapList{}
 			err = k8sClient.List(ctx, cmList, client.InNamespace(ns))
 			g.Expect(err).ShouldNot(HaveOccurred())
-			for _, cm := range cmList.Items {
-				// Verify no flavour ConfigMaps exist (since flavours don't have configs yet)
-				g.Expect(cm.Annotations).NotTo(HaveKeyWithValue(model.SourceAnnotation, "flavour-lightspeed"))
-			}
+
+			// with lightspeed by default
+			//for _, cm := range cmList.Items {
+			//	// Verify no flavour ConfigMaps exist (since flavours don't have configs yet)
+			//	g.Expect(cm.Annotations).NotTo(HaveKeyWithValue(model.SourceAnnotation, "flavour-lightspeed"))
+			//}
 
 			By("creating dynamic-plugins ConfigMap")
 			dpConfigMap := &corev1.ConfigMap{}

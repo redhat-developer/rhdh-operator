@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -144,14 +146,28 @@ func mergeMultiObjectConfigs(sources []configSource, scheme runtime.Scheme, plat
 			return nil, fmt.Errorf("failed to parse config from %s: %w", src.path, err)
 		}
 
+		// set source annotation for information
 		for _, obj := range objs {
-			// If this is a flavour config, add a source annotation
 			if src.flavourName != "" {
-				utils.AddAnnotation(obj, SourceAnnotation, fmt.Sprintf("flavour-%s", src.flavourName))
+				utils.AddAnnotation(obj, SourceAnnotation, "flavour-"+src.flavourName)
+			} else {
+				utils.AddAnnotation(obj, SourceAnnotation, "default")
 			}
 			allObjects = append(allObjects, obj)
 		}
 	}
 
 	return allObjects, nil
+}
+
+func DefaultMultiObjectName(objectType, backstageName, objectName string) string {
+	return "backstage-" + objectType + "-" + backstageName + "-" + objectName
+}
+
+func setMultiObjectConfigMetaInfo(mo *multiobject.MultiObject, objectType string, backstage api.Backstage, scheme *runtime.Scheme) {
+	for _, item := range mo.Items {
+		utils.AddAnnotation(item, ConfiguredNameAnnotation, item.GetName())
+		item.SetName(DefaultMultiObjectName(objectType, backstage.Name, item.GetName()))
+		setMetaInfo(item, backstage, scheme)
+	}
 }

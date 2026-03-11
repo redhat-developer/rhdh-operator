@@ -82,9 +82,9 @@ var _ = When("create backstage PVCs configured", func() {
 		Eventually(func(g Gomega) {
 
 			pvc := &corev1.PersistentVolumeClaim{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim1")}, pvc)
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim2")}, pvc)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if PVC is correctly created and initialized
@@ -96,7 +96,7 @@ var _ = When("create backstage PVCs configured", func() {
 			pv := &corev1.PersistentVolume{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: createdPvName}, pv)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(pv.Spec.ClaimRef.Name).To(Equal(model.PvcsName(backstageName, "myclaim2")))
+			g.Expect(pv.Spec.ClaimRef.Name).To(Equal(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")))
 			g.Expect(pv.Status.Phase).To(Equal(corev1.VolumeBound))
 
 			// check if added to deployment
@@ -105,16 +105,16 @@ var _ = When("create backstage PVCs configured", func() {
 			bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1")))
+			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")))
 			g.Expect(path).To(BeMountedToContainer(backstageContainer(bpod.Spec)))
 
-			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1"))).
+			g.Expect(utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1"))).
 				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
 
-			path = filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim2")))
+			path = filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")))
 			g.Expect(path).To(BeMountedToContainer(backstageContainer(bpod.Spec)))
 
-			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim2"))).
+			g.Expect(utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2"))).
 				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
 
 			// check if mounted directory is there
@@ -178,7 +178,7 @@ var _ = When("create backstage PVCs configured", func() {
 		Eventually(func(g Gomega) {
 
 			pvc := &corev1.PersistentVolumeClaim{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim1")}, pvc)
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if PVC is bound to precreated PV
@@ -190,9 +190,9 @@ var _ = When("create backstage PVCs configured", func() {
 			// check if added to deployment
 			depl, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1")))
+			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")))
 			g.Expect(path).To(BeMountedToContainer(backstageContainer(*depl.PodSpec())))
-			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1"))).
+			g.Expect(utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1"))).
 				To(BeAddedAsVolumeToPodSpec(*depl.PodSpec()))
 
 			pod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
@@ -275,9 +275,9 @@ var _ = When("create backstage PVCs configured", func() {
 		Eventually(func(g Gomega) {
 
 			pvc := &corev1.PersistentVolumeClaim{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim1")}, pvc)
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim2")}, pvc)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "my-pvc1"}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())

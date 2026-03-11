@@ -1,0 +1,167 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: llama-stack-run-no-guard
+  annotations:
+    rhdh.redhat.com/containers: "llama-stack"
+    rhdh.redhat.com/mount-path: "/app-root/run.yaml"
+data:
+  run.yaml: |
+    version: 2
+    image_name: redhat-ai-dev-llama-stack-no-guard
+    apis:
+      - agents
+      - inference
+      - safety
+      - tool_runtime
+      - vector_io
+      - files
+    container_image:
+    external_providers_dir:
+    providers:
+      agents:
+        - config:
+            persistence:
+              agent_state:
+                namespace: agents
+                backend: kv_default
+              responses:
+                table_name: responses
+                backend: sql_default
+          provider_id: meta-reference
+          provider_type: inline::meta-reference
+      inference:
+        - provider_id: ${env.ENABLE_VLLM:+vllm}
+          provider_type: remote::vllm
+          config:
+            url: ${env.VLLM_URL:=}
+            api_token: ${env.VLLM_API_KEY:=}
+            max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
+            tls_verify: ${env.VLLM_TLS_VERIFY:=true}
+        - provider_id: ${env.ENABLE_OLLAMA:+ollama}
+          provider_type: remote::ollama
+          config:
+            url: ${env.OLLAMA_URL:=http://localhost:11434}
+        - provider_id: ${env.ENABLE_OPENAI:+openai}
+          provider_type: remote::openai
+          config:
+            api_key: ${env.OPENAI_API_KEY:=}
+        - provider_id: ${env.ENABLE_VERTEX_AI:+vertexai}
+          provider_type: remote::vertexai
+          config:
+            project: ${env.VERTEX_AI_PROJECT:=}
+            location: ${env.VERTEX_AI_LOCATION:=us-central1}
+        - provider_id: sentence-transformers
+          provider_type: inline::sentence-transformers
+          config: {}
+      tool_runtime:
+        - provider_id: model-context-protocol
+          provider_type: remote::model-context-protocol
+          config: {}
+        - provider_id: rag-runtime
+          provider_type: inline::rag-runtime
+          config: {}
+      vector_io:
+        - provider_id: faiss
+          provider_type: inline::faiss
+          config:
+            persistence:
+              namespace: vector_io::faiss
+              backend: faiss_kv
+      files:
+        - provider_id: localfs
+          provider_type: inline::localfs
+          config:
+            storage_dir: /tmp/llama-stack-files
+            metadata_store:
+              table_name: files_metadata
+              backend: sql_files
+    storage:
+      backends:
+        kv_default:
+          type: kv_sqlite
+          db_path: /tmp/kvstore.db
+        sql_default:
+          type: sql_sqlite
+          db_path: /tmp/sql_store.db
+        sql_files:
+          type: sql_sqlite
+          db_path: /rag-content/vector_db/rhdh_product_docs/1.9/files_metadata.db
+        faiss_kv:
+          type: kv_sqlite
+          db_path: /rag-content/vector_db/rhdh_product_docs/1.9/faiss_store.db
+      stores:
+        metadata:
+          namespace: registry
+          backend: faiss_kv
+        inference:
+          table_name: inference_store
+          backend: sql_default
+          max_write_queue_size: 10000
+          num_writers: 4
+        conversations:
+          table_name: openai_conversations
+          backend: sql_default
+    registered_resources:
+      models:
+        - model_id: sentence-transformers/all-mpnet-base-v2
+          metadata:
+            embedding_dimension: 768
+          model_type: embedding
+          provider_id: sentence-transformers
+          provider_model_id: /rag-content/embeddings_model
+      tool_groups:
+        - provider_id: rag-runtime
+          toolgroup_id: builtin::rag
+      vector_dbs:
+        - vector_db_id: rhdh-product-docs-1_8
+          embedding_model: sentence-transformers/all-mpnet-base-v2
+          embedding_dimension: 768
+          provider_id: faiss
+    server:
+      auth:
+      host:
+      port: 8321
+      quota:
+      tls_cafile:
+      tls_certfile:
+      tls_keyfile:
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: lightspeed-stack
+  annotations:
+    rhdh.redhat.com/containers: "lightspeed-core"
+    rhdh.redhat.com/mount-path: "/app-root/lightspeed-stack.yaml"
+data:
+  lightspeed-stack.yaml: |
+    name: "lightspeed-core-stack"
+    service:
+      host: 0.0.0.0
+      port: 8080
+      auth_enabled: false
+      workers: 1
+      color_log: true
+      access_log: true
+    llama_stack:
+      use_as_library_client: false
+      url: http://localhost:8321
+    user_data_collection:
+      feedback_enabled: true
+      feedback_storage: "/tmp/data/feedback"
+    authentication:
+      module: "noop"
+    conversation_cache:
+      type: "sqlite"
+      sqlite:
+        db_path: "/tmp/cache.db"
+    mcp_servers:
+      - name: mcp-integration-tools
+        provider_id: "model-context-protocol"
+        url: "http://{{ .Release.Name }}-backstage.{{ .Release.Namespace }}.svc.cluster.local:7007/api/mcp-actions/v1"
+        authorization_headers:
+          Authorization: "client"
+
+        

@@ -5,8 +5,6 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -85,15 +83,5 @@ func (p *SecretEnvs) updateAndValidate(_ api.Backstage) error {
 
 // implementation of RuntimeObject interface
 func (p *SecretEnvs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	for _, item := range p.secrets.Items {
-		secret := item.(*corev1.Secret)
-		utils.AddAnnotation(secret, ConfiguredNameAnnotation, item.GetName())
-		if len(p.secrets.Items) == 1 {
-			// keep for backward compatibility
-			secret.Name = utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs")
-		} else {
-			secret.Name = fmt.Sprintf("%s-%s", utils.GenerateRuntimeObjectName(backstage.Name, "backstage-envs"), secret.Name)
-		}
-		setMetaInfo(secret, backstage, scheme)
-	}
+	setMultiObjectConfigMetaInfo(p.secrets, "envs", backstage, scheme)
 }

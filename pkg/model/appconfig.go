@@ -9,8 +9,6 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -29,13 +27,6 @@ type AppConfig struct {
 
 func init() {
 	registerConfig("app-config.yaml", AppConfigFactory{}, true, mergeMultiObjectConfigs)
-}
-
-func AppConfigDefaultName(backstageName, src string) string {
-	if src == "" {
-		return "backstage-appconfig-" + backstageName
-	}
-	return "backstage-appconfig-" + src + "-" + backstageName
 }
 
 func (b *AppConfig) addExternalConfig(spec api.BackstageSpec) error {
@@ -91,12 +82,7 @@ func (b *AppConfig) updateAndValidate(_ api.Backstage) error {
 }
 
 func (b *AppConfig) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	for _, item := range b.ConfigMaps.Items {
-		cm := item.(*corev1.ConfigMap)
-		utils.AddAnnotation(cm, ConfiguredNameAnnotation, cm.Name)
-		cm.Name = AppConfigDefaultName(backstage.Name, cm.Annotations[SourceAnnotation])
-		setMetaInfo(cm, backstage, scheme)
-	}
+	setMultiObjectConfigMetaInfo(b.ConfigMaps, "appconfig", backstage, scheme)
 }
 
 // updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args

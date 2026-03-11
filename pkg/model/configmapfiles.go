@@ -27,13 +27,6 @@ func init() {
 	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, true, mergeMultiObjectConfigs)
 }
 
-func ConfigMapFilesDefaultName(backstageName, src string) string {
-	if src == "" {
-		return "backstage-files-" + backstageName
-	}
-	return "backstage-files-" + src + "-" + backstageName
-}
-
 func (p *ConfigMapFiles) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
 		return nil
@@ -94,9 +87,5 @@ func (p *ConfigMapFiles) updateAndValidate(_ api.Backstage) error {
 }
 
 func (p *ConfigMapFiles) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	for _, item := range p.ConfigMaps.Items {
-		cm := item.(*corev1.ConfigMap)
-		cm.Name = ConfigMapFilesDefaultName(backstage.Name, cm.Annotations[SourceAnnotation])
-		setMetaInfo(cm, backstage, scheme)
-	}
+	setMultiObjectConfigMetaInfo(p.ConfigMaps, "files", backstage, scheme)
 }

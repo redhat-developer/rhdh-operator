@@ -50,16 +50,16 @@ func TestDefaultPvcs(t *testing.T) {
 	mv, ok := obj.Object().(*multiobject.MultiObject)
 	assert.True(t, ok)
 	assert.Equal(t, 2, len(mv.Items))
-	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), mv.Items[0].GetName())
+	assert.Equal(t, DefaultMultiObjectName("pvcs", bs.Name, "myclaim1"), mv.Items[0].GetName())
 	assert.Equal(t, "myclaim1", mv.Items[0].GetAnnotations()[ConfiguredNameAnnotation])
 	assert.Equal(t, "/mount/path/from/annotation", mv.Items[1].GetAnnotations()[DefaultMountPathAnnotation])
 
 	// PVC volumes created and mounted to backstage container
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Volumes))
-	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), model.backstageDeployment.podSpec().Volumes[0].Name)
+	assert.Equal(t, DefaultMultiObjectName("pvcs", bs.Name, "myclaim1"), model.backstageDeployment.podSpec().Volumes[0].Name)
 	assert.Equal(t, 2, len(model.backstageDeployment.container().VolumeMounts))
-	assert.Equal(t, PvcsName(bs.Name, "myclaim1"), model.backstageDeployment.container().VolumeMounts[0].Name)
-	assert.Equal(t, filepath.Join(DefaultMountDir, PvcsName(bs.Name, "myclaim1")), model.backstageDeployment.container().VolumeMounts[0].MountPath)
+	assert.Equal(t, DefaultMultiObjectName("pvcs", bs.Name, "myclaim1"), model.backstageDeployment.container().VolumeMounts[0].Name)
+	assert.Equal(t, filepath.Join(DefaultMountDir, DefaultMultiObjectName("pvcs", bs.Name, "myclaim1")), model.backstageDeployment.container().VolumeMounts[0].MountPath)
 	assert.Equal(t, "/mount/path/from/annotation", model.backstageDeployment.container().VolumeMounts[1].MountPath)
 
 }

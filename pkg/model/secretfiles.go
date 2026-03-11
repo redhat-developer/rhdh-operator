@@ -4,14 +4,11 @@ import (
 	"fmt"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-
 	"golang.org/x/exp/maps"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -99,16 +96,5 @@ func (p *SecretFiles) updateAndValidate(_ api.Backstage) error {
 
 // implementation of RuntimeObject interface
 func (p *SecretFiles) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-
-	for _, item := range p.secrets.Items {
-		secret := item.(*corev1.Secret)
-		if len(p.secrets.Items) == 1 {
-			// keep for backward compatibility
-			secret.Name = utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files")
-		} else {
-			utils.AddAnnotation(secret, ConfiguredNameAnnotation, item.GetName())
-			secret.Name = fmt.Sprintf("%s-%s", utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files"), secret.Name)
-		}
-		setMetaInfo(secret, backstage, scheme)
-	}
+	setMultiObjectConfigMetaInfo(p.secrets, "files", backstage, scheme)
 }

@@ -38,19 +38,19 @@ func TestFlavoursWithDefaultsEnabled(t *testing.T) {
 	assert.NotNil(t, model)
 
 	// Verify app-config: should have base + flavor1 (enabledByDefault: true)
-	assert.NotNil(t, findConfigMapByName(model.appConfig.ConfigMaps.Items, "backstage-appconfig-bs"), "base app-config should exist")
+	assert.NotNil(t, findConfigMapByName(model.appConfig.ConfigMaps.Items, "backstage-appconfig-bs-base-app-config"), "base app-config should exist")
 	assert.NotNil(t, findConfigMapBySource(model.appConfig.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour app-config should exist")
 
 	// Verify configmap-files: should have base + flavor1
 	cmFiles := model.getRuntimeObjectByType(&ConfigMapFiles{}).(*ConfigMapFiles)
 	assert.NotNil(t, cmFiles)
-	assert.NotNil(t, findConfigMapByName(cmFiles.ConfigMaps.Items, "backstage-files-bs"), "base configmap-files should exist")
+	assert.NotNil(t, findConfigMapByName(cmFiles.ConfigMaps.Items, "backstage-files-bs-base-configmap-files"), "base configmap-files should exist")
 	assert.NotNil(t, findConfigMapBySource(cmFiles.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour configmap-files should exist")
 
 	// Verify configmap-envs: should have base + flavor1
 	cmEnvs := model.getRuntimeObjectByType(&ConfigMapEnvs{}).(*ConfigMapEnvs)
 	assert.NotNil(t, cmEnvs)
-	assert.NotNil(t, findConfigMapByName(cmEnvs.ConfigMaps.Items, "backstage-envs-bs"), "base configmap-envs should exist")
+	assert.NotNil(t, findConfigMapByName(cmEnvs.ConfigMaps.Items, "backstage-envs-bs-base-configmap-envs"), "base configmap-envs should exist")
 	assert.NotNil(t, findConfigMapBySource(cmEnvs.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour configmap-envs should exist")
 
 	// Verify deployment: should have flavor1 label and env var merged
@@ -81,21 +81,21 @@ func TestFlavoursWithExplicitEnabled(t *testing.T) {
 	assert.NotNil(t, model)
 
 	// Verify app-config: should have base + flavor2 + flavor1 (default not disabled)
-	assert.NotNil(t, findConfigMapByName(model.appConfig.ConfigMaps.Items, "backstage-appconfig-bs"), "base app-config should exist")
+	assert.NotNil(t, findConfigMapByName(model.appConfig.ConfigMaps.Items, "backstage-appconfig-bs-base-app-config"), "base app-config should exist")
 	assert.NotNil(t, findConfigMapBySource(model.appConfig.ConfigMaps.Items, "flavour-flavor2"), "flavor2 flavour app-config should exist")
 	assert.NotNil(t, findConfigMapBySource(model.appConfig.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour app-config should exist")
 
 	// Verify configmap-files: should have base + flavor2 + flavor1
 	cmFiles := model.getRuntimeObjectByType(&ConfigMapFiles{}).(*ConfigMapFiles)
 	assert.NotNil(t, cmFiles)
-	assert.NotNil(t, findConfigMapByName(cmFiles.ConfigMaps.Items, "backstage-files-bs"), "base configmap-files should exist")
+	assert.NotNil(t, findConfigMapByName(cmFiles.ConfigMaps.Items, "backstage-files-bs-base-configmap-files"), "base configmap-files should exist")
 	assert.NotNil(t, findConfigMapBySource(cmFiles.ConfigMaps.Items, "flavour-flavor2"), "flavor2 flavour configmap-files should exist")
 	assert.NotNil(t, findConfigMapBySource(cmFiles.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour configmap-files should exist")
 
 	// Verify configmap-envs: should have base + flavor2 + flavor1
 	cmEnvs := model.getRuntimeObjectByType(&ConfigMapEnvs{}).(*ConfigMapEnvs)
 	assert.NotNil(t, cmEnvs)
-	assert.NotNil(t, findConfigMapByName(cmEnvs.ConfigMaps.Items, "backstage-envs-bs"), "base configmap-envs should exist")
+	assert.NotNil(t, findConfigMapByName(cmEnvs.ConfigMaps.Items, "backstage-envs-bs-base-configmap-envs"), "base configmap-envs should exist")
 	assert.NotNil(t, findConfigMapBySource(cmEnvs.ConfigMaps.Items, "flavour-flavor2"), "flavor2 flavour configmap-envs should exist")
 	assert.NotNil(t, findConfigMapBySource(cmEnvs.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour configmap-envs should exist")
 
@@ -131,19 +131,19 @@ func TestFlavoursWithDefaultDisabled(t *testing.T) {
 	assert.NotNil(t, model)
 
 	// Verify app-config: should have only base (flavor1 disabled)
-	assert.NotNil(t, findConfigMapByName(model.appConfig.ConfigMaps.Items, "backstage-appconfig-bs"), "base app-config should exist")
+	assert.NotNil(t, findConfigMapByName(model.appConfig.ConfigMaps.Items, "backstage-appconfig-bs-base-app-config"), "base app-config should exist")
 	assert.Nil(t, findConfigMapBySource(model.appConfig.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour app-config should NOT exist")
 
 	// Verify configmap-files: should have only base (flavor1 disabled)
 	cmFiles := model.getRuntimeObjectByType(&ConfigMapFiles{}).(*ConfigMapFiles)
 	assert.NotNil(t, cmFiles)
-	assert.NotNil(t, findConfigMapByName(cmFiles.ConfigMaps.Items, "backstage-files-bs"), "base configmap-files should exist")
+	assert.NotNil(t, findConfigMapByName(cmFiles.ConfigMaps.Items, "backstage-files-bs-base-configmap-files"), "base configmap-files should exist")
 	assert.Nil(t, findConfigMapBySource(cmFiles.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour configmap-files should NOT exist")
 
 	// Verify configmap-envs: should have only base (flavor1 disabled)
 	cmEnvs := model.getRuntimeObjectByType(&ConfigMapEnvs{}).(*ConfigMapEnvs)
 	assert.NotNil(t, cmEnvs)
-	assert.NotNil(t, findConfigMapByName(cmEnvs.ConfigMaps.Items, "backstage-envs-bs"), "base configmap-envs should exist")
+	assert.NotNil(t, findConfigMapByName(cmEnvs.ConfigMaps.Items, "backstage-envs-bs-base-configmap-envs"), "base configmap-envs should exist")
 	assert.Nil(t, findConfigMapBySource(cmEnvs.ConfigMaps.Items, "flavour-flavor1"), "flavor1 flavour configmap-envs should NOT exist")
 
 	// Verify deployment: should NOT have flavor1 label or env var

@@ -26,13 +26,6 @@ func init() {
 	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, true, mergeMultiObjectConfigs)
 }
 
-func ConfigMapEnvsDefaultName(backstageName, src string) string {
-	if src == "" {
-		return "backstage-envs-" + backstageName
-	}
-	return "backstage-envs-" + src + "-" + backstageName
-}
-
 func (p *ConfigMapEnvs) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.ConfigMaps == nil {
 		return nil
@@ -87,9 +80,10 @@ func (p *ConfigMapEnvs) updateAndValidate(backstage api.Backstage) error {
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	for _, item := range p.ConfigMaps.Items {
-		cm := item.(*corev1.ConfigMap)
-		cm.Name = ConfigMapEnvsDefaultName(backstage.Name, cm.Annotations[SourceAnnotation])
-		setMetaInfo(cm, backstage, scheme)
-	}
+	//for _, item := range p.ConfigMaps.Items {
+	//	cm := item.(*corev1.ConfigMap)
+	//	cm.Name = ConfigMapEnvsDefaultName(backstage.Name, cm.Annotations[SourceAnnotation])
+	//	setMetaInfo(cm, backstage, scheme)
+	//}
+	setMultiObjectConfigMetaInfo(p.ConfigMaps, "envs", backstage, scheme)
 }
