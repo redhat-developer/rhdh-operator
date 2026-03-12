@@ -24,7 +24,7 @@ Run the mirroring script with the catalog index (replace `1.9` with your desired
 [source,console]
 ----
 bash mirror-plugins.sh \
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --plugin-index oci://registry.access.redhat.com/rhdh/plugin-catalog-index:1.9 \
     --to-registry registry.example.com
 ----
 
@@ -42,7 +42,7 @@ Export all plugins to a local directory:
 [source,console]
 ----
 bash mirror-plugins.sh \
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --plugin-index oci://registry.access.redhat.com/rhdh/plugin-catalog-index:1.9 \
     --to-dir /tmp/rhdh-plugins
 ----
 
@@ -109,7 +109,7 @@ You can combine any of the plugin sources (catalog index, plugin list file, and 
 [source,console]
 ----
 bash mirror-plugins.sh \
-    --plugin-index oci://quay.io/rhdh/plugin-catalog-index:1.9 \
+    --plugin-index oci://registry.access.redhat.com/rhdh/plugin-catalog-index:1.9 \
     --plugin-list custom-plugins.txt \
     --plugins 'oci://registry.internal.example.com/custom/my-plugin:1.0' \
     --to-registry registry.example.com
