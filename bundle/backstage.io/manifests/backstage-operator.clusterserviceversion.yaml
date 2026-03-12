@@ -35,13 +35,13 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-03-04T17:52:47Z"
+    createdAt: "2026-03-12T01:33:07Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   labels:
     operatorframework.io/arch.amd64: supported
-  name: backstage-operator.v0.9.1
+  name: backstage-operator.v0.9.2
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -235,7 +235,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/rhdh-community/operator:0.9.1
+                image: quay.io/rhdh-community/operator:0.9.2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -346,4 +346,4 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 0.9.1
+  version: 0.9.2
