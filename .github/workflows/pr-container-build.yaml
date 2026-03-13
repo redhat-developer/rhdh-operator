@@ -18,7 +18,6 @@ env:
 
 jobs:
   build-images:
-    # 1. SECURITY GATE: Trust on First Use (TOFU) via RBAC
     if: |
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/build-images') &&
@@ -49,7 +48,20 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            core.setOutput('sha', pr.data.head.sha);
+            
+            // Extract the exact SHA the maintainer authorized from the comment
+            const commentBody = context.payload.comment.body.trim();
+            const match = commentBody.match(/^\/build-images\s+([a-f0-9]{7,40})/);
+            
+            if (!match) {
+              core.setFailed("❌ Security Gate: You must provide a specific commit SHA to build. Example: /build-images abc1234");
+              return;
+            }
+            
+            const authorizedSha = match[1];
+
+            // 4. Output the frozen, trusted data
+            core.setOutput('sha', authorizedSha);
             core.setOutput('repo', pr.data.head.repo.full_name);
             core.setOutput('number', context.issue.number);
 
@@ -85,7 +97,6 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Build and push images
-        # 4. SECRET ISOLATION:
         # We explicitly do NOT pass GH_TOKEN or RHDH_BOT_TOKEN here.
         # This makes running 'make' safe, even if the Makefile is malicious,
         # because there are no secrets in the env to steal.

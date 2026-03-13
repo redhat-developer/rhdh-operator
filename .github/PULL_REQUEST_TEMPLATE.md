@@ -25,7 +25,12 @@ Detailed instructions may help reviewers test this PR quickly and provide quicke
 
 Need to test container images from this PR?
 
-**For Maintainers:** Comment `/build-images` to trigger image builds
-**For Contributors:** Ask a maintainer to run `/build-images`
+**For Maintainers:** Triggering Builds
+To trigger a test image build, review the code and comment with the specific commit SHA you are approving:
+`/build-images <sha>` *(e.g., `/build-images a1b2c3d`)*
+
+*(You can find the short SHA at the bottom of the PR timeline or in the Commits tab).*
+
+**For Contributors:** Ask a maintainer to run `/build-images <sha>`
 
 Images will be built and pushed to Quay with links posted in comments.
