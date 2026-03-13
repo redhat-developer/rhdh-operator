@@ -59,7 +59,8 @@ func TestDefaultPvcs(t *testing.T) {
 	assert.Equal(t, DefaultMultiObjectName("pvcs", bs.Name, "myclaim1"), model.backstageDeployment.podSpec().Volumes[0].Name)
 	assert.Equal(t, 2, len(model.backstageDeployment.container().VolumeMounts))
 	assert.Equal(t, DefaultMultiObjectName("pvcs", bs.Name, "myclaim1"), model.backstageDeployment.container().VolumeMounts[0].Name)
-	assert.Equal(t, filepath.Join(DefaultMountDir, DefaultMultiObjectName("pvcs", bs.Name, "myclaim1")), model.backstageDeployment.container().VolumeMounts[0].MountPath)
+	//	assert.Equal(t, filepath.Join(DefaultMountDir, DefaultMultiObjectName("pvcs", bs.Name, "myclaim1")), model.backstageDeployment.container().VolumeMounts[0].MountPath)
+	assert.Equal(t, DefaultMountDir, model.backstageDeployment.container().VolumeMounts[0].MountPath)
 	assert.Equal(t, "/mount/path/from/annotation", model.backstageDeployment.container().VolumeMounts[1].MountPath)
 
 }

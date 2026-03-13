@@ -190,16 +190,11 @@ func TestCMFilesWithNonExistedContainerFailed(t *testing.T) {
 
 }
 
-func TestReplaceFiles(t *testing.T) {
+func TestDefaultSubpath(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
-	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, api.FileObjectRef{Name: appConfigTestCm.Name, MountPath: DefaultMountDir, Key: "dynamic-plugins123.yaml"})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
-
-	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
-	testObj.externalConfig.ExtraFileConfigMapKeys[appConfigTestCm.Name] = NewDataObjectKeys(nil, map[string][]byte{"dynamic-plugins123.yaml": []byte("data")})
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-subpath.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -208,8 +203,21 @@ func TestReplaceFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	// only one file is expected as the original one is replaced
-	// MountPath == DefaultMountDir + dynamic-plugins123.yaml for both default and specified configmap
-	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
+	mts := deployment.container().VolumeMounts
+	assert.Equal(t, 5, len(mts))
+
+	data1 := findVolumeMountByPath(mts, DefaultMountDir+"/data1")
+	assert.NotEmpty(t, data1)
+	assert.Equal(t, "data1", data1.SubPath)
+
+	data3 := findVolumeMountByPath(mts, "/mount/path2/data3")
+	assert.NotEmpty(t, data3)
+	assert.Equal(t, "data3", data3.SubPath)
+
+	data5 := findVolumeMountByPath(mts, "/mount/path3/data5")
+	assert.NotEmpty(t, data5)
+	assert.Equal(t, "data5", data5.SubPath)
+
+	assert.Empty(t, findVolumeMountByPath(mts, "/mount/path3/data6"))
 
 }

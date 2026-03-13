@@ -141,3 +141,12 @@ func findEnvVar(envVars []corev1.EnvVar, name string) *corev1.EnvVar {
 	}
 	return nil
 }
+
+func findVolumeMountByPath(volMounts []corev1.VolumeMount, path string) *corev1.VolumeMount {
+	for i := range volMounts {
+		if volMounts[i].MountPath == path {
+			return &volMounts[i]
+		}
+	}
+	return nil
+}

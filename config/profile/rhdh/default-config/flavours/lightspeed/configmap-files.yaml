@@ -4,7 +4,8 @@ metadata:
   name: llama-stack-run-no-guard
   annotations:
     rhdh.redhat.com/containers: "llama-stack"
-    rhdh.redhat.com/mount-path: "/app-root/run.yaml"
+    rhdh.redhat.com/mount-path: "/app-root"
+    rhdh.redhat.com/sub-path: "*"
 data:
   run.yaml: |
     version: 2
@@ -134,7 +135,8 @@ metadata:
   name: lightspeed-stack
   annotations:
     rhdh.redhat.com/containers: "lightspeed-core"
-    rhdh.redhat.com/mount-path: "/app-root/lightspeed-stack.yaml"
+    rhdh.redhat.com/mount-path: "/app-root"
+    rhdh.redhat.com/sub-path: "*"
 data:
   lightspeed-stack.yaml: |
     name: "lightspeed-core-stack"

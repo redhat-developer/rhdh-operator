@@ -76,10 +76,10 @@ func TestDefaultMultiSecretFiles(t *testing.T) {
 
 	mo := model.getRuntimeObjectByType(&SecretFiles{}).Object().(*multiobject.MultiObject)
 	assert.Equal(t, 3, len(mo.Items))
-	// data1,data2,data3+data4,data5
-	assert.Equal(t, 4, len(model.backstageDeployment.container().VolumeMounts))
-	// data1,data2,data5
-	assert.Equal(t, 3, len(model.backstageDeployment.containerByName("install-dynamic-plugins").VolumeMounts))
+	// data1+data2,data3+data4,data5
+	assert.Equal(t, 3, len(model.backstageDeployment.container().VolumeMounts))
+	// data1+data2,data5
+	assert.Equal(t, 2, len(model.backstageDeployment.containerByName("install-dynamic-plugins").VolumeMounts))
 	// data5
 	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-container").VolumeMounts))
 	assert.Equal(t, 3, len(model.backstageDeployment.podSpec().Volumes))

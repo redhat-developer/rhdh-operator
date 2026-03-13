@@ -258,17 +258,40 @@ func (b *BackstageDeployment) setDeployment(backstage api.Backstage) error {
 }
 
 // getDefConfigMountPath returns the mount path and subpath (defined in default configuration)
-func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath string, subPath string) {
+func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath, subPath, fileName string) {
 
-	mountPath, ok := obj.GetAnnotations()[DefaultMountPathAnnotation]
-	subPath = ""
-	if !ok {
-		volName := utils.ToRFC1123Label(obj.GetName())
-		mountPath = filepath.Join(b.defaultMountPath(), volName)
-		subPath = volName
+	// mountPath, no subPath or subPath="" - mount folder
+	// mountPath, subPath="*" (must not work for Secrets?) or "list,of,keys" - mount files one-by-one to mountPath
+	// no mountPath (subPath does not matter) - mount files to defaultMountPath()
+
+	mountPath = obj.GetAnnotations()[DefaultMountPathAnnotation]
+	if mountPath == "" {
+		mountPath = b.defaultMountPath()
 	}
+	subPath = obj.GetAnnotations()[DefaultSubPathAnnotation]
+	fileName = ""
+	if subPath != "" && subPath != "*" {
+		fileName = subPath
+	}
+	//if mountPath == "" {
+	//	return
+	//}
+	//return mountPath, subPath, fileName
 	return
+
 }
+
+//func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath string, subPath string) {
+//
+//	mountPath, ok := obj.GetAnnotations()[DefaultMountPathAnnotation]
+//	subPath = ""
+//	if !ok {
+//		volName := utils.ToRFC1123Label(obj.GetName())
+//		mountPath = filepath.Join(b.defaultMountPath(), volName)
+//		subPath = volName
+//	}
+//	return
+//}
 
 // sets container image name of Backstage Container
 func (b *BackstageDeployment) setImage(image *string) {

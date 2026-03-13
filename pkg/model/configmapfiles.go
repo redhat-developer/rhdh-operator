@@ -76,8 +76,9 @@ func (p *ConfigMapFiles) updateAndValidate(_ api.Backstage) error {
 		}
 
 		keys := append(maps.Keys(cm.Data), maps.Keys(cm.BinaryData)...)
+		mountPath, subPath, fileName := p.model.backstageDeployment.getDefConfigMountPath(cm)
 		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: cm.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
-			cm.Name, p.model.backstageDeployment.defaultMountPath(), "", true, keys)
+			cm.Name, mountPath, fileName, subPath != "", keys)
 
 		if err != nil {
 			return fmt.Errorf("failed to add files from configmap %s: %w", cm.Name, err)

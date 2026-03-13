@@ -84,9 +84,9 @@ func (p *SecretFiles) updateAndValidate(_ api.Backstage) error {
 		}
 
 		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
-		mountPath, subPath := p.model.backstageDeployment.getDefConfigMountPath(item)
+		mountPath, subPath, fileName := p.model.backstageDeployment.getDefConfigMountPath(item)
 		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
-			item.GetName(), mountPath, "", subPath != "", keys)
+			item.GetName(), mountPath, fileName, subPath != "", keys)
 		if err != nil {
 			return fmt.Errorf("failed to add files from secret %s: %w", item.GetName(), err)
 		}

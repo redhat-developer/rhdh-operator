@@ -28,6 +28,7 @@ import (
 const BackstageAppLabel = "rhdh.redhat.com/app"
 const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
 const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
+const DefaultSubPathAnnotation = "rhdh.redhat.com/sub-path"
 const ContainersAnnotation = "rhdh.redhat.com/containers"
 const SourceAnnotation = "rhdh.redhat.com/source"
 
