@@ -16,7 +16,6 @@ jobs:
           - main
           - release-1.9
           - release-1.8
-          - release-1.7
     name: 'Nightly Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
@@ -31,25 +30,10 @@ jobs:
 
       - name: Set env vars
         run: |
-          branch=${{ matrix.branch }}
-          distLocation="dist/rhdh/install.yaml"
-          OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
-          proto="file://"
-          if [[ "${branch}" != "main" ]]; then
-            version="${branch#release-}"
-            major=$(echo $version | cut -d. -f1)
-            minor=$(echo $version | cut -d. -f2)
-            OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
-            # TODO(rm3l): remove this once 1.6 is the minimal supported version
-            if [[ $major -ge 1 && $minor -ge 6 ]]; then
-              OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${branch}/${distLocation}"
-              proto=""
-            fi
-          fi
+          OPERATOR_MANIFEST="${{ github.workspace }}/dist/rhdh/install.yaml"
           echo "OPERATOR_MANIFEST=${OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          OPERATOR_IMAGE=$(curl -s "${proto}${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          OPERATOR_IMAGE=$(curl -s "file://${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> $GITHUB_ENV
-          echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
 
       - name: Check if operator image exists in remote registry
         id: operator-image-existence-checker
@@ -63,7 +47,7 @@ jobs:
 
       - name: Remove unnecessary files to free up disk space
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: endersonmenezes/free-disk-space@e6ed9b02e683a3b55ed0252f1ee469ce3b39a885 # v3
+        uses: endersonmenezes/free-disk-space@7901478139cff6e9d44df5972fd8ab8fcade4db1 # v3
         with:
           remove_android: true
           remove_dotnet: true
@@ -72,7 +56,7 @@ jobs:
 
       - name: Setup Go
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version-file: 'go.mod'
 

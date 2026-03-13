@@ -26,6 +26,12 @@
   "packageRules": [
     {
       "matchBaseBranches": [
+        "release-1.7"
+      ],
+      "enabled": false
+    },
+    {
+      "matchBaseBranches": [
         "release-1.6"
       ],
       "enabled": false

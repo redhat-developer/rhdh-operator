@@ -13,14 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         from_branch:
-          - release-1.7
           - release-1.8
           - release-1.9
         to_branch:
           - main
           - release-1.9
           - release-1.8
-          - release-1.7
 
     name: 'E2E Upgrade: ${{ matrix.from_branch }} => ${{ matrix.to_branch }}'
     concurrency:
@@ -53,7 +51,7 @@ jobs:
 
       - name: Remove unnecessary files to free up disk space
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        uses: endersonmenezes/free-disk-space@e6ed9b02e683a3b55ed0252f1ee469ce3b39a885 # v3
+        uses: endersonmenezes/free-disk-space@7901478139cff6e9d44df5972fd8ab8fcade4db1 # v3
         with:
           remove_android: true
           remove_dotnet: true
@@ -68,7 +66,7 @@ jobs:
 
       - name: Setup Go
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version-file: 'go.mod'
 
