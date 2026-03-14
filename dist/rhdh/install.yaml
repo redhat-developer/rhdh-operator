@@ -2334,7 +2334,7 @@ data:
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: my-backstage-config-cm1 # placeholder for <bs>-default-appconfig
+      name: default-appconfig # placeholder for <bs>-default-appconfig
     data:
       default.app-config.yaml: |
         ###########################################################################################################
