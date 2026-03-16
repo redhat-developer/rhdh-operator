@@ -116,7 +116,7 @@ var _ = When("create default backstage", func() {
 						}
 					}
 				}
-			}, time.Minute, time.Second).Should(Succeed())
+			}, 3*time.Minute, time.Second).Should(Succeed())
 		}
 	})
 

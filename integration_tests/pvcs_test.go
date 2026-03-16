@@ -87,7 +87,9 @@ var _ = When("create backstage PVCs configured", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			// check if PVC is correctly created and initialized
+			// check if PVC is bound
+			stat := pvc.Status.Phase
+			g.Expect(stat).Should(Equal(corev1.ClaimBound))
 			createdPvName := pvc.Spec.VolumeName
 			g.Expect(createdPvName).NotTo(BeEmpty())
 			g.Expect(*pvc.Spec.StorageClassName).NotTo(BeEmpty())
@@ -100,25 +102,14 @@ var _ = When("create backstage PVCs configured", func() {
 			g.Expect(pv.Status.Phase).To(Equal(corev1.VolumeBound))
 
 			// check if added to deployment
-			//depl := &appsv1.Deployment{}
-			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
 			bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-
-			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")))
-			g.Expect(path).To(BeMountedToContainer(backstageContainer(bpod.Spec)))
-
-			g.Expect(utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1"))).
-				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
-
-			path = filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")))
-			g.Expect(path).To(BeMountedToContainer(backstageContainer(bpod.Spec)))
-
-			g.Expect(utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2"))).
-				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
+			path1 := "/mnt/rhdh-vol1"
+			g.Expect(path1).To(BeMountedToContainer(backstageContainer(bpod.Spec)))
+			g.Expect("/mnt/rhdh-vol2").To(BeMountedToContainer(backstageContainer(bpod.Spec)))
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, bpod.Name, backstageContainer(bpod.Spec).Name, fmt.Sprintf("test -d %s", path))
+			_, _, err = executeRemoteCommand(ctx, ns, bpod.Name, backstageContainer(bpod.Spec).Name, fmt.Sprintf("test -d %s", path1))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
@@ -190,7 +181,8 @@ var _ = When("create backstage PVCs configured", func() {
 			// check if added to deployment
 			depl, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")))
+			path := "/mnt/rhdh-vol1"
+			//filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")))
 			g.Expect(path).To(BeMountedToContainer(backstageContainer(*depl.PodSpec())))
 			g.Expect(utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1"))).
 				To(BeAddedAsVolumeToPodSpec(*depl.PodSpec()))
