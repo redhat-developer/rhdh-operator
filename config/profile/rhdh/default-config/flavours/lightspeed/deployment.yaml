@@ -15,185 +15,181 @@ spec:
               name: rag-data-volume
 
       containers:
-        # Model Catalog Location Service
-       - name: location
-         image: quay.io/redhat-ai-dev/model-catalog-location-service@sha256:c4471e07be6e0dbe821613053e6264a552cacda7f8604dbf306e6ac9e81e8ab9
-         imagePullPolicy: Always
-         workingDir: /opt/app-root/src
-         ports:
-           - containerPort: 9090
-             name: location
-             protocol: TCP
-         env:
-           - name: NORMALIZER_FORMAT
-             value: "JsonArrayFormat"
-           - name: POD_IP
-             valueFrom:
-               fieldRef:
-                 fieldPath: status.podIP
-           - name: POD_NAMESPACE
-             valueFrom:
-               fieldRef:
-                 fieldPath: metadata.namespace
-           - name: NODE_TLS_REJECT_UNAUTHORIZED
-             value: "0"
-         volumeMounts:
-           - mountPath: /opt/app-root/src/dynamic-plugins-root
-             name: dynamic-plugins-root
-           - name: kube-api-access
-             mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-             readOnly: true
-         startupProbe:
-           httpGet:
-             path: /.backstage/health/v1/liveness
-             port: 7007
-             scheme: HTTP
-           initialDelaySeconds: 30
-           timeoutSeconds: 4
-           periodSeconds: 20
-           successThreshold: 1
-           failureThreshold: 3
 
-         # Model Catalog Storage REST API
-       - name: storage-rest
-         image: quay.io/redhat-ai-dev/model-catalog-storage-rest@sha256:609f6866c7913a87c51912260803c219e564fa7dc90c2ff735ff6dfc5797bc3b
-         imagePullPolicy: Always
-         workingDir: /opt/app-root/src
-         env:
-           - name: NORMALIZER_FORMAT
-             value: "JsonArrayFormat"
-           - name: STORAGE_TYPE
-             value: "ConfigMap"
-           - name: PUSH_TO_RHDH
-             value: "False"
-           - name: POD_IP
-             valueFrom:
-               fieldRef:
-                 fieldPath: status.podIP
-           - name: POD_NAMESPACE
-             valueFrom:
-               fieldRef:
-                 fieldPath: metadata.namespace
-         volumeMounts:
-           - mountPath: /opt/app-root/src/dynamic-plugins-root
-             name: dynamic-plugins-root
-           - name: kube-api-access
-             mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-             readOnly: true
-
-        # RHOAI Normalizer for Model Catalog
-       - name: rhoai-normalizer
-         image: quay.io/redhat-ai-dev/model-catalog-rhoai-normalizer@sha256:9f19742450a3a9c6d9c01d8341a20db7eb5a52a39348f488ae06b6aa49754a26
-         imagePullPolicy: Always
-         workingDir: /opt/app-root/src
-         args:
-           - "-metrics-address=:8888"
-           - "-zap-log-level=6"
-           - "-v=6"
-         env:
-           - name: NORMALIZER_FORMAT
-             value: "JsonArrayFormat"
-           - name: POLLING_INTERVAL
-             value: "10s"
-           - name: POD_IP
-             valueFrom:
-               fieldRef:
-                 fieldPath: status.podIP
-           - name: POD_NAMESPACE
-             valueFrom:
-               fieldRef:
-                 fieldPath: metadata.namespace
-         volumeMounts:
-           - mountPath: /opt/app-root/src/dynamic-plugins-root
-             name: dynamic-plugins-root
-           - name: kube-api-access
-             mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-             readOnly: true
-
-       # Llama Stack AI Service
-       - name: llama-stack
-         image: quay.io/redhat-ai-dev/llama-stack:0.1.4
-         imagePullPolicy: Always
-         #securityContext:
-         #  readOnlyRootFilesystem: false    # temporary, experimental
-         envFrom:
-           - secretRef:
-               name: llama-stack-secrets
-         volumeMounts:
-           - mountPath: /app-root/.llama
-             name: shared-storage
-           - mountPath: /rag-content/embeddings_model
-             name: rag-data-volume
-             subPath: embeddings_model
-           - mountPath: /rag-content/vector_db/rhdh_product_docs
-             name: rag-data-volume
-             subPath: rhdh_product_docs
-           - mountPath: /tmp              # Add this to make /tmp writable
-             name: temp
+        # Llama Stack AI Service
+        - name: llama-stack
+          image: quay.io/redhat-ai-dev/llama-stack:0.1.4
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /app-root/.llama
+              name: shared-storage
+            - mountPath: /rag-content/embeddings_model
+              name: rag-data-volume
+              subPath: embeddings_model
+            - mountPath: /rag-content/vector_db/rhdh_product_docs
+              name: rag-data-volume
+              subPath: rhdh_product_docs
+            - mountPath: /tmp              # Add this to make /tmp writable
+              name: temp
 
         # Lightspeed Core Backend
-       - name: lightspeed-core
-         image: quay.io/lightspeed-core/lightspeed-stack:0.4.0
-         imagePullPolicy: Always
-         ports:
-           - containerPort: 8080
-             name: lcs-backend
-             protocol: TCP
-         volumeMounts:
-           - mountPath: /tmp/data/feedback
-             name: shared-storage
+        - name: lightspeed-core
+          image: quay.io/lightspeed-core/lightspeed-stack:0.4.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: lcs-backend
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /tmp/data/feedback
+              name: shared-storage
 
-       # Feedback Harvester - Collects feedback to PostgreSQL
-       - name: feedback-harvester
-         image: quay.io/redhat-ai-dev/feedback-harvester:v0.1.0
-         imagePullPolicy: IfNotPresent
-         env:
-           - name: PGUSER
-             valueFrom:
-               secretKeyRef:
-                 name: lightspeed-postgres-info
-                 key: user
-           - name: PGPASSWORD
-             valueFrom:
-               secretKeyRef:
-                 name: lightspeed-postgres-info
-                 key: password
-           - name: PGDATABASE
-             valueFrom:
-               secretKeyRef:
-                 name: lightspeed-postgres-info
-                 key: db-name
-           - name: PGHOST
-             value: lightspeed-postgres-svc.lightspeed-postgres.svc.cluster.local
-           - name: PGPORT
-             value: "5432"
-           - name: FEEDBACK_DIRECTORY
-             value: /tmp/data/feedback
-           - name: FETCH_FREQUENCY
-             value: "60"
-         volumeMounts:
-           - mountPath: /tmp/data/feedback
-             name: shared-storage
+#        # Model Catalog Location Service
+#        - name: location
+#          image: quay.io/redhat-ai-dev/model-catalog-location-service@sha256:c4471e07be6e0dbe821613053e6264a552cacda7f8604dbf306e6ac9e81e8ab9
+#          imagePullPolicy: Always
+#          workingDir: /opt/app-root/src
+#          ports:
+#            - containerPort: 9090
+#              name: location
+#              protocol: TCP
+#          env:
+#            - name: NORMALIZER_FORMAT
+#              value: "JsonArrayFormat"
+#            - name: POD_IP
+#              valueFrom:
+#                fieldRef:
+#                  fieldPath: status.podIP
+#            - name: POD_NAMESPACE
+#              valueFrom:
+#                fieldRef:
+#                  fieldPath: metadata.namespace
+#            - name: NODE_TLS_REJECT_UNAUTHORIZED
+#              value: "0"
+#          volumeMounts:
+#            - mountPath: /opt/app-root/src/dynamic-plugins-root
+#              name: dynamic-plugins-root
+#            - name: kube-api-access
+#              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+#              readOnly: true
+#          startupProbe:
+#            httpGet:
+#              path: /.backstage/health/v1/liveness
+#              port: 7007
+#              scheme: HTTP
+#            initialDelaySeconds: 30
+#            timeoutSeconds: 4
+#            periodSeconds: 20
+#            successThreshold: 1
+#            failureThreshold: 3
+#
+#          # Model Catalog Storage REST API
+#        - name: storage-rest
+#          image: quay.io/redhat-ai-dev/model-catalog-storage-rest@sha256:609f6866c7913a87c51912260803c219e564fa7dc90c2ff735ff6dfc5797bc3b
+#          imagePullPolicy: Always
+#          workingDir: /opt/app-root/src
+#          env:
+#            - name: NORMALIZER_FORMAT
+#              value: "JsonArrayFormat"
+#            - name: STORAGE_TYPE
+#              value: "ConfigMap"
+#            - name: PUSH_TO_RHDH
+#              value: "False"
+#            - name: POD_IP
+#              valueFrom:
+#                fieldRef:
+#                  fieldPath: status.podIP
+#            - name: POD_NAMESPACE
+#              valueFrom:
+#                fieldRef:
+#                  fieldPath: metadata.namespace
+#          volumeMounts:
+#            - mountPath: /opt/app-root/src/dynamic-plugins-root
+#              name: dynamic-plugins-root
+#            - name: kube-api-access
+#              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+#              readOnly: true
+#
+#        # RHOAI Normalizer for Model Catalog
+#        - name: rhoai-normalizer
+#          image: quay.io/redhat-ai-dev/model-catalog-rhoai-normalizer@sha256:9f19742450a3a9c6d9c01d8341a20db7eb5a52a39348f488ae06b6aa49754a26
+#          imagePullPolicy: Always
+#          workingDir: /opt/app-root/src
+#          args:
+#            - "-metrics-address=:8888"
+#            - "-zap-log-level=6"
+#            - "-v=6"
+#          env:
+#            - name: NORMALIZER_FORMAT
+#              value: "JsonArrayFormat"
+#            - name: POLLING_INTERVAL
+#              value: "10s"
+#            - name: POD_IP
+#              valueFrom:
+#                fieldRef:
+#                  fieldPath: status.podIP
+#            - name: POD_NAMESPACE
+#              valueFrom:
+#                fieldRef:
+#                  fieldPath: metadata.namespace
+#          volumeMounts:
+#            - mountPath: /opt/app-root/src/dynamic-plugins-root
+#              name: dynamic-plugins-root
+#            - name: kube-api-access
+#              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+#              readOnly: true
+#
+#        # Feedback Harvester - Collects feedback to PostgreSQL
+#        - name: feedback-harvester
+#          image: quay.io/redhat-ai-dev/feedback-harvester:v0.1.0
+#          imagePullPolicy: IfNotPresent
+#          env:
+#            - name: PGUSER
+#              valueFrom:
+#                secretKeyRef:
+#                  name: lightspeed-postgres-info
+#                  key: user
+#            - name: PGPASSWORD
+#              valueFrom:
+#                secretKeyRef:
+#                  name: lightspeed-postgres-info
+#                  key: password
+#            - name: PGDATABASE
+#              valueFrom:
+#                secretKeyRef:
+#                  name: lightspeed-postgres-info
+#                  key: db-name
+#            - name: PGHOST
+#              value: lightspeed-postgres-svc.lightspeed-postgres.svc.cluster.local
+#            - name: PGPORT
+#              value: "5432"
+#            - name: FEEDBACK_DIRECTORY
+#              value: /tmp/data/feedback
+#            - name: FETCH_FREQUENCY
+#              value: "60"
+#          volumeMounts:
+#            - mountPath: /tmp/data/feedback
+#              name: shared-storage
 
       volumes:
         - name: shared-storage
-          emptyDir: {}
+          emptyDir: { }
         - name: rag-data-volume
-          emptyDir: {}
+          emptyDir: { }
         - name: kube-api-access
           projected:
-           defaultMode: 420
-           sources:
-             - serviceAccountToken:
-                 expirationSeconds: 3600
-                 path: token
-             - configMap:
-                 name: kube-root-ca.crt
-                 items:
-                   - key: ca.crt
-                     path: ca.crt
-             - downwardAPI:
-                 items:
-                   - path: namespace
-                     fieldRef:
-                       fieldPath: metadata.namespace
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: 3600
+                  path: token
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace
