@@ -4,33 +4,19 @@ metadata:
   name: llama-stack-secrets
 type: Opaque
 stringData:
-  ENABLE_VLLM: "true"
-  VLLM_URL: "<your-vllm-url>"
-  VLLM_API_KEY: "<your-vllm-api-key>"
-  VALIDATION_PROVIDER: "vllm"
-  VALIDATION_MODEL_NAME: "meta-llama/Llama-3.1-8B-Instruct"
+  ENABLE_OLLAMA: ""
+  ENABLE_OPENAI: ""
+  ENABLE_VERTEX_AI: ""
+  ENABLE_VLLM: ""
+  GOOGLE_APPLICATION_CREDENTIALS: ""
+  OPENAI_API_KEY: ""
+  VERTEX_AI_LOCATION: ""
+  VERTEX_AI_PROJECT: ""
+  VLLM_API_KEY: ""
+  VLLM_MAX_TOKENS: ""
+  VLLM_TLS_VERIFY: ""
+  VLLM_URL: ""
 ---
-#apiVersion: v1
-#kind: Secret
-#metadata:
-#  name: lightspeed-secrets
-#type: Opaque
-#stringData:
-#  # These are EXAMPLE values - replace with your actual Ollama deployment
-#  OLLAMA_URL: "http://<your-ollama-service>.<your-namespace>.svc.cluster.local:11434"
-#  OLLAMA_TOKEN: "<ollama-api-token-if-required>"
-#---
-#apiVersion: v1
-#kind: Secret
-#metadata:
-#  name: lightspeed-postgres-info
-#type: Opaque
-#stringData:
-#  namespace: "lightspeed-postgres"
-#  user: "postgres"
-#  password: "<postgres-password>"
-#  db-name: "lightspeed"
-#---
 apiVersion: rhdh.redhat.com/v1alpha6
 kind: Backstage
 metadata:
@@ -39,12 +25,11 @@ spec:
   # TODO: should be enabled by default (default-config/flavours/lightspeed/metadata.yaml -> enabledByDefault: true
   flavours:
     - name: lightspeed
+      enabled: true
   application:
     extraEnvs:
       secrets:
         - name: llama-stack-secrets
           containers:
             - llama-stack
-        #- name: lightspeed-secrets
-            #- lightspeed-core
 
