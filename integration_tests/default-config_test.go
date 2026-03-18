@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	appsv1 "k8s.io/api/apps/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -39,7 +37,7 @@ var _ = When("create default backstage", func() {
 
 	It("creates runtime objects", func() {
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			By("creating a secret for accessing the Database")
@@ -73,22 +71,24 @@ var _ = When("create default backstage", func() {
 			g.Expect(or).To(HaveLen(1))
 			g.Expect(or[0].Name).To(Equal(backstageName))
 
-			By("creating default app-config")
-			appConfig := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.AppConfigDefaultName(backstageName)}, appConfig)
-			g.Expect(err).ShouldNot(HaveOccurred())
+			// Passed but commented out as is configuration specific (name: "default-appconfig")
+			//By("creating default app-config")
+			//defAppConfigName := model.DefaultMultiObjectName("appconfig", backstageName, "default-appconfig")
+			//appConfig := &corev1.ConfigMap{}
+			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: defAppConfigName}, appConfig)
+			//g.Expect(err).ShouldNot(HaveOccurred())
+			//
+			//By("mounting Volume defined in default app-config")
+			//g.Expect(utils.GenerateVolumeNameFromCmOrSecret(defAppConfigName)).
+			//	To(BeAddedAsVolumeToPodSpec(*deploy.PodSpec()))
 
-			By("mounting Volume defined in default app-config")
-			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(model.AppConfigDefaultName(backstageName))).
-				To(BeAddedAsVolumeToPodSpec(*deploy.PodSpec()))
-
-		}, 5*time.Minute, time.Second).Should(Succeed())
+		}, time.Minute, time.Second).Should(Succeed())
 
 		if *testEnv.UseExistingCluster && useExistingController {
 			By("setting Backstage status (real cluster only)")
 			Eventually(func(g Gomega) {
 
-				bs := &bsv1.Backstage{}
+				bs := &api.Backstage{}
 				err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
 				g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -116,20 +116,21 @@ var _ = When("create default backstage", func() {
 						}
 					}
 				}
-			}, 5*time.Minute, time.Second).Should(Succeed())
+			}, 3*time.Minute, time.Second).Should(Succeed())
 		}
 	})
 
-	It("creates runtime object using raw configuration ", func() {
+	It("creates runtime object using raw configuration", func() {
 
-		bsConf := map[string]string{"deployment.yaml": readTestYamlFile("raw-deployment.yaml")}
+		bsConf := map[string]string{"deployment.yaml": readTestYamlFile("raw-deployment.yaml"),
+			"configmap-files.yaml": readTestYamlFile("raw-cm-files.yaml")}
 		dbConf := map[string]string{"db-statefulset.yaml": readTestYamlFile("raw-statefulset.yaml")}
 
 		bsRaw := generateConfigMap(ctx, k8sClient, "bsraw", ns, bsConf, nil, nil)
 		dbRaw := generateConfigMap(ctx, k8sClient, "dbraw", ns, dbConf, nil, nil)
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			RawRuntimeConfig: &bsv1.RuntimeConfig{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			RawRuntimeConfig: &api.RuntimeConfig{
 				BackstageConfigName: bsRaw,
 				LocalDbConfigName:   dbRaw,
 			},
@@ -163,10 +164,10 @@ var _ = When("create default backstage", func() {
 			Skip("Real controller required")
 		}
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
-			bs := &bsv1.Backstage{}
+			bs := &api.Backstage{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(bs.Status.Conditions).To(HaveLen(1))
@@ -174,7 +175,7 @@ var _ = When("create default backstage", func() {
 		}, time.Minute, time.Second).Should(Succeed())
 
 		Eventually(func(g Gomega) {
-			bs := &bsv1.Backstage{}
+			bs := &api.Backstage{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(bs.Status.Conditions).To(HaveLen(1))

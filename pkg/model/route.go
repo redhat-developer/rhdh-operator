@@ -3,9 +3,10 @@ package model
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"sigs.k8s.io/yaml"
@@ -30,7 +31,7 @@ func RouteName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage")
 }
 
-func (b *BackstageRoute) setRoute(specified *bsv1.Route) {
+func (b *BackstageRoute) setRoute(specified *api.Route) {
 
 	if len(specified.Host) > 0 {
 		b.route.Spec.Host = specified.Host
@@ -74,7 +75,7 @@ func (b *BackstageRoute) setRoute(specified *bsv1.Route) {
 }
 
 func init() {
-	registerConfig("route.yaml", BackstageRouteFactory{}, false)
+	registerConfig("route.yaml", BackstageRouteFactory{}, false, nil)
 }
 
 // implementation of RuntimeObject interface
@@ -90,12 +91,7 @@ func (b *BackstageRoute) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (b *BackstageRoute) EmptyObject() client.Object {
-//	return &openshift.Route{}
-//}
-
-// implementation of RuntimeObject interface
-func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (b *BackstageRoute) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
 
 	b.model = model
 	// not Openshift
@@ -132,13 +128,13 @@ func (b *BackstageRoute) addToModel(model *BackstageModel, backstage bsv1.Backst
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageRoute) updateAndValidate(backstage bsv1.Backstage) error {
+func (b *BackstageRoute) updateAndValidate(backstage api.Backstage) error {
 	b.route.Spec.To.Name = b.model.backstageService.service.Name
 	b.updateAppConfigWithBaseUrls(b.model, backstage)
 	return nil
 }
 
-func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *BackstageRoute) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.route.SetName(RouteName(backstage.Name))
 	setMetaInfo(b.route, backstage, scheme)
 }
@@ -146,8 +142,8 @@ func (b *BackstageRoute) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.S
 // updateAppConfigWithBaseUrls tries to set the baseUrl in the default app-config.
 // Note that this is purposely done on a best effort basis. So it is not considered an issue if the cluster ingress domain
 // could not be determined, since the user can always set it explicitly in their custom app-config.
-func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstage bsv1.Backstage) {
-	if m.appConfig == nil || m.appConfig.ConfigMap == nil {
+func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstage api.Backstage) {
+	if m.appConfig == nil || m.appConfig.ConfigMaps == nil {
 		klog.V(1).Infof(
 			"Default app-config ConfigMap not initialized yet - skipping automatic population of base URLS in the default app-config for Backstage %s",
 			backstage.Name)
@@ -192,20 +188,29 @@ func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstag
 		return string(updated), nil
 	}
 
-	for k, v := range m.appConfig.ConfigMap.Data {
+	if len(m.appConfig.ConfigMaps.Items) == 0 {
+		klog.V(1).Infof(
+			"No app-config ConfigMaps to update - skipping automatic population of base URLS in the default app-config for Backstage %s",
+			backstage.Name)
+		return
+	}
+
+	// Update only the first ConfigMap (base config) with baseUrl
+	cm := m.appConfig.ConfigMaps.Items[0].(*corev1.ConfigMap)
+	for k, v := range cm.Data {
 		updated, err := updateFn(v)
 		if err != nil {
 			klog.V(1).Infof("[warn] could not update base url in default app-config %q for backstage %s: %v",
 				k, backstage.Name, err)
 			continue
 		}
-		m.appConfig.ConfigMap.Data[k] = updated
+		cm.Data[k] = updated
 	}
 }
 
 // buildBaseUrl returns the base URL that should be considered as default on OpenShift,
 // per the cluster ingress domain and the Route spec.
-func buildBaseUrl(model *BackstageModel, backstage bsv1.Backstage) string {
+func buildBaseUrl(model *BackstageModel, backstage api.Backstage) string {
 	host := fmt.Sprintf("%s-%s", RouteName(backstage.Name), backstage.Namespace)
 	appendIngressDomain := true
 	if backstage.Spec.Application != nil && backstage.Spec.Application.Route != nil {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -15,16 +15,16 @@ import (
 )
 
 var (
-	configMapFilesTestBackstage = bsv1.Backstage{
+	configMapFilesTestBackstage = api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
 					MountPath:  "/my/path",
-					ConfigMaps: []bsv1.FileObjectRef{},
+					ConfigMaps: []api.FileObjectRef{},
 				},
 			},
 		},
@@ -53,9 +53,9 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm1"})
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm2", MountPath: "/custom/path"})
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm3", MountPath: "rel"})
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm1"})
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm2", MountPath: "/custom/path"})
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm3", MountPath: "rel"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -93,7 +93,7 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: appConfigTestCm.Name})
+	*cmf = append(*cmf, api.FileObjectRef{Name: appConfigTestCm.Name})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
 
@@ -118,7 +118,7 @@ func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm1"})
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -143,9 +143,9 @@ func TestSpecifiedCMFilesWithContainers(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
 	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm1", Containers: []string{"install-dynamic-plugins", "another-container"}})
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: "cm3", MountPath: "rel", Containers: []string{"*"}})
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm1", Containers: []string{"install-dynamic-plugins", "another-container"}})
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm3", MountPath: "rel", Containers: []string{"*"}})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
 
@@ -171,9 +171,9 @@ func TestSpecifiedCMFilesWithContainers(t *testing.T) {
 
 func TestCMFilesWithNonExistedContainerFailed(t *testing.T) {
 	bs := *configMapFilesTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraFiles: &bsv1.ExtraFiles{
-			ConfigMaps: []bsv1.FileObjectRef{
+	bs.Spec.Application = &api.Application{
+		ExtraFiles: &api.ExtraFiles{
+			ConfigMaps: []api.FileObjectRef{
 				{
 					Name:       "cmName",
 					Containers: []string{"another-container"},
@@ -190,16 +190,11 @@ func TestCMFilesWithNonExistedContainerFailed(t *testing.T) {
 
 }
 
-func TestReplaceFiles(t *testing.T) {
+func TestDefaultSubpath(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
-	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
-	*cmf = append(*cmf, bsv1.FileObjectRef{Name: appConfigTestCm.Name, MountPath: DefaultMountDir, Key: "dynamic-plugins123.yaml"})
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files.yaml")
-
-	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
-	testObj.externalConfig.ExtraFileConfigMapKeys[appConfigTestCm.Name] = NewDataObjectKeys(nil, map[string][]byte{"dynamic-plugins123.yaml": []byte("data")})
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-subpath.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -208,8 +203,21 @@ func TestReplaceFiles(t *testing.T) {
 	deployment := model.backstageDeployment
 	assert.NotNil(t, deployment)
 
-	// only one file is expected as the original one is replaced
-	// MountPath == DefaultMountDir + dynamic-plugins123.yaml for both default and specified configmap
-	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
+	mts := deployment.container().VolumeMounts
+	assert.Equal(t, 5, len(mts))
+
+	data1 := findVolumeMountByPath(mts, DefaultMountDir+"/data1")
+	assert.NotEmpty(t, data1)
+	assert.Equal(t, "data1", data1.SubPath)
+
+	data3 := findVolumeMountByPath(mts, "/mount/path2/data3")
+	assert.NotEmpty(t, data3)
+	assert.Equal(t, "data3", data3.SubPath)
+
+	data5 := findVolumeMountByPath(mts, "/mount/path3/data5")
+	assert.NotEmpty(t, data5)
+	assert.Equal(t, "data5", data5.SubPath)
+
+	assert.Empty(t, findVolumeMountByPath(mts, "/mount/path3/data6"))
 
 }

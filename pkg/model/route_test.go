@@ -5,30 +5,32 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	openshift "github.com/openshift/api/route/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/utils/ptr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultRoute(t *testing.T) {
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				Route: &bsv1.Route{},
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				Route: &api.Route{},
 			},
 		},
 	}
@@ -54,14 +56,14 @@ func TestDefaultRoute(t *testing.T) {
 }
 
 func TestSpecifiedRoute(t *testing.T) {
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				Route: &bsv1.Route{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				Route: &api.Route{
 					Enabled: ptr.To(true),
 					Host:    "TestSpecifiedRoute",
 					//TLS:     nil,
@@ -100,14 +102,14 @@ func TestSpecifiedRoute(t *testing.T) {
 func TestDisabledRoute(t *testing.T) {
 
 	// Route.Enabled = false
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				Route: &bsv1.Route{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				Route: &api.Route{
 					Enabled: ptr.To(false),
 					Host:    "TestSpecifiedRoute",
 					//TLS:     nil,
@@ -132,12 +134,12 @@ func TestDisabledRoute(t *testing.T) {
 
 func TestExcludedRoute(t *testing.T) {
 	// No route configured
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		//Spec: bsv1.BackstageSpec{ //	//Application: &bsv1.Application{},
+		//Spec: api.BackstageSpec{ //	//Application: &api.Application{},
 		//},
 	}
 
@@ -156,14 +158,14 @@ func TestExcludedRoute(t *testing.T) {
 
 func TestEnabledRoute(t *testing.T) {
 	// Route is enabled by default if configured
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "TestSpecifiedRoute",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				Route: &bsv1.Route{},
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				Route: &api.Route{},
 			},
 		},
 	}
@@ -185,7 +187,7 @@ func TestEnabledRoute(t *testing.T) {
 func Test_buildBaseUrl(t *testing.T) {
 	type args struct {
 		model     *BackstageModel
-		backstage bsv1.Backstage
+		backstage api.Backstage
 	}
 	tests := []struct {
 		name string
@@ -207,10 +209,10 @@ func Test_buildBaseUrl(t *testing.T) {
 				model: &BackstageModel{
 					isOpenshift: true,
 				},
-				backstage: bsv1.Backstage{
-					Spec: bsv1.BackstageSpec{
-						Application: &bsv1.Application{
-							Route: &bsv1.Route{
+				backstage: api.Backstage{
+					Spec: api.BackstageSpec{
+						Application: &api.Application{
+							Route: &api.Route{
 								Enabled: ptr.To(false),
 							},
 						},
@@ -225,7 +227,7 @@ func Test_buildBaseUrl(t *testing.T) {
 				model: &BackstageModel{
 					isOpenshift: true,
 				},
-				backstage: bsv1.Backstage{
+				backstage: api.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-backstage",
 						Namespace: "my-ns",
@@ -243,7 +245,7 @@ func Test_buildBaseUrl(t *testing.T) {
 						OpenShiftIngressDomain: "my-ocp-apps.example.com",
 					},
 				},
-				backstage: bsv1.Backstage{
+				backstage: api.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-backstage",
 						Namespace: "my-ns",
@@ -261,14 +263,14 @@ func Test_buildBaseUrl(t *testing.T) {
 						OpenShiftIngressDomain: "my-ocp-apps.example.com",
 					},
 				},
-				backstage: bsv1.Backstage{
+				backstage: api.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-backstage",
 						Namespace: "my-ns",
 					},
-					Spec: bsv1.BackstageSpec{
-						Application: &bsv1.Application{
-							Route: &bsv1.Route{
+					Spec: api.BackstageSpec{
+						Application: &api.Application{
+							Route: &api.Route{
 								Enabled:   ptr.To(true),
 								Subdomain: "my-backstage.subdomain",
 							},
@@ -287,14 +289,14 @@ func Test_buildBaseUrl(t *testing.T) {
 						OpenShiftIngressDomain: "my-ocp-apps.example.com",
 					},
 				},
-				backstage: bsv1.Backstage{
+				backstage: api.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-backstage",
 						Namespace: "my-ns",
 					},
-					Spec: bsv1.BackstageSpec{
-						Application: &bsv1.Application{
-							Route: &bsv1.Route{
+					Spec: api.BackstageSpec{
+						Application: &api.Application{
+							Route: &api.Route{
 								Enabled:   ptr.To(true),
 								Host:      "my-awesome-backstage.idp.example.com",
 								Subdomain: "my-backstage.subdomain",
@@ -322,7 +324,7 @@ func Test_buildBaseUrl(t *testing.T) {
 func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 	type args struct {
 		model     *BackstageModel
-		backstage bsv1.Backstage
+		backstage api.Backstage
 	}
 	tests := []struct {
 		name     string
@@ -346,14 +348,18 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 						OpenShiftIngressDomain: "my-ocp-apps.example.com",
 					},
 					appConfig: &AppConfig{
-						ConfigMap: &corev1.ConfigMap{
-							Data: map[string]string{
-								"my-default-app-config.yaml": "",
+						ConfigMaps: &multiobject.MultiObject{
+							Items: []client.Object{
+								&corev1.ConfigMap{
+									Data: map[string]string{
+										"my-default-app-config.yaml": "",
+									},
+								},
 							},
 						},
 					},
 				},
-				backstage: bsv1.Backstage{
+				backstage: api.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-backstage-app",
 						Namespace: "my-ns",
@@ -378,16 +384,18 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 						OpenShiftIngressDomain: "my-ocp-apps.example.com",
 					},
 					appConfig: &AppConfig{
-						ConfigMap: &corev1.ConfigMap{
-							Data: map[string]string{
-								"my-default-app-config-1.yaml": `---
+						ConfigMaps: &multiobject.MultiObject{
+							Items: []client.Object{
+								&corev1.ConfigMap{
+									Data: map[string]string{
+										"my-default-app-config-1.yaml": `---
 app:
   title: "My Awesome App"
 plugin1:
   config1: [val1, val2]
 ---
 `,
-								"my-default-app-config-2.yaml": `backend:
+										"my-default-app-config-2.yaml": `backend:
   baseUrl: https://app.example.com
   auth:
     # TODO: once plugins have been migrated we can remove this, but right now it
@@ -399,13 +407,15 @@ plugin1:
 
 organization:
   name: My Company
-    
+
 `,
+									},
+								},
 							},
 						},
 					},
 				},
-				backstage: bsv1.Backstage{
+				backstage: api.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-backstage-app",
 						Namespace: "my-ns",
@@ -442,8 +452,9 @@ organization:
 			b := &BackstageRoute{}
 			b.updateAppConfigWithBaseUrls(tt.args.model, tt.args.backstage)
 			updatedAppConfigMaps := make(map[string]map[string]any)
-			if tt.args.model.appConfig != nil && tt.args.model.appConfig.ConfigMap != nil {
-				for k, v := range tt.args.model.appConfig.ConfigMap.Data {
+			if tt.args.model.appConfig != nil && tt.args.model.appConfig.ConfigMaps != nil && len(tt.args.model.appConfig.ConfigMaps.Items) > 0 {
+				cm := tt.args.model.appConfig.ConfigMaps.Items[0].(*corev1.ConfigMap)
+				for k, v := range cm.Data {
 					var appConfig map[string]any
 					err := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(v)), 1000).Decode(&appConfig)
 					assert.NoError(t, err)

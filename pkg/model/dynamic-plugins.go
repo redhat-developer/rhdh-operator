@@ -10,7 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -61,7 +61,7 @@ type PluginDependency struct {
 }
 
 func init() {
-	registerConfig("dynamic-plugins.yaml", DynamicPluginsFactory{}, false)
+	registerConfig("dynamic-plugins.yaml", DynamicPluginsFactory{}, false, mergeDynamicPlugins)
 }
 
 func DynamicPluginsDefaultName(backstageName string) string {
@@ -81,12 +81,7 @@ func (p *DynamicPlugins) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-//func (p *DynamicPlugins) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
-
-// implementation of RuntimeObject interface
-func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (p *DynamicPlugins) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	p.model = model
 	if p.ConfigMap == nil {
 		return false, nil
@@ -104,7 +99,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
+func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage) error {
 
 	_, initContainer := p.getInitContainer()
 	if initContainer == nil {
@@ -121,12 +116,12 @@ func (p *DynamicPlugins) updateAndValidate(backstage bsv1.Backstage) error {
 }
 
 // implementation of RuntimeObject interface
-func (p *DynamicPlugins) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (p *DynamicPlugins) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	p.ConfigMap.SetName(DynamicPluginsDefaultName(backstage.Name))
 	setMetaInfo(p.ConfigMap, backstage, scheme)
 }
 
-func (p *DynamicPlugins) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (p *DynamicPlugins) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application != nil && spec.Application.DynamicPluginsConfigMapName != "" {
 
 		_, initContainer := p.getInitContainer()
@@ -210,24 +205,59 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 		return "", fmt.Errorf("dynamic plugins ConfigMap is not set")
 	}
 	modelData := p.ConfigMap.Data[DynamicPluginsFile]
-	var modelPluginsConfig, specPluginsConfig, mergedPluginsConfig DynaPluginsConfig
-	if modelData != "" {
-		if err := yaml.Unmarshal([]byte(modelData), &modelPluginsConfig); err != nil {
-			return "", fmt.Errorf("failed to unmarshal model ConfigMap data: %w", err)
+
+	return MergePluginsData(modelData, specData)
+
+}
+
+func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
+	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.podSpec().InitContainers)
+	if initContainer == nil {
+		return i, nil
+	}
+	// override image with env var
+	if os.Getenv(BackstageImageEnvVar) != "" {
+		initContainer.Image = os.Getenv(BackstageImageEnvVar)
+	}
+	return i, initContainer
+}
+
+// returns initContainer supposed to initialize DynamicPlugins
+func DynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev1.Container) {
+	for i := range initContainers {
+		if initContainers[i].Name == dynamicPluginInitContainerName {
+			return i, &initContainers[i]
 		}
 	}
-	if specData != "" {
-		if err := yaml.Unmarshal([]byte(specData), &specPluginsConfig); err != nil {
-			return "", fmt.Errorf("failed to unmarshal spec ConfigMap data: %w", err)
-		}
+	return -1, nil
+}
+
+func MergePluginsData(firstData, secondData string) (string, error) {
+
+	if firstData == "" {
+		return secondData, nil
+	}
+
+	if secondData == "" {
+		return firstData, nil
+	}
+
+	var firstPluginsConfig, secondPluginsConfig, mergedPluginsConfig DynaPluginsConfig
+
+	if err := yaml.Unmarshal([]byte(firstData), &firstPluginsConfig); err != nil {
+		return "", fmt.Errorf("failed to unmarshal first ConfigMap data: %w", err)
+	}
+
+	if err := yaml.Unmarshal([]byte(secondData), &secondPluginsConfig); err != nil {
+		return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
 	}
 
 	// Merge Plugins by package field
 	pluginMap := make(map[string]DynaPlugin)
-	for _, plugin := range modelPluginsConfig.Plugins {
+	for _, plugin := range firstPluginsConfig.Plugins {
 		pluginMap[plugin.Package] = plugin
 	}
-	for _, plugin := range specPluginsConfig.Plugins {
+	for _, plugin := range secondPluginsConfig.Plugins {
 
 		if existingPlugin, found := pluginMap[plugin.Package]; found {
 			if plugin.PluginConfig != nil {
@@ -255,16 +285,16 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 		mergedPluginsConfig.Plugins = append(mergedPluginsConfig.Plugins, plugin)
 	}
 
-	if specPluginsConfig.Includes != nil && len(specPluginsConfig.Includes) == 0 {
+	if secondPluginsConfig.Includes != nil && len(secondPluginsConfig.Includes) == 0 {
 		// if includes is empty explicitly, clean it
 		mergedPluginsConfig.Includes = make([]string, 0)
 	} else {
 		// otherwise merge ensuring uniqueness
 		includeSet := make(map[string]struct{})
-		for _, include := range modelPluginsConfig.Includes {
+		for _, include := range firstPluginsConfig.Includes {
 			includeSet[include] = struct{}{}
 		}
-		for _, include := range specPluginsConfig.Includes {
+		for _, include := range secondPluginsConfig.Includes {
 			includeSet[include] = struct{}{}
 		}
 		mergedPluginsConfig.Includes = make([]string, 0, len(includeSet))
@@ -280,25 +310,4 @@ func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
 	}
 
 	return string(mergedData), nil
-}
-func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
-	i, initContainer := DynamicPluginsInitContainer(p.model.backstageDeployment.podSpec().InitContainers)
-	if initContainer == nil {
-		return i, nil
-	}
-	// override image with env var
-	if os.Getenv(BackstageImageEnvVar) != "" {
-		initContainer.Image = os.Getenv(BackstageImageEnvVar)
-	}
-	return i, initContainer
-}
-
-// returns initContainer supposed to initialize DynamicPlugins
-func DynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev1.Container) {
-	for i := range initContainers {
-		if initContainers[i].Name == dynamicPluginInitContainerName {
-			return i, &initContainers[i]
-		}
-	}
-	return -1, nil
 }
