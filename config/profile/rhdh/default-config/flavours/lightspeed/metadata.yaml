@@ -1,4 +1,3 @@
 # Lightspeed (AI) flavour metadata
 # This flavour is enabled by default and provides AI/Lightspeed functionality
-# TODO temporarily disabled
-enabledByDefault: false
+enabledByDefault: true

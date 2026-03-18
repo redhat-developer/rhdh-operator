@@ -277,9 +277,10 @@ var _ = When("create default rhdh", func() {
 			g.Expect(err).To(Not(HaveOccurred()))
 
 			// no default flavour
-			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+			// g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+
 			// with default lightspeed flavour
-			//g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(2))
+			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(2))
 
 			initCont := deploy.PodSpec().InitContainers[0]
 			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
@@ -296,7 +297,7 @@ var _ = When("create default rhdh", func() {
 
 	})
 
-	It("creates Backstage with flavours", func() {
+	It("creates rhdh with default Lightspeed flavour", func() {
 
 		if !isProfile("rhdh") {
 			Skip("Skipped for non rhdh config")
@@ -311,38 +312,30 @@ var _ = When("create default rhdh", func() {
 		}, "")
 
 		Eventually(func(g Gomega) {
-			By("listing all ConfigMaps to see what was created")
 			cmList := &corev1.ConfigMapList{}
 			err := k8sClient.List(ctx, cmList, client.InNamespace(ns))
 			g.Expect(err).ShouldNot(HaveOccurred())
-			GinkgoWriter.Printf("Found %d ConfigMaps in namespace %s:\n", len(cmList.Items), ns)
+
+			// check if contains ConfigMaps with "flavour-lightspeed" source
+			foundSource := false
 			for _, cm := range cmList.Items {
-				GinkgoWriter.Printf("  - %s (annotations: %v)\n", cm.Name, cm.Annotations)
+				if cm.Annotations[model.SourceAnnotation] == "flavour-lightspeed" {
+					foundSource = true
+				}
 			}
+			g.Expect(foundSource).To(BeTrue())
 
-			By("creating base app-config ConfigMap")
-			baseAppConfig := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("appconfig", backstageName, "default-appconfig")}, baseAppConfig)
-			g.Expect(err).ShouldNot(HaveOccurred(), "base app-config should exist")
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).To(Not(HaveOccurred()))
 
-			By("verifying no flavour app-config was created (flavour has no configs yet)")
-			// Since lightspeed flavour only has metadata.yaml and no app-config.yaml,
-			// we should NOT expect a flavour ConfigMap to be created
-			cmList = &corev1.ConfigMapList{}
-			err = k8sClient.List(ctx, cmList, client.InNamespace(ns))
-			g.Expect(err).ShouldNot(HaveOccurred())
-
-			// with lightspeed by default
-			//for _, cm := range cmList.Items {
-			//	// Verify no flavour ConfigMaps exist (since flavours don't have configs yet)
-			//	g.Expect(cm.Annotations).NotTo(HaveKeyWithValue(model.SourceAnnotation, "flavour-lightspeed"))
-			//}
-
-			By("creating dynamic-plugins ConfigMap")
-			dpConfigMap := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DynamicPluginsDefaultName(backstageName)}, dpConfigMap)
-			g.Expect(err).ShouldNot(HaveOccurred(), "dynamic-plugins ConfigMap should exist")
-			g.Expect(dpConfigMap.Data).To(HaveKey(model.DynamicPluginsFile))
+			// check if contains Lightspeed sidecars
+			foundContainers := false
+			for _, c := range deploy.PodSpec().Containers {
+				if c.Name == "llama-stack" || c.Name == "lightspeed-core" {
+					foundContainers = true
+				}
+			}
+			g.Expect(foundContainers).To(BeTrue())
 
 		}, 20*time.Second, time.Second).Should(Succeed())
 

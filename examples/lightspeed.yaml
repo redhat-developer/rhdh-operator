@@ -22,7 +22,6 @@ kind: Backstage
 metadata:
   name: lightspeed-test
 spec:
-  # TODO: should be enabled by default (default-config/flavours/lightspeed/metadata.yaml -> enabledByDefault: true
   flavours:
     - name: lightspeed
       enabled: true
