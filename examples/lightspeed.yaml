@@ -22,9 +22,6 @@ kind: Backstage
 metadata:
   name: lightspeed-test
 spec:
-  flavours:
-    - name: lightspeed
-      enabled: true
   application:
     extraEnvs:
       secrets:
