@@ -17,6 +17,5 @@ data:
     ###########################################################################################################
     auth:
       environment: development
-      providers:
-        guest:
-          dangerouslyAllowOutsideDevelopment: true
+      providers:  
+        guest: {}
