@@ -1822,8 +1822,7 @@ data:
     \   # If you want to customize the application configuration, you should create
     your own app-config ConfigMap\n    # and reference it in your CR.\n    # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/configuring/provisioning-and-using-your-custom-configuration#provisioning-your-custom-configuration\n
     \   # for more details.\n    ###########################################################################################################\n
-    \   auth:\n      environment: development\n      providers:  \n        guest:
-    {}\n"
+    \   auth:\n      environment: development\n      providers:  \n        {}\n"
   db-secret.yaml: |-
     apiVersion: v1
     kind: Secret
