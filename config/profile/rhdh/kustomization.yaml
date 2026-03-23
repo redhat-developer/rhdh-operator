@@ -26,6 +26,13 @@ patches:
 generatorOptions:
   disableNameSuffixHash: true
 
+# Base configuration
+
+# Lightspeed flavour configuration
+
+# Orchestrator flavour configuration
+
+# Plugin dependencies
 configMapGenerator:
 - files:
   - default-config/app-config.yaml
@@ -41,6 +48,16 @@ configMapGenerator:
   - default-config/service.yaml.k8s
   - default-config/secret-files.yaml
   name: default-config
+- files:
+  - default-config/flavours/lightspeed/metadata.yaml
+  - default-config/flavours/lightspeed/configmap-files.yaml
+  - default-config/flavours/lightspeed/deployment.yaml
+  - default-config/flavours/lightspeed/dynamic-plugins.yaml
+  name: flavour-lightspeed-config
+- files:
+  - default-config/flavours/orchestrator/metadata.yaml
+  - default-config/flavours/orchestrator/dynamic-plugins.yaml
+  name: flavour-orchestrator-config
 - files:
   - plugin-deps/sonataflow.yaml
   - plugin-deps/argocd.yaml
