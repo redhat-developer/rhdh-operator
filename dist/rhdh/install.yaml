@@ -1813,34 +1813,16 @@ subjects:
 ---
 apiVersion: v1
 data:
-  app-config.yaml: |
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: my-backstage-config-cm1 # placeholder for <bs>-default-appconfig
-    data:
-      default.app-config.yaml: |
-        ###########################################################################################################
-        # /!\ WARNING
-        #
-        # This is the default app-config file created and managed by the Operator for your CR.
-        # Do NOT edit this manually in the Cluster, as your changes will be overridden by the Operator upon the
-        # next reconciliation.
-        # If you want to customize the application configuration, you should create your own app-config ConfigMap
-        # and reference it in your CR.
-        # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/configuring/provisioning-and-using-your-custom-configuration#provisioning-your-custom-configuration
-        # for more details.
-        ###########################################################################################################
-        backend:
-          auth:
-            externalAccess:
-              - type: legacy
-                options:
-                  subject: legacy-default-config
-                  # This is a default value, which you should change by providing your own app-config
-                  secret: "pl4s3Ch4ng3M3"
-        auth:
-          providers: {}
+  app-config.yaml: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: my-backstage-config-cm1
+    # placeholder for <bs>-default-appconfig\ndata:\n  default.app-config.yaml: |\n
+    \   ###########################################################################################################\n
+    \   # /!\\ WARNING\n    #\n    # This is the default app-config file created and
+    managed by the Operator for your CR.\n    # Do NOT edit this manually in the Cluster,
+    as your changes will be overridden by the Operator upon the\n    # next reconciliation.\n
+    \   # If you want to customize the application configuration, you should create
+    your own app-config ConfigMap\n    # and reference it in your CR.\n    # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/configuring/provisioning-and-using-your-custom-configuration#provisioning-your-custom-configuration\n
+    \   # for more details.\n    ###########################################################################################################\n
+    \   auth:\n      environment: development\n      providers:  \n        {}\n"
   db-secret.yaml: |-
     apiVersion: v1
     kind: Secret
