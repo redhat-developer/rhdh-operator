@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
@@ -171,6 +172,7 @@ var _ = When("create default backstage", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(bs.Status.Conditions).To(HaveLen(1))
 			g.Expect(bs.Status.Conditions[0].Reason).To(Equal("DeployInProgress"))
+			g.Expect(bs.Status.Conditions[0].Status).To(Equal(metav1.ConditionFalse))
 		}, time.Minute, time.Second).Should(Succeed())
 
 		Eventually(func(g Gomega) {
@@ -179,6 +181,7 @@ var _ = When("create default backstage", func() {
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(bs.Status.Conditions).To(HaveLen(1))
 			g.Expect(bs.Status.Conditions[0].Reason).To(Equal("Deployed"))
+			g.Expect(bs.Status.Conditions[0].Status).To(Equal(metav1.ConditionTrue))
 		}, 3*time.Minute, time.Second).Should(Succeed())
 
 	})
