@@ -268,7 +268,6 @@ func TestGetEnabledFlavours(t *testing.T) {
 					gotNames[i] = f.name
 				}
 
-				// Assert exact match (order matters)
 				if !assert.ElementsMatch(t, tt.wantFlavours, gotNames) {
 					t.Logf("Expected flavours: %v", tt.wantFlavours)
 					t.Logf("Got flavours: %v", gotNames)
