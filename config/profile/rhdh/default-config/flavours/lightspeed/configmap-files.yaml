@@ -162,7 +162,7 @@ data:
     mcp_servers:
       - name: mcp-integration-tools
         provider_id: "model-context-protocol"
-        url: "http://{{ .Release.Name }}-backstage.{{ .Release.Namespace }}.svc.cluster.local:7007/api/mcp-actions/v1"
+        url: "http://localhost:7007/api/mcp-actions/v1"
         authorization_headers:
           Authorization: "client"
 
