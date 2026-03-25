@@ -37,7 +37,11 @@ func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage
 	}
 
 	state, msg := resolveState(obj)
-	setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, state, msg)
+	status := metav1.ConditionFalse
+	if state == bs.BackstageConditionReasonDeployed {
+		status = metav1.ConditionTrue
+	}
+	setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, status, state, msg)
 }
 
 func setStatusCondition(backstage *bs.Backstage, condType bs.BackstageConditionType, status metav1.ConditionStatus, reason bs.BackstageConditionReason, msg string) {
