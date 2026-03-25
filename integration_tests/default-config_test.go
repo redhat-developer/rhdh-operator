@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
