@@ -56,9 +56,8 @@ data:
     true\n      feedback_storage: \"/tmp/data/feedback\"\n    authentication:\n      module:
     \"noop\"\n    conversation_cache:\n      type: \"sqlite\"\n      sqlite:\n        db_path:
     \"/tmp/cache.db\"\n    mcp_servers:\n      - name: mcp-integration-tools\n        provider_id:
-    \"model-context-protocol\"\n        url: \"http://{{ .Release.Name }}-backstage.{{
-    .Release.Namespace }}.svc.cluster.local:7007/api/mcp-actions/v1\"\n        authorization_headers:\n
-    \         Authorization: \"client\"\n\n        \n"
+    \"model-context-protocol\"\n        url: \"http://localhost:7007/api/mcp-actions/v1\"\n
+    \       authorization_headers:\n          Authorization: \"client\"\n\n        \n"
   deployment.yaml: |
     apiVersion: apps/v1
     kind: Deployment
