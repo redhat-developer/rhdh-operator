@@ -2787,6 +2787,216 @@ metadata:
 ---
 apiVersion: v1
 data:
+  configmap-files.yaml: "kind: ConfigMap\napiVersion: v1\nmetadata:\n  name: llama-stack-run-no-guard\n
+    \ annotations:\n    rhdh.redhat.com/containers: \"llama-stack\"\n    rhdh.redhat.com/mount-path:
+    \"/app-root\"\n    rhdh.redhat.com/sub-path: \"*\"\ndata:\n  run.yaml: |\n    version:
+    2\n    image_name: redhat-ai-dev-llama-stack-no-guard\n    apis:\n      - agents\n
+    \     - inference\n      - safety\n      - tool_runtime\n      - vector_io\n      -
+    files\n    container_image:\n    external_providers_dir:\n    providers:\n      agents:\n
+    \       - config:\n            persistence:\n              agent_state:\n                namespace:
+    agents\n                backend: kv_default\n              responses:\n                table_name:
+    responses\n                backend: sql_default\n          provider_id: meta-reference\n
+    \         provider_type: inline::meta-reference\n      inference:\n        - provider_id:
+    ${env.ENABLE_VLLM:+vllm}\n          provider_type: remote::vllm\n          config:\n
+    \           url: ${env.VLLM_URL:=}\n            api_token: ${env.VLLM_API_KEY:=}\n
+    \           max_tokens: ${env.VLLM_MAX_TOKENS:=4096}\n            tls_verify:
+    ${env.VLLM_TLS_VERIFY:=true}\n        - provider_id: ${env.ENABLE_OLLAMA:+ollama}\n
+    \         provider_type: remote::ollama\n          config:\n            url: ${env.OLLAMA_URL:=http://localhost:11434}\n
+    \       - provider_id: ${env.ENABLE_OPENAI:+openai}\n          provider_type:
+    remote::openai\n          config:\n            api_key: ${env.OPENAI_API_KEY:=}\n
+    \       - provider_id: ${env.ENABLE_VERTEX_AI:+vertexai}\n          provider_type:
+    remote::vertexai\n          config:\n            project: ${env.VERTEX_AI_PROJECT:=}\n
+    \           location: ${env.VERTEX_AI_LOCATION:=us-central1}\n        - provider_id:
+    sentence-transformers\n          provider_type: inline::sentence-transformers\n
+    \         config: {}\n      tool_runtime:\n        - provider_id: model-context-protocol\n
+    \         provider_type: remote::model-context-protocol\n          config: {}\n
+    \       - provider_id: rag-runtime\n          provider_type: inline::rag-runtime\n
+    \         config: {}\n      vector_io:\n        - provider_id: faiss\n          provider_type:
+    inline::faiss\n          config:\n            persistence:\n              namespace:
+    vector_io::faiss\n              backend: faiss_kv\n      files:\n        - provider_id:
+    localfs\n          provider_type: inline::localfs\n          config:\n            storage_dir:
+    /tmp/llama-stack-files\n            metadata_store:\n              table_name:
+    files_metadata\n              backend: sql_files\n    storage:\n      backends:\n
+    \       kv_default:\n          type: kv_sqlite\n          db_path: /tmp/kvstore.db\n
+    \       sql_default:\n          type: sql_sqlite\n          db_path: /tmp/sql_store.db\n
+    \       sql_files:\n          type: sql_sqlite\n          db_path: /rag-content/vector_db/rhdh_product_docs/1.9/files_metadata.db\n
+    \       faiss_kv:\n          type: kv_sqlite\n          db_path: /rag-content/vector_db/rhdh_product_docs/1.9/faiss_store.db\n
+    \     stores:\n        metadata:\n          namespace: registry\n          backend:
+    faiss_kv\n        inference:\n          table_name: inference_store\n          backend:
+    sql_default\n          max_write_queue_size: 10000\n          num_writers: 4\n
+    \       conversations:\n          table_name: openai_conversations\n          backend:
+    sql_default\n    registered_resources:\n      models:\n        - model_id: sentence-transformers/all-mpnet-base-v2\n
+    \         metadata:\n            embedding_dimension: 768\n          model_type:
+    embedding\n          provider_id: sentence-transformers\n          provider_model_id:
+    /rag-content/embeddings_model\n      tool_groups:\n        - provider_id: rag-runtime\n
+    \         toolgroup_id: builtin::rag\n      vector_dbs:\n        - vector_db_id:
+    rhdh-product-docs-1_8\n          embedding_model: sentence-transformers/all-mpnet-base-v2\n
+    \         embedding_dimension: 768\n          provider_id: faiss\n    server:\n
+    \     auth:\n      host:\n      port: 8321\n      quota:\n      tls_cafile:\n
+    \     tls_certfile:\n      tls_keyfile:\n\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n
+    \ name: lightspeed-stack\n  annotations:\n    rhdh.redhat.com/containers: \"lightspeed-core\"\n
+    \   rhdh.redhat.com/mount-path: \"/app-root\"\n    rhdh.redhat.com/sub-path: \"*\"\ndata:\n
+    \ lightspeed-stack.yaml: |\n    name: \"lightspeed-core-stack\"\n    service:\n
+    \     host: 0.0.0.0\n      port: 8080\n      auth_enabled: false\n      workers:
+    1\n      color_log: true\n      access_log: true\n    llama_stack:\n      use_as_library_client:
+    false\n      url: http://localhost:8321\n    user_data_collection:\n      feedback_enabled:
+    true\n      feedback_storage: \"/tmp/data/feedback\"\n    authentication:\n      module:
+    \"noop\"\n    conversation_cache:\n      type: \"sqlite\"\n      sqlite:\n        db_path:
+    \"/tmp/cache.db\"\n    mcp_servers:\n      - name: mcp-integration-tools\n        provider_id:
+    \"model-context-protocol\"\n        url: \"http://{{ .Release.Name }}-backstage.{{
+    .Release.Namespace }}.svc.cluster.local:7007/api/mcp-actions/v1\"\n        authorization_headers:\n
+    \         Authorization: \"client\"\n\n        \n"
+  deployment.yaml: |
+    apiVersion: apps/v1
+    kind: Deployment
+    spec:
+      template:
+        spec:
+          initContainers:
+            - name: init-rag-data
+              image: 'quay.io/redhat-ai-dev/rag-content:release-1.9-lcs'
+              command:
+                - "sh"
+                - "-c"
+                - "echo 'Copying RAG data...'; cp -r /rag/vector_db/rhdh_product_docs /data/ && cp -r /rag/embeddings_model /data/ && chmod -R 777 /data/rhdh_product_docs && echo 'Copy complete.'"
+              volumeMounts:
+                - mountPath: /data
+                  name: rag-data-volume
+
+          containers:
+            # Llama Stack AI Service
+            - name: llama-stack
+              image: quay.io/redhat-ai-dev/llama-stack:0.1.4
+              imagePullPolicy: Always
+              volumeMounts:
+                - mountPath: /app-root/.llama
+                  name: shared-storage
+                - mountPath: /rag-content
+                  name: rag-data-volume
+                - mountPath: /tmp              # Add this to make /tmp writable
+                  name: temp
+
+            # Lightspeed Core Backend
+            - name: lightspeed-core
+              image: quay.io/lightspeed-core/lightspeed-stack:0.4.0
+              imagePullPolicy: Always
+              ports:
+                - containerPort: 8080
+                  name: lcs-backend
+                  protocol: TCP
+              volumeMounts:
+                - mountPath: /tmp/data/feedback
+                  name: shared-storage
+
+          volumes:
+            - name: shared-storage
+              emptyDir: { }
+            - name: rag-data-volume
+              emptyDir: { }
+            - name: kube-api-access
+              projected:
+                defaultMode: 420
+                sources:
+                  - serviceAccountToken:
+                      expirationSeconds: 3600
+                      path: token
+                  - configMap:
+                      name: kube-root-ca.crt
+                      items:
+                        - key: ca.crt
+                          path: ca.crt
+                  - downwardAPI:
+                      items:
+                        - path: namespace
+                          fieldRef:
+                            fieldPath: metadata.namespace
+  dynamic-plugins.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: default-dynamic-plugins
+    data:
+      dynamic-plugins.yaml: |
+        plugins:
+          # Lightspeed Plugins
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed:bs_1.45.3__1.2.3
+            disabled: false
+            pluginConfig:
+              dynamicPlugins:
+                frontend:
+                  red-hat-developer-hub.backstage-plugin-lightspeed:
+                    translationResources:
+                      - importName: lightspeedTranslations
+                        module: Alpha
+                        ref: lightspeedTranslationRef
+                    dynamicRoutes:
+                      - path: /lightspeed
+                        importName: LightspeedPage
+                    mountPoints:
+                      - mountPoint: application/listener
+                        importName: LightspeedFAB
+                      - mountPoint: application/provider
+                        importName: LightspeedDrawerProvider
+                      - mountPoint: application/internal/drawer-state
+                        importName: LightspeedDrawerStateExposer
+                        config:
+                          id: lightspeed
+                      - mountPoint: application/internal/drawer-content
+                        importName: LightspeedChatContainer
+                        config:
+                          id: lightspeed
+                          priority: 100
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.45.3__1.2.3
+            disabled: false
+
+          # MCP Actions plugins
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-mcp-actions-backend:bs_1.45.3__0.1.5
+            disabled: false
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-software-catalog-mcp-tool:bs_1.45.3__0.4.1
+            disabled: false
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-techdocs-mcp-tool:bs_1.45.3__0.3.2
+            disabled: false
+  metadata.yaml: |
+    # Lightspeed (AI) flavour metadata
+    # This flavour is enabled by default and provides AI/Lightspeed functionality
+    enabledByDefault: true
+kind: ConfigMap
+metadata:
+  name: rhdh-flavour-lightspeed-config
+  namespace: rhdh-operator
+---
+apiVersion: v1
+data:
+  dynamic-plugins.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: default-dynamic-plugins
+    data:
+      dynamic-plugins.yaml: |
+        plugins:
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+            disabled: false
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+            disabled: false
+            dependencies:
+              - ref: sonataflow
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+            disabled: false
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+            disabled: false
+  metadata.yaml: |
+    # Orchestrator flavour metadata
+    # This flavour is disabled by default due to heavy infrastructure dependencies
+    # (requires Tekton, ArgoCD, Serverless Workflow Operator)
+    enabledByDefault: false
+kind: ConfigMap
+metadata:
+  name: rhdh-flavour-orchestrator-config
+  namespace: rhdh-operator
+---
+apiVersion: v1
+data:
   argocd.yaml: |-
     ---
     apiVersion: argoproj.io/v1alpha1
@@ -3470,6 +3680,10 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         volumeMounts:
+        - mountPath: /default-config/flavours/lightspeed
+          name: flavour-lightspeed-config
+        - mountPath: /default-config/flavours/orchestrator
+          name: flavour-orchestrator-config
         - mountPath: /default-config
           name: default-config
         - mountPath: /plugin-deps
@@ -3479,6 +3693,12 @@ spec:
       serviceAccountName: rhdh-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
+      - configMap:
+          name: rhdh-flavour-lightspeed-config
+        name: flavour-lightspeed-config
+      - configMap:
+          name: rhdh-flavour-orchestrator-config
+        name: flavour-orchestrator-config
       - configMap:
           name: rhdh-default-config
         name: default-config

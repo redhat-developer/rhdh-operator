@@ -49,7 +49,7 @@ metadata:
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.10
-    createdAt: "2026-03-13T11:27:40Z"
+    createdAt: "2026-03-23T17:17:13Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -393,6 +393,10 @@ spec:
                     - ALL
                   readOnlyRootFilesystem: true
                 volumeMounts:
+                - mountPath: /default-config/flavours/lightspeed
+                  name: flavour-lightspeed-config
+                - mountPath: /default-config/flavours/orchestrator
+                  name: flavour-orchestrator-config
                 - mountPath: /default-config
                   name: default-config
                 - mountPath: /plugin-deps
@@ -402,6 +406,12 @@ spec:
               serviceAccountName: rhdh-controller-manager
               terminationGracePeriodSeconds: 10
               volumes:
+              - configMap:
+                  name: rhdh-flavour-lightspeed-config
+                name: flavour-lightspeed-config
+              - configMap:
+                  name: rhdh-flavour-orchestrator-config
+                name: flavour-orchestrator-config
               - configMap:
                   name: rhdh-default-config
                 name: default-config
