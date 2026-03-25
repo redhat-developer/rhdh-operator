@@ -105,23 +105,6 @@ data:
               emptyDir: { }
             - name: rag-data-volume
               emptyDir: { }
-            - name: kube-api-access
-              projected:
-                defaultMode: 420
-                sources:
-                  - serviceAccountToken:
-                      expirationSeconds: 3600
-                      path: token
-                  - configMap:
-                      name: kube-root-ca.crt
-                      items:
-                        - key: ca.crt
-                          path: ca.crt
-                  - downwardAPI:
-                      items:
-                        - path: namespace
-                          fieldRef:
-                            fieldPath: metadata.namespace
   dynamic-plugins.yaml: |
     apiVersion: v1
     kind: ConfigMap
