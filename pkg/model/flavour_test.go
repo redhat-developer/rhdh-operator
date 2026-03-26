@@ -196,3 +196,21 @@ func TestFlavoursOnlyNoBase(t *testing.T) {
 	assert.Nil(t, findPluginByPackage(dpConfig.Plugins, "plugin-base"), "base plugin should NOT exist")
 	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "plugin-flavor3"), "flavor3 plugin should exist")
 }
+
+func TestFlavoursWithEmptyArray(t *testing.T) {
+	bs := testFlavoursBackstage.DeepCopy()
+	bs.Spec.Flavours = []api.Flavour{} // Empty array - disable ALL flavours
+
+	testObj := createBackstageTest(*bs).withConfigPath("./testdata/testflavours").withLocalDb(false)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.Kubernetes, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	// Verify app-config: should have only base (all flavours disabled)
+	assert.NotNil(t, findConfigMapByName(model.appConfig.ConfigMaps.Items, "backstage-appconfig-bs-base-app-config"), "base app-config should exist")
+	assert.Nil(t, findConfigMapBySource(model.appConfig.ConfigMaps.Items, "flavour-flavor1"), "flavor1 should NOT exist")
+	assert.Nil(t, findConfigMapBySource(model.appConfig.ConfigMaps.Items, "flavour-flavor2"), "flavor2 should NOT exist")
+
+}

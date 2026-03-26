@@ -172,11 +172,11 @@ func TestGetEnabledFlavours(t *testing.T) {
 			wantErr:      false,
 		},
 		{
-			name: "empty spec.Flavours returns defaults not mentioned",
+			name: "empty spec.Flavours returns no defaults",
 			spec: api.BackstageSpec{
 				Flavours: []api.Flavour{},
 			},
-			wantFlavours: []string{"flavor1", "flavor3"},
+			wantFlavours: []string{},
 			wantErr:      false,
 		},
 		{

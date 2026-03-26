@@ -41,6 +41,12 @@ func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
 
 	// Step 2: Override enabled status from spec
 	if spec.Flavours != nil {
+
+		// No specified returns empty list
+		if len(spec.Flavours) == 0 {
+			return make([]enabledFlavour, 0), nil
+		}
+
 		for _, f := range spec.Flavours {
 			flavour, exists := allFlavours[f.Name]
 			if !exists {
