@@ -1798,7 +1798,7 @@ spec:
                   base defaults with domain-specific customizations.
 
                   If not specified (nil), flavours with enabledByDefault: true in their metadata are used.
-                  If specified as empty array ([]), default flavours are still used.
+                  If specified as empty array ([]), default flavours are disabled.
                   To disable a default flavour, explicitly list it with enabled: false.
 
                   Multiple flavours can be enabled - configs are merged in the order specified.
