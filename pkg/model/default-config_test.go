@@ -226,7 +226,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 			wantErr:      false,
 		},
 		{
-			name: "spec order is preserved for explicit flavours",
+			name: "all flavours explicitly enabled",
 			spec: api.BackstageSpec{
 				Flavours: []api.Flavour{
 					{Name: "flavor3", Enabled: true},
@@ -234,7 +234,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 					{Name: "flavor1", Enabled: true},
 				},
 			},
-			// Should be in spec order since all are explicit
+
 			wantFlavours: []string{"flavor3", "flavor2", "flavor1"},
 			wantErr:      false,
 		},
