@@ -6,8 +6,8 @@ import (
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -19,15 +19,15 @@ func (f ConfigMapFilesFactory) newBackstageObject() RuntimeObject {
 }
 
 type ConfigMapFiles struct {
-	ConfigMap *corev1.ConfigMap
-	model     *BackstageModel
+	ConfigMaps *multiobject.MultiObject
+	model      *BackstageModel
 }
 
 func init() {
-	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, false)
+	registerConfig("configmap-files.yaml", ConfigMapFilesFactory{}, true, mergeMultiObjectConfigs)
 }
 
-func (p *ConfigMapFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (p *ConfigMapFiles) addExternalConfig(spec api.BackstageSpec) error {
 	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.ConfigMaps == nil {
 		return nil
 	}
@@ -47,25 +47,20 @@ func (p *ConfigMapFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapFiles) Object() runtime.Object {
-	return p.ConfigMap
+	return p.ConfigMaps
 }
 
 func (p *ConfigMapFiles) setObject(obj runtime.Object) {
-	p.ConfigMap = nil
+	p.ConfigMaps = nil
 	if obj != nil {
-		p.ConfigMap = obj.(*corev1.ConfigMap)
+		p.ConfigMaps = obj.(*multiobject.MultiObject)
 	}
 }
 
 // implementation of RuntimeObject interface
-//func (p *ConfigMapFiles) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
-
-// implementation of RuntimeObject interface
-func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	p.model = model
-	if p.ConfigMap != nil {
+	if p.ConfigMaps != nil {
 		model.setRuntimeObject(p)
 		return true, nil
 	}
@@ -73,19 +68,25 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 }
 
 // implementation of RuntimeObject interface
-func (p *ConfigMapFiles) updateAndValidate(_ bsv1.Backstage) error {
+func (p *ConfigMapFiles) updateAndValidate(_ api.Backstage) error {
+	for _, item := range p.ConfigMaps.Items {
+		cm, ok := item.(*corev1.ConfigMap)
+		if !ok {
+			return fmt.Errorf("payload is not ConfigMap kind: %T", item)
+		}
 
-	keys := append(maps.Keys(p.ConfigMap.Data), maps.Keys(p.ConfigMap.BinaryData)...)
-	err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: p.ConfigMap.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
-		p.ConfigMap.Name, p.model.backstageDeployment.defaultMountPath(), "", true, keys)
+		keys := append(maps.Keys(cm.Data), maps.Keys(cm.BinaryData)...)
+		mountPath, subPath, fileName := p.model.backstageDeployment.getDefConfigMountPath(cm)
+		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: cm.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
+			cm.Name, mountPath, fileName, subPath != "", keys)
 
-	if err != nil {
-		return fmt.Errorf("failed to add files from configmap %s: %w", p.ConfigMap.Name, err)
+		if err != nil {
+			return fmt.Errorf("failed to add files from configmap %s: %w", cm.Name, err)
+		}
 	}
 	return nil
 }
 
-func (p *ConfigMapFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
-	p.ConfigMap.SetName(utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files"))
-	setMetaInfo(p.ConfigMap, backstage, scheme)
+func (p *ConfigMapFiles) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
+	setMultiObjectConfigMetaInfo(p.ConfigMaps, "files", backstage, scheme)
 }

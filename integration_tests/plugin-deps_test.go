@@ -7,7 +7,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -48,8 +48,8 @@ var _ = When("test plugin deps", func() {
 
 		bsRaw := generateConfigMap(ctx, k8sClient, "dynaplugins", ns, dynapluginCm, nil, nil)
 
-		createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			RawRuntimeConfig: &bsv1.RuntimeConfig{
+		createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			RawRuntimeConfig: &api.RuntimeConfig{
 				BackstageConfigName: bsRaw,
 			},
 		}, "")

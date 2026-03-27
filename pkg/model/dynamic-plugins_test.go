@@ -12,7 +12,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -21,16 +21,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var testDynamicPluginsBackstage = bsv1.Backstage{
+var testDynamicPluginsBackstage = api.Backstage{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "bs",
 		Namespace: "ns123",
 	},
-	Spec: bsv1.BackstageSpec{
-		Database: &bsv1.Database{
+	Spec: api.BackstageSpec{
+		Database: &api.Database{
 			EnableLocalDb: ptr.To(false),
 		},
-		Application: &bsv1.Application{},
+		Application: &api.Application{},
 	},
 }
 
@@ -304,7 +304,7 @@ func TestCatalogIndexImageUserPatchTakesPrecedence(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
 	// User specifies CATALOG_INDEX_IMAGE via deployment patch
-	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment = &api.BackstageDeployment{}
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
 		Raw: []byte(`
 spec:
@@ -343,8 +343,8 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
 	// User specifies a different catalog index image via extraEnvs
-	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
-		Envs: []bsv1.Env{
+	bs.Spec.Application.ExtraEnvs = &api.ExtraEnvs{
+		Envs: []api.Env{
 			{Name: "CATALOG_INDEX_IMAGE", Value: "quay.io/rhdh/plugin-catalog-index:extra-env", Containers: []string{"install-dynamic-plugins"}},
 		},
 	}
@@ -666,13 +666,4 @@ plugins:
 	assert.Equal(t, 1, len(mergedConfig.Plugins))
 	assert.Equal(t, 0, len(mergedConfig.Plugins[0].Dependencies))
 
-}
-
-func findPluginByPackage(plugins []DynaPlugin, packageName string) *DynaPlugin {
-	for _, plugin := range plugins {
-		if plugin.Package == packageName {
-			return &plugin
-		}
-	}
-	return nil
 }

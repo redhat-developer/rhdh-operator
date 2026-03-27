@@ -8,7 +8,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -17,13 +17,13 @@ import (
 
 func TestDefaultConfigMapEnvFrom(t *testing.T) {
 
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Database: &bsv1.Database{
+		Spec: api.BackstageSpec{
+			Database: &api.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
@@ -46,25 +46,25 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 
 func TestSpecifiedConfigMapEnvs(t *testing.T) {
 
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraEnvs: &bsv1.ExtraEnvs{
-					ConfigMaps: []bsv1.EnvObjectRef{},
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				ExtraEnvs: &api.ExtraEnvs{
+					ConfigMaps: []api.EnvObjectRef{},
 				},
 			},
-			Database: &bsv1.Database{
+			Database: &api.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
 	}
 
 	bs.Spec.Application.ExtraEnvs.ConfigMaps = append(bs.Spec.Application.ExtraEnvs.ConfigMaps,
-		bsv1.EnvObjectRef{Name: "mapName", Key: "ENV1"})
+		api.EnvObjectRef{Name: "mapName", Key: "ENV1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -87,20 +87,20 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 
 func TestDefaultAndSpecifiedConfigMapEnvFrom(t *testing.T) {
 
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraEnvs: &bsv1.ExtraEnvs{
-					ConfigMaps: []bsv1.EnvObjectRef{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				ExtraEnvs: &api.ExtraEnvs{
+					ConfigMaps: []api.EnvObjectRef{
 						{Name: "mapName", Key: "ENV1"},
 					},
 				},
 			},
-			Database: &bsv1.Database{
+			Database: &api.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
@@ -127,9 +127,9 @@ func TestDefaultAndSpecifiedConfigMapEnvFrom(t *testing.T) {
 func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
 
 	bs := *secretEnvsTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraEnvs: &bsv1.ExtraEnvs{
-			ConfigMaps: []bsv1.EnvObjectRef{
+	bs.Spec.Application = &api.Application{
+		ExtraEnvs: &api.ExtraEnvs{
+			ConfigMaps: []api.EnvObjectRef{
 				{
 					Name:       "cmName",
 					Key:        "ENV1",
@@ -186,9 +186,9 @@ func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
 
 func TestCMEnvsWithNonExistedContainerFailed(t *testing.T) {
 	bs := *secretEnvsTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraEnvs: &bsv1.ExtraEnvs{
-			ConfigMaps: []bsv1.EnvObjectRef{
+	bs.Spec.Application = &api.Application{
+		ExtraEnvs: &api.ExtraEnvs{
+			ConfigMaps: []api.EnvObjectRef{
 				{
 					Name:       "cmName",
 					Key:        "ENV1",

@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secret1
+  annotations:
+    rhdh.redhat.com/sub-path: "*"
+data:
+  data1: "data1"
+  data2: "data2"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    rhdh.redhat.com/mount-path: /mount/path2
+    rhdh.redhat.com/sub-path: "*"
+  name: secret2
+data:
+  data3: "data3"
+  data4: "data4"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secret3
+  annotations:
+    rhdh.redhat.com/mount-path: /mount/path3
+    rhdh.redhat.com/sub-path: "data5"
+data:
+  data5: "data5"
+  data6: "data6"

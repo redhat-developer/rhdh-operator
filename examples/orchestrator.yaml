@@ -1,24 +1,6 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: orchestrator-plugin
-data:
-  dynamic-plugins.yaml: |
-    plugins:
-      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
-        disabled: false
-      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
-        disabled: false
-        dependencies:
-          - ref: sonataflow
-      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
-        disabled: false
-      - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
-        disabled: false
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
   name: app-config-rhdh
 data:
   app-config-rhdh.yaml: |-
@@ -45,16 +27,18 @@ stringData:
   # node -p 'require("crypto").randomBytes(24).toString("base64")'
   BACKEND_SECRET: "R2FxRVNrcmwzYzhhN3l0V1VRcnQ3L1pLT09WaVhDNUEK" # notsecret
 ---
-apiVersion: rhdh.redhat.com/v1alpha5
+apiVersion: rhdh.redhat.com/v1alpha6
 kind: Backstage
 metadata:
   name: orchestrator
 spec:
+  flavours:
+    - name: orchestrator
+      enabled: true
   application:
     appConfig:
       configMaps:
         - name: app-config-rhdh
-    dynamicPluginsConfigMapName: orchestrator-plugin
     extraEnvs:
       secrets:
         - name: backend-auth-secret # secret that contains the BACKEND_SECRET key

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flavor3-app-config
+data:
+  flavor3.app-config.yaml: |
+    app:
+      title: Flavor3 Flavour Only
+    flavor3:
+      enabled: true

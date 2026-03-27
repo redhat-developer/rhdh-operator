@@ -18,7 +18,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
@@ -47,7 +47,7 @@ type BackstageDeployment struct {
 }
 
 func init() {
-	registerConfig("deployment.yaml", BackstageDeploymentFactory{}, false)
+	registerConfig("deployment.yaml", BackstageDeploymentFactory{}, false, mergeDeployments)
 }
 
 func DeploymentName(backstageName string) string {
@@ -76,11 +76,6 @@ func (b *BackstageDeployment) Object() runtime.Object {
 // implementation of RuntimeObject interface
 func (b *BackstageDeployment) setObject(obj runtime.Object) {
 
-	//b.deployable = DeploymentObj{}
-
-	//if obj != nil {
-	//	b.deployable.setObject(obj)
-	//}
 	var err error
 	b.deployable, err = CreateDeployable(obj)
 	if err != nil {
@@ -89,7 +84,7 @@ func (b *BackstageDeployment) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
 	if b.deployable.GetObject() == nil {
 		return false, fmt.Errorf("backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
 	}
@@ -127,7 +122,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.B
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error {
+func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage) error {
 
 	//DbSecret
 	var err error
@@ -144,7 +139,7 @@ func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error 
 	return nil
 }
 
-func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *BackstageDeployment) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.deployable.GetObject().SetName(DeploymentName(backstage.Name))
 	utils.GenerateLabel(&b.deployable.PodObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
 
@@ -220,7 +215,7 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 
 // setDeployment sets the deployment object from the backstage configuration
 // it merges the deployment object with the patch from the backstage configuration
-func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
+func (b *BackstageDeployment) setDeployment(backstage api.Backstage) error {
 
 	// set from backstage.Spec.Deployment
 	if backstage.Spec.Deployment != nil {
@@ -263,17 +258,40 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 }
 
 // getDefConfigMountPath returns the mount path and subpath (defined in default configuration)
-func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath string, subPath string) {
+func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath, subPath, fileName string) {
 
-	mountPath, ok := obj.GetAnnotations()[DefaultMountPathAnnotation]
-	subPath = ""
-	if !ok {
-		volName := utils.ToRFC1123Label(obj.GetName())
-		mountPath = filepath.Join(b.defaultMountPath(), volName)
-		subPath = volName
+	// mountPath, no subPath or subPath="" - mount folder
+	// mountPath, subPath="*" (must not work for Secrets?) or "list,of,keys" - mount files one-by-one to mountPath
+	// no mountPath (subPath does not matter) - mount files to defaultMountPath()
+
+	mountPath = obj.GetAnnotations()[DefaultMountPathAnnotation]
+	if mountPath == "" {
+		mountPath = b.defaultMountPath()
 	}
+	subPath = obj.GetAnnotations()[DefaultSubPathAnnotation]
+	fileName = ""
+	if subPath != "" && subPath != "*" {
+		fileName = subPath
+	}
+	//if mountPath == "" {
+	//	return
+	//}
+	//return mountPath, subPath, fileName
 	return
+
 }
+
+//func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath string, subPath string) {
+//
+//	mountPath, ok := obj.GetAnnotations()[DefaultMountPathAnnotation]
+//	subPath = ""
+//	if !ok {
+//		volName := utils.ToRFC1123Label(obj.GetName())
+//		mountPath = filepath.Join(b.defaultMountPath(), volName)
+//		subPath = volName
+//	}
+//	return
+//}
 
 // sets container image name of Backstage Container
 func (b *BackstageDeployment) setImage(image *string) {
@@ -294,7 +312,7 @@ func (b *BackstageDeployment) setImage(image *string) {
 
 // adds environment from source to the Backstage Container
 // If an env var with the same name already exists, it will be replaced (not duplicated)
-func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
+func (b *BackstageDeployment) addExtraEnvs(extraEnvs *api.ExtraEnvs) error {
 	if extraEnvs == nil {
 		return nil
 	}
@@ -407,7 +425,6 @@ func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, 
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // varName - name of env variable
-
 func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, kind ObjectKind, objectName, varName string) error {
 
 	containers, err := containersFilter.getContainers(b)
@@ -456,4 +473,36 @@ func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, 
 		}
 	}
 	return nil
+}
+
+// mergeDeployments merges deployment configurations from base and flavours
+// Uses merge2.MergeStrings to merge YAML, then applies platform patch
+func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+	if len(sources) == 0 {
+		return []client.Object{}, nil
+	}
+	mergedYAML := sources[0].content
+
+	// Merge with flavour patches
+	for i := 1; i < len(sources); i++ {
+		mergedStr, err := merge2.MergeStrings(string(sources[i].content), string(mergedYAML), false, kyaml.MergeOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to merge deployment from %s: %w", sources[i].path, err)
+		}
+		mergedYAML = []byte(mergedStr)
+	}
+
+	// Apply platform patch to the merged result
+	platformPatch, err := utils.ReadPlatformPatch(sources[0].path, platformExt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read platform patch: %w", err)
+	}
+
+	// Parse with platform patch applied
+	objs, err := utils.ReadYamls(mergedYAML, platformPatch, scheme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse merged deployment: %w", err)
+	}
+
+	return []client.Object{objs[0]}, nil
 }
