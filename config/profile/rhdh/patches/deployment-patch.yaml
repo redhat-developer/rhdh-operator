@@ -30,4 +30,15 @@ spec:
               value: quay.io/rhdh-community/rhdh:next
             - name: RELATED_IMAGE_catalog_index
               value: quay.io/rhdh/plugin-catalog-index:1.9
-
+          volumeMounts:
+            - mountPath: /default-config/flavours/lightspeed
+              name: flavour-lightspeed-config
+            - mountPath: /default-config/flavours/orchestrator
+              name: flavour-orchestrator-config
+      volumes:
+        - name: flavour-lightspeed-config
+          configMap:
+            name: flavour-lightspeed-config
+        - name: flavour-orchestrator-config
+          configMap:
+            name: flavour-orchestrator-config

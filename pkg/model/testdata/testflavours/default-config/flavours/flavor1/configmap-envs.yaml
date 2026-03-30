@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flavor1-configmap-envs
+data:
+  FLAVOR1_ENV1: "flavor1 value 1"
+  FLAVOR1_ENV2: "flavor1 value 2"

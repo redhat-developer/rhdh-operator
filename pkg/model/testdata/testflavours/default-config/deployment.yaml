@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: install-dynamic-plugins
+          image: 'quay.io/rhdh/rhdh-hub-rhel9:next'
+      containers:
+        - name: backstage-backend  # placeholder for 'backstage-backend'
+          image: ghcr.io/backstage/backstage
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 7007

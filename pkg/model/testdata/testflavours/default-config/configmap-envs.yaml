@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: base-configmap-envs
+data:
+  BASE_ENV1: "base value 1"
+  BASE_ENV2: "base value 2"

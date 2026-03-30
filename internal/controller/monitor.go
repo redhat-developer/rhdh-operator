@@ -11,11 +11,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
-func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage *bs.Backstage) error {
+func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage *api.Backstage) error {
 	lg := log.FromContext(ctx).WithValues("Backstage", backstage.Name)
 
 	if !backstage.Spec.IsMonitoringEnabled() {

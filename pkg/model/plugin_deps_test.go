@@ -7,7 +7,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -118,14 +118,14 @@ plugins:
 	}
 
 	// Call GetPluginDeps
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-name",
 			Namespace: "test-namespace",
 		},
 	}
 	sc := runtime.NewScheme()
-	utilruntime.Must(bsv1.AddToScheme(sc))
+	utilruntime.Must(api.AddToScheme(sc))
 	objects, err := GetPluginDeps(bs, dynaPlugins, sc)
 	assert.NoError(t, err)
 	assert.Len(t, objects, 2)

@@ -9,20 +9,20 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var dbSecretBackstage = &bsv1.Backstage{
+var dbSecretBackstage = &api.Backstage{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "bs",
 		Namespace: "ns123",
 	},
-	Spec: bsv1.BackstageSpec{
-		Database: &bsv1.Database{
+	Spec: api.BackstageSpec{
+		Database: &api.Database{
 			EnableLocalDb: ptr.To(false),
 		},
 	},
@@ -33,7 +33,7 @@ func TestEmptyDbSecret(t *testing.T) {
 	bs := *dbSecretBackstage.DeepCopy()
 
 	// expected generatePassword = false (default db-secret defined) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-empty-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true).addToDefaultConfig("db-secret.yaml", "db-empty-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -52,7 +52,7 @@ func TestDefaultWithGeneratedSecrets(t *testing.T) {
 	bs := *dbSecretBackstage.DeepCopy()
 
 	// expected generatePassword = true (no db-secret defined) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true).addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
@@ -73,7 +73,7 @@ func TestSpecifiedSecret(t *testing.T) {
 	bs.Spec.Database.AuthSecretName = "custom-db-secret"
 
 	// expected generatePassword = false (db-secret defined in the spec) will come from preprocess
-	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb().addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true).addToDefaultConfig("db-secret.yaml", "db-generated-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 

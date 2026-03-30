@@ -1,0 +1,28 @@
+apiVersion: v1
+data:
+  dynamic-plugins.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: default-dynamic-plugins
+    data:
+      dynamic-plugins.yaml: |
+        plugins:
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+            disabled: false
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+            disabled: false
+            dependencies:
+              - ref: sonataflow
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+            disabled: false
+          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+            disabled: false
+  metadata.yaml: |
+    # Orchestrator flavour metadata
+    # This flavour is disabled by default due to heavy infrastructure dependencies
+    # (requires Tekton, ArgoCD, Serverless Workflow Operator)
+    enabledByDefault: false
+kind: ConfigMap
+metadata:
+  name: rhdh-flavour-orchestrator-config
