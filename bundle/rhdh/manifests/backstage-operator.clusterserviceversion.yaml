@@ -59,12 +59,12 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <1.9.3'
+    skipRange: '>=1.0.0 <1.9.4'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.arm64: supported
-  name: rhdh-operator.v1.9.3
+  name: rhdh-operator.v1.9.4
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -464,4 +464,4 @@ spec:
   - image: quay.io/rhdh/plugin-catalog-index:1.9
     name: catalog-index
   replaces: rhdh-operator.v1.9.0
-  version: 1.9.3
+  version: 1.9.4

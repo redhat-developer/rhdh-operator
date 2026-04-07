@@ -346,4 +346,4 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 0.9.3
+  version: 0.9.4
