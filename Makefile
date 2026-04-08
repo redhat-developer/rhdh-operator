@@ -338,10 +338,17 @@ bundle-build: ## Build the bundle image (multi-platform for opm compatibility on
 	done
 	@echo "Creating manifest list..."
 	@$(CONTAINER_TOOL) manifest rm $(BUNDLE_IMG) 2>/dev/null || true
-	@$(CONTAINER_TOOL) manifest create $(BUNDLE_IMG) \
-		$$(for platform in $$(echo $(BUNDLE_PLATFORMS) | tr ',' ' '); do \
-			echo "$(BUNDLE_IMG)-$$(echo $$platform | tr '/' '-')"; \
-		done)
+	@if [ "$(CONTAINER_TOOL)" = "podman" ]; then \
+		$(CONTAINER_TOOL) manifest create $(BUNDLE_IMG) \
+			$$(for platform in $$(echo $(BUNDLE_PLATFORMS) | tr ',' ' '); do \
+				echo "containers-storage:$(BUNDLE_IMG)-$$(echo $$platform | tr '/' '-')"; \
+			done); \
+	else \
+		$(CONTAINER_TOOL) manifest create $(BUNDLE_IMG) \
+			$$(for platform in $$(echo $(BUNDLE_PLATFORMS) | tr ',' ' '); do \
+				echo "$(BUNDLE_IMG)-$$(echo $$platform | tr '/' '-')"; \
+			done); \
+	fi
 	@echo "Multi-arch bundle image built successfully"
 
 .PHONY: bundle-push
@@ -378,10 +385,17 @@ catalog-build: bundle-push opm ## Generate operator-catalog dockerfile using the
 	done
 	@echo "Creating catalog manifest list..."
 	@$(CONTAINER_TOOL) manifest rm $(CATALOG_IMG) 2>/dev/null || true
-	@$(CONTAINER_TOOL) manifest create $(CATALOG_IMG) \
-		$$(for platform in $$(echo $(CATALOG_PLATFORMS) | tr ',' ' '); do \
-			echo "$(CATALOG_IMG)-$$(echo $$platform | tr '/' '-')"; \
-		done)
+	@if [ "$(CONTAINER_TOOL)" = "podman" ]; then \
+		$(CONTAINER_TOOL) manifest create $(CATALOG_IMG) \
+			$$(for platform in $$(echo $(CATALOG_PLATFORMS) | tr ',' ' '); do \
+				echo "containers-storage:$(CATALOG_IMG)-$$(echo $$platform | tr '/' '-')"; \
+			done); \
+	else \
+		$(CONTAINER_TOOL) manifest create $(CATALOG_IMG) \
+			$$(for platform in $$(echo $(CATALOG_PLATFORMS) | tr ',' ' '); do \
+				echo "$(CATALOG_IMG)-$$(echo $$platform | tr '/' '-')"; \
+			done); \
+	fi
 	@echo "Multi-arch catalog image built successfully"
 
 # Push the catalog image.
