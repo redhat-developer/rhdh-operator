@@ -237,40 +237,18 @@ run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
 LABEL ?= quay.expires-after=14d
-
-# Platforms to build for the operator image
-IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
+PLATFORM ?= linux/amd64
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: image-build
 image-build: ## Build container image with the manager.
-	@echo "Building multi-arch operator image for platforms: $(IMAGE_PLATFORMS)"
-	@for platform in $$(echo $(IMAGE_PLATFORMS) | tr ',' ' '); do \
-		echo "Building for $$platform..."; \
-		$(CONTAINER_TOOL) build --platform $$platform \
-			-t $(IMG)-$$(echo $$platform | tr '/' '-') \
-			--label $(LABEL) \
-			.; \
-	done
-	@echo "Creating manifest list..."
-	@$(CONTAINER_TOOL) manifest rm $(IMG) 2>/dev/null || true
-	@$(CONTAINER_TOOL) manifest create $(IMG) \
-		$$(for platform in $$(echo $(IMAGE_PLATFORMS) | tr ',' ' '); do \
-			echo "$(IMG)-$$(echo $$platform | tr '/' '-')"; \
-		done)
-	@echo "Multi-arch operator image built successfully"
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(IMG) --label $(LABEL) .
 
 .PHONY: image-push
 image-push: ## Push container image with the manager.
-	@echo "Pushing platform-specific operator images..."
-	@for platform in $$(echo $(IMAGE_PLATFORMS) | tr ',' ' '); do \
-		echo "Pushing $(IMG)-$$(echo $$platform | tr '/' '-')..."; \
-		$(CONTAINER_TOOL) push $(IMG)-$$(echo $$platform | tr '/' '-'); \
-	done
-	@echo "Pushing manifest list..."
-	@$(CONTAINER_TOOL) manifest push $(IMG)
+	$(CONTAINER_TOOL) push $(IMG)
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
