@@ -40,7 +40,8 @@ ifeq ($(PROFILE), rhdh)
 	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
 	IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator
 	DEFAULT_CHANNEL ?= fast
-	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	CHANNELS ?= fast,fast-${VERSION}
+	#$fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
 else
 	# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
@@ -322,8 +323,8 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 ## or
 ## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh-community/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
 .PHONY: bundle-build
-bundle-build: ## Build the bundle image.
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f bundle/$(PROFILE)/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
+bundle-build: ## Build the bundle image (multi-platform for opm compatibility on ARM64).
+	$(CONTAINER_TOOL) buildx build --platform linux/amd64,linux/arm64 -f bundle/$(PROFILE)/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) --push .
 
 .PHONY: bundle-push
 bundle-push: ## Push bundle image to registry
