@@ -281,7 +281,7 @@ data:
 
 ### Default base URLs
 
-Since version 0.6.0, the Operator may set the base URLs fields in the default app-config ConfigMap (named `backstage-appconfig-<CR_name>`) created per CR, based on the [Route](#route) parameters and the [OpenShift cluster ingress domain](https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/networking/networking-operators#nw-ne-openshift-ingress_configuring-ingress).
+The Operator may set the base URLs fields in the default app-config ConfigMap (named `backstage-appconfig-<CR_name>`) created per CR, based on the [Route](#route) parameters and the [OpenShift cluster ingress domain](https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/networking/networking-operators#nw-ne-openshift-ingress_configuring-ingress).
 
 Below are the rules currently governing this behavior:
 

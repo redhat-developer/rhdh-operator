@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-files-1
+  annotations:
+    rhdh.redhat.com/sub-path: "*"
+data:
+  file1.yaml: |
+    config:
+      key1: value1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-files-2
+  annotations:
+    rhdh.redhat.com/sub-path: "*"
+data:
+  file2.yaml: |
+    config:
+      key2: value2

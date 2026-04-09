@@ -72,7 +72,7 @@ You can use it for manual and automated ([such as](../integration_tests/README.m
 
 #### Configuration Profiles
 
-Since v0.3.0 Operator has a facility to support different predefined runtime configurations, we call it Configuration Profile.
+Operator has a facility to support different predefined runtime configurations, we call it Configuration Profile.
 You can see them as a subdirectories of /config/profile: 
 
 * **rhdh** (default as for v0.3.0) - OOTB supporting Red Hat Developer Hub runtime. See [The `rhdh` profile](./profiles.md#the-rhdh-profile) for more details about the specific customizations.
