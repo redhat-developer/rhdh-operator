@@ -15,18 +15,6 @@ spec:
               name: rag-data-volume
 
       containers:
-        # Llama Stack AI Service
-        - name: llama-stack
-          image: quay.io/redhat-ai-dev/llama-stack:0.1.4
-          imagePullPolicy: Always
-          volumeMounts:
-            - mountPath: /app-root/.llama
-              name: shared-storage
-            - mountPath: /rag-content
-              name: rag-data-volume
-            - mountPath: /tmp              # Add this to make /tmp writable
-              name: temp
-
         # Lightspeed Core Backend
         - name: lightspeed-core
           image: quay.io/lightspeed-core/lightspeed-stack:0.4.0
@@ -38,6 +26,10 @@ spec:
           volumeMounts:
             - mountPath: /tmp/data/feedback
               name: shared-storage
+            - mountPath: /rag-content
+              name: rag-data-volume
+            - mountPath: /tmp              # Add this to make /tmp writable
+              name: temp
 
       volumes:
         - name: shared-storage
