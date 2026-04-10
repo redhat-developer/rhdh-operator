@@ -73,7 +73,9 @@ replace_indented_block() {
     local marker="$2"
     local indent="$3"
     local replacement="$4"
-    local tmp="${TMP_DIR}/$(basename "$file").tmp"
+    local tmp
+
+    tmp="${TMP_DIR}/$(basename "$file").tmp"
 
     awk \
         -v marker="$marker" \
