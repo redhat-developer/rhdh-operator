@@ -5,7 +5,7 @@ spec:
     spec:
       initContainers:
         - name: init-rag-data
-          image: 'quay.io/redhat-ai-dev/rag-content:release-1.9-lcs'
+          image: quay.io/redhat-ai-dev/rag-content:release-1.9-lls-0.5.0
           command:
             - "sh"
             - "-c"
@@ -17,7 +17,7 @@ spec:
       containers:
         # Lightspeed Core Backend
         - name: lightspeed-core
-          image: quay.io/lightspeed-core/lightspeed-stack:0.4.0
+          image: quay.io/lightspeed-core/lightspeed-stack:0.5.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
