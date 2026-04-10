@@ -250,7 +250,7 @@ data:
               command:
                 - "sh"
                 - "-c"
-                - "echo 'Copying RAG data...'; cp -r /rag/vector_db/rhdh_product_docs /data/ && cp -r /rag/embeddings_model /data/ && chmod -R 777 /data/rhdh_product_docs && echo 'Copy complete.'"
+                - "echo 'Copying RAG data...'; cp -a /rag/. /data/ && chmod -R 777 /data/vector_db && echo 'Copy complete.'"
               volumeMounts:
                 - mountPath: /data
                   name: rag-data-volume
