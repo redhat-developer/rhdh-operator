@@ -10,6 +10,13 @@ spec:
             - "sh"
             - "-c"
             - "echo 'Copying RAG data...'; cp -r /rag/. /data/ && chmod -R 777 /data/vector_db && echo 'Copy complete.'"
+          resources:
+            requests:
+              memory: 150Mi
+              cpu: 50m
+            limits:
+              memory: 500Mi
+              cpu: 100m
           volumeMounts:
             - mountPath: /data
               name: rag-data-volume
@@ -23,6 +30,13 @@ spec:
             - containerPort: 8080
               name: lcs-backend
               protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
           volumeMounts:
             - mountPath: /tmp/data/feedback
               name: shared-storage
