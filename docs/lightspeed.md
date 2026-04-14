@@ -28,7 +28,7 @@ To use Lightspeed, you need:
 
 #### Using the Flavour (Recommended)
 
-Starting from version 1.10, RHDH includes Lightspeed as an **enabled-by-default** flavour. For new deployments, Lightspeed is automatically active:
+Starting from version 1.10, RHDH includes Lightspeed as an **enabled-by-default** flavour. For new deployments, Lightspeed is automatically active (the requisite containers are running) but inert (there is a Secret which must be updated with sufficient metadata to interact with a LLM for which you have access):
 
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha6
