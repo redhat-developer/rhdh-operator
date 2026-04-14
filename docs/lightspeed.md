@@ -89,7 +89,7 @@ For more information about configuring dynamic plugins, please refer to the [Con
 
 #### Backend Authentication
 
-The Lightspeed backend requires authentication configuration to connect to Red Hat's AI services. Configure this through environment variables or app-config:
+The Lightspeed backend requires authentication configuration to connect to your LLM. Configure this through environment variables or app-config:
 
 ```yaml
 spec:
