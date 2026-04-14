@@ -40,8 +40,7 @@ ifeq ($(PROFILE), rhdh)
 	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
 	IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator
 	DEFAULT_CHANNEL ?= fast
-	CHANNELS ?= fast,fast-${VERSION}
-	#$fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
 else
 	# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
