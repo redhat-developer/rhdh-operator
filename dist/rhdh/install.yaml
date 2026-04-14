@@ -2498,7 +2498,7 @@ data:
     \     - disabled: true\n        package: \"@redhat/backstage-plugin-orchestrator-form-widgets@1.8.10\"\n
     \       integrity: sha512-BGnPNkd2JZ8hIrkZ8+/C1RSH1PA7DT8SPqkV1MsrRRONYSJZ/xcVNFb2HWo3BtIjYV3pbASm+vysuBYyxilQog==\n
     \       pluginConfig:\n          dynamicPlugins:\n            frontend:\n              red-hat-developer-hub.backstage-plugin-orchestrator-form-widgets:
-    { }"
+    { }\n"
   route.yaml: |-
     apiVersion: route.openshift.io/v1
     kind: Route
