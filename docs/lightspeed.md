@@ -13,9 +13,10 @@ The Lightspeed flavour (as of v1.10) consists of the following dynamic plugins:
 - `backstage-plugin-lightspeed-backend` - Backend services for AI processing
 
 **Model Context Protocol (MCP) Tools:**
-- `backstage-plugin-mcp-actions-backend` - Backend for MCP actions
-- `backstage-plugin-software-catalog-mcp-tool` - AI tools for software catalog queries
-- `backstage-plugin-techdocs-mcp-tool` - AI tools for TechDocs navigation and search
+* [backstage-plugin-scaffolder-mcp-extras](https://github.com/redhat-developer/rhdh-plugin-export-overlays/pkgs/container/rhdh-plugin-export-overlays%2Fred-hat-developer-hub-backstage-plugin-scaffolder-mcp-extras)
+* [backstage-plugin-techdocs-mcp-extras](https://github.com/redhat-developer/rhdh-plugin-export-overlays/pkgs/container/rhdh-plugin-export-overlays%2Fred-hat-developer-hub-backstage-plugin-techdocs-mcp-extras)
+* [backstage-plugin-software-catalog-mcp-extras](https://github.com/redhat-developer/rhdh-plugin-export-overlays/pkgs/container/rhdh-plugin-export-overlays%2Fred-hat-developer-hub-backstage-plugin-software-catalog-mcp-extras)
+
 
 ### Prerequisites
 
