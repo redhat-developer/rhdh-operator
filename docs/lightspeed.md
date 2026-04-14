@@ -21,7 +21,7 @@ The Lightspeed flavour (as of v1.10) consists of the following dynamic plugins:
 
 To use Lightspeed, you need:
 - Red Hat Developer Hub 1.10 or later
-- Access to Red Hat's AI services (configured through backend authentication)
+- Access to any LLM of your choosing (which you set up in the Llama Stack run.yaml configuration)
 - (Optional) Custom MCP server configurations for extended capabilities
 
 ### Enabling Lightspeed
