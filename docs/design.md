@@ -40,7 +40,7 @@ As shown in the picture above:
   (where Backstage controller is launched). It provides a default configation which is optimal for most cases and will be applied 
 if there are no other config to override (i.e. Backstage CR is empty). 
 - One way of overriding the default is instance (Backstage CR) scoped, implemented as a ConfigMap which
-has the same as default structure but inside the Backstage instance's namespace. The name of theis ConfigMap 
+has the same as default structure but inside the Backstage instance's namespace. The name of this ConfigMap 
 is specified in the Backstage.Spec.RawConfig field. It offers a very flexible way to configure a specific Backstage instance.  
 - And finally, there are a set of fields on Backstage.Spec to override configuration made on level 1 and 2 above.
 It offers simple configuration of some parameters. So, the user is not required to understand the
@@ -64,13 +64,13 @@ As you can see, the Operator mounts ConfigMaps and Secrets to the Backstage cont
 * As a part of Default/Raw configuration, configuring certain configuration files
 * As a part of Backstage CR configuration, using the `spec.application` field
 
-In either case, a ConfigMaps/Secrets data's key/value is transformed to the file's name/content at Backstage CR creatiion time and the general expectation is to be able to update the file contents by updating the corresponding ConfigMap/Secret.
+In either case, a ConfigMaps/Secrets data's key/value is transformed to the file's name/content at Backstage CR creation time and the general expectation is to be able to update the file contents by updating the corresponding ConfigMap/Secret.
 Kubernetes [allows this updating](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically) but only if volume mount does not contain a subPath. In turn, using a subPath allows for mounting certain files individually on a certain container's directory, and not worrying about directories overlapping, which is beneficial for some cases. 
 
 Historically, the Operator actively uses the subPath option which allows a "convenient" Backstage App file structure (e g all the app-config files in the same directory). In this case file(s) are mounted to the default directory or to the **spec.application.(appConfig|extraFiles).mountPath** field if specified. 
 Also, in the case where a user needs only a certain key (file) to be mounted, the only choice is to use a subPath.
 In order to be able to update file(s) mounted with subPath volumes, the Operator watches ConfigMaps/Secrets and refreshes (recreates) the Backstage Pod when changes occur.
-Technically this approach works in either case (with or without subPath) but there are certan disadvantages:
+Technically this approach works in either case (with or without subPath) but there are certain disadvantages:
 * recreating of Pod is quite slow
 * it disables in fact using Backstage's file watching mechanism. Indeed, configuration changing causes file-system rebooting, so file-system watchers have no effect.  
 
