@@ -33,14 +33,14 @@ It only takes a few seconds to run, but covers quite a lot of functionality. For
 
 For testing, you will need a Kubernetes cluster, either remote (with sufficient admin rights) or local, such as [minikube](https://kubernetes.io/docs/tasks/tools/#minikube) or [kind](https://kubernetes.io/docs/tasks/tools/#kind)
 
-- Build and push your image to the location specified by `IMG`. If your laptop architecture is not the default (linux/amd64), you may need to specify [PLATFORM](#tested-platforms) as well:
+- Build and push your image to the location specified by `IMG`. If your laptop architecture is not the default (linux/amd64), you may need to specify PLATFORM as well:
 ```sh
 make [PLATFORM=<platform>] image-build image-push IMG=<your-registry>/backstage-operator:tag
 ```
 
 **NOTE:** This image ought to be published in the personal registry you specified.
 And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+Make sure you have the proper permission to the registry if the above commands don't work.
 
 - Install the Custom Resource Definitions into the local cluster (minikube is installed and running):
 ```sh
@@ -53,7 +53,7 @@ make install
 make uninstall
 ```
 
-#### Tested platforms:
+#### Supported platforms:
 - linux/amd64 - default
 - linux/arm64
 
@@ -129,19 +129,31 @@ Also note that the [`pr-bundle-diff-checks.yaml`](https://github.com/redhat-deve
 
 #### Build and push images
 
-There are a bunch of commands to build and push to the registry necessary images.
-For development purpose, you might need to specify the image you build and push with IMAGE_TAG_BASE env variable, if you test on a laptop with non default **linux/amd64** architecture you may need to specify **[PLATFORM](#tested-platforms)** as well: 
+Bundle and catalog images are built for multiple architectures (linux/amd64 and linux/arm64) to support local development on different platforms. The operator image is built for a single platform.
 
-* `[PLATFORM=<platform>] [IMAGE_TAG_BASE=<your-registry>/backstage-operator] make image-build` builds operator manager image (**backstage-operator**)
-* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make image-push` pushes operator manager image to **your-registry**
-* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make bundle-build` builds operator manager image (**backstage-operator-bundle**)
-* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make bundle-push` pushes bundle image to **your-registry**
-* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make catalog-build` builds catalog image (**backstage-operator-catalog**)
-* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make catalog-push` pushes catalog image to **your-registry**
+For development, you might need to specify the image registry using the IMAGE_TAG_BASE variable:
+
+* `[PLATFORM=<platform>] [IMAGE_TAG_BASE=<your-registry>/backstage-operator] make image-build` builds operator image (**backstage-operator**) for specified platform
+* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make image-push` pushes operator image to **your-registry**
+* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make bundle-build` builds multi-arch bundle image (**backstage-operator-bundle**)
+* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make bundle-push` pushes multi-arch bundle image to **your-registry**
+* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make catalog-build` builds multi-arch catalog image (**backstage-operator-catalog**)
+* `[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make catalog-push` pushes multi-arch catalog image to **your-registry**
 
 You can do it all together using:
 ```sh
 [IMAGE_TAG_BASE=<your-registry>/backstage-operator] make release-build release-push
+```
+
+**Multi-arch support:** Bundle and catalog images support multiple architectures out of the box. To customize the platforms:
+```sh
+# Build bundle and catalog for custom platforms
+BUNDLE_PLATFORMS=linux/amd64,linux/arm64,linux/ppc64le make bundle-build catalog-build
+```
+
+**Container tool:** The build works with both Docker and Podman. To use Podman explicitly:
+```sh
+CONTAINER_TOOL=podman make release-build
 ```
 
 #### Deploy or update the Catalog Source

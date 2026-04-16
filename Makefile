@@ -321,28 +321,92 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 ## yq '.spec.install.spec.deployments[0].spec.template.spec.containers[1].image|="quay.io/rhdh-community/operator:some-other-tag"' bundle/manifests/backstage-operator.clusterserviceversion.yaml
 ## or
 ## sed -r -e "s#(image: +)quay.io/.+operator.+#\1quay.io/rhdh-community/operator:some-other-tag#g" -i bundle/manifests/backstage-operator.clusterserviceversion.yaml
+# Platforms to build for bundle (must include both amd64 and arm64 for OLM compatibility)
+BUNDLE_PLATFORMS ?= linux/amd64,linux/arm64
+
 .PHONY: bundle-build
-bundle-build: ## Build the bundle image.
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f bundle/$(PROFILE)/bundle.Dockerfile -t $(BUNDLE_IMG) --label $(LABEL) .
+bundle-build: ## Build the bundle image (multi-platform for opm compatibility on ARM64).
+	@echo "Building multi-arch bundle image for platforms: $(BUNDLE_PLATFORMS)"
+	@for platform in $$(echo $(BUNDLE_PLATFORMS) | tr ',' ' '); do \
+		echo "Building for $$platform..."; \
+		$(CONTAINER_TOOL) build --platform $$platform \
+			-f bundle/$(PROFILE)/bundle.Dockerfile \
+			-t $(BUNDLE_IMG)-$$(echo $$platform | tr '/' '-') \
+			--label $(LABEL) \
+			.; \
+	done
+	@echo "Creating manifest list..."
+	@$(CONTAINER_TOOL) manifest rm $(BUNDLE_IMG) 2>/dev/null || true
+	@if [ "$(CONTAINER_TOOL)" = "podman" ]; then \
+		$(CONTAINER_TOOL) manifest create $(BUNDLE_IMG) \
+			$$(for platform in $$(echo $(BUNDLE_PLATFORMS) | tr ',' ' '); do \
+				echo "containers-storage:$(BUNDLE_IMG)-$$(echo $$platform | tr '/' '-')"; \
+			done); \
+	else \
+		$(CONTAINER_TOOL) manifest create $(BUNDLE_IMG) \
+			$$(for platform in $$(echo $(BUNDLE_PLATFORMS) | tr ',' ' '); do \
+				echo "$(BUNDLE_IMG)-$$(echo $$platform | tr '/' '-')"; \
+			done); \
+	fi
+	@echo "Multi-arch bundle image built successfully"
 
 .PHONY: bundle-push
 bundle-push: ## Push bundle image to registry
-	$(MAKE) image-push IMG=$(BUNDLE_IMG)
+	@echo "Pushing platform-specific bundle images..."
+	@for platform in $$(echo $(BUNDLE_PLATFORMS) | tr ',' ' '); do \
+		echo "Pushing $(BUNDLE_IMG)-$$(echo $$platform | tr '/' '-')..."; \
+		$(CONTAINER_TOOL) push $(BUNDLE_IMG)-$$(echo $$platform | tr '/' '-'); \
+	done
+	@echo "Pushing manifest list..."
+	@$(CONTAINER_TOOL) manifest push $(BUNDLE_IMG)
 
 # Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
 # This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 # bundle-push is needed because 'opm index add' always pulls from the remote registry and never uses the local image.
 # See https://github.com/operator-framework/operator-registry/issues/885
+
+# Platforms to build for catalog (should match bundle platforms)
+CATALOG_PLATFORMS ?= $(BUNDLE_PLATFORMS)
+
 .PHONY: catalog-build
 catalog-build: bundle-push opm ## Generate operator-catalog dockerfile using the operator-bundle image built and published above; then build catalog image
+	@echo "Generating catalog dockerfile..."
 	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT) --generate -d ./index.Dockerfile
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f index.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) .
+	@echo "Building multi-arch catalog image for platforms: $(CATALOG_PLATFORMS)"
+	@for platform in $$(echo $(CATALOG_PLATFORMS) | tr ',' ' '); do \
+		echo "Building catalog for $$platform..."; \
+		$(CONTAINER_TOOL) build --platform $$platform \
+			-f index.Dockerfile \
+			-t $(CATALOG_IMG)-$$(echo $$platform | tr '/' '-') \
+			--label $(LABEL) \
+			.; \
+	done
+	@echo "Creating catalog manifest list..."
+	@$(CONTAINER_TOOL) manifest rm $(CATALOG_IMG) 2>/dev/null || true
+	@if [ "$(CONTAINER_TOOL)" = "podman" ]; then \
+		$(CONTAINER_TOOL) manifest create $(CATALOG_IMG) \
+			$$(for platform in $$(echo $(CATALOG_PLATFORMS) | tr ',' ' '); do \
+				echo "containers-storage:$(CATALOG_IMG)-$$(echo $$platform | tr '/' '-')"; \
+			done); \
+	else \
+		$(CONTAINER_TOOL) manifest create $(CATALOG_IMG) \
+			$$(for platform in $$(echo $(CATALOG_PLATFORMS) | tr ',' ' '); do \
+				echo "$(CATALOG_IMG)-$$(echo $$platform | tr '/' '-')"; \
+			done); \
+	fi
+	@echo "Multi-arch catalog image built successfully"
 
 # Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
-	$(MAKE) image-push IMG=$(CATALOG_IMG)
+	@echo "Pushing platform-specific catalog images..."
+	@for platform in $$(echo $(CATALOG_PLATFORMS) | tr ',' ' '); do \
+		echo "Pushing $(CATALOG_IMG)-$$(echo $$platform | tr '/' '-')..."; \
+		$(CONTAINER_TOOL) push $(CATALOG_IMG)-$$(echo $$platform | tr '/' '-'); \
+	done
+	@echo "Pushing catalog manifest list..."
+	@$(CONTAINER_TOOL) manifest push $(CATALOG_IMG)
 
 .PHONY:
 release-build: bundle image-build bundle-build catalog-build ## Build operator, bundle + catalog images
