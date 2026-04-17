@@ -19,6 +19,7 @@ EXAMPLE_SECRET_FILE="${REPO_ROOT}/examples/lightspeed.yaml"
 
 REF="main"
 UPDATED=0
+TMP_DIR=""
 
 usage() {
     cat <<'EOF'
@@ -81,6 +82,16 @@ mcp_servers:
     authorization_headers:
       Authorization: "client"
 EOF
+}
+
+cleanup() {
+    local exit_code=$?
+
+    if [[ -n "${TMP_DIR:-}" ]]; then
+        rm -rf "$TMP_DIR" || true
+    fi
+
+    return "$exit_code"
 }
 
 replace_indented_block() {
@@ -149,7 +160,7 @@ main() {
     parse_args "$@"
 
     TMP_DIR="$(mktemp -d)"
-    trap 'rm -rf "$TMP_DIR"' EXIT
+    trap cleanup EXIT
 
     local config_file="${TMP_DIR}/config.yaml"
     local stack_file="${TMP_DIR}/lightspeed-stack.yaml"
