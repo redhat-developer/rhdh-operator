@@ -12,6 +12,13 @@ It is highly recommended to read the [Design](design.md) document to understand 
   - [Metadata Generation](#metadata-generation)
   - [Multi Objects](#multi-objects)
   - [Default Base URLs](#default-base-urls)
+  - [Flavours](#flavours)
+    - [Overview](#overview)
+    - [Key Capabilities](#key-capabilities)
+    - [Available Flavours](#available-flavours)
+    - [Usage](#usage)
+    - [Benefits](#benefits)
+    - [Technical Details](#technical-details)
 - [Raw Configuration](#raw-configuration)
 - [Custom Resource Spec](#custom-resource-spec)
   - [Application Configuration](#application-configuration)
@@ -138,6 +145,68 @@ metadata:
 ```
 In the example above the PVC called **myclaim** will be mounted to all the containers
 
+#### rhdh.redhat.com/sub-path to configure volume mount behavior
+
+This annotation controls whether volumes are mounted as directories or individual files with [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath). The annotation value determines the mounting strategy:
+
+Supported objects: **configmap-files**, **secret-files**.
+
+Options:
+
+* No or empty annotation: mount as directory (without subPath)
+* `*` (asterisk): mount each key as individual file with subPath
+* Specific value (e.g., `"myfile.yaml"`): mount only that specific key as file with subPath
+
+**Important:** Volumes mounted with subPath are not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). The Operator watches such ConfigMaps/Secrets and refreshes the Backstage Pod when they change.
+
+Examples:
+
+_**configmap-files.yaml** - Mount all files individually_
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-files
+  annotations:
+    rhdh.redhat.com/sub-path: "*"
+data:
+  file1.yaml: |
+    content: data1
+  file2.yaml: |
+    content: data2
+```
+In the example above, files will be mounted individually as `/opt/app-root/src/file1.yaml` and `/opt/app-root/src/file2.yaml`
+
+_**configmap-files.yaml** - Mount specific file only_
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  annotations:
+    rhdh.redhat.com/sub-path: "config.yaml"
+data:
+  config.yaml: |
+    key: value
+  other.yaml: |
+    ignored: data
+```
+In the example above, only `config.yaml` will be mounted as `/opt/app-root/src/config.yaml`, `other.yaml` is ignored
+
+_**configmap-files.yaml** - Mount as directory (no subPath)_
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-dir
+data:
+  file1.yaml: |
+    content: data1
+  file2.yaml: |
+    content: data2
+```
+In the example above, ConfigMap will be mounted as directory `/opt/app-root/src/my-dir/` containing both files. This mount will be automatically updated by Kubernetes when the ConfigMap changes.
+
 ### Metadata Generation
   
 For Backstage to function consistently at runtime, certain metadata values need to be predictable. Therefore, the Operator generates values according to the following rules. Any value for these fields specified in either Default or Raw Configuration will be replaced by the generated values.
@@ -158,9 +227,17 @@ For example, Backstage CR named **mybackstage** will create K8s Deployment resou
 
 ### Multi objects
 
-Since version **0.4.0**, Operator supports multi objects which mean the object type(s) marked as Multi=true in the table above can be declared and added to the model as the list of objects of certain type. To do so multiple objects are added to the yaml file using "---" delimiter.
+Operator supports multi objects which mean the object type(s) marked as Multi=Yes in the table above can be declared and added to the model as the list of objects of certain type. To do so multiple objects are added to the yaml file using "---" delimiter.
 
-For example, adding the following code snip to **pvcs.yaml** will cause creating 2 PVCs called **backstage-&lt;cr-name&gt;-myclaim1** and **backstage-&lt;cr-name&gt;-myclaim2** and mounting them to Backstage container accordingly. 
+The following configuration files support multi-object definitions:
+- **app-config.yaml** 
+- **configmap-files.yaml** (since 0.10.0)
+- **configmap-envs.yaml** (since 0.10.0)
+- **secret-files.yaml** 
+- **secret-envs.yaml** 
+- **pvcs.yaml** 
+
+For example, adding the following to **pvcs.yaml** will create 2 PVCs and mount them to the Backstage container:
 
 ```yaml
 apiVersion: v1
@@ -176,9 +253,35 @@ metadata:
 ...
 ```
 
+The same pattern applies to ConfigMaps and Secrets. For instance, **configmap-files.yaml**:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-files-1
+  annotations:
+    rhdh.redhat.com/sub-path: "*"
+data:
+  file1.yaml: |
+    config:
+      key1: value1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-files-2
+  annotations:
+    rhdh.redhat.com/sub-path: "*"
+data:
+  file2.yaml: |
+    config:
+      key2: value2
+```
+
 ### Default base URLs
 
-Since version 0.6.0, the Operator may set the base URLs fields in the default app-config ConfigMap (named `backstage-appconfig-<CR_name>`) created per CR, based on the [Route](#route) parameters and the [OpenShift cluster ingress domain](https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/networking/networking-operators#nw-ne-openshift-ingress_configuring-ingress).
+The Operator may set the base URLs fields in the default app-config ConfigMap (named `backstage-appconfig-<CR_name>`) created per CR, based on the [Route](#route) parameters and the [OpenShift cluster ingress domain](https://docs.redhat.com/en/documentation/openshift_container_platform/4.17/html/networking/networking-operators#nw-ne-openshift-ingress_configuring-ingress).
 
 Below are the rules currently governing this behavior:
 
@@ -196,6 +299,84 @@ The following app-config fields might be updated in this default app-config Conf
 Note that this behavior is done on a best-effort basis and only on OpenShift.
 
 In any case (error or on non-OpenShift clusters), users still have the ability to override such defaults by providing custom app-config ConfigMap(s), as depicted in the [app-config](#app-config) section.
+
+### Flavours
+
+#### Overview
+
+Flavours are pre-packaged configuration sets that bundle together related features and settings, enabling users to deploy pre-configured Red Hat Developer Hub (RHDH) instances with common patterns without manual configuration. Instead of manually configuring each Backstage instance, users can specify which flavours to enable, and the operator automatically applies the appropriate configurations.
+
+These configuration variations extend the base default configuration, allowing teams to quickly deploy Backstage instances tailored for specific use cases.
+
+#### Key Capabilities
+
+- **Multi-Flavour Support**: Enable multiple flavours simultaneously to combine features (e.g., AI + Orchestrator)
+- **Smart Defaults**: Flavours can be marked as enabled by default, reducing configuration overhead
+- **Flexible Override**: Users can explicitly enable, disable, or override any flavour configuration
+- **Configuration Merging**: Flavours merge intelligently with base configurations and user-provided overrides
+- **Backward Compatible**: Existing deployments work unchanged; flavours are optional
+
+#### Available Flavours
+
+##### Orchestrator
+Workflow orchestration capabilities powered by Serverless Workflow. Disabled by default. See [Orchestrator documentation](orchestrator.md) for details.
+
+##### Lightspeed
+AI-powered developer assistance with chat interface and Model Context Protocol (MCP) tools. Enabled by default. See [Lightspeed documentation](lightspeed.md) for details.
+
+#### Usage
+
+##### Default Deployment
+Deploy with automatically enabled default flavours:
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha6
+kind: Backstage
+metadata:
+  name: my-backstage
+spec: {}
+```
+
+##### Enable Multiple Flavours
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha6
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  flavours:
+    - name: orchestrator
+      enabled: true
+    - name: lightspeed
+      enabled: true
+```
+
+##### Disable All Flavours
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha6
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  flavours: []
+```
+
+#### Benefits
+
+- **Faster Time-to-Value**: Deploy common patterns instantly without manual configuration
+- **Consistency**: Standardized configurations across teams and instances
+- **Flexibility**: Mix and match flavours or disable them entirely
+- **Maintainability**: Flavour configurations version with operator releases
+- **Easy Onboarding**: New users can start with proven configurations
+
+#### Technical Details
+
+Flavours extend the default configuration system by organizing pre-configured settings in `/default-config/flavours/<flavour-name>/`. Each flavour includes a `metadata.yaml` file controlling default enablement behavior. When multiple flavours are specified, configurations merge additively in the order specified, with later entries overriding earlier ones when conflicts occur.
+
+Different file types use appropriate merge strategies:
+- Kubernetes objects use kyaml deep merge
+- Dynamic plugins merge by package name
+- App configs mount as multiple files for Backstage's internal merging
+- Extra configs maintain multiple ConfigMaps/Secrets
 
 ## Deployment kind
 
@@ -378,18 +559,25 @@ spec:
 ```
 
 The Operator will either get all entries from the specified object (if no key is specified) or will pick the specified one, creating volumes per object and mounting the files to the Backstage container.
-Backstage CRD introduces **mountPath** field which allows to mount ConfigMap or Secret to specified path. A combination of key/mountPath fields impacts on whether the Volume will be mounted with or without [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath) as following:
-* If nothing specified: each key/values will be mounted as filename/content with **subPath**
-* If **key** specified, with or without **mountPath**: the specified key/value will be mounted with **subPath**
-* If only **mountPath** specified: a directory containing all the key/value will be mounted without **subPath**
+
+**Mount Path and SubPath Behavior:**
+
+The combination of **key** and **mountPath** fields in the CR spec determines whether volumes are mounted with or without [subPath](https://kubernetes.io/docs/concepts/storage/volumes/#using-subpath):
+
+* **Nothing specified** (`key: ""`, `mountPath: ""`): All keys mounted as individual files with subPath to `spec.application.extraFiles.mountPath` (or default mount path)
+* **Only key specified** (`key: "file.yaml"`, `mountPath: ""`): Specific key mounted as individual file with subPath to `spec.application.extraFiles.mountPath` (or default mount path)
+* **Only mountPath specified** (`key: ""`, `mountPath: "/custom/path"`): All keys mounted as directory without subPath to the specified path
+* **Both key and mountPath specified** (`key: "file.yaml"`, `mountPath: "/custom/path"`): Specific key mounted as individual file with subPath to the specified path
+
+**Important:** Volumes mounted with subPath are not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). The Operator watches such ConfigMaps/Secrets and refreshes the Backstage Pod when they change.
+
+**Container Selection:**
 
 Since **v1alpha4 (v0.8)** it is possible to specify the container(s) and initContainer(s) names in the **containers** field. If not specified, the volume will be mounted to the Backstage container only. The following options are supported:
 * No or empty field: the volume will be mounted to the Backstage container only
 * \* (asterisk) as the first and only array element: the volume will be mounted to all the containers
 * explicit container names as the array elements
 
-**Note**: A volume mounted with **subPath** is not [automatically updated by Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically). So, by default, the Operator watches such ConfigMaps/Secrets and refreshes the Backstage Pod when they change. 
-  
 **Note:** To limit read access to Secrets by the Operator Service Account (for security reasons), we do not support mounting files from Secrets without mountPath and key specified.
 
 In our example, the following files will be mounted:

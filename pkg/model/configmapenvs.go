@@ -80,10 +80,5 @@ func (p *ConfigMapEnvs) updateAndValidate(_ api.Backstage) error {
 
 // implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	//for _, item := range p.ConfigMaps.Items {
-	//	cm := item.(*corev1.ConfigMap)
-	//	cm.Name = ConfigMapEnvsDefaultName(backstage.Name, cm.Annotations[SourceAnnotation])
-	//	setMetaInfo(cm, backstage, scheme)
-	//}
 	setMultiObjectConfigMetaInfo(p.ConfigMaps, "envs", backstage, scheme)
 }

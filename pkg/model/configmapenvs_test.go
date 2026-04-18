@@ -205,3 +205,95 @@ func TestCMEnvsWithNonExistedContainerFailed(t *testing.T) {
 	assert.ErrorContains(t, err, "not found")
 
 }
+
+func TestMultiObjectConfigMapEnvsInDefaultConfig(t *testing.T) {
+
+	bs := api.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bs",
+			Namespace: "ns123",
+		},
+		Spec: api.BackstageSpec{
+			Database: &api.Database{
+				EnableLocalDb: ptr.To(false),
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-envs.yaml", "multi-cm-envs.yaml")
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	bscontainer := model.backstageDeployment.container()
+	assert.NotNil(t, bscontainer)
+
+	// Should have 2 ConfigMap EnvFrom sources (cm-envs-1, cm-envs-2)
+	assert.Equal(t, 2, len(bscontainer.EnvFrom))
+	assert.Equal(t, 0, len(bscontainer.Env))
+
+	// Verify the ConfigMap names
+	cmNames := make(map[string]bool)
+	for _, envFrom := range bscontainer.EnvFrom {
+		if envFrom.ConfigMapRef != nil {
+			cmNames[envFrom.ConfigMapRef.Name] = true
+		}
+	}
+
+	assert.True(t, cmNames["backstage-envs-bs-cm-envs-1"])
+	assert.True(t, cmNames["backstage-envs-bs-cm-envs-2"])
+}
+
+func TestMultiObjectConfigMapEnvsInSpec(t *testing.T) {
+
+	bs := api.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bs",
+			Namespace: "ns123",
+		},
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				ExtraEnvs: &api.ExtraEnvs{
+					ConfigMaps: []api.EnvObjectRef{
+						{Name: "cm1"},
+						{Name: "cm2"},
+					},
+				},
+			},
+			Database: &api.Database{
+				EnableLocalDb: ptr.To(false),
+			},
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraEnvConfigMapKeys["cm1"] = NewDataObjectKeys(map[string]string{"ENV1": "value1", "ENV2": "value2"}, nil)
+	testObj.externalConfig.ExtraEnvConfigMapKeys["cm2"] = NewDataObjectKeys(map[string]string{"ENV3": "value3", "ENV4": "value4"}, nil)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	bscontainer := model.backstageDeployment.container()
+	assert.NotNil(t, bscontainer)
+
+	// Should have 2 ConfigMap EnvFrom sources (cm1, cm2)
+	assert.Equal(t, 2, len(bscontainer.EnvFrom))
+	assert.Equal(t, 0, len(bscontainer.Env))
+
+	// Verify the ConfigMap names
+	cmNames := make(map[string]bool)
+	for _, envFrom := range bscontainer.EnvFrom {
+		if envFrom.ConfigMapRef != nil {
+			cmNames[envFrom.ConfigMapRef.Name] = true
+		}
+	}
+
+	assert.True(t, cmNames["cm1"])
+	assert.True(t, cmNames["cm2"])
+}
