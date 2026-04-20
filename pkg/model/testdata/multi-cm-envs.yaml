@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-envs-1
+data:
+  CM1_ENV1: "cm1 value 1"
+  CM1_ENV2: "cm1 value 2"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-envs-2
+data:
+  CM2_ENV1: "cm2 value 1"
+  CM2_ENV2: "cm2 value 2"

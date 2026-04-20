@@ -1,6 +1,6 @@
 # Configuration Profiles
 
-Starting with version 0.4.0, the Backstage Operator supports the concept of **Configuration Profiles**.
+The Backstage Operator supports the concept of **Configuration Profiles**.
 
 A Configuration Profile is a predefined and named Backstage Operator [Default Configuration](configuration.md#default-configuration), along with additional metadata for OLM manifests to be applied at deploy time (when deploying the Operator on a Kubernetes cluster). This approach allows us to decouple the Operator Controller (which provides functionality through binaries) from the set and shape of Kubernetes resources created and managed by the Operator.
 
@@ -113,7 +113,13 @@ To add a custom ClusterServiceVersion (CSV) manifest, create a directory with th
 
 Certain Profiles may need additional patches to the Operator default configuration. For example, the Red Hat Developer Hub (RHDH) Profile requires additional patches to the Operator deployment manifest to work correctly with container's filesystem on vanilla Kubernetes vs Openshift.
 For this purpose, the Operator provides a way to apply additional patches to the Profile's default configuration. These patches are provided as a YAML files with the same name as the default configuration file, but with the **.{PlatformID}** extension.
-For the time being (v0.5), there are two PlatformIDs: **k8s** for vanilla Kubernetes and **ocp** for Openshift platform.
+
+There are two platform extension types:
+- **k8s** - for vanilla Kubernetes and Kubernetes-based platforms (EKS, AKS, GKE)
+- **ocp** - for OpenShift platform
+
+The Operator automatically detects the platform and applies the appropriate extension patches.
+
 
 Patch application is done by the Operator during the deployment process as following:
 1. The Operator reads and applies the default configuration file from the Profile's directory (e g deployment.yaml).

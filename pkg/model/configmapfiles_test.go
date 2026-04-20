@@ -114,6 +114,53 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 
 }
 
+func TestConfigMapFilesMountPathReplacement(t *testing.T) {
+	// Test that CR spec ConfigMap replaces default config ConfigMap when mounting to the same path
+
+	bs := *configMapFilesTestBackstage.DeepCopy()
+
+	// CR spec ConfigMap mounting as directory (no Key specified) to the same custom path
+	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
+	*cmf = append(*cmf, api.FileObjectRef{
+		Name:      "cr-configmap",
+		MountPath: "/custom/mount", // Same path as default will use
+	})
+
+	// Add default config with a ConfigMap that also mounts to /custom/mount
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "raw-cm-files-custom-path.yaml")
+
+	// CR ConfigMap - mounts to same path, should replace default
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys["cr-configmap"] = NewDataObjectKeys(map[string]string{
+		"file1.yaml": "CR data 1",
+		"file2.yaml": "CR data 2",
+	}, nil)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	deployment := model.backstageDeployment
+	assert.NotNil(t, deployment)
+
+	// Should have only 1 volume mount (CR replaced default at same path)
+	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
+
+	// Both volumes should be defined in pod spec (even though one isn't mounted)
+	assert.Equal(t, 2, len(deployment.podSpec().Volumes))
+
+	// Verify the mount is to /custom/mount
+	mount := deployment.container().VolumeMounts[0]
+	assert.Equal(t, "/custom/mount", mount.MountPath)
+
+	// Verify it's the CR ConfigMap that's mounted (volume name should be from cr-configmap)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret("cr-configmap"), mount.Name)
+
+	// No subPath since mounting entire directory
+	assert.Equal(t, "", mount.SubPath)
+}
+
 func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
 
 	bs := *configMapFilesTestBackstage.DeepCopy()
@@ -220,4 +267,67 @@ func TestDefaultSubpath(t *testing.T) {
 
 	assert.Empty(t, findVolumeMountByPath(mts, "/mount/path3/data6"))
 
+}
+
+func TestMultiObjectConfigMapFilesInDefaultConfig(t *testing.T) {
+
+	bs := *configMapFilesTestBackstage.DeepCopy()
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("configmap-files.yaml", "multi-cm-files.yaml")
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	deployment := model.backstageDeployment
+	assert.NotNil(t, deployment)
+
+	// Should have 2 volume mounts for the 2 ConfigMaps
+	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
+	assert.Equal(t, 2, len(deployment.podSpec().Volumes))
+
+	// Verify volume names
+	volumeNames := make(map[string]bool)
+	for _, volume := range deployment.podSpec().Volumes {
+		volumeNames[volume.Name] = true
+	}
+
+	assert.True(t, volumeNames["backstage-files-bs-cm-files-1"])
+	assert.True(t, volumeNames["backstage-files-bs-cm-files-2"])
+}
+
+func TestMultiObjectConfigMapFilesInSpec(t *testing.T) {
+
+	bs := *configMapFilesTestBackstage.DeepCopy()
+	cmf := &bs.Spec.Application.ExtraFiles.ConfigMaps
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm1"})
+	*cmf = append(*cmf, api.FileObjectRef{Name: "cm2"})
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	testObj.externalConfig.ExtraFileConfigMapKeys = map[string]DataObjectKeys{}
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm1"] = NewDataObjectKeys(map[string]string{"file1.yaml": "data"}, nil)
+	testObj.externalConfig.ExtraFileConfigMapKeys["cm2"] = NewDataObjectKeys(map[string]string{"file2.yaml": "data"}, nil)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	deployment := model.backstageDeployment
+	assert.NotNil(t, deployment)
+
+	// Should have 2 volume mounts for the 2 ConfigMaps
+	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
+	assert.Equal(t, 2, len(deployment.podSpec().Volumes))
+
+	// Verify volume names
+	volumeNames := make(map[string]bool)
+	for _, volume := range deployment.podSpec().Volumes {
+		volumeNames[volume.Name] = true
+	}
+
+	assert.True(t, volumeNames[utils.GenerateVolumeNameFromCmOrSecret("cm1")])
+	assert.True(t, volumeNames[utils.GenerateVolumeNameFromCmOrSecret("cm2")])
 }
