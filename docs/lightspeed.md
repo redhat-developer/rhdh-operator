@@ -18,8 +18,7 @@ The Lightspeed flavour (as of v1.10) consists of the following dynamic plugins:
 
 To use Lightspeed, you need:
 - Red Hat Developer Hub 1.10 or later
-- Access to any LLM of your choosing (which you set up in the Llama Stack run.yaml configuration)
-- (Optional) Custom MCP server configurations for extended capabilities
+- Access to any LLM of your choosing (which you set up in the Llama Stack config.yaml configuration)
 
 ### Enabling Lightspeed
 
@@ -72,12 +71,6 @@ plugins:
     disabled: false
   - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.45.3__1.2.3
     disabled: false
-  - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-mcp-actions-backend:bs_1.45.3__0.1.5
-    disabled: false
-  - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-software-catalog-mcp-tool:bs_1.45.3__0.4.1
-    disabled: false
-  - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-techdocs-mcp-tool:bs_1.45.3__0.3.2
-    disabled: false
 ```
 
 For more information about configuring dynamic plugins, please refer to the [Configuration documentation](configuration.md).
@@ -107,14 +100,6 @@ The Lightspeed chat interface appears as:
 
 These UI elements are configured through the plugin's `pluginConfig` and can be customized in the dynamic plugins configuration.
 
-#### MCP Server Configuration
-
-Model Context Protocol servers can be extended with custom tools. Configure additional MCP servers in your app-config:
-
-```yaml
-# Example MCP server configuration
-# (Specific configuration format depends on MCP server implementation)
-```
 
 ### Features
 
@@ -124,28 +109,16 @@ Model Context Protocol servers can be extended with custom tools. Configure addi
 - Workflow guidance and best practices
 - Natural language queries about the software catalog
 
-**Software Catalog Integration:**
-- Query components, APIs, and resources using natural language
-- Get information about ownership, dependencies, and relationships
-
-**TechDocs Integration:**
-- Search and navigate technical documentation
-- Ask questions about documentation content
-- Get contextual help based on current documentation
 
 ### Usage
 
 Once enabled, users can:
 1. Click the Lightspeed floating button to open the chat interface
 2. Ask questions about code, documentation, or workflows
-3. Query the software catalog using natural language
-4. Navigate TechDocs with AI assistance
 
 ### Notes
 
 - Lightspeed is enabled by default for all new RHDH deployments starting from version 1.10
 - The flavour includes all necessary UI components and backend services
-- MCP tools provide AI access to catalog and documentation data
-- Custom MCP servers can be added for organization-specific capabilities
 
 For more information about the Flavour-based configuration system, see the [Configuration documentation](configuration.md#flavours).
