@@ -69,21 +69,6 @@ render_secret_entries() {
     ' "$1"
 }
 
-render_lightspeed_stack_yaml() {
-    local source_file="$1"
-    local destination_file="$2"
-
-    cp "$source_file" "$destination_file"
-    cat <<'EOF' >> "$destination_file"
-mcp_servers:
-  - name: mcp-integration-tools
-    provider_id: "model-context-protocol"
-    url: "http://localhost:7007/api/mcp-actions/v1"
-    authorization_headers:
-      Authorization: "client"
-EOF
-}
-
 cleanup() {
     local exit_code=$?
 
@@ -164,7 +149,6 @@ main() {
 
     local config_file="${TMP_DIR}/config.yaml"
     local stack_file="${TMP_DIR}/lightspeed-stack.yaml"
-    local rendered_stack_file="${TMP_DIR}/lightspeed-stack.rendered.yaml"
     local profile_file="${TMP_DIR}/rhdh-profile.py"
     local env_file="${TMP_DIR}/default-values.env"
     local config_block="${TMP_DIR}/config-block.yaml"
@@ -178,8 +162,7 @@ main() {
     fetch_upstream_file "$UPSTREAM_ENV_PATH" "$env_file"
 
     indent_file "$config_file" > "$config_block"
-    render_lightspeed_stack_yaml "$stack_file" "$rendered_stack_file"
-    indent_file "$rendered_stack_file" > "$stack_block"
+    indent_file "$stack_file" > "$stack_block"
     indent_file "$profile_file" > "$profile_block"
     render_secret_entries "$env_file" > "$secret_entries"
 

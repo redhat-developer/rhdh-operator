@@ -275,10 +275,10 @@ data:
       profile_path: '/app-root/rhdh-profile.py'
     mcp_servers:
       - name: mcp-integration-tools
-        provider_id: "model-context-protocol"
-        url: "http://localhost:7007/api/mcp-actions/v1"
+        provider_id: 'model-context-protocol'
+        url: 'http://localhost:7007/api/mcp-actions/v1'
         authorization_headers:
-          Authorization: "client"
+          Authorization: 'client'
 ---
 kind: ConfigMap
 apiVersion: v1
