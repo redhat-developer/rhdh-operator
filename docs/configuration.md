@@ -13,11 +13,9 @@ It is highly recommended to read the [Design](design.md) document to understand 
   - [Multi Objects](#multi-objects)
   - [Default Base URLs](#default-base-urls)
   - [Flavours](#flavours)
-    - [Overview](#overview)
     - [Key Capabilities](#key-capabilities)
     - [Available Flavours](#available-flavours)
     - [Usage](#usage)
-    - [Benefits](#benefits)
     - [Technical Details](#technical-details)
 - [Raw Configuration](#raw-configuration)
 - [Custom Resource Spec](#custom-resource-spec)
@@ -302,8 +300,6 @@ In any case (error or on non-OpenShift clusters), users still have the ability t
 
 ### Flavours
 
-#### Overview
-
 Flavours are pre-packaged configuration sets that bundle together related features and settings, enabling users to deploy pre-configured Red Hat Developer Hub (RHDH) instances with common patterns without manual configuration. Instead of manually configuring each Backstage instance, users can specify which flavours to enable, and the operator automatically applies the appropriate configurations.
 
 These configuration variations extend the base default configuration, allowing teams to quickly deploy Backstage instances tailored for specific use cases.
@@ -359,14 +355,6 @@ metadata:
 spec:
   flavours: []
 ```
-
-#### Benefits
-
-- **Faster Time-to-Value**: Deploy common patterns instantly without manual configuration
-- **Consistency**: Standardized configurations across teams and instances
-- **Flexibility**: Mix and match flavours or disable them entirely
-- **Maintainability**: Flavour configurations version with operator releases
-- **Easy Onboarding**: New users can start with proven configurations
 
 #### Technical Details
 
