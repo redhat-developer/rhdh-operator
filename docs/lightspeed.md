@@ -118,7 +118,7 @@ Once enabled, users can:
 
 ### Notes
 
-- Lightspeed is enabled by default for all new RHDH deployments starting from version 1.10
+- Starting with version 1.10, Lightspeed is enabled by default for all RHDH deployments, including new installs and upgrades of existing instances.
 - The flavour includes all necessary UI components and backend services
 
 For more information about the Flavour-based configuration system, see the [Configuration documentation](configuration.md#flavours).
