@@ -392,7 +392,7 @@ func TestExtraCatalogIndexImagesNotSetWhenNoEnvVars(t *testing.T) {
 
 // TestExtraCatalogIndexImagesFromEnvVars verifies that RELATED_IMAGE_extra_catalog_index_*
 // env vars are collected and set as EXTRA_CATALOG_INDEX_IMAGES on the init container
-// using the name=image_ref format
+// using the name=image_ref format, preserving declaration order
 func TestExtraCatalogIndexImagesFromEnvVars(t *testing.T) {
 	bs := testDynamicPluginsBackstage.DeepCopy()
 
@@ -400,8 +400,9 @@ func TestExtraCatalogIndexImagesFromEnvVars(t *testing.T) {
 		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
 		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
 
-	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"alpha", "quay.io/rhdh/extra-index-alpha:1.0")
+	// Set in deliberate order: beta before alpha — output must preserve this order
 	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"beta", "quay.io/rhdh/extra-index-beta:2.0")
+	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"alpha", "quay.io/rhdh/extra-index-alpha:1.0")
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
@@ -414,7 +415,7 @@ func TestExtraCatalogIndexImagesFromEnvVars(t *testing.T) {
 	for _, env := range ic.Env {
 		if env.Name == "EXTRA_CATALOG_INDEX_IMAGES" {
 			found = true
-			assert.Equal(t, "alpha=quay.io/rhdh/extra-index-alpha:1.0,beta=quay.io/rhdh/extra-index-beta:2.0", env.Value, "EXTRA_CATALOG_INDEX_IMAGES should contain sorted name=image_ref entries")
+			assert.Equal(t, "beta=quay.io/rhdh/extra-index-beta:2.0,alpha=quay.io/rhdh/extra-index-alpha:1.0", env.Value, "EXTRA_CATALOG_INDEX_IMAGES must preserve env var declaration order")
 			break
 		}
 	}

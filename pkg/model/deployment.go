@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -521,13 +520,9 @@ func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt
 // collectExtraCatalogIndexImages scans environment variables for RELATED_IMAGE_extra_catalog_index_*
 // and returns their values as a comma-separated string using the name=image_ref format,
 // where name is the suffix after the RELATED_IMAGE_extra_catalog_index_ prefix.
-// Entries are sorted by env var name for determinism.
+// The order of entries preserves the order in which the env vars are declared.
 func collectExtraCatalogIndexImages() string {
-	var images []struct {
-		key   string
-		name  string
-		value string
-	}
+	var entries []string
 	for _, env := range os.Environ() {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) != 2 {
@@ -536,23 +531,9 @@ func collectExtraCatalogIndexImages() string {
 		if strings.HasPrefix(parts[0], ExtraCatalogIndexImagesEnvVarPrefix) && parts[1] != "" {
 			name := strings.TrimPrefix(parts[0], ExtraCatalogIndexImagesEnvVarPrefix)
 			if name != "" {
-				images = append(images, struct {
-					key   string
-					name  string
-					value string
-				}{key: parts[0], name: name, value: parts[1]})
+				entries = append(entries, name+"="+parts[1])
 			}
 		}
-	}
-	if len(images) == 0 {
-		return ""
-	}
-	sort.Slice(images, func(i, j int) bool {
-		return images[i].key < images[j].key
-	})
-	entries := make([]string, len(images))
-	for i, img := range images {
-		entries[i] = img.name + "=" + img.value
 	}
 	return strings.Join(entries, ",")
 }
