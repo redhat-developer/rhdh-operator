@@ -41,7 +41,7 @@ func TestDefaultConfigMapFiles(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
@@ -67,9 +67,9 @@ func TestSpecifiedConfigMapFiles(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 3, len(deployment.container().VolumeMounts))
@@ -103,9 +103,9 @@ func TestDefaultAndSpecifiedConfigMapFiles(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
@@ -128,9 +128,9 @@ func TestSpecifiedConfigMapFilesWithBinaryData(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
@@ -157,9 +157,9 @@ func TestSpecifiedCMFilesWithContainers(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 3, len(deployment.containerByName("install-dynamic-plugins").VolumeMounts))
@@ -200,7 +200,7 @@ func TestDefaultSubpath(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	mts := deployment.container().VolumeMounts

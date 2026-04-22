@@ -5,9 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	"k8s.io/utils/ptr"
 
@@ -33,14 +32,14 @@ func TestDefaultSecretEnvFrom(t *testing.T) {
 
 	bs := *secretEnvsTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretEnvsObjectKey, "raw-sec-envs.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretEnvsKey, "raw-sec-envs.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.container()
+	bscontainer := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).container()
 	assert.NotNil(t, bscontainer)
 
 	assert.Equal(t, 1, len(bscontainer.EnvFrom))
@@ -53,18 +52,21 @@ func TestDefaultMultiSecretEnv(t *testing.T) {
 	bs := *secretEnvsTestBackstage.DeepCopy()
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
-		addToDefaultConfig(SecretEnvsObjectKey, "raw-multi-secret.yaml")
+		addToDefaultConfig(SecretEnvsKey, "raw-multi-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	assert.Equal(t, 4, len(model.backstageDeployment.allContainers()))
-	assert.Equal(t, 3, len(model.backstageDeployment.container().EnvFrom))
-	assert.Equal(t, 2, len(model.backstageDeployment.containerByName("install-dynamic-plugins").EnvFrom))
-	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-container").EnvFrom))
-	mo := model.getRuntimeObjectByType(&SecretEnvs{}).Object().(*multiobject.MultiObject)
+	assert.Equal(t, 4, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).allContainers()))
+	assert.Equal(t, 3, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).container().EnvFrom))
+	assert.Equal(t, 2, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("install-dynamic-plugins").EnvFrom))
+	assert.Equal(t, 1, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("another-container").EnvFrom))
+	secretEnvs := model.GetRuntimeObject(SecretEnvsKey)
+	assert.NotNil(t, secretEnvs)
+	obj := secretEnvs.Object()
+	mo := obj.(*multiobject.MultiObject)
 	assert.Equal(t, 3, len(mo.Items))
 	assert.True(t, strings.HasPrefix(mo.Items[0].GetName(), "backstage-envs-"+bs.Name))
 }
@@ -90,7 +92,7 @@ func TestSpecifiedSecretEnvs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.container()
+	bscontainer := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).container()
 	assert.NotNil(t, bscontainer)
 	assert.Equal(t, 1, len(bscontainer.Env))
 
@@ -123,19 +125,19 @@ func TestSpecifiedSecretEnvsWithContainers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	cont := model.backstageDeployment.containerByName("install-dynamic-plugins")
+	cont := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("install-dynamic-plugins")
 	assert.NotNil(t, cont)
 	assert.Equal(t, 1, len(cont.Env))
 	assert.NotNil(t, cont.Env[0])
 	assert.Equal(t, "ENV1", cont.Env[0].Name)
 
-	cont = model.backstageDeployment.containerByName("another-container")
+	cont = model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("another-container")
 	assert.NotNil(t, cont)
 	assert.Equal(t, 1, len(cont.Env))
 	assert.NotNil(t, cont.Env[0])
 	assert.Equal(t, "ENV1", cont.Env[0].Name)
 
-	cont = model.backstageDeployment.containerByName("backstage-backend")
+	cont = model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("backstage-backend")
 	assert.NotNil(t, cont)
 	assert.Equal(t, 0, len(cont.Env))
 
@@ -150,9 +152,9 @@ func TestSpecifiedSecretEnvsWithContainers(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
-	assert.Equal(t, 4, len(model.backstageDeployment.allContainers()))
-	for _, cn := range model.backstageDeployment.allContainers() {
-		c := model.backstageDeployment.containerByName(cn)
+	assert.Equal(t, 4, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).allContainers()))
+	for _, cn := range model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).allContainers() {
+		c := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName(cn)
 		assert.Equal(t, 1, len(c.Env))
 		assert.NotNil(t, c.Env[0])
 		assert.Equal(t, "ENV1", c.Env[0].Name)

@@ -42,17 +42,17 @@ func TestDefaultRoute(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	assert.NotNil(t, model.route)
+	assert.NotNil(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute))
 
-	assert.Equal(t, RouteName(bs.Name), model.route.route.Name)
-	assert.Equal(t, model.backstageService.service.Name, model.route.route.Spec.To.Name)
+	assert.Equal(t, RouteName(bs.Name), model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Name)
+	assert.Equal(t, model.GetRuntimeObject(ServiceKey).(*BackstageService).service.Name, model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.To.Name)
 	// from spec
-	assert.Equal(t, "/default", model.route.route.Spec.Path)
+	assert.Equal(t, "/default", model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.Path)
 	// from default
-	assert.NotNil(t, model.route.route.Spec.TLS)
-	assert.NotEmpty(t, model.route.route.Spec.TLS.Termination)
+	assert.NotNil(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.TLS)
+	assert.NotEmpty(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.TLS.Termination)
 
-	//	assert.Empty(t, model.route.route.Spec.Host)
+	//	assert.Empty(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.Host)
 }
 
 func TestSpecifiedRoute(t *testing.T) {
@@ -79,24 +79,24 @@ func TestSpecifiedRoute(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObjNoDef.externalConfig, platform.OpenShift, testObjNoDef.scheme)
 
 	assert.NoError(t, err)
-	assert.NotNil(t, model.route)
+	assert.NotNil(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute))
 
 	// check if what we have is what we specified in bs
-	assert.Equal(t, RouteName(bs.Name), model.route.route.Name)
-	assert.Equal(t, bs.Spec.Application.Route.Host, model.route.route.Spec.Host)
+	assert.Equal(t, RouteName(bs.Name), model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Name)
+	assert.Equal(t, bs.Spec.Application.Route.Host, model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.Host)
 
 	// Test with default route configured
 	testObjWithDef := testObjNoDef.addToDefaultConfig("route.yaml", "raw-route.yaml")
 	model, err = InitObjects(context.TODO(), bs, testObjWithDef.externalConfig, platform.OpenShift, testObjWithDef.scheme)
 
 	assert.NoError(t, err)
-	assert.NotNil(t, model.route)
+	assert.NotNil(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute))
 
 	// check if what we have is default route merged with fields defined in bs
-	assert.Equal(t, RouteName(bs.Name), model.route.route.Name)
-	assert.Equal(t, bs.Spec.Application.Route.Host, model.route.route.Spec.Host)
-	assert.NotNil(t, model.route.route.Spec.TLS)
-	assert.Equal(t, openshift.TLSTerminationEdge, model.route.route.Spec.TLS.Termination)
+	assert.Equal(t, RouteName(bs.Name), model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Name)
+	assert.Equal(t, bs.Spec.Application.Route.Host, model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.Host)
+	assert.NotNil(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.TLS)
+	assert.Equal(t, openshift.TLSTerminationEdge, model.GetRuntimeObject(RouteKey).(*BackstageRoute).route.Spec.TLS.Termination)
 }
 
 func TestDisabledRoute(t *testing.T) {
@@ -122,13 +122,15 @@ func TestDisabledRoute(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
-	assert.Nil(t, model.route)
+	route := model.GetRuntimeObject(RouteKey)
+	assert.Nil(t, route, "Route should not be returned when disabled")
 
 	// W/o def route config
 	testObj = createBackstageTest(bs).withDefaultConfig(true)
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
-	assert.Nil(t, model.route)
+	route = model.GetRuntimeObject(RouteKey)
+	assert.Nil(t, route, "Route should not be returned when disabled")
 
 }
 
@@ -147,13 +149,15 @@ func TestExcludedRoute(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.route)
+	route := model.GetRuntimeObject(RouteKey)
+	assert.NotNil(t, route, "Route should be in the map when configured")
 
 	// W/o def route config - do not create route
 	testObj = createBackstageTest(bs).withDefaultConfig(true)
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
-	assert.Nil(t, model.route)
+	route = model.GetRuntimeObject(RouteKey)
+	assert.Nil(t, route, "Route should not be returned when not configured")
 }
 
 func TestEnabledRoute(t *testing.T) {
@@ -174,13 +178,13 @@ func TestEnabledRoute(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("route.yaml", "raw-route.yaml")
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.route)
+	assert.NotNil(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute))
 
 	// W/o def route config
 	testObj = createBackstageTest(bs).withDefaultConfig(true)
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.route)
+	assert.NotNil(t, model.GetRuntimeObject(RouteKey).(*BackstageRoute))
 
 }
 
@@ -343,11 +347,13 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 		{
 			name: "empty data in default app config ConfigMap",
 			args: args{
-				model: &BackstageModel{
-					ExternalConfig: ExternalConfig{
-						OpenShiftIngressDomain: "my-ocp-apps.example.com",
-					},
-					appConfig: &AppConfig{
+				model: func() *BackstageModel {
+					m := &BackstageModel{
+						ExternalConfig: ExternalConfig{
+							OpenShiftIngressDomain: "my-ocp-apps.example.com",
+						},
+					}
+					appConfig := &AppConfig{
 						ConfigMaps: &multiobject.MultiObject{
 							Items: []client.Object{
 								&corev1.ConfigMap{
@@ -357,8 +363,10 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
+					}
+					m.setRuntimeObject(AppConfigKey, appConfig)
+					return m
+				}(),
 				backstage: api.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-backstage-app",
@@ -379,11 +387,13 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 		{
 			name: "multi-file default app-config ConfigMap with other fields defined",
 			args: args{
-				model: &BackstageModel{
-					ExternalConfig: ExternalConfig{
-						OpenShiftIngressDomain: "my-ocp-apps.example.com",
-					},
-					appConfig: &AppConfig{
+				model: func() *BackstageModel {
+					m := &BackstageModel{
+						ExternalConfig: ExternalConfig{
+							OpenShiftIngressDomain: "my-ocp-apps.example.com",
+						},
+					}
+					appConfig := &AppConfig{
 						ConfigMaps: &multiobject.MultiObject{
 							Items: []client.Object{
 								&corev1.ConfigMap{
@@ -413,8 +423,10 @@ organization:
 								},
 							},
 						},
-					},
-				},
+					}
+					m.setRuntimeObject(AppConfigKey, appConfig)
+					return m
+				}(),
 				backstage: api.Backstage{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-backstage-app",
@@ -452,13 +464,17 @@ organization:
 			b := &BackstageRoute{}
 			b.updateAppConfigWithBaseUrls(tt.args.model, tt.args.backstage)
 			updatedAppConfigMaps := make(map[string]map[string]any)
-			if tt.args.model.appConfig != nil && tt.args.model.appConfig.ConfigMaps != nil && len(tt.args.model.appConfig.ConfigMaps.Items) > 0 {
-				cm := tt.args.model.appConfig.ConfigMaps.Items[0].(*corev1.ConfigMap)
-				for k, v := range cm.Data {
-					var appConfig map[string]any
-					err := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(v)), 1000).Decode(&appConfig)
-					assert.NoError(t, err)
-					updatedAppConfigMaps[k] = appConfig
+			appConfigObj := tt.args.model.GetRuntimeObject(AppConfigKey)
+			if appConfigObj != nil {
+				appConfig := appConfigObj.(*AppConfig)
+				if appConfig.ConfigMaps != nil && len(appConfig.ConfigMaps.Items) > 0 {
+					cm := appConfig.ConfigMaps.Items[0].(*corev1.ConfigMap)
+					for k, v := range cm.Data {
+						var appConfigData map[string]any
+						err := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(v)), 1000).Decode(&appConfigData)
+						assert.NoError(t, err)
+						updatedAppConfigMaps[k] = appConfigData
+					}
 				}
 			}
 			tt.assertFn(t, updatedAppConfigMaps)

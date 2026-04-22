@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
@@ -26,58 +27,65 @@ type AppConfig struct {
 }
 
 func init() {
-	registerConfig("app-config.yaml", AppConfigFactory{}, true, mergeMultiObjectConfigs)
+	registerConfig(AppConfigKey, AppConfigFactory{}, true, mergeMultiObjectConfigs)
 }
 
-func (b *AppConfig) addExternalConfig(spec api.BackstageSpec) error {
-
-	if spec.Application == nil || spec.Application.AppConfig == nil || spec.Application.AppConfig.ConfigMaps == nil {
-		return nil
-	}
-
-	for _, specCm := range spec.Application.AppConfig.ConfigMaps {
-		mp, wSubpath := b.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
-		updatePodWithAppConfig(b.model.backstageDeployment, specCm.Name,
-			mp, specCm.Key, wSubpath, b.model.ExternalConfig.AppConfigKeys[specCm.Name])
+// implementation of RuntimeObject interface
+func (b *AppConfig) Object() runtime.Object {
+	if b.ConfigMaps != nil && len(b.ConfigMaps.Items) > 0 {
+		return b.ConfigMaps
 	}
 	return nil
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) Object() runtime.Object {
-	return b.ConfigMaps
-}
-
-// implementation of RuntimeObject interface
-func (b *AppConfig) setObject(obj runtime.Object) {
-	b.ConfigMaps = nil
-	if obj != nil {
-		b.ConfigMaps = obj.(*multiobject.MultiObject)
-	}
-}
-
-// implementation of RuntimeObject interface
-func (b *AppConfig) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
+func (b *AppConfig) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
-	if b.ConfigMaps != nil {
-		model.appConfig = b
-		model.setRuntimeObject(b)
-		return true, nil
+	if config != nil {
+		b.ConfigMaps = config.(*multiobject.MultiObject)
+	} else {
+		// Create empty ConfigMaps - might be populated later from spec
+		b.ConfigMaps = &multiobject.MultiObject{Items: []client.Object{}}
 	}
-	return false, nil
+
+	// Always add to model so updateAndValidate is called (may process spec ConfigMaps)
+	model.setRuntimeObject(AppConfigKey, b)
+	b.setMetaInfo(backstage, scheme)
+
+	return nil
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(_ api.Backstage) error {
-	for _, item := range b.ConfigMaps.Items {
-		cm, ok := item.(*corev1.ConfigMap)
-		if !ok {
-			return fmt.Errorf("payload is not ConfigMap kind: %T", item)
-		}
-
-		updatePodWithAppConfig(b.model.backstageDeployment, cm.Name,
-			b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(cm.Data))
+func (b *AppConfig) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+	deployment := b.model.getDeployment()
+	if deployment == nil {
+		return fmt.Errorf("backstage deployment not found in model")
 	}
+
+	// Get plugins app-config CM if any and add to b.ConfigMaps on the first place
+
+	// Process ConfigMaps from config files
+	if b.ConfigMaps != nil {
+		for _, item := range b.ConfigMaps.Items {
+			cm, ok := item.(*corev1.ConfigMap)
+			if !ok {
+				return fmt.Errorf("payload is not ConfigMap kind: %T", item)
+			}
+
+			updatePodWithAppConfig(deployment, cm.Name,
+				deployment.defaultMountPath(), "", true, maps.Keys(cm.Data))
+		}
+	}
+
+	// Process ConfigMaps from CR spec
+	if backstage.Spec.Application != nil && backstage.Spec.Application.AppConfig != nil && backstage.Spec.Application.AppConfig.ConfigMaps != nil {
+		for _, specCm := range backstage.Spec.Application.AppConfig.ConfigMaps {
+			mp, wSubpath := deployment.mountPath(specCm.MountPath, specCm.Key, backstage.Spec.Application.AppConfig.MountPath)
+			updatePodWithAppConfig(deployment, specCm.Name,
+				mp, specCm.Key, wSubpath, b.model.ExternalConfig.AppConfigKeys[specCm.Name])
+		}
+	}
+
 	return nil
 }
 

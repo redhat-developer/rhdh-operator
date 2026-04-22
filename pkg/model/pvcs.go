@@ -19,30 +19,7 @@ func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
 }
 
 func init() {
-	registerConfig("pvcs.yaml", BackstagePvcsFactory{}, true, nil)
-}
-
-func (b *BackstagePvcs) addExternalConfig(spec api.BackstageSpec) error {
-	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Pvcs == nil || len(spec.Application.ExtraFiles.Pvcs) == 0 {
-		return nil
-	}
-
-	for _, pvcSpec := range spec.Application.ExtraFiles.Pvcs {
-
-		subPath := ""
-		mountPath, wSubpath := b.model.backstageDeployment.mountPath(pvcSpec.MountPath, "", spec.Application.ExtraFiles.MountPath)
-
-		if wSubpath {
-			mountPath = filepath.Join(mountPath, pvcSpec.Name)
-			subPath = utils.ToRFC1123Label(pvcSpec.Name)
-		}
-
-		err := addPvc(b.model.backstageDeployment, pvcSpec.Name, mountPath, subPath, containersFilter{names: pvcSpec.Containers})
-		if err != nil {
-			return fmt.Errorf("failed to add pvc %s: %w", pvcSpec.Name, err)
-		}
-	}
-	return nil
+	registerConfig(PvcsKey, BackstagePvcsFactory{}, true, nil)
 }
 
 type BackstagePvcs struct {
@@ -50,35 +27,72 @@ type BackstagePvcs struct {
 	model *BackstageModel
 }
 
+// implementation of RuntimeObject interface
 func (b *BackstagePvcs) Object() runtime.Object {
-	return b.pvcs
+	if b.pvcs != nil && len(b.pvcs.Items) > 0 {
+		return b.pvcs
+	}
+	return nil
 }
 
-func (b *BackstagePvcs) setObject(object runtime.Object) {
-	b.pvcs = object.(*multiobject.MultiObject)
-}
-
-func (b *BackstagePvcs) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
+// implementation of RuntimeObject interface
+func (b *BackstagePvcs) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
-	if b.pvcs != nil {
-		model.setRuntimeObject(b)
-		return true, nil
+	if config != nil {
+		b.pvcs = config.(*multiobject.MultiObject)
 	}
-	return false, nil
+
+	// Always add wrapper to model (unconditional)
+	model.setRuntimeObject(PvcsKey, b)
+
+	// Only set metadata if underlying object exists
+	if b.pvcs != nil && len(b.pvcs.Items) > 0 {
+		b.setMetaInfo(backstage, scheme)
+	}
+	return nil
 }
 
-func (b *BackstagePvcs) updateAndValidate(_ api.Backstage) error {
-	for _, o := range b.pvcs.Items {
-		pvc, ok := o.(*corev1.PersistentVolumeClaim)
-		if !ok {
-			return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
-		}
-		mountPath, subPath, _ := b.model.backstageDeployment.getDefConfigMountPath(o)
-		err := addPvc(b.model.backstageDeployment, pvc.Name, mountPath, subPath, containersFilter{annotation: o.GetAnnotations()[ContainersAnnotation]})
-		if err != nil {
-			return fmt.Errorf("failed to get containers for pvc %s: %w", o.GetName(), err)
+// implementation of RuntimeObject interface
+func (b *BackstagePvcs) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+	deployment := b.model.getDeployment()
+	if deployment == nil {
+		return fmt.Errorf("backstage deployment not found in model")
+	}
+
+	// Process PVCs from config files
+	if b.pvcs != nil {
+		for _, o := range b.pvcs.Items {
+			pvc, ok := o.(*corev1.PersistentVolumeClaim)
+			if !ok {
+				return fmt.Errorf("payload is not corev1.PersistentVolumeClaim: %T", o)
+			}
+			mountPath, subPath, _ := deployment.getDefConfigMountPath(o)
+			err := addPvc(deployment, pvc.Name, mountPath, subPath, containersFilter{annotation: o.GetAnnotations()[ContainersAnnotation]})
+			if err != nil {
+				return fmt.Errorf("failed to get containers for pvc %s: %w", o.GetName(), err)
+			}
 		}
 	}
+
+	// Process PVCs from CR spec (formerly addExternalConfig)
+	if backstage.Spec.Application != nil && backstage.Spec.Application.ExtraFiles != nil && backstage.Spec.Application.ExtraFiles.Pvcs != nil && len(backstage.Spec.Application.ExtraFiles.Pvcs) > 0 {
+		for _, pvcSpec := range backstage.Spec.Application.ExtraFiles.Pvcs {
+
+			subPath := ""
+			mountPath, wSubpath := deployment.mountPath(pvcSpec.MountPath, "", backstage.Spec.Application.ExtraFiles.MountPath)
+
+			if wSubpath {
+				mountPath = filepath.Join(mountPath, pvcSpec.Name)
+				subPath = utils.ToRFC1123Label(pvcSpec.Name)
+			}
+
+			err := addPvc(deployment, pvcSpec.Name, mountPath, subPath, containersFilter{names: pvcSpec.Containers})
+			if err != nil {
+				return fmt.Errorf("failed to add pvc %s: %w", pvcSpec.Name, err)
+			}
+		}
+	}
+
 	return nil
 }
 

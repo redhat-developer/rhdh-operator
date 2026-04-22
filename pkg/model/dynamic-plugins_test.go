@@ -82,12 +82,12 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
+	assert.NotNil(t, model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment))
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
 	//dynamic-plugins-auth
 	//vol-default-dynamic-plugins
-	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
+	assert.Equal(t, 4, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).podSpec().Volumes))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
@@ -97,7 +97,7 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	//vol-default-dynamic-plugins
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 
-	deps, err := model.DynamicPlugins.Dependencies()
+	deps, err := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(deps))
 
@@ -131,7 +131,7 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(DynamicPluginsDefaultName(bs.Name)), ic.VolumeMounts[3].Name)
 
-	deps, err := model.DynamicPlugins.Dependencies()
+	deps, err := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(deps))
 }
@@ -159,11 +159,11 @@ func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
 	//dynamic-plugins-auth
-	//dplugin
+	//backstage-dynamic-plugins-{name} (operator-managed ConfigMap with user's data)
 	assert.Equal(t, 4, len(ic.VolumeMounts))
-	assert.Equal(t, bs.Spec.Application.DynamicPluginsConfigMapName, ic.VolumeMounts[3].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(DynamicPluginsDefaultName(bs.Name)), ic.VolumeMounts[3].Name)
 
-	deps, err := model.DynamicPlugins.Dependencies()
+	deps, err := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(deps))
 }
@@ -191,11 +191,9 @@ func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
 	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	for _, obj := range m.RuntimeObjects {
-		if _, ok := obj.(*DynamicPlugins); ok {
-			assert.Fail(t, "Model contains DynamicPlugins object")
-		}
-	}
+	// DynamicPlugins should not be returned when not configured
+	dpObj := m.GetRuntimeObject(DynamicPluginsKey)
+	assert.Nil(t, dpObj, "DynamicPlugins should not be returned when not configured")
 }
 
 func TestWithDynamicPluginsDeps(t *testing.T) {
@@ -229,18 +227,18 @@ plugins:
 	// dependencies from external config
 	//  - ref: "dependency-1"
 	//  - ref: "dependency-2"
-	deps, err := model.DynamicPlugins.Dependencies()
+	deps, err := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(deps))
 
-	depends, err := (model.getRuntimeObjectByType(&DynamicPlugins{})).(*DynamicPlugins).Dependencies()
+	depends, err := (model.GetRuntimeObject(DynamicPluginsKey)).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(depends))
 
 }
 
 func initContainer(model *BackstageModel) *corev1.Container {
-	for _, v := range model.backstageDeployment.podSpec().InitContainers {
+	for _, v := range model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).podSpec().InitContainers {
 		if v.Name == dynamicPluginInitContainerName {
 			return &v
 		}
@@ -259,7 +257,7 @@ func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
+	assert.NotNil(t, model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
@@ -287,7 +285,7 @@ func TestCatalogIndexImageOverridesDefaultConfig(t *testing.T) {
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
+	assert.NotNil(t, model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
@@ -327,7 +325,7 @@ spec:
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
+	assert.NotNil(t, model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
@@ -359,7 +357,7 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
+	assert.NotNil(t, model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)

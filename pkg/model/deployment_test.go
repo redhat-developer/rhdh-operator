@@ -40,12 +40,13 @@ func TestWorkingDirMount(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "/my/home", model.backstageDeployment.defaultMountPath())
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	assert.Equal(t, "/my/home", deployment.defaultMountPath())
 	fileor := api.FileObjectRef{
 		Name:      "test",
 		MountPath: "subpath",
 	}
-	mp, sp := model.backstageDeployment.mountPath(fileor.MountPath, "", "")
+	mp, sp := deployment.mountPath(fileor.MountPath, "", "")
 	assert.Equal(t, "/my/home/subpath", mp)
 	assert.False(t, sp)
 
@@ -64,10 +65,11 @@ func TestOverrideBackstageImage(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Containers))
-	assert.Equal(t, "dummy", model.backstageDeployment.container().Image)
-	assert.Equal(t, "dummy", model.backstageDeployment.podSpec().InitContainers[0].Image)
-	assert.Equal(t, "busybox", model.backstageDeployment.podSpec().Containers[1].Image)
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	assert.Equal(t, 2, len(deployment.podSpec().Containers))
+	assert.Equal(t, "dummy", deployment.container().Image)
+	assert.Equal(t, "dummy", deployment.podSpec().InitContainers[0].Image)
+	assert.Equal(t, "busybox", deployment.podSpec().Containers[1].Image)
 
 }
 
@@ -80,9 +82,10 @@ func TestSpecImagePullSecrets(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	// if imagepullsecrets not defined - default used
-	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().ImagePullSecrets))
-	assert.Equal(t, "ips1", model.backstageDeployment.podSpec().ImagePullSecrets[0].Name)
+	assert.Equal(t, 2, len(deployment.podSpec().ImagePullSecrets))
+	assert.Equal(t, "ips1", deployment.podSpec().ImagePullSecrets[0].Name)
 
 	//bs.Spec.Application.ImagePullSecrets = []string{}
 	//
@@ -136,27 +139,28 @@ spec:
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	// label added
-	assert.Equal(t, "java", model.backstageDeployment.deployable.GetObject().GetLabels()["mylabel"])
-	assert.Equal(t, "backstage", model.backstageDeployment.deployable.PodObjectMeta().GetLabels()["pod"])
+	assert.Equal(t, "java", deployment.deployable.GetObject().GetLabels()["mylabel"])
+	assert.Equal(t, "backstage", deployment.deployable.PodObjectMeta().GetLabels()["pod"])
 
 	// sidecar added
-	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Containers))
-	assert.Equal(t, "sidecar", model.backstageDeployment.podSpec().Containers[1].Name)
-	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.podSpec().Containers[1].Image)
+	assert.Equal(t, 2, len(deployment.podSpec().Containers))
+	assert.Equal(t, "sidecar", deployment.podSpec().Containers[1].Name)
+	assert.Equal(t, "my-image:1.0.0", deployment.podSpec().Containers[1].Image)
 
 	// backstage container resources updated
-	assert.Equal(t, "backstage-backend", model.backstageDeployment.container().Name)
-	assert.Equal(t, "257Mi", model.backstageDeployment.container().Resources.Requests.Memory().String())
+	assert.Equal(t, "backstage-backend", deployment.container().Name)
+	assert.Equal(t, "257Mi", deployment.container().Resources.Requests.Memory().String())
 
 	// volumes
 	// dynamic-plugins-root, dynamic-plugins-npmrc, dynamic-plugins-auth, my-vol
-	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
-	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.podSpec().Volumes[0].Name)
+	assert.Equal(t, 4, len(deployment.podSpec().Volumes))
+	assert.Equal(t, "dynamic-plugins-root", deployment.podSpec().Volumes[0].Name)
 	// overrides StorageClassName
-	assert.Equal(t, "special", *model.backstageDeployment.podSpec().Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
+	assert.Equal(t, "special", *deployment.podSpec().Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
 	// adds new volume
-	assert.Equal(t, "my-vol", model.backstageDeployment.podSpec().Volumes[3].Name)
+	assert.Equal(t, "my-vol", deployment.podSpec().Volumes[3].Name)
 }
 
 func TestImageInCRPrevailsOnEnvVar(t *testing.T) {
@@ -180,12 +184,14 @@ spec:
 	model, err := InitObjects(context.TODO(), api.Backstage{}, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	// make sure env var works
-	assert.Equal(t, "envvar-image", model.backstageDeployment.container().Image)
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	assert.Equal(t, "envvar-image", deployment.container().Image)
 
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	// make sure image defined in CR overrides
-	assert.Equal(t, "cr-image", model.backstageDeployment.container().Image)
+	deployment = model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	assert.Equal(t, "cr-image", deployment.container().Image)
 }
 
 func TestFilterContainers(t *testing.T) {
@@ -209,8 +215,9 @@ spec:
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
-	d := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	assert.NotNil(t, deployment)
+	d := deployment
 
 	f := containersFilter{}
 	cs, err := f.getContainers(d)
@@ -235,7 +242,7 @@ spec:
 	cs, _ = f.getContainers(d)
 	assert.Equal(t, 2, len(cs))
 	assert.Equal(t, "c1", cs[0].Name)
-	assert.NotNil(t, model.backstageDeployment.containerByName("c1"))
+	assert.NotNil(t, deployment.containerByName("c1"))
 
 }
 
@@ -262,8 +269,9 @@ spec:
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
-	sidecar := model.backstageDeployment.containerByName("sidecar")
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	assert.NotNil(t, deployment)
+	sidecar := deployment.containerByName("sidecar")
 	assert.NotNil(t, sidecar)
 	assert.Equal(t, 1, len(sidecar.Env))
 	assert.Equal(t, "VAR1", sidecar.Env[0].Name)
@@ -280,16 +288,18 @@ func TestDeploymentKind(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	depPodSpec := model.backstageDeployment.podSpec()
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	depPodSpec := deployment.podSpec()
 
 	bs.Spec.Deployment.Kind = "StatefulSet"
 	testObj = createBackstageTest(bs).withDefaultConfig(true)
 	model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "StatefulSet", model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
+	deployment = model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	assert.Equal(t, "StatefulSet", deployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
 
-	ssPodSpec := model.backstageDeployment.podSpec()
+	ssPodSpec := deployment.podSpec()
 	assert.Equal(t, depPodSpec, ssPodSpec)
 }
 
@@ -308,9 +318,10 @@ spec:
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "StatefulSet", model.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+	assert.Equal(t, "StatefulSet", deployment.deployable.GetObject().GetObjectKind().GroupVersionKind().Kind)
 
-	ss, ok := model.backstageDeployment.deployable.GetObject().(*appv1.StatefulSet)
+	ss, ok := deployment.deployable.GetObject().(*appv1.StatefulSet)
 	assert.True(t, ok)
 	assert.Equal(t, "my-service", ss.Spec.ServiceName)
 }

@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,7 +27,7 @@ type DbStatefulSet struct {
 }
 
 func init() {
-	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false, nil)
+	registerConfig(DbStatefulSetKey, DbStatefulSetFactory{}, false, nil)
 }
 
 func DbStatefulSetName(backstageName string) string {
@@ -37,56 +36,58 @@ func DbStatefulSetName(backstageName string) string {
 
 // implementation of RuntimeObject interface
 func (b *DbStatefulSet) Object() runtime.Object {
+	if b.statefulSet == nil {
+		return nil
+	}
 	return b.statefulSet
 }
 
-func (b *DbStatefulSet) setObject(obj runtime.Object) {
-	b.statefulSet = nil
-	if obj != nil {
-		b.statefulSet = obj.(*appsv1.StatefulSet)
-	}
-}
-
 // implementation of RuntimeObject interface
-func (b *DbStatefulSet) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
+func (b *DbStatefulSet) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
-	if b.statefulSet == nil {
-		if model.localDbEnabled {
-			return false, fmt.Errorf("LocalDb StatefulSet not configured, make sure there is db-statefulset.yaml in default or raw configuration")
-		}
-		return false, nil
-	} else {
-		if !model.localDbEnabled {
-			return false, nil
-		}
+
+	// Only set statefulSet if localDb is enabled
+	if model.localDbEnabled && config != nil {
+		b.statefulSet = config.(*appsv1.StatefulSet)
 	}
 
-	model.localDbStatefulSet = b
-	model.setRuntimeObject(b)
+	// Always add wrapper to model (unconditional)
+	model.setRuntimeObject(DbStatefulSetKey, b)
 
-	// override image with env var
-	// [GA] Do we really need this feature?
-	if os.Getenv(LocalDbImageEnvVar) != "" {
-		b.container().Image = os.Getenv(LocalDbImageEnvVar)
+	// Only set metadata if underlying object exists
+	if b.statefulSet != nil {
+		// override image with env var
+		// [GA] Do we really need this feature?
+		if os.Getenv(LocalDbImageEnvVar) != "" {
+			b.container().Image = os.Getenv(LocalDbImageEnvVar)
+		}
+		b.setMetaInfo(backstage, scheme)
 	}
 
-	return true, nil
+	return nil
 }
 
 // implementation of RuntimeObject interface
-func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage) error {
+func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+	if b.statefulSet == nil {
+		return nil
+	}
 
 	// point ServiceName to localDb
-	b.statefulSet.Spec.ServiceName = b.model.LocalDbService.service.Name
-
-	//if backstage.Spec.Application != nil && backstage.Spec.Application.ImagePullSecrets != nil {
-	//	utils.SetImagePullSecrets(b.podSpec(), backstage.Spec.Application.ImagePullSecrets)
-	//}
+	if dbService := b.model.GetRuntimeObject(DbServiceKey); dbService != nil {
+		service := dbService.(*DbService).service
+		if service != nil {
+			b.statefulSet.Spec.ServiceName = service.Name
+		}
+	}
 
 	if backstage.Spec.IsAuthSecretSpecified() {
 		b.setDbSecretEnvVar(b.container(), backstage.Spec.Database.AuthSecretName)
-	} else if b.model.LocalDbSecret != nil {
-		b.setDbSecretEnvVar(b.container(), b.model.LocalDbSecret.secret.Name)
+	} else if dbSecret := b.model.GetRuntimeObject(DbSecretKey); dbSecret != nil {
+		secret := dbSecret.(*DbSecret).secret
+		if secret != nil {
+			b.setDbSecretEnvVar(b.container(), secret.Name)
+		}
 	}
 	return nil
 }

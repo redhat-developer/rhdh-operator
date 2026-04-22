@@ -1,8 +1,6 @@
 package model
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -23,7 +21,7 @@ type DbService struct {
 }
 
 func init() {
-	registerConfig("db-service.yaml", DbServiceFactory{}, false, nil)
+	registerConfig(DbServiceKey, DbServiceFactory{}, false, nil)
 }
 
 func DbServiceName(backstageName string) string {
@@ -32,46 +30,36 @@ func DbServiceName(backstageName string) string {
 
 // implementation of RuntimeObject interface
 func (b *DbService) Object() runtime.Object {
+	if b.service == nil {
+		return nil
+	}
 	return b.service
 }
 
-func (b *DbService) setObject(obj runtime.Object) {
-	b.service = nil
-	if obj != nil {
-		b.service = obj.(*corev1.Service)
-	}
-}
-
 // implementation of RuntimeObject interface
-func (b *DbService) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
+func (b *DbService) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
-	if b.service == nil {
-		if model.localDbEnabled {
-			return false, fmt.Errorf("LocalDb Service not initialized, make sure there is db-service.yaml in default or raw configuration")
-		}
-		return false, nil
-	} else {
-		if !model.localDbEnabled {
-			return false, nil
-		}
+
+	// Only set service if localDb is enabled
+	if model.localDbEnabled && config != nil {
+		b.service = config.(*corev1.Service)
 	}
 
-	// force this service to be headless even if it is not set in the original config
-	b.service.Spec.ClusterIP = corev1.ClusterIPNone
+	// Always add wrapper to model (unconditional)
+	model.setRuntimeObject(DbServiceKey, b)
 
-	model.LocalDbService = b
-	model.setRuntimeObject(b)
+	// Only set metadata if underlying object exists
+	if b.service != nil {
+		// force this service to be headless even if it is not set in the original config
+		b.service.Spec.ClusterIP = corev1.ClusterIPNone
+		b.setMetaInfo(backstage, scheme)
+	}
 
-	return true, nil
+	return nil
 }
 
 // implementation of RuntimeObject interface
-//func (b *DbService) EmptyObject() client.Object {
-//	return &corev1.Service{}
-//}
-
-// implementation of RuntimeObject interface
-func (b *DbService) updateAndValidate(_ api.Backstage) error {
+func (b *DbService) updateAndValidate(_ api.Backstage, _ *runtime.Scheme) error {
 	return nil
 }
 

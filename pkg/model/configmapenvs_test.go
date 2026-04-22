@@ -36,7 +36,7 @@ func TestDefaultConfigMapEnvFrom(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.container()
+	bscontainer := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).container()
 	assert.NotNil(t, bscontainer)
 
 	assert.Equal(t, 1, len(bscontainer.EnvFrom))
@@ -76,7 +76,7 @@ func TestSpecifiedConfigMapEnvs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.container()
+	bscontainer := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).container()
 	assert.NotNil(t, bscontainer)
 	assert.Equal(t, 1, len(bscontainer.Env))
 
@@ -116,7 +116,7 @@ func TestDefaultAndSpecifiedConfigMapEnvFrom(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.container()
+	bscontainer := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).container()
 	assert.NotNil(t, bscontainer)
 
 	assert.Equal(t, 1, len(bscontainer.EnvFrom))
@@ -148,19 +148,19 @@ func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	cont := model.backstageDeployment.containerByName("install-dynamic-plugins")
+	cont := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("install-dynamic-plugins")
 	assert.NotNil(t, cont)
 	assert.Equal(t, 1, len(cont.Env))
 	assert.NotNil(t, cont.Env[0])
 	assert.Equal(t, "ENV1", cont.Env[0].Name)
 
-	cont = model.backstageDeployment.containerByName("another-container")
+	cont = model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("another-container")
 	assert.NotNil(t, cont)
 	assert.Equal(t, 1, len(cont.Env))
 	assert.NotNil(t, cont.Env[0])
 	assert.Equal(t, "ENV1", cont.Env[0].Name)
 
-	cont = model.backstageDeployment.containerByName("backstage-backend")
+	cont = model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("backstage-backend")
 	assert.NotNil(t, cont)
 	assert.Equal(t, 0, len(cont.Env))
 
@@ -175,9 +175,9 @@ func TestSpecifiedCMEnvsWithContainers(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
-	assert.Equal(t, 4, len(model.backstageDeployment.allContainers()))
-	for _, cn := range model.backstageDeployment.allContainers() {
-		c := model.backstageDeployment.containerByName(cn)
+	assert.Equal(t, 4, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).allContainers()))
+	for _, cn := range model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).allContainers() {
+		c := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName(cn)
 		assert.Equal(t, 1, len(c.Env))
 		assert.NotNil(t, c.Env[0])
 		assert.Equal(t, "ENV1", c.Env[0].Name)

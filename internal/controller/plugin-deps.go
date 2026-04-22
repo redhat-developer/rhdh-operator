@@ -16,9 +16,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, backstage api.Backstage, plugins model.DynamicPlugins) error {
+func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, backstage api.Backstage, bsModel *model.BackstageModel) error {
 
 	lg := log.FromContext(ctx)
+
+	obj := bsModel.GetRuntimeObject(model.DynamicPluginsKey)
+	if obj == nil {
+		return nil
+	}
+	plugins := *obj.(*model.DynamicPlugins)
 
 	objects, err := model.GetPluginDeps(backstage, plugins, r.Scheme)
 	if err != nil {

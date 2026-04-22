@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
-	"slices"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,6 +30,23 @@ const DefaultSubPathAnnotation = "rhdh.redhat.com/sub-path"
 const ContainersAnnotation = "rhdh.redhat.com/containers"
 const SourceAnnotation = "rhdh.redhat.com/source"
 
+// Runtime object keys used to store and retrieve objects from BackstageModel
+const (
+	DeploymentKey     = "deployment.yaml"
+	ServiceKey        = "service.yaml"
+	RouteKey          = "route.yaml"
+	AppConfigKey      = "app-config.yaml"
+	DynamicPluginsKey = "dynamic-plugins.yaml"
+	DbStatefulSetKey  = "db-statefulset.yaml"
+	DbServiceKey      = "db-service.yaml"
+	DbSecretKey       = "db-secret.yaml"
+	SecretEnvsKey     = "secret-envs.yaml"
+	SecretFilesKey    = "secret-files.yaml"
+	ConfigMapEnvsKey  = "configmap-envs.yaml"
+	ConfigMapFilesKey = "configmap-files.yaml"
+	PvcsKey           = "pvcs.yaml"
+)
+
 // Backstage configuration scaffolding with empty BackstageObjects.
 // There are all possible objects for configuration
 var runtimeConfig []ObjectConfig
@@ -41,57 +56,66 @@ type BackstageModel struct {
 	localDbEnabled bool
 	isOpenshift    bool
 
-	backstageDeployment *BackstageDeployment
-	backstageService    *BackstageService
-
-	localDbStatefulSet *DbStatefulSet
-	LocalDbService     *DbService
-	LocalDbSecret      *DbSecret
-
-	route          *BackstageRoute
-	appConfig      *AppConfig
-	DynamicPlugins DynamicPlugins
-
-	RuntimeObjects []RuntimeObject
+	// Single source of truth - contains ALL object wrappers
+	// Key is the config file name (e.g., "deployment.yaml", "service.yaml")
+	runtimeObjects map[string]RuntimeObject
 
 	ExternalConfig ExternalConfig
 }
 
-func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
-	for i, obj := range m.RuntimeObjects {
-		if reflect.TypeOf(obj) == reflect.TypeOf(object) {
-			m.RuntimeObjects[i] = object
-			return
-		}
+// setRuntimeObject adds an object to the model by key.
+// Objects are only added if they should be applied (no placeholders).
+func (m *BackstageModel) setRuntimeObject(key string, object RuntimeObject) {
+	if m.runtimeObjects == nil {
+		m.runtimeObjects = make(map[string]RuntimeObject)
 	}
-	m.RuntimeObjects = append(m.RuntimeObjects, object)
+	m.runtimeObjects[key] = object
 }
 
-func (m *BackstageModel) getRuntimeObjectByType(object RuntimeObject) RuntimeObject {
-	for _, obj := range m.RuntimeObjects {
-		if reflect.TypeOf(obj) == reflect.TypeOf(object) {
-			return obj
-		}
+// GetRuntimeObject retrieves an object from the model by key.
+// Returns nil if the object doesn't exist or shouldn't be applied (Object() returns nil).
+func (m *BackstageModel) GetRuntimeObject(key string) RuntimeObject {
+	if m.runtimeObjects == nil {
+		return nil
+	}
+	obj := m.runtimeObjects[key]
+	if obj != nil && obj.Object() != nil {
+		return obj
 	}
 	return nil
 }
 
-// sort objects so DbStatefulSet and BackstageDeployment become the last in the list
-func (m *BackstageModel) sortRuntimeObjects() {
+// GetRuntimeObjects returns only objects that should be applied (where Object() != nil).
+// Returns an empty map if no objects should be applied.
+func (m *BackstageModel) GetRuntimeObjects() map[string]RuntimeObject {
+	result := make(map[string]RuntimeObject)
+	if m.runtimeObjects == nil {
+		return result
+	}
 
-	slices.SortFunc(m.RuntimeObjects,
-		func(a, b RuntimeObject) int {
-			_, ok1 := b.(*DbStatefulSet)
-			_, ok2 := b.(*BackstageDeployment)
-			if ok1 || ok2 {
-				return -1
-			}
-			return 1
-		})
+	// Filter: only return objects where Object() returns non-nil (should be applied)
+	for key, obj := range m.runtimeObjects {
+		objResult := obj.Object()
+		if objResult != nil {
+			result[key] = obj
+		}
+	}
+	return result
+}
+
+// getDeployment returns the BackstageDeployment from the model.
+// Returns nil if deployment doesn't exist in the model.
+func (m *BackstageModel) getDeployment() *BackstageDeployment {
+	obj := m.GetRuntimeObject(DeploymentKey)
+	if obj == nil {
+		return nil
+	}
+	return obj.(*BackstageDeployment)
 }
 
 func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
-	return m.backstageDeployment.deployable.GetObject().GetObjectKind().GroupVersionKind()
+	deployment := m.getDeployment()
+	return deployment.deployable.GetObject().GetObjectKind().GroupVersionKind()
 }
 
 // Registers config object
@@ -116,7 +140,12 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 	lg := log.FromContext(ctx)
 	lg.V(1)
 
-	model := &BackstageModel{RuntimeObjects: make([]RuntimeObject, 0), ExternalConfig: externalConfig, localDbEnabled: backstage.Spec.IsLocalDbEnabled(), isOpenshift: platform.IsOpenshift(), DynamicPlugins: DynamicPlugins{}}
+	model := &BackstageModel{
+		ExternalConfig: externalConfig,
+		localDbEnabled: backstage.Spec.IsLocalDbEnabled(),
+		isOpenshift:    platform.IsOpenshift(),
+		runtimeObjects: make(map[string]RuntimeObject),
+	}
 
 	// Get enabled flavours once for all configs
 	flavours, err := GetEnabledFlavours(backstage.Spec)
@@ -129,73 +158,60 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		}
 	}
 
-	ecs := make([]ExternalConfigContributor, 0)
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
 
 		// creating the instance of backstageObject
 		backstageObject := conf.ObjectFactory.newBackstageObject()
 
-		if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
-			}
-		} else if len(objs) > 0 {
-			if obj, err := adjustObject(conf, objs); err != nil {
-				return nil, fmt.Errorf("failed to initialize object: %w", err)
-			} else {
-				backstageObject.setObject(obj)
-			}
-		}
+		// Choose config: overlay OR default (not both)
+		var chosenConfig runtime.Object
 
-		// read configuration defined in BackstageCR.Spec.RawConfigContent ConfigMap
-		// if present, backstageObject's default configuration will be overridden
+		// First, try overlay from CR spec
 		overlay, overlayExist := externalConfig.RawConfig[conf.Key]
 		if overlayExist {
-			// new object to replace default, not merge
 			if objs, err := utils.ReadYamls([]byte(overlay), nil, *scheme); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
-					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
+					return nil, fmt.Errorf("failed to read overlay config for the key %s, reason: %s", conf.Key, err)
 				}
 			} else {
 				if obj, err := adjustObject(conf, objs); err != nil {
-					return nil, fmt.Errorf("failed to initialize object: %w", err)
+					return nil, fmt.Errorf("failed to initialize object from overlay: %w", err)
 				} else {
-					backstageObject.setObject(obj)
+					chosenConfig = obj
 				}
 			}
 		}
 
-		// apply spec and add the object to the model and list
-		if added, err := backstageObject.addToModel(model, backstage); err != nil {
-			return nil, fmt.Errorf("failed to initialize backstage, reason: %s", err)
-		} else if added {
-			backstageObject.setMetaInfo(backstage, scheme)
-		}
-		if ecc, ok := backstageObject.(ExternalConfigContributor); ok {
-			// backstageObject is an instance of ExternalConfigContributor
-			ecs = append(ecs, ecc)
+		// If no overlay, use default config
+		if chosenConfig == nil {
+			if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
+				}
+			} else if len(objs) > 0 {
+				if obj, err := adjustObject(conf, objs); err != nil {
+					return nil, fmt.Errorf("failed to initialize object from default: %w", err)
+				} else {
+					chosenConfig = obj
+				}
+			}
 		}
 
+		// Add object to model (always added, even if config is nil - placeholder pattern)
+		if err := backstageObject.addToModel(model, backstage, chosenConfig, scheme); err != nil {
+			return nil, fmt.Errorf("failed to add object to model for key %s, reason: %s", conf.Key, err)
+		}
 	}
 
-	// set generic metainfo and updateAndValidate all
-	for _, v := range model.RuntimeObjects {
-		err := v.updateAndValidate(backstage)
+	// Phase 2: updateAndValidate all objects
+	// All objects are now in model, so cross-references are safe
+	for _, v := range model.runtimeObjects {
+		err := v.updateAndValidate(backstage, scheme)
 		if err != nil {
 			return nil, fmt.Errorf("failed object validation, reason: %s", err)
 		}
 	}
-
-	// Add objects specified in Backstage CR
-	for _, ecc := range ecs {
-		if err := ecc.addExternalConfig(backstage.Spec); err != nil {
-			return nil, fmt.Errorf("failed to contribute external config, reason: %s", err)
-		}
-	}
-
-	// sort for reconciliation number optimization
-	model.sortRuntimeObjects()
 
 	return model, nil
 }

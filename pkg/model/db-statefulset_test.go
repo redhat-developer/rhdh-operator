@@ -37,8 +37,10 @@ func TestDefault(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, model.LocalDbService.service.Name, model.localDbStatefulSet.statefulSet.Spec.ServiceName)
-	assert.Equal(t, corev1.ClusterIPNone, model.LocalDbService.service.Spec.ClusterIP)
+	dbService := model.GetRuntimeObject(DbServiceKey).(*DbService)
+	dbStatefulSet := model.GetRuntimeObject(DbStatefulSetKey).(*DbStatefulSet)
+	assert.Equal(t, dbService.service.Name, dbStatefulSet.statefulSet.Spec.ServiceName)
+	assert.Equal(t, corev1.ClusterIPNone, dbService.service.Spec.ClusterIP)
 }
 
 // It tests the overriding image feature
@@ -55,7 +57,8 @@ func TestOverrideDbImage(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "dummy", model.localDbStatefulSet.statefulSet.Spec.Template.Spec.Containers[0].Image)
+	dbStatefulSet := model.GetRuntimeObject(DbStatefulSetKey).(*DbStatefulSet)
+	assert.Equal(t, "dummy", dbStatefulSet.statefulSet.Spec.Template.Spec.Containers[0].Image)
 }
 
 // test bs.Spec.Application.ImagePullSecrets shared with StatefulSet
