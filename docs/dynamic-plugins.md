@@ -50,6 +50,46 @@ The operator supports loading default plugin configurations from an OCI containe
 By default, the `rhdh` profile of operator [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable in the RHDH `install-dynamic-plugins` init container.
 To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for a complete example.
 
+### Extra Catalog Index Images
+
+In addition to the primary catalog index image, you can configure extra catalog index images using the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. This allows loading plugin configurations from multiple catalog index images.
+
+The value is a comma-separated list of entries. Each entry supports two forms:
+- **`name=image_ref`**: Assigns an explicit name to the catalog index image, which controls the extraction subdirectory under `/extensions/extra/<name>/`.
+- **`image_ref`**: A direct image reference without a name; the extraction directory is auto-generated from the image reference.
+
+To configure extra catalog index images, use the `extraEnvs` field in your Backstage CR:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha6
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    extraEnvs:
+      envs:
+        - name: EXTRA_CATALOG_INDEX_IMAGES
+          value: "community=quay.io/rhdh/extra-index-community:1.0,internal=registry.example.com/catalog:latest"
+          containers:
+            - install-dynamic-plugins
+```
+
+#### Disconnected environments
+
+For disconnected (air-gapped) environments, the operator supports `RELATED_IMAGE_extra_catalog_index_{short_name}` environment variables on the controller deployment. These are automatically collected at reconciliation time and used to build the `EXTRA_CATALOG_INDEX_IMAGES` value set on the `install-dynamic-plugins` init container, using the `name=image_ref` format where the name is derived from the `{short_name}` suffix of the env var.
+
+For example, setting the following env vars on the operator deployment:
+```yaml
+- name: RELATED_IMAGE_extra_catalog_index_community
+  value: "registry.example.com/rhdh/extra-index-community:1.0"
+- name: RELATED_IMAGE_extra_catalog_index_internal
+  value: "registry.example.com/rhdh/extra-index-internal:2.0"
+```
+will result in `EXTRA_CATALOG_INDEX_IMAGES=community=registry.example.com/rhdh/extra-index-community:1.0,internal=registry.example.com/rhdh/extra-index-internal:2.0` being set on the init container.
+
+This follows the same pattern as the existing `RELATED_IMAGE_catalog_index` env var for the primary catalog index image. If a user also sets `EXTRA_CATALOG_INDEX_IMAGES` via `extraEnvs` or a deployment patch in their CR, the user-specified value takes precedence.
+
 ### Extensions Catalog Entities
 
 Starting from version 1.9, the `rhdh` profile of the operator instructs the RHDH `install-dynamic-plugins` init container to extract catalog entities from the catalog index image to a new `/extensions` volume mount by default.

@@ -369,6 +369,166 @@ func TestCatalogIndexImageExtraEnvsOverride(t *testing.T) {
 	assert.Equal(t, "quay.io/rhdh/plugin-catalog-index:extra-env", ic.Env[1].Value, "extraEnvs value should override the operator's RELATED_IMAGE_catalog_index")
 }
 
+// TestExtraCatalogIndexImagesNotSetWhenNoEnvVars verifies that EXTRA_CATALOG_INDEX_IMAGES
+// is not set on the init container when no RELATED_IMAGE_extra_catalog_index_* env vars are present
+func TestExtraCatalogIndexImagesNotSetWhenNoEnvVars(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	for _, env := range ic.Env {
+		assert.NotEqual(t, "EXTRA_CATALOG_INDEX_IMAGES", env.Name, "EXTRA_CATALOG_INDEX_IMAGES should not be set when no RELATED_IMAGE_extra_catalog_index_* env vars exist")
+	}
+}
+
+// TestExtraCatalogIndexImagesFromEnvVars verifies that RELATED_IMAGE_extra_catalog_index_*
+// env vars are collected and set as EXTRA_CATALOG_INDEX_IMAGES on the init container
+// using the name=image_ref format
+func TestExtraCatalogIndexImagesFromEnvVars(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"alpha", "quay.io/rhdh/extra-index-alpha:1.0")
+	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"beta", "quay.io/rhdh/extra-index-beta:2.0")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	var found bool
+	for _, env := range ic.Env {
+		if env.Name == "EXTRA_CATALOG_INDEX_IMAGES" {
+			found = true
+			assert.Equal(t, "alpha=quay.io/rhdh/extra-index-alpha:1.0,beta=quay.io/rhdh/extra-index-beta:2.0", env.Value, "EXTRA_CATALOG_INDEX_IMAGES should contain sorted name=image_ref entries")
+			break
+		}
+	}
+	assert.True(t, found, "EXTRA_CATALOG_INDEX_IMAGES should be set on the init container")
+}
+
+// TestExtraCatalogIndexImagesSingleEnvVar verifies that a single RELATED_IMAGE_extra_catalog_index_*
+// env var is set as EXTRA_CATALOG_INDEX_IMAGES using the name=image_ref format
+func TestExtraCatalogIndexImagesSingleEnvVar(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"custom", "quay.io/rhdh/extra-index-custom:3.0")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	var found bool
+	for _, env := range ic.Env {
+		if env.Name == "EXTRA_CATALOG_INDEX_IMAGES" {
+			found = true
+			assert.Equal(t, "custom=quay.io/rhdh/extra-index-custom:3.0", env.Value)
+			break
+		}
+	}
+	assert.True(t, found, "EXTRA_CATALOG_INDEX_IMAGES should be set on the init container")
+}
+
+// TestExtraCatalogIndexImagesUserPatchTakesPrecedence verifies that user-specified deployment patch
+// takes precedence over the operator's RELATED_IMAGE_extra_catalog_index_* env vars
+func TestExtraCatalogIndexImagesUserPatchTakesPrecedence(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	bs.Spec.Deployment = &api.BackstageDeployment{}
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: install-dynamic-plugins
+          env:
+            - name: EXTRA_CATALOG_INDEX_IMAGES
+              value: "quay.io/user-specified/extra-index:2.0"
+`),
+	}
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"alpha", "quay.io/rhdh/extra-index-alpha:1.0")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	var found bool
+	for _, env := range ic.Env {
+		if env.Name == "EXTRA_CATALOG_INDEX_IMAGES" {
+			found = true
+			assert.Equal(t, "quay.io/user-specified/extra-index:2.0", env.Value, "user's deployment patch should override RELATED_IMAGE_extra_catalog_index_* env vars")
+			break
+		}
+	}
+	assert.True(t, found, "EXTRA_CATALOG_INDEX_IMAGES should be set on the init container")
+}
+
+// TestExtraCatalogIndexImagesExtraEnvsOverride verifies that user-specified extraEnvs
+// takes precedence over the operator's RELATED_IMAGE_extra_catalog_index_* env vars
+func TestExtraCatalogIndexImagesExtraEnvsOverride(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	bs.Spec.Application.ExtraEnvs = &api.ExtraEnvs{
+		Envs: []api.Env{
+			{Name: "EXTRA_CATALOG_INDEX_IMAGES", Value: "quay.io/user/custom-extra-index:5.0", Containers: []string{"install-dynamic-plugins"}},
+		},
+	}
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "raw-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"alpha", "quay.io/rhdh/extra-index-alpha:1.0")
+	t.Setenv(ExtraCatalogIndexImagesEnvVarPrefix+"beta", "quay.io/rhdh/extra-index-beta:2.0")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model.backstageDeployment)
+
+	ic := initContainer(model)
+	assert.NotNil(t, ic)
+
+	var found bool
+	for _, env := range ic.Env {
+		if env.Name == "EXTRA_CATALOG_INDEX_IMAGES" {
+			found = true
+			assert.Equal(t, "quay.io/user/custom-extra-index:5.0", env.Value, "extraEnvs value should override the operator's RELATED_IMAGE_extra_catalog_index_* env vars")
+			break
+		}
+	}
+	assert.True(t, found, "EXTRA_CATALOG_INDEX_IMAGES should be set on the init container")
+}
+
 func TestUnmarshalDynaPluginsConfig(t *testing.T) {
 	yamlData := `
 plugins:

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,6 +32,7 @@ const (
 
 const BackstageImageEnvVar = "RELATED_IMAGE_backstage"
 const CatalogIndexImageEnvVar = "RELATED_IMAGE_catalog_index"
+const ExtraCatalogIndexImagesEnvVarPrefix = "RELATED_IMAGE_extra_catalog_index_"
 const DefaultMountDir = "/opt/app-root/src"
 const ExtConfigHashAnnotation = "rhdh.redhat.com/ext-config-hash"
 
@@ -111,6 +114,14 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 	if catalogIndexImage := os.Getenv(CatalogIndexImageEnvVar); catalogIndexImage != "" {
 		if i, _ := DynamicPluginsInitContainer(b.podSpec().InitContainers); i >= 0 {
 			b.setOrAppendEnvVar(&b.podSpec().InitContainers[i], "CATALOG_INDEX_IMAGE", catalogIndexImage)
+		}
+	}
+
+	// Set EXTRA_CATALOG_INDEX_IMAGES from operator env vars with RELATED_IMAGE_extra_catalog_index_ prefix
+	// BEFORE extraEnvs are applied, so user-specified extraEnvs can still override this value
+	if extraImages := collectExtraCatalogIndexImages(); extraImages != "" {
+		if i, _ := DynamicPluginsInitContainer(b.podSpec().InitContainers); i >= 0 {
+			b.setOrAppendEnvVar(&b.podSpec().InitContainers[i], "EXTRA_CATALOG_INDEX_IMAGES", extraImages)
 		}
 	}
 
@@ -505,4 +516,43 @@ func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt
 	}
 
 	return []client.Object{objs[0]}, nil
+}
+
+// collectExtraCatalogIndexImages scans environment variables for RELATED_IMAGE_extra_catalog_index_*
+// and returns their values as a comma-separated string using the name=image_ref format,
+// where name is the suffix after the RELATED_IMAGE_extra_catalog_index_ prefix.
+// Entries are sorted by env var name for determinism.
+func collectExtraCatalogIndexImages() string {
+	var images []struct {
+		key   string
+		name  string
+		value string
+	}
+	for _, env := range os.Environ() {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		if strings.HasPrefix(parts[0], ExtraCatalogIndexImagesEnvVarPrefix) && parts[1] != "" {
+			name := strings.TrimPrefix(parts[0], ExtraCatalogIndexImagesEnvVarPrefix)
+			if name != "" {
+				images = append(images, struct {
+					key   string
+					name  string
+					value string
+				}{key: parts[0], name: name, value: parts[1]})
+			}
+		}
+	}
+	if len(images) == 0 {
+		return ""
+	}
+	sort.Slice(images, func(i, j int) bool {
+		return images[i].key < images[j].key
+	})
+	entries := make([]string, len(images))
+	for i, img := range images {
+		entries[i] = img.name + "=" + img.value
+	}
+	return strings.Join(entries, ",")
 }

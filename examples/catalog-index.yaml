@@ -6,8 +6,14 @@ spec:
   application:
     extraEnvs:
       envs:
+        # Override the primary catalog index image
         - name: CATALOG_INDEX_IMAGE
           value: "quay.io/rhdh/plugin-catalog-index:1.9"
+          containers:
+            - install-dynamic-plugins
+        # Optional: add extra catalog index images (comma-separated, supports name=image_ref or image_ref format)
+        - name: EXTRA_CATALOG_INDEX_IMAGES
+          value: "community=quay.io/rhdh/extra-index-community:1.0,internal=registry.example.com/catalog:latest"
           containers:
             - install-dynamic-plugins
 
