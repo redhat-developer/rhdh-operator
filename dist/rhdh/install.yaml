@@ -2883,9 +2883,9 @@ data:
     \     feedback_storage: '/tmp/data/feedback'\n    authentication:\n      module:
     'noop'\n    conversation_cache:\n      type: 'sqlite'\n      sqlite:\n        db_path:
     '/tmp/cache.db'\n    customization:\n      profile_path: '/app-root/rhdh-profile.py'\n
-    \   mcp_servers:\n      - name: mcp-integration-tools\n        provider_id: \"model-context-protocol\"\n
-    \       url: \"http://localhost:7007/api/mcp-actions/v1\"\n        authorization_headers:\n
-    \         Authorization: \"client\"\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n
+    \   mcp_servers:\n      - name: mcp-integration-tools\n        provider_id: 'model-context-protocol'\n
+    \       url: 'http://localhost:7007/api/mcp-actions/v1'\n        authorization_headers:\n
+    \         Authorization: 'client'\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n
     \ name: rhdh-profile\n  annotations:\n    rhdh.redhat.com/containers: \"lightspeed-core\"\n
     \   rhdh.redhat.com/mount-path: \"/app-root\"\n    rhdh.redhat.com/sub-path: \"*\"\ndata:\n
     \ rhdh-profile.py: |\n    # There is no need for enforcing line length in this
