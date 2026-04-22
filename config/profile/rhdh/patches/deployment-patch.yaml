@@ -29,7 +29,10 @@ spec:
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh-community/rhdh:next
             - name: RELATED_IMAGE_catalog_index
-              value: quay.io/rhdh/plugin-catalog-index:1.9
+              value: quay.io/rhdh/plugin-catalog-index:1.10
+            # TODO(asoro): Handle this when we have a community catalog index image available
+            #- name: RELATED_IMAGE_extra_catalog_index_community
+            #  value: quay.io/rhdh-community/plugin-catalog-index:1.10
           volumeMounts:
             - mountPath: /default-config/flavours/lightspeed
               name: flavour-lightspeed-config
