@@ -124,6 +124,8 @@ Once enabled, users can:
 For more information about the Flavour-based configuration system, see the [Configuration documentation](configuration.md#flavours).
 
 ### Syncing Upstream Lightspeed Configs
+> [!NOTE]
+> This syncing functionality is intended for use by maintainers of the Lightspeed flavour for RHDH.
 
 The Lightspeed flavour vendors configuration files from the upstream [`redhat-ai-dev/lightspeed-configs`](https://github.com/redhat-ai-dev/lightspeed-configs) repository. A sync script is provided to fetch the latest versions of these files and update the operator tree in place.
 
