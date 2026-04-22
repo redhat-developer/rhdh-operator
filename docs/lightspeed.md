@@ -122,3 +122,40 @@ Once enabled, users can:
 - The flavour includes all necessary UI components and backend services
 
 For more information about the Flavour-based configuration system, see the [Configuration documentation](configuration.md#flavours).
+
+### Syncing Upstream Lightspeed Configs
+> [!NOTE]
+> This syncing functionality is intended for use by maintainers of the Lightspeed flavour for RHDH.
+
+The Lightspeed flavour vendors configuration files from the upstream [`redhat-ai-dev/lightspeed-configs`](https://github.com/redhat-ai-dev/lightspeed-configs) repository. A sync script is provided to fetch the latest versions of these files and update the operator tree in place.
+
+#### What Gets Synced
+
+The script fetches four files from the upstream repository and writes them into two local targets:
+
+| Upstream path | Local target | Content |
+|---|---|---|
+| `llama-stack-configs/config.yaml` | `config/profile/rhdh/default-config/flavours/lightspeed/configmap-files.yaml` | Llama Stack server configuration |
+| `lightspeed-core-configs/lightspeed-stack.yaml` | (same ConfigMap file, different YAML document) | Lightspeed Core stack configuration |
+| `lightspeed-core-configs/rhdh-profile.py` | (same ConfigMap file, different YAML document) | RHDH prompt profile |
+| `env/default-values.env` | `examples/lightspeed.yaml` | Secret key scaffolding |
+
+#### Running the Script
+
+Sync from the default upstream branch (`main`):
+
+```bash
+./hack/sync-lightspeed-configs.sh
+```
+
+#### Syncing from a Release Branch or Tag
+
+Use the `--ref` flag to sync from a specific branch, tag, or commit:
+
+```bash
+./hack/sync-lightspeed-configs.sh --ref release-1.10
+```
+
+This is useful when preparing a release and the operator needs to pin its vendored configs to a stable upstream ref rather than `main`.
+
+If the upstream content has not changed, the script prints `already up to date` and leaves the files untouched.
