@@ -75,16 +75,17 @@ spec:
             - install-dynamic-plugins
 ```
 
-Alternatively, the operator can automatically populate `EXTRA_CATALOG_INDEX_IMAGES` from environment variables prefixed with `RELATED_IMAGE_extra_catalog_index_`. This is useful for injecting extra catalog index images at the operator level (e.g., via the operator deployment or subscription), without requiring changes to individual Backstage CRs.
+Alternatively, the operator can automatically populate `EXTRA_CATALOG_INDEX_IMAGES` in operands from environment variables prefixed with `RELATED_IMAGE_extra_catalog_index_` and defined in the controller environment. This is useful for injecting extra catalog index images at the operator level (e.g., via the operator deployment or subscription), without requiring changes to individual Backstage CRs.
+This is also useful for airgap tools that need to mirror all operator related images based on what is declared in the operator bundle manifest.
 
-Each environment variable of the form `RELATED_IMAGE_extra_catalog_index_<name>=<image_ref>` contributes an entry `<name>=<image_ref>` to the comma-separated `EXTRA_CATALOG_INDEX_IMAGES` value. For example, setting:
+Each environment variable of the form `RELATED_IMAGE_extra_catalog_index_<name>=<image_ref>` in the controller contributes an entry `<name>=<image_ref>` to the comma-separated `EXTRA_CATALOG_INDEX_IMAGES` value in the RHDH operand (`install-dynamic-plugins` init container only). For example, setting these in the operator:
 
 ```
 RELATED_IMAGE_extra_catalog_index_community=quay.io/rhdh-community/plugin-catalog-index:1.10
 RELATED_IMAGE_extra_catalog_index_internal=registry.example.com/rhdh-catalog:latest
 ```
 
-results in `EXTRA_CATALOG_INDEX_IMAGES` being set to `community=quay.io/rhdh-community/plugin-catalog-index:1.10,internal=registry.example.com/rhdh-catalog:latest` (or in reverse order).
+results in `EXTRA_CATALOG_INDEX_IMAGES` being set to `community=quay.io/rhdh-community/plugin-catalog-index:1.10,internal=registry.example.com/rhdh-catalog:latest` (or in reverse order) in any RHDH operand's `install-dynamic-plugins` init container (unless explicitly overridden in the Backstage CR).
 
 > **Note:** The order of entries in the generated `EXTRA_CATALOG_INDEX_IMAGES` value is determined by the operating system and is not guaranteed. If ordering matters, set `EXTRA_CATALOG_INDEX_IMAGES` explicitly via `extraEnvs` in the Backstage CR instead.
 
