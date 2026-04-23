@@ -520,7 +520,7 @@ func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt
 // collectExtraCatalogIndexImages scans environment variables for RELATED_IMAGE_extra_catalog_index_*
 // and returns their values as a comma-separated string using the name=image_ref format,
 // where name is the suffix after the RELATED_IMAGE_extra_catalog_index_ prefix.
-// The order of entries preserves the order in which the env vars are declared.
+// The order of entries is determined by the operating system and is not guaranteed.
 func collectExtraCatalogIndexImages() string {
 	var entries []string
 	for _, env := range os.Environ() {

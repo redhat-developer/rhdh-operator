@@ -75,6 +75,23 @@ spec:
             - install-dynamic-plugins
 ```
 
+Alternatively, the operator can automatically populate `EXTRA_CATALOG_INDEX_IMAGES` from environment variables prefixed with `RELATED_IMAGE_extra_catalog_index_`. This is useful for injecting extra catalog index images at the operator level (e.g., via the operator deployment or subscription), without requiring changes to individual Backstage CRs.
+
+Each environment variable of the form `RELATED_IMAGE_extra_catalog_index_<name>=<image_ref>` contributes an entry `<name>=<image_ref>` to the comma-separated `EXTRA_CATALOG_INDEX_IMAGES` value. For example, setting:
+
+```
+RELATED_IMAGE_extra_catalog_index_community=quay.io/rhdh-community/plugin-catalog-index:1.10
+RELATED_IMAGE_extra_catalog_index_internal=registry.example.com/rhdh-catalog:latest
+```
+
+results in `EXTRA_CATALOG_INDEX_IMAGES` being set to `community=quay.io/rhdh-community/plugin-catalog-index:1.10,internal=registry.example.com/rhdh-catalog:latest` (or in reverse order).
+
+> **Note:** The order of entries in the generated `EXTRA_CATALOG_INDEX_IMAGES` value is determined by the operating system and is not guaranteed. If ordering matters, set `EXTRA_CATALOG_INDEX_IMAGES` explicitly via `extraEnvs` in the Backstage CR instead.
+
+Environment variables with an empty name suffix (i.e., `RELATED_IMAGE_extra_catalog_index_=...`) or an empty value are ignored.
+
+If `EXTRA_CATALOG_INDEX_IMAGES` is also set via `extraEnvs` in the Backstage CR, the CR value takes precedence over the operator-level environment variables.
+
 ### Extensions Catalog Entities
 
 Starting from version 1.9, the `rhdh` profile of the operator instructs the RHDH `install-dynamic-plugins` init container to extract catalog entities from the catalog index image to a new `/extensions` volume mount by default.
