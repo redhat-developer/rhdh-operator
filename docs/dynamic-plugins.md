@@ -70,7 +70,7 @@ spec:
     extraEnvs:
       envs:
         - name: EXTRA_CATALOG_INDEX_IMAGES
-          value: "rhdh-community=quay.io/rhdh-community/plugin-catalog-index:1.10,internal=registry.example.com/rhdh-catalog:latest"
+          value: "rhdh-community=quay.io/rhdh-community/plugin-catalog-index:1.10,registry.example.com/rhdh-catalog:latest"
           containers:
             - install-dynamic-plugins
 ```
