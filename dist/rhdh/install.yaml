@@ -3289,7 +3289,7 @@ data:
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:0.5.0
+              image: quay.io/lightspeed-core/lightspeed-stack:0.5.1
               imagePullPolicy: Always
               ports:
                 - containerPort: 8080
@@ -3324,7 +3324,7 @@ data:
       dynamic-plugins.yaml: |
         plugins:
           # Lightspeed Plugins
-          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed:bs_1.45.3__1.2.3
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed:bs_1.49.4__2.1.0
             disabled: false
             pluginConfig:
               dynamicPlugins:
@@ -3351,7 +3351,7 @@ data:
                         config:
                           id: lightspeed
                           priority: 100
-          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.45.3__1.2.3
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.49.4__2.1.0
             disabled: false
   metadata.yaml: |
     # Lightspeed (AI) flavour metadata
