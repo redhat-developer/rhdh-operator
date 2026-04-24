@@ -303,7 +303,7 @@ data:
       dynamic-plugins.yaml: |
         plugins:
           # Lightspeed Plugins
-          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed:bs_1.49.4__2.1.0
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed:bs_1.49.4__2.2.1
             disabled: false
             pluginConfig:
               dynamicPlugins:
@@ -330,7 +330,7 @@ data:
                         config:
                           id: lightspeed
                           priority: 100
-          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.49.4__2.1.0
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.49.4__2.2.1
             disabled: false
   metadata.yaml: |
     # Lightspeed (AI) flavour metadata
