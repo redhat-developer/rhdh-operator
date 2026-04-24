@@ -498,4 +498,3 @@ func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt
 
 	return []client.Object{objs[0]}, nil
 }
-
