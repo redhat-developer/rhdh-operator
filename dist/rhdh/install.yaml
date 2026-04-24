@@ -2556,10 +2556,8 @@ data:
                   value: /opt/app-root/src/.npmrc.dynamic-plugins/.npmrc
                 - name: MAX_ENTRY_SIZE
                   value: "30000000"
-                # CATALOG_INDEX_IMAGE will be replaced by the value of the `RELATED_IMAGE_catalog_index` env var, if set
                 - name: CATALOG_INDEX_IMAGE
                   value: "quay.io/rhdh/plugin-catalog-index:1.9"
-                # EXTRA_CATALOG_INDEX_IMAGES will be built from the values of the `RELATED_IMAGE_extra_catalog_index_*` env vars, if set
                 - name: CATALOG_ENTITIES_EXTRACT_DIR
                   value: '/extensions'
               volumeMounts:
@@ -3790,8 +3788,6 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
-        - name: RELATED_IMAGE_catalog_index
-          value: quay.io/rhdh/plugin-catalog-index:1.10
         image: quay.io/rhdh/rhdh-rhel9-operator:1.10
         livenessProbe:
           httpGet:
