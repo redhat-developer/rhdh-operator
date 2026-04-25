@@ -50,6 +50,31 @@ The operator supports loading default plugin configurations from an OCI containe
 By default, the `rhdh` profile of operator [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable in the RHDH `install-dynamic-plugins` init container.
 To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for a complete example.
 
+### Extra catalog index images
+
+In addition to the primary catalog index image, you can configure extra catalog index images using the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. This allows loading plugin configurations from multiple catalog index images. See [Using extra catalog index images](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-extra-catalog-index-images) for more details on how RHDH handles this environment variables.
+
+The value is a comma-separated list of entries. Each entry supports two forms:
+- **`name=image_ref`**: Assigns an explicit name to the catalog index image, which controls the extraction subdirectory under `/extensions/extra/<name>/`.
+- **`image_ref`**: A direct image reference without a name; the extraction directory is auto-generated from the image reference.
+
+To configure extra catalog index images, use the `extraEnvs` field in your Backstage CR:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha6
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    extraEnvs:
+      envs:
+        - name: EXTRA_CATALOG_INDEX_IMAGES
+          value: "rhdh-community=quay.io/rhdh-community/plugin-catalog-index:1.10,registry.example.com/rhdh-catalog:latest"
+          containers:
+            - install-dynamic-plugins
+```
+
 ### Extensions Catalog Entities
 
 Starting from version 1.9, the `rhdh` profile of the operator instructs the RHDH `install-dynamic-plugins` init container to extract catalog entities from the catalog index image to a new `/extensions` volume mount by default.
