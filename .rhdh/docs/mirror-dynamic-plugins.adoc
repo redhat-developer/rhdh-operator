@@ -121,6 +121,17 @@ After mirroring completes, the script generates a `rhdh-plugin-mirroring-summary
 
 To use the mirrored plugins in RHDH, you need to configure container registry mirroring so that RHDH transparently pulls plugins from your mirror registry instead of the original source registries. This is done by mounting a custom `registries.conf` (and `policy.json` if needed) as extra files into the RHDH init container, as depicted in the sections below. See link:../../examples/plugin-mirroring.yaml[examples/plugin-mirroring.yaml] for a CR example.
 
+[#_catalog_index_image_mirroring]
+==== Catalog index image mirroring
+
+When `--plugin-index` is used, the script mirrors the plugin catalog index image itself in addition to the individual plugin artifacts. The mirrored location is included in the generated `rhdh-plugin-mirroring-summary.txt` file.
+
+If you configure transparent registry mirroring via `registries.conf` (as described in <<_creating_registry_mirroring_configmap>>), no additional RHDH configuration is needed -- the catalog index image will be pulled from the mirror automatically.
+
+Alternatively, you can explicitly point RHDH to the mirrored catalog index images by setting `CATALOG_INDEX_IMAGE` and/or `EXTRA_CATALOG_INDEX_IMAGES` environment variables on the `install-dynamic-plugins` init container (see link:../../docs/dynamic-plugins.md#extra-catalog-index-images[Extra catalog index images]). This can be done via `extraEnvs` in the Backstage CR (when using the RHDH Operator) or via `upstream.backstage.initContainers.env` in Helm values (when using the RHDH Helm chart). However, this should not be necessary when `registries.conf` is properly configured for transparent mirroring.
+
+NOTE: Unlike container images pulled by the Kubelet, plugin catalog index images are pulled directly by `skopeo` from inside the `install-dynamic-plugins` init container. This means that cluster-level mirroring resources (`ImageContentSourcePolicy`, `ImageDigestMirrorSet`, `ImageTagMirrorSet`) have no effect. You should use the `registries.conf`-based approach described here.
+
 [#_creating_registry_mirroring_configmap]
 ==== Creating the registry mirroring ConfigMap
 
