@@ -45,7 +45,7 @@ spec:
       displayName: Red Hat Developer Hub
       kind: Backstage
       name: backstages.rhdh.redhat.com
-      version: v1alpha6
+      version: v1alpha5
   description: |
     Backstage Operator
   displayName: Backstage Operator

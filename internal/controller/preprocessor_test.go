@@ -6,7 +6,7 @@ import (
 
 	"testing"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha6"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	"github.com/stretchr/testify/assert"
@@ -18,15 +18,15 @@ import (
 func updateConfigMap(t *testing.T) BackstageReconciler {
 	ctx := context.TODO()
 
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs1",
 			Namespace: "ns1",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
-					ConfigMaps: []bsv1.FileObjectRef{{Name: "cm1"}},
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				AppConfig: &api.AppConfig{
+					ConfigMaps: []api.FileObjectRef{{Name: "cm1"}},
 				},
 			},
 		},
