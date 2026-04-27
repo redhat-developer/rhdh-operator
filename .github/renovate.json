@@ -98,6 +98,7 @@
         "minor"
       ],
       "matchBaseBranches": [
+        "main",
         "/^release-1\\..*/"
       ],
       "automerge": false
