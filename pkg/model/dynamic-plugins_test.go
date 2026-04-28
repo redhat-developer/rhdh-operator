@@ -530,7 +530,9 @@ includes:
 `
 
 	// Call the function
-	mergedData, err := defDynamicPlugins.mergeWith(specData)
+	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
+
+	//mergedData, err := defDynamicPlugins.mergeWith(specData)
 
 	// Assertions
 	assert.NoError(t, err)
@@ -609,7 +611,8 @@ plugins:
 includes: []
 `
 	// Call the function
-	mergedData, err := defDynamicPlugins.mergeWith(specData)
+	//mergedData, err := defDynamicPlugins.mergeWith(specData)
+	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
 
 	// Assertions
 	assert.NoError(t, err)
@@ -652,7 +655,8 @@ plugins:
      key1: "overridden"
    dependencies: []
 `
-	mergedData, err := defDynamicPlugins.mergeWith(specData)
+	//mergedData, err := defDynamicPlugins.mergeWith(specData)
+	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, mergedData)
