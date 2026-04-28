@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	"github.com/redhat-developer/rhdh-operator/api"
-	bsv1alpha3 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1prev "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -113,7 +113,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = bsv1alpha3.AddToScheme(scheme.Scheme)
+	err = bsv1prev.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = api.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())

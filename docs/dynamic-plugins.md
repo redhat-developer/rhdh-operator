@@ -27,7 +27,7 @@ stringData:
 * Mount the Secret to the install-dynamic-plugin container by adding the following to the Backstage CR:
 
 ```yaml 
-apiVersion: rhdh.redhat.com/v1alpha6
+apiVersion: rhdh.redhat.com/v1alpha5
 #...
 spec:
   application:
@@ -61,7 +61,7 @@ The value is a comma-separated list of entries. Each entry supports two forms:
 To configure extra catalog index images, use the `extraEnvs` field in your Backstage CR:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha6
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-backstage

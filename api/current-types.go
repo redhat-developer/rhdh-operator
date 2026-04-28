@@ -1,7 +1,7 @@
 package api
 
 import (
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha6"
+	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 )
 
 // Type aliases to decouple application code from specific API versions.

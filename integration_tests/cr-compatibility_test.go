@@ -9,7 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/redhat-developer/rhdh-operator/api"
-	bsv1prev "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
+	bsv1prev "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,14 +45,14 @@ var _ = When("testing API version compatibility", func() {
 		}
 
 		// test prev version backward compatibility
-		By("creating a Backstage resource using v1alpha3 API")
-		backstageNameV3 := generateRandName("bs-v1alpha3")
+		By("creating a Backstage resource using v1alpha4 API")
+		backstageNameV3 := generateRandName("bs-v1alpha4")
 
 		// create ConfigMap for prev version test
 		generateConfigMap(ctx, k8sClient, "default-app-config", ns,
 			map[string]string{
 				"app-config.yaml": `app:
-					title: Test App v1alpha3
+					title: Test App v1alpha4
 					baseUrl: http://localhost:3000`,
 			}, nil, nil)
 
