@@ -15,7 +15,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -40,7 +40,7 @@ var _ = When("create backstage with CR configured", func() {
 	})
 
 	It("creates default Backstage and then update CR to not to use local DB", func() {
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{}, "")
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			By("creating Deployment with database.enableLocalDb=true by default")
@@ -57,10 +57,10 @@ var _ = When("create backstage with CR configured", func() {
 		}, time.Minute, time.Second).Should(Succeed())
 
 		By("updating Backstage")
-		update := &bsv1.Backstage{}
+		update := &api.Backstage{}
 		err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, update)
 		Expect(err).To(Not(HaveOccurred()))
-		update.Spec.Database = &bsv1.Database{}
+		update.Spec.Database = &api.Database{}
 		update.Spec.Database.EnableLocalDb = ptr.To(false)
 		err = k8sClient.Update(ctx, update)
 		Expect(err).To(Not(HaveOccurred()))
@@ -87,8 +87,8 @@ var _ = When("create backstage with CR configured", func() {
 	})
 
 	It("creates Backstage with disabled local DB and secret", func() {
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			Database: &bsv1.Database{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			Database: &api.Database{
 				EnableLocalDb:  ptr.To(false),
 				AuthSecretName: "existing-secret",
 			},
@@ -109,8 +109,8 @@ var _ = When("create backstage with CR configured", func() {
 	})
 
 	It("creates Backstage with disabled local DB no secret", func() {
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			Database: &bsv1.Database{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			Database: &api.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		}, "")

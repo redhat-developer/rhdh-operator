@@ -1,14 +1,14 @@
 package model
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
+	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -19,22 +19,17 @@ func (f AppConfigFactory) newBackstageObject() RuntimeObject {
 	return &AppConfig{}
 }
 
-// structure containing ConfigMap where keys are Backstage ConfigApp file names and vaues are contents of the files
-// Mount path is a patch to the follder to place the files to
+// AppConfig represents app-config ConfigMaps from base and flavours
 type AppConfig struct {
-	ConfigMap *corev1.ConfigMap
-	model     *BackstageModel
+	ConfigMaps *multiobject.MultiObject
+	model      *BackstageModel
 }
 
 func init() {
-	registerConfig("app-config.yaml", AppConfigFactory{}, false)
+	registerConfig("app-config.yaml", AppConfigFactory{}, true, mergeMultiObjectConfigs)
 }
 
-func AppConfigDefaultName(backstageName string) string {
-	return utils.GenerateRuntimeObjectName(backstageName, "backstage-appconfig")
-}
-
-func (b *AppConfig) addExternalConfig(spec bsv1.BackstageSpec) error {
+func (b *AppConfig) addExternalConfig(spec api.BackstageSpec) error {
 
 	if spec.Application == nil || spec.Application.AppConfig == nil || spec.Application.AppConfig.ConfigMaps == nil {
 		return nil
@@ -50,26 +45,21 @@ func (b *AppConfig) addExternalConfig(spec bsv1.BackstageSpec) error {
 
 // implementation of RuntimeObject interface
 func (b *AppConfig) Object() runtime.Object {
-	return b.ConfigMap
+	return b.ConfigMaps
 }
 
 // implementation of RuntimeObject interface
 func (b *AppConfig) setObject(obj runtime.Object) {
-	b.ConfigMap = nil
+	b.ConfigMaps = nil
 	if obj != nil {
-		b.ConfigMap = obj.(*corev1.ConfigMap)
+		b.ConfigMaps = obj.(*multiobject.MultiObject)
 	}
 }
 
 // implementation of RuntimeObject interface
-//func (b *AppConfig) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
-
-// implementation of RuntimeObject interface
-func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (b *AppConfig) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	b.model = model
-	if b.ConfigMap != nil {
+	if b.ConfigMaps != nil {
 		model.appConfig = b
 		model.setRuntimeObject(b)
 		return true, nil
@@ -78,15 +68,21 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 }
 
 // implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(_ bsv1.Backstage) error {
-	updatePodWithAppConfig(b.model.backstageDeployment, b.ConfigMap.Name,
-		b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
+func (b *AppConfig) updateAndValidate(_ api.Backstage) error {
+	for _, item := range b.ConfigMaps.Items {
+		cm, ok := item.(*corev1.ConfigMap)
+		if !ok {
+			return fmt.Errorf("payload is not ConfigMap kind: %T", item)
+		}
+
+		updatePodWithAppConfig(b.model.backstageDeployment, cm.Name,
+			b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(cm.Data))
+	}
 	return nil
 }
 
-func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
-	b.ConfigMap.SetName(AppConfigDefaultName(backstage.Name))
-	setMetaInfo(b.ConfigMap, backstage, scheme)
+func (b *AppConfig) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
+	setMultiObjectConfigMetaInfo(b.ConfigMaps, "appconfig", backstage, scheme)
 }
 
 // updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args

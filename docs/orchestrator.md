@@ -74,7 +74,7 @@ The orchestrator plugin (as of v1.8.2) consists of four dynamic plugins:
 - orchestrator-scaffolder-backend-module
 - orchestrator-form-widgets
 
-As for RHDH 1.7 all of these plugins are included in the default dynamic-plugins.yaml file of **install-dynamic-plugins** container but disabled by default.
+All of these plugins are included in the default dynamic-plugins.yaml file of **install-dynamic-plugins** container but disabled by default.
 To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMap with following data in your Backstage Custom Resource (CR):
 ```yaml
     includes:
@@ -91,6 +91,16 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
         disabled: false
 ```
+
+Starting from version 1.10, RHDH contains a predefined Orchestrator flavour with configured plugins. Users can enable it by configuring:
+
+```yaml
+spec:
+  flavours:
+    - name: orchestrator
+      enabled: true    # optional, 'true' by default
+```
+
 
 See [example](/examples/orchestrator.yaml) for a complete configuration of the orchestrator plugin. 
 Ensure to add a secret with the BACKEND_SECRET key/value and update

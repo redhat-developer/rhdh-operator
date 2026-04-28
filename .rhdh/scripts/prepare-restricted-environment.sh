@@ -914,11 +914,11 @@ EOF
     nbExtraImgs=${#EXTRA_IMAGES[@]}
     if [ "$nbExtraImgs" -ge 1 ]; then
       cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
-      additionalImages:
+  additionalImages:
 EOF
       for extraImg in "${EXTRA_IMAGES[@]}"; do
         cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
-      - name: "$extraImg"
+  - name: "$extraImg"
 EOF
       done
     fi
@@ -1309,7 +1309,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   fi
   CR_EXAMPLE="
   cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
-  apiVersion: rhdh.redhat.com/v1alpha5
+  apiVersion: rhdh.redhat.com/v1alpha6
   kind: Backstage
   metadata:
     name: developer-hub

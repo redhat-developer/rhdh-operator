@@ -38,19 +38,12 @@ data:
         disabled: false
       - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-module-addons-contrib
         disabled: true
-      # Group: Marketplace
-      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-catalog-backend-module-marketplace-dynamic
-        disabled: false
-      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-marketplace-backend-dynamic
-        disabled: false
-      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-marketplace
-        disabled: false
       
       # Homepage
       - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-dynamic-home-page
         disabled: false
 ---
-apiVersion: rhdh.redhat.com/v1alpha5
+apiVersion: rhdh.redhat.com/v1alpha6
 kind: Backstage
 metadata:
   name: bs1
@@ -94,6 +87,4 @@ spec:
                   storage: 1Gi
   application:
     dynamicPluginsConfigMapName: dynamic-plugins
-
-
 

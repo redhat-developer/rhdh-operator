@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -142,7 +142,7 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 		Name:      backstageName,
 	}
 
-	backstage := bs.Backstage{}
+	backstage := api.Backstage{}
 	if err := r.Get(ctx, nn, &backstage); err != nil {
 		if !errors.IsNotFound(err) {
 			lg.Error(err, "request by label failed, get Backstage ")

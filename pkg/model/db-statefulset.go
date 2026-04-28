@@ -8,7 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,7 +28,7 @@ type DbStatefulSet struct {
 }
 
 func init() {
-	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false)
+	registerConfig("db-statefulset.yaml", DbStatefulSetFactory{}, false, nil)
 }
 
 func DbStatefulSetName(backstageName string) string {
@@ -48,7 +48,7 @@ func (b *DbStatefulSet) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
+func (b *DbStatefulSet) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
 	b.model = model
 	if b.statefulSet == nil {
 		if model.localDbEnabled {
@@ -74,12 +74,7 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, _ bsv1.Backstage) (boo
 }
 
 // implementation of RuntimeObject interface
-//func (b *DbStatefulSet) EmptyObject() client.Object {
-//	return &appsv1.StatefulSet{}
-//}
-
-// implementation of RuntimeObject interface
-func (b *DbStatefulSet) updateAndValidate(backstage bsv1.Backstage) error {
+func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage) error {
 
 	// point ServiceName to localDb
 	b.statefulSet.Spec.ServiceName = b.model.LocalDbService.service.Name
@@ -96,7 +91,7 @@ func (b *DbStatefulSet) updateAndValidate(backstage bsv1.Backstage) error {
 	return nil
 }
 
-func (b *DbStatefulSet) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *DbStatefulSet) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.statefulSet.SetName(DbStatefulSetName(backstage.Name))
 	utils.GenerateLabel(&b.statefulSet.Spec.Template.Labels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))
 	utils.GenerateLabel(&b.statefulSet.Spec.Selector.MatchLabels, BackstageAppLabel, utils.BackstageDbAppLabelValue(backstage.Name))

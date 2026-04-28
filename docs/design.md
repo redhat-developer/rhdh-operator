@@ -1,27 +1,27 @@
 # Backstage Operator Design
 
-The goal of Backstage Operator is to deploy Backstage workload to the Kubernetes namespace and keep this workload synced with the desired state defined by configuration. 
+The goal of the Backstage Operator is to deploy a Backstage workload to the Kubernetes namespace and keep this workload synced with the desired state defined by a configuration. 
 
 ## Backstage Kubernetes Runtime
 
-Backstage Kubernetes workload consists of set of Kubernetes resources (Runtime Objects).
-Approximate set of Runtime Objects necessary for Backstage server on Kubernetes is shown on the diagram below:
+The Backstage Kubernetes workload consists of set of Kubernetes resources (Runtime Objects).
+The approximate set of Runtime Objects necessary for a Backstage server on Kubernetes is shown on the diagram below:
 
 ![Backstage Kubernetes Runtime](images/backstage_kubernetes_runtime.jpg)
 
-The most important object is Backstage Pod created by Backstage Deployment. That is where we run 'backstage-backend' container with Backstage application inside.
-This Backstage application is a web server which can be reached using Backstage Service.
-Actually, those 2 are the core part of Backstage workload. 
+The most important object is the Backstage Pod created by Backstage Deployment. That is where the 'backstage-backend' container runs that contains the Backstage application.
+This Backstage application is a web server which can be reached using the Backstage Service.
+Those two components are the core part of the Backstage workload. 
 
-Backstage application uses SQL database as a data storage and it is possible to install PostgreSQL DB on the same namespace as Backstage instance.
-It brings PostgreSQL StatefulSet/Pod, Service to connect to Backstage and PV/PVC to store the data.
+The Backstage application uses a SQL database as a data storage platform, and it is possible to install PostgreSQL DB on the same namespace as the Backstage instance.
+This includes a PostgreSQL StatefulSet/Pod, a Service to connect to Backstage, and PV/PVC to store the data.
 
-For providing external access to Backstage server it is possible, depending on underlying infrastructure, to use Openshift Route or
+Depending on underlying infrastructure, external access to the Backstage server is possible via an Openshift Route or
 K8s Ingress on top of Backstage Service.
-Note that in versions up to 0.0.2, only Route configuration is supported by the Operator.
+Note that in versions up to 0.0.2, only a Route configuration is supported by the Operator.
 
 Finally, the Backstage Operator supports all the [Backstage configuration](https://backstage.io/docs/conf/writing) options, which can be provided by creating dedicated 
-ConfigMaps and Secrets, then contributing them to the Backstage Pod as mounted volumes or environment variables (see [Configuration](configuration.md) guide for details).  
+ConfigMaps and Secrets, then injecting them into the Backstage Pod as mounted volumes or environment variables (see [Configuration](configuration.md) guide for details).  
 
 ## Configuration
 
@@ -36,20 +36,20 @@ When you do want to customize your Backstage instance, there are 3 layers of con
 
 As shown in the picture above:
 
-- There is an Operator (Cluster) level Default Configuration implemented as a ConfigMap inside Backstage system namespace
-  (where Backstage controller is launched). It allows to choose some optimal for most cases configuration which will be applied 
+- There is an Operator (Cluster) level Default Configuration implemented as a ConfigMap inside the Backstage system namespace
+  (where Backstage controller is launched). It provides a default configation which is optimal for most cases and will be applied 
 if there are no other config to override (i.e. Backstage CR is empty). 
-- Another layer overriding default is instance (Backstage CR) scoped, implemented as a ConfigMap which
-has the same as default structure but inside Backstage instance's namespace. The name of theis ConfigMap 
-is specified on Backstage.Spec.RawConfig field. It offers very flexible way to configure certain Backstage instance  
-- And finally, there are set of fields on Backstage.Spec to override configuration made on level 1 and 2.
-It offers simple configuration of some parameters. So, user is not required to understand the
-overall structure of Backstage runtime object and is able to simply configure "the most important" parameters.
+- One way of overriding the default is instance (Backstage CR) scoped, implemented as a ConfigMap which
+has the same as default structure but inside the Backstage instance's namespace. The name of this ConfigMap 
+is specified in the Backstage.Spec.RawConfig field. It offers a very flexible way to configure a specific Backstage instance.  
+- And finally, there are a set of fields on Backstage.Spec to override configuration made on level 1 and 2 above.
+It offers simple configuration of some parameters. So, the user is not required to understand the
+overall structure of a Backstage runtime object and is able to simply configure the "most important" parameters.
   (see [configuration](configuration.md) for more details)
 
 ### Backstage Application
 
-Backstage Application comes with advanced configuration features.
+The Backstage Application comes with advanced configuration features.
 
 As per the [Backstage configuration](https://backstage.io/docs/conf/writing), a user can define and overload multiple _app-config.yaml_
 files and flexibly configure them by including environment variables.
@@ -61,20 +61,20 @@ Backstage Operator supports this flexibility allowing to define these configurat
 #### Updating mounted files
 
 As you can see, the Operator mounts ConfigMaps and Secrets to the Backstage container
-* As a part of Default/Raw configuration, configuring certan configuration files
-* As a part of Backstage CR configuration, using spec.application field
+* As a part of Default/Raw configuration, configuring certain configuration files
+* As a part of Backstage CR configuration, using the `spec.application` field
 
-In either case ConfigMaps/Secrets data's key/value is transformed to file's name/content on Backstage CR creating time and the general expectation is to be able to update the file contents by updating the corresponding ConfigMap/Secret.
-Kubernetes [allows this updating](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically) but only if volume mount does not contain subPath. In turn, using subPath allows to mount certain file individually on certain container's directory not worrying about directories overlapping, which is beneficial for some cases. 
+In either case, a ConfigMaps/Secrets data's key/value is transformed to the file's name/content at Backstage CR creation time and the general expectation is to be able to update the file contents by updating the corresponding ConfigMap/Secret.
+Kubernetes [allows this updating](https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically) but only if volume mount does not contain a subPath. In turn, using a subPath allows for mounting certain files individually on a certain container's directory, and not worrying about directories overlapping, which is beneficial for some cases. 
 
-Historically, the Operator actively uses subPath option which allows to make "convenient" Backstage App file structure (e g all the app-config files in the same directory). In this case file(s) are mounted to default directory or to the **spec.application.(appConfig|extraFiles).mountPath** field if specified. 
-Also, in a case if user need only certain key (file) to be mounted, the only choice is to use subPath.
-In order to be able to update file(s) for mounted with subPath volumes case Operator watches ConfigMaps/Secrets and refreshes (recreates) Backstage Pod in a case of changes.
-Technically this approach is working in any case (with or without subPath) but it has certan disadvantages:
+Historically, the Operator actively uses the subPath option which allows a "convenient" Backstage App file structure (e g all the app-config files in the same directory). In this case file(s) are mounted to the default directory or to the **spec.application.(appConfig|extraFiles).mountPath** field if specified. 
+Also, in the case where a user needs only a certain key (file) to be mounted, the only choice is to use a subPath.
+In order to be able to update file(s) mounted with subPath volumes, the Operator watches ConfigMaps/Secrets and refreshes (recreates) the Backstage Pod when changes occur.
+Technically this approach works in either case (with or without subPath) but there are certain disadvantages:
 * recreating of Pod is quite slow
 * it disables in fact using Backstage's file watching mechanism. Indeed, configuration changing causes file-system rebooting, so file-system watchers have no effect.  
 
-Another option, implemented in version 0.4.0, is to specify the **mountPath** and not specify the key (filename). In this case, Operator relies on the automatic update provided by Kubernetes, it simply mounts a directory with all key/value files at the specified path.
+Another option, implemented in version 0.4.0, is to specify the **mountPath** and not specify the key (filename). In this case, the Operator relies on the automatic update provided by Kubernetes; it simply mounts a directory with all key/value files at the specified path.
 
 #### Updating injected environment variables
 

@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-bs-config
+data:
+  "app-config-base-urls.yaml": |
+    app:
+      baseUrl: "${BACKSTAGE_URL}"
+    backend:
+      baseUrl: "${BACKSTAGE_URL}"
+      cors:
+        origin: "${BACKSTAGE_URL}"
+---
+apiVersion: rhdh.redhat.com/v1alpha6
+kind: Backstage
+metadata:
+  name: local-bs
+spec:
+  application:
+    extraEnvs:
+      envs:
+        - name: BACKSTAGE_URL
+          value: 'http://localhost:17007'
+    appConfig:
+      configMaps:
+        - name: "local-bs-config"
+

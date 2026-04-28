@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llama-stack-secrets
+type: Opaque
+stringData:
+  ENABLE_VLLM: ""
+  ENABLE_VERTEX_AI: ""
+  ENABLE_OPENAI: ""
+  ENABLE_OLLAMA: ""
+  ENABLE_VALIDATION: ""
+  VLLM_URL: ""
+  VLLM_API_KEY: ""
+  VLLM_MAX_TOKENS: ""
+  VLLM_TLS_VERIFY: ""
+  OPENAI_API_KEY: ""
+  VERTEX_AI_PROJECT: ""
+  VERTEX_AI_LOCATION: ""
+  GOOGLE_APPLICATION_CREDENTIALS: ""
+  OLLAMA_URL: ""
+  VALIDATION_PROVIDER: ""
+  VALIDATION_MODEL_NAME: ""
+  LLAMA_STACK_LOGGING: ""
+---
+apiVersion: rhdh.redhat.com/v1alpha6
+kind: Backstage
+metadata:
+  name: lightspeed-test
+spec:
+  application:
+    extraEnvs:
+      secrets:
+        - name: llama-stack-secrets
+          containers:
+            - lightspeed-core
+

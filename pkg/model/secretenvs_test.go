@@ -11,19 +11,19 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var secretEnvsTestBackstage = bsv1.Backstage{
+var secretEnvsTestBackstage = api.Backstage{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "bs",
 	},
-	Spec: bsv1.BackstageSpec{
-		Database: &bsv1.Database{
+	Spec: api.BackstageSpec{
+		Database: &api.Database{
 			EnableLocalDb: ptr.To(false),
 		},
 	},
@@ -72,14 +72,14 @@ func TestDefaultMultiSecretEnv(t *testing.T) {
 func TestSpecifiedSecretEnvs(t *testing.T) {
 
 	bs := *secretEnvsTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraEnvs: &bsv1.ExtraEnvs{
-			Secrets: []bsv1.EnvObjectRef{},
+	bs.Spec.Application = &api.Application{
+		ExtraEnvs: &api.ExtraEnvs{
+			Secrets: []api.EnvObjectRef{},
 		},
 	}
 
 	bs.Spec.Application.ExtraEnvs.Secrets = append(bs.Spec.Application.ExtraEnvs.Secrets,
-		bsv1.EnvObjectRef{Name: "secName", Key: "ENV1"})
+		api.EnvObjectRef{Name: "secName", Key: "ENV1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	testObj.externalConfig.ExtraEnvConfigMapKeys = map[string]DataObjectKeys{}
@@ -102,9 +102,9 @@ func TestSpecifiedSecretEnvs(t *testing.T) {
 func TestSpecifiedSecretEnvsWithContainers(t *testing.T) {
 
 	bs := *secretEnvsTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraEnvs: &bsv1.ExtraEnvs{
-			Secrets: []bsv1.EnvObjectRef{
+	bs.Spec.Application = &api.Application{
+		ExtraEnvs: &api.ExtraEnvs{
+			Secrets: []api.EnvObjectRef{
 				{
 					Name:       "secName",
 					Key:        "ENV1",
@@ -161,9 +161,9 @@ func TestSpecifiedSecretEnvsWithContainers(t *testing.T) {
 
 func TestSecretEnvsWithNonExistedContainerFailed(t *testing.T) {
 	bs := *secretEnvsTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraEnvs: &bsv1.ExtraEnvs{
-			Secrets: []bsv1.EnvObjectRef{
+	bs.Spec.Application = &api.Application{
+		ExtraEnvs: &api.ExtraEnvs{
+			Secrets: []api.EnvObjectRef{
 				{
 					Name:       "secName",
 					Key:        "ENV1",

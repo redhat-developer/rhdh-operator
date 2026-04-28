@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flavor1-dynamic-plugins
+data:
+  "dynamic-plugins.yaml": |
+    plugins:
+      - package: "plugin-flavor1"
+        disabled: false

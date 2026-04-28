@@ -26,6 +26,12 @@
   "packageRules": [
     {
       "matchBaseBranches": [
+        "release-1.7"
+      ],
+      "enabled": false
+    },
+    {
+      "matchBaseBranches": [
         "release-1.6"
       ],
       "enabled": false
@@ -83,8 +89,8 @@
       "automerge": false
     },
     {
-      "description": "Do NOT generate PRs for minor dockerfile updates in 1.y ",
-      "enabled": false,
+      "description": "Do generate PRs for minor dockerfile updates in 1.y ",
+      "enabled": true,
       "matchDatasources": [
         "docker"
       ],
@@ -92,6 +98,7 @@
         "minor"
       ],
       "matchBaseBranches": [
+        "main",
         "/^release-1\\..*/"
       ],
       "automerge": false

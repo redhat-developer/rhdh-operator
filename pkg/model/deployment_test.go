@@ -11,23 +11,23 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
 )
 
-var deploymentTestBackstage = bsv1.Backstage{
+var deploymentTestBackstage = api.Backstage{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "bs",
 		Namespace: "ns123",
 	},
-	Spec: bsv1.BackstageSpec{
-		Database: &bsv1.Database{
+	Spec: api.BackstageSpec{
+		Database: &api.Database{
 			EnableLocalDb: ptr.To(false),
 		},
-		Application: &bsv1.Application{},
+		Application: &api.Application{},
 	},
 }
 
@@ -41,7 +41,7 @@ func TestWorkingDirMount(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "/my/home", model.backstageDeployment.defaultMountPath())
-	fileor := bsv1.FileObjectRef{
+	fileor := api.FileObjectRef{
 		Name:      "test",
 		MountPath: "subpath",
 	}
@@ -99,7 +99,7 @@ func TestSpecImagePullSecrets(t *testing.T) {
 
 func TestMergeFromSpecDeployment(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
-	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment = &api.BackstageDeployment{}
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
 		Raw: []byte(`
 metadata:
@@ -161,7 +161,7 @@ spec:
 
 func TestImageInCRPrevailsOnEnvVar(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
-	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment = &api.BackstageDeployment{}
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
 		Raw: []byte(`
 spec:
@@ -177,7 +177,7 @@ spec:
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
-	model, err := InitObjects(context.TODO(), bsv1.Backstage{}, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), api.Backstage{}, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	// make sure env var works
 	assert.Equal(t, "envvar-image", model.backstageDeployment.container().Image)
@@ -191,7 +191,7 @@ spec:
 func TestFilterContainers(t *testing.T) {
 
 	bs := *deploymentTestBackstage.DeepCopy()
-	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment = &api.BackstageDeployment{}
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
 		Raw: []byte(`
 spec:
@@ -241,7 +241,7 @@ spec:
 
 func TestEnvVarsWithSidecars(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
-	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment = &api.BackstageDeployment{}
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
 		Raw: []byte(`
 spec:
@@ -252,8 +252,8 @@ spec:
           image: busybox
 `),
 	}
-	bs.Spec.Application.ExtraEnvs = &bsv1.ExtraEnvs{
-		Envs: []bsv1.Env{
+	bs.Spec.Application.ExtraEnvs = &api.ExtraEnvs{
+		Envs: []api.Env{
 			{Name: "VAR1", Value: "v1", Containers: []string{"sidecar"}},
 		},
 	}
@@ -273,7 +273,7 @@ spec:
 func TestDeploymentKind(t *testing.T) {
 
 	bs := *deploymentTestBackstage.DeepCopy()
-	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment = &api.BackstageDeployment{}
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -295,7 +295,7 @@ func TestDeploymentKind(t *testing.T) {
 
 func TestPatchedStatefulSet(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
-	bs.Spec.Deployment = &bsv1.BackstageDeployment{}
+	bs.Spec.Deployment = &api.BackstageDeployment{}
 	bs.Spec.Deployment.Kind = "StatefulSet"
 	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
 		Raw: []byte(`

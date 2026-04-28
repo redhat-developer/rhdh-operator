@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flavor1-cm-files
+data:
+  flavor1-file.txt: |
+    This is a flavor1 file

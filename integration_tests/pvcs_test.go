@@ -33,7 +33,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -73,8 +73,8 @@ var _ = When("create backstage PVCs configured", func() {
 		pvcCm := generateConfigMap(ctx, k8sClient, "pvc-conf", ns,
 			map[string]string{"pvcs.yaml": readTestYamlFile("raw-pvcs.yaml")}, nil, nil)
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			RawRuntimeConfig: &bsv1.RuntimeConfig{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			RawRuntimeConfig: &api.RuntimeConfig{
 				BackstageConfigName: pvcCm,
 			},
 		}, "")
@@ -82,12 +82,14 @@ var _ = When("create backstage PVCs configured", func() {
 		Eventually(func(g Gomega) {
 
 			pvc := &corev1.PersistentVolumeClaim{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim1")}, pvc)
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim2")}, pvc)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			// check if PVC is correctly created and initialized
+			// check if PVC is bound
+			stat := pvc.Status.Phase
+			g.Expect(stat).Should(Equal(corev1.ClaimBound))
 			createdPvName := pvc.Spec.VolumeName
 			g.Expect(createdPvName).NotTo(BeEmpty())
 			g.Expect(*pvc.Spec.StorageClassName).NotTo(BeEmpty())
@@ -96,29 +98,18 @@ var _ = When("create backstage PVCs configured", func() {
 			pv := &corev1.PersistentVolume{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: createdPvName}, pv)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(pv.Spec.ClaimRef.Name).To(Equal(model.PvcsName(backstageName, "myclaim2")))
+			g.Expect(pv.Spec.ClaimRef.Name).To(Equal(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")))
 			g.Expect(pv.Status.Phase).To(Equal(corev1.VolumeBound))
 
 			// check if added to deployment
-			//depl := &appsv1.Deployment{}
-			//err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DeploymentName(backstageName)}, depl)
 			bpod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-
-			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1")))
-			g.Expect(path).To(BeMountedToContainer(backstageContainer(bpod.Spec)))
-
-			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1"))).
-				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
-
-			path = filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim2")))
-			g.Expect(path).To(BeMountedToContainer(backstageContainer(bpod.Spec)))
-
-			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim2"))).
-				To(BeAddedAsVolumeToPodSpec(bpod.Spec))
+			path1 := "/mnt/rhdh-vol1"
+			g.Expect(path1).To(BeMountedToContainer(backstageContainer(bpod.Spec)))
+			g.Expect("/mnt/rhdh-vol2").To(BeMountedToContainer(backstageContainer(bpod.Spec)))
 
 			// check if mounted directory is there
-			_, _, err = executeRemoteCommand(ctx, ns, bpod.Name, backstageContainer(bpod.Spec).Name, fmt.Sprintf("test -d %s", path))
+			_, _, err = executeRemoteCommand(ctx, ns, bpod.Name, backstageContainer(bpod.Spec).Name, fmt.Sprintf("test -d %s", path1))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 		}, 5*time.Minute, time.Second).Should(Succeed(), controllerMessage())
@@ -169,8 +160,8 @@ var _ = When("create backstage PVCs configured", func() {
 		pvcCm := generateConfigMap(ctx, k8sClient, "pvc-conf", ns,
 			map[string]string{"pvcs.yaml": readTestYamlFile("raw-pvcs2.yaml")}, nil, nil)
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			RawRuntimeConfig: &bsv1.RuntimeConfig{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			RawRuntimeConfig: &api.RuntimeConfig{
 				BackstageConfigName: pvcCm,
 			},
 		}, "")
@@ -178,7 +169,7 @@ var _ = When("create backstage PVCs configured", func() {
 		Eventually(func(g Gomega) {
 
 			pvc := &corev1.PersistentVolumeClaim{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim1")}, pvc)
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			// check if PVC is bound to precreated PV
@@ -190,9 +181,10 @@ var _ = When("create backstage PVCs configured", func() {
 			// check if added to deployment
 			depl, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			path := filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1")))
+			path := "/mnt/rhdh-vol1"
+			//filepath.Join(model.DefaultMountDir, utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")))
 			g.Expect(path).To(BeMountedToContainer(backstageContainer(*depl.PodSpec())))
-			g.Expect(utils.ToRFC1123Label(model.PvcsName(backstageName, "myclaim1"))).
+			g.Expect(utils.ToRFC1123Label(model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1"))).
 				To(BeAddedAsVolumeToPodSpec(*depl.PodSpec()))
 
 			pod, err := getBackstagePod(ctx, k8sClient, ns, backstageName)
@@ -253,10 +245,10 @@ var _ = When("create backstage PVCs configured", func() {
 		pvcCm := generateConfigMap(ctx, k8sClient, "pvc-conf", ns,
 			map[string]string{"pvcs.yaml": readTestYamlFile("raw-pvcs.yaml")}, nil, nil)
 
-		backstageName := createAndReconcileBackstage(ctx, ns, bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
-					Pvcs: []bsv1.PvcRef{
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
+					Pvcs: []api.PvcRef{
 						{
 							Name: "my-pvc1",
 						},
@@ -267,7 +259,7 @@ var _ = When("create backstage PVCs configured", func() {
 					},
 				},
 			},
-			RawRuntimeConfig: &bsv1.RuntimeConfig{
+			RawRuntimeConfig: &api.RuntimeConfig{
 				BackstageConfigName: pvcCm,
 			},
 		}, "")
@@ -275,9 +267,9 @@ var _ = When("create backstage PVCs configured", func() {
 		Eventually(func(g Gomega) {
 
 			pvc := &corev1.PersistentVolumeClaim{}
-			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim1")}, pvc)
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim1")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.PvcsName(backstageName, "myclaim2")}, pvc)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: model.DefaultMultiObjectName("pvcs", backstageName, "myclaim2")}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: "my-pvc1"}, pvc)
 			g.Expect(err).ShouldNot(HaveOccurred())

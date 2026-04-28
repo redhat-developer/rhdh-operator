@@ -5,7 +5,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -23,7 +23,7 @@ type DbSecret struct {
 }
 
 func init() {
-	registerConfig("db-secret.yaml", DbSecretFactory{}, false)
+	registerConfig("db-secret.yaml", DbSecretFactory{}, false, nil)
 }
 
 func DbSecretDefaultName(backstageName string) string {
@@ -44,7 +44,7 @@ func (b *DbSecret) setObject(obj runtime.Object) {
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
+func (b *DbSecret) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
 
 	b.model = model
 	// do not add if specified
@@ -67,7 +67,7 @@ func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (
 //}
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) updateAndValidate(_ bsv1.Backstage) error {
+func (b *DbSecret) updateAndValidate(_ api.Backstage) error {
 
 	pswd, _ := utils.GeneratePassword(24)
 
@@ -84,7 +84,7 @@ func (b *DbSecret) updateAndValidate(_ bsv1.Backstage) error {
 	return nil
 }
 
-func (b *DbSecret) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *DbSecret) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.secret.SetName(DbSecretDefaultName(backstage.Name))
 	setMetaInfo(b.secret, backstage, scheme)
 }

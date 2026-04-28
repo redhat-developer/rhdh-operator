@@ -18,7 +18,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -72,43 +72,43 @@ spec:
         - name: sidecar
           image: busybox
 `))
-		bs := bsv1.BackstageSpec{
-			Deployment: &bsv1.BackstageDeployment{
+		bs := api.BackstageSpec{
+			Deployment: &api.BackstageDeployment{
 				Patch: &apiextensionsv1.JSON{Raw: patch},
 			},
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
+			Application: &api.Application{
+				AppConfig: &api.AppConfig{
 					MountPath: "/my/mount/path",
-					ConfigMaps: []bsv1.FileObjectRef{
+					ConfigMaps: []api.FileObjectRef{
 						{Name: appConfig1},
 						{Name: appConfig2, Key: "key21"},
 						{Name: appConfig3},
 					},
 				},
-				ExtraFiles: &bsv1.ExtraFiles{
+				ExtraFiles: &api.ExtraFiles{
 					MountPath: "/my/file/path",
-					ConfigMaps: []bsv1.FileObjectRef{
+					ConfigMaps: []api.FileObjectRef{
 						{Name: cmFile1},
 						{Name: cmFile2, Key: "cm21"},
 						{Name: cmFile3, Containers: []string{"*"}},
 						{Name: cmFileWithPath, MountPath: "/cm/file/withpath"},
 					},
-					Secrets: []bsv1.FileObjectRef{
+					Secrets: []api.FileObjectRef{
 						{Name: secretFile1, Key: "sec11"},
 						{Name: secretFile2, Key: "sec21"},
 						{Name: secretFile3, Key: "sec.31", Containers: []string{"sidecar"}},
 						{Name: secretFileWithPath, MountPath: "/secret/file/withpath"},
 					},
 				},
-				ExtraEnvs: &bsv1.ExtraEnvs{
-					ConfigMaps: []bsv1.EnvObjectRef{
+				ExtraEnvs: &api.ExtraEnvs{
+					ConfigMaps: []api.EnvObjectRef{
 						{Name: cmEnv1},
 						{Name: cmEnv2, Key: "cm21", Containers: []string{"*"}},
 					},
-					Secrets: []bsv1.EnvObjectRef{
+					Secrets: []api.EnvObjectRef{
 						{Name: secretEnv1, Key: "sec11"},
 					},
-					Envs: []bsv1.Env{
+					Envs: []api.Env{
 						{Name: "env1", Value: "val1"},
 					},
 				},
@@ -195,10 +195,10 @@ spec:
 
 		appConfig := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
 
-		bs := bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
-					ConfigMaps: []bsv1.FileObjectRef{
+		bs := api.BackstageSpec{
+			Application: &api.Application{
+				AppConfig: &api.AppConfig{
+					ConfigMaps: []api.FileObjectRef{
 						{Name: appConfig},
 					},
 				},
@@ -224,7 +224,7 @@ spec:
 
 	It("creates Backstage with spec.deployment.patch ", func() {
 
-		bs2 := &bsv1.Backstage{}
+		bs2 := &api.Backstage{}
 
 		err := readYamlFile("testdata/spec-deployment.yaml", bs2)
 		Expect(err).To(Not(HaveOccurred()))
@@ -266,9 +266,9 @@ spec:
 
 	It("creates Backstage with spec.deployment.kind=StatefulSet ", func() {
 
-		bs2 := &bsv1.Backstage{
-			Spec: bsv1.BackstageSpec{
-				Deployment: &bsv1.BackstageDeployment{
+		bs2 := &api.Backstage{
+			Spec: api.BackstageSpec{
+				Deployment: &api.BackstageDeployment{
 					Kind: "StatefulSet",
 				},
 			},
@@ -288,9 +288,9 @@ spec:
 
 	It("failed Backstage with unknown spec.deployment.kind ", func() {
 
-		bs2 := &bsv1.Backstage{
-			Spec: bsv1.BackstageSpec{
-				Deployment: &bsv1.BackstageDeployment{
+		bs2 := &api.Backstage{
+			Spec: api.BackstageSpec{
+				Deployment: &api.BackstageDeployment{
 					Kind: "Unknown",
 				},
 			},
@@ -308,7 +308,7 @@ spec:
 			Skip("Skipped for not real cluster")
 		}
 
-		bs := bsv1.BackstageSpec{}
+		bs := api.BackstageSpec{}
 		backstageName := createAndReconcileBackstage(ctx, ns, bs, "")
 		Eventually(func(g Gomega) {
 
@@ -330,13 +330,13 @@ spec:
       $patch: delete
 `))
 
-			backstage := &bsv1.Backstage{
+			backstage := &api.Backstage{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      backstageName,
 					Namespace: ns,
 				},
-				Spec: bsv1.BackstageSpec{
-					Deployment: &bsv1.BackstageDeployment{
+				Spec: api.BackstageSpec{
+					Deployment: &api.BackstageDeployment{
 						Patch: &apiextensionsv1.JSON{Raw: patch},
 					},
 				},
