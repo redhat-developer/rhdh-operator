@@ -19,12 +19,7 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 	lg := log.FromContext(ctx).WithValues("Backstage", backstage.Name)
 
 	if !backstage.Spec.IsMonitoringEnabled() {
-		lg.Info("monitoring disabled, deleting any existing ServiceMonitor")
-		return r.tryToDelete(ctx,
-			&monitoringv1.ServiceMonitor{},
-			utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
-			backstage.Namespace,
-		)
+		return nil
 	}
 
 	sm := &monitoringv1.ServiceMonitor{
