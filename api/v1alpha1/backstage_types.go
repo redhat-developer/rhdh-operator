@@ -1,7 +1,6 @@
-package v1alpha3
+package v1alpha1
 
 import (
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -28,19 +27,6 @@ type BackstageSpec struct {
 
 	// Configuration for database access. Optional.
 	Database *Database `json:"database,omitempty"`
-
-	// Valid fragment of Deployment to be merged with default/raw configuration.
-	// Set the Deployment's metadata and|or spec fields you want to override or add.
-	// Optional.
-	Deployment *BackstageDeployment `json:"deployment,omitempty"`
-}
-
-type BackstageDeployment struct {
-	// Valid fragment of Deployment to be merged with default/raw configuration.
-	// Set the Deployment's metadata and|or spec fields you want to override or add.
-	// Optional.
-	// +kubebuilder:pruning:PreserveUnknownFields
-	Patch *apiextensionsv1.JSON `json:"patch,omitempty"`
 }
 
 type RuntimeConfig struct {
@@ -128,7 +114,7 @@ type AppConfig struct {
 	// environment variables (which you can set with the ExtraEnvs field) and/or include extra files (see the ExtraFiles field).
 	// More details on https://backstage.io/docs/conf/writing/.
 	// +optional
-	ConfigMaps []FileObjectRef `json:"configMaps,omitempty"`
+	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
 }
 
 type ExtraFiles struct {
@@ -141,17 +127,12 @@ type ExtraFiles struct {
 	// For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be mounted as files.
 	// Otherwise, only the specified key will be mounted as a file.
 	// +optional
-	ConfigMaps []FileObjectRef `json:"configMaps,omitempty"`
+	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
 
 	// List of references to Secrets objects mounted as extra files under the MountPath specified.
 	// For each item in this array, a key must be specified that will be mounted as a file.
 	// +optional
-	Secrets []FileObjectRef `json:"secrets,omitempty"`
-
-	// List of references to Persistent Volume Claim objects mounted as extra files
-	// For each item in this array, a key must be specified that will be mounted as a file.
-	// +optional
-	Pvcs []PvcRef `json:"pvcs,omitempty"`
+	Secrets []ObjectKeyRef `json:"secrets,omitempty"`
 }
 
 type ExtraEnvs struct {
@@ -159,20 +140,20 @@ type ExtraEnvs struct {
 	// For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be injected as additional environment variables.
 	// Otherwise, only the specified key will be injected as an additional environment variable.
 	// +optional
-	ConfigMaps []EnvObjectRef `json:"configMaps,omitempty"`
+	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
 
 	// List of references to Secrets objects to inject as additional environment variables.
 	// For each item in this array, if a key is not specified, it means that all keys in the Secret will be injected as additional environment variables.
 	// Otherwise, only the specified key will be injected as environment variable.
 	// +optional
-	Secrets []EnvObjectRef `json:"secrets,omitempty"`
+	Secrets []ObjectKeyRef `json:"secrets,omitempty"`
 
 	// List of name and value pairs to add as environment variables.
 	// +optional
 	Envs []Env `json:"envs,omitempty"`
 }
 
-type EnvObjectRef struct {
+type ObjectKeyRef struct {
 	// Name of the object
 	// We support only ConfigMaps and Secrets.
 	//+kubebuilder:validation:Required
@@ -181,31 +162,6 @@ type EnvObjectRef struct {
 	// Key in the object
 	// +optional
 	Key string `json:"key,omitempty"`
-}
-
-type FileObjectRef struct {
-	// Name of the object
-	// Supported ConfigMaps and Secrets
-	//+kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Key in the object
-	// +optional
-	Key string `json:"key,omitempty"`
-
-	// Path to mount the Object. If not specified default-path/Name will be used
-	// +optional
-	MountPath string `json:"mountPath"`
-}
-
-type PvcRef struct {
-	// Name of the object
-	//+kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Path to mount PVC. If not specified default-path/Name will be used
-	// +optional
-	MountPath string `json:"mountPath"`
 }
 
 type Env struct {
@@ -226,7 +182,7 @@ type BackstageStatus struct {
 }
 
 //+kubebuilder:unservedversion
-//+kubebuilder:deprecatedversion:warning="v1alpha3 is not served"
+//+kubebuilder:deprecatedversion:warning="v1alpha1 is not served"
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"

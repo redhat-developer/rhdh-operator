@@ -1,8 +1,0 @@
-apiVersion: rhdh.redhat.com/v1alpha3
-kind: Backstage
-metadata:
-  labels:
-    app.kubernetes.io/name: backstage
-  name: backstage-sample
-#spec:
-  # (user): Add fields here

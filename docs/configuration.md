@@ -325,7 +325,7 @@ AI-powered developer assistance with chat interface and Model Context Protocol (
 ##### Default Deployment
 Deploy with automatically enabled default flavours:
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha6
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-backstage
@@ -334,7 +334,7 @@ spec: {}
 
 ##### Enable Multiple Flavours
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha6
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-backstage
@@ -348,7 +348,7 @@ spec:
 
 ##### Disable All Flavours
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha6
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-backstage
@@ -390,7 +390,7 @@ spec:
 The desired state of resources created by the Backstage Operator is defined in the Backstage Custom Resource Spec. Here’s an example of a simple Backstage CR:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha6
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: mybackstage
