@@ -70,7 +70,7 @@ spec:
               value: "40000000"
             # CATALOG_INDEX_IMAGE will be replaced by the value of the `RELATED_IMAGE_catalog_index` env var, if set
             - name: CATALOG_INDEX_IMAGE
-              value: "quay.io/rhdh/plugin-catalog-index:1.9"
+              value: "quay.io/rhdh/plugin-catalog-index:1.10"
             - name: CATALOG_ENTITIES_EXTRACT_DIR
               value: '/extensions'
           volumeMounts:
