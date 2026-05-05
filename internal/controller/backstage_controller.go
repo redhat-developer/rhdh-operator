@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
@@ -177,6 +178,19 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 		} else {
 			lg.V(1).Info("create object ", objDispKind(obj, r.Scheme), obj.GetName())
 		}
+		return nil
+	}
+
+	live, ok := obj.DeepCopyObject().(client.Object)
+	if !ok {
+		return fmt.Errorf("failed to deep-copy object %s as client.Object", obj.GetName())
+	}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(obj), live); err != nil {
+		if !errors.IsNotFound(err) {
+			return fmt.Errorf("failed to get object for prevent-overwrite check: %w", err)
+		}
+	} else if annotations := live.GetAnnotations(); annotations != nil && strings.EqualFold(annotations[model.PreventOverwriteAnnotation], "true") {
+		lg.V(1).Info("skipping apply for prevent-overwrite object", "kind", objDispKind(obj, r.Scheme), "name", obj.GetName(), "namespace", obj.GetNamespace())
 		return nil
 	}
 

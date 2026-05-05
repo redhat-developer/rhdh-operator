@@ -31,6 +31,7 @@ const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
 const DefaultSubPathAnnotation = "rhdh.redhat.com/sub-path"
 const ContainersAnnotation = "rhdh.redhat.com/containers"
 const SourceAnnotation = "rhdh.redhat.com/source"
+const PreventOverwriteAnnotation = "rhdh.redhat.com/prevent-overwrite"
 
 // Backstage configuration scaffolding with empty BackstageObjects.
 // There are all possible objects for configuration

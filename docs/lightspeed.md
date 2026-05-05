@@ -91,6 +91,36 @@ spec:
 
 Ensure the secret contains the necessary authentication keys for AI service access.
 
+#### Preserving Manual Changes To Generated Configs
+
+After the first deployment, you can preserve manual changes to operator-created Lightspeed ConfigMaps by annotating the live object with `rhdh.redhat.com/prevent-overwrite`.
+
+This is useful when you want the operator to create the initial Lightspeed resources for you, and then stop overwriting later edits that you make directly in the cluster. Common examples include the generated `llama-stack-config`, `lightspeed-stack-config`, and `rhdh-profile` ConfigMaps.
+
+Example:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lightspeed-stack-config
+  annotations:
+    rhdh.redhat.com/prevent-overwrite: "true"
+```
+
+Accepted values:
+
+- `true` in any letter case enables the behavior, for example `true`, `True`, or `TRUE`
+- Any other value, including `false` or an empty string, is treated as unset and the operator will continue reconciling the resource
+
+Behavior notes:
+
+- The annotation is checked on the existing live resource after it has already been created by the operator
+- When set to `true`, the operator skips future apply updates for that resource so your manual changes are preserved
+- This does not transfer ownership of the resource away from the `Backstage` CR
+- If the `Backstage` CR is deleted, owned resources can still be deleted as part of normal cleanup
+- Remove the annotation if you want the operator to resume applying updates
+
 #### UI Customization
 
 The Lightspeed chat interface appears as:
