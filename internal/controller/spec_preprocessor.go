@@ -16,8 +16,6 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	"golang.org/x/exp/maps"
-
 	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -85,7 +83,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage api.
 			if hashingData, err = r.addExtConfig(ctx, cm, backstage.Name, ac.Name, ns, addToWatch(ac), hashingData); err != nil {
 				return result, err
 			}
-			result.AppConfigKeys[ac.Name] = maps.Keys(cm.Data)
+			result.AppConfigKeys[ac.Name] = utils.SortedKeys(cm.Data)
 		}
 	}
 

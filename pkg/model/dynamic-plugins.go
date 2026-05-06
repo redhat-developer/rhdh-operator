@@ -6,8 +6,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"golang.org/x/exp/maps"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -107,7 +105,7 @@ func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage) error {
 	}
 	if backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "" {
 		if err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
-			p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data)); err != nil {
+			p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, utils.SortedKeys(p.ConfigMap.Data)); err != nil {
 			return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)
 		}
 	}
@@ -143,13 +141,13 @@ func (p *DynamicPlugins) addExternalConfig(spec api.BackstageSpec) error {
 			}
 			p.ConfigMap.Data[DynamicPluginsFile] = mergedData
 			err = p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
-				p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data))
+				p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, utils.SortedKeys(p.ConfigMap.Data))
 			if err != nil {
 				return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)
 			}
 		} else {
 			err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
-				dp.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(dp.Data))
+				dp.Name, initContainer.WorkingDir, DynamicPluginsFile, true, utils.SortedKeys(dp.Data))
 			if err != nil {
 				return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)
 			}
