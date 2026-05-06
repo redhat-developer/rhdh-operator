@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 
-	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
@@ -75,7 +74,7 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bo
 // implementation of RuntimeObject interface
 func (p *ConfigMapFiles) updateAndValidate(_ bsv1.Backstage) error {
 
-	keys := append(maps.Keys(p.ConfigMap.Data), maps.Keys(p.ConfigMap.BinaryData)...)
+	keys := append(utils.SortedKeys(p.ConfigMap.Data), utils.SortedKeys(p.ConfigMap.BinaryData)...)
 	err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: p.ConfigMap.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
 		p.ConfigMap.Name, p.model.backstageDeployment.defaultMountPath(), "", true, keys)
 

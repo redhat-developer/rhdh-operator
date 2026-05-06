@@ -13,8 +13,11 @@ import (
 
 	//"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+
+	"golang.org/x/exp/maps"
 
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
@@ -279,6 +282,13 @@ func ToRFC1123Label(str string) string {
 	}
 
 	return name
+}
+
+// SortedKeys returns the keys of a map in sorted order.
+func SortedKeys[M ~map[K]V, K ~string, V any](m M) []K {
+	keys := maps.Keys(m)
+	slices.Sort(keys)
+	return keys
 }
 
 func BoolEnvVar(envvar string, def bool) bool {

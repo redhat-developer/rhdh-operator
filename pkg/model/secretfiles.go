@@ -5,8 +5,6 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
-	"golang.org/x/exp/maps"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
@@ -91,9 +89,8 @@ func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
 			return fmt.Errorf("payload is not Secret kind: %T", item)
 		}
 
-		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
+		keys := append(utils.SortedKeys(secret.Data), utils.SortedKeys(secret.StringData)...)
 		mountPath, subPath := p.model.backstageDeployment.getDefConfigMountPath(item)
-		//containers, err := p.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
 		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
 			item.GetName(), mountPath, "", subPath != "", keys)
 		if err != nil {
