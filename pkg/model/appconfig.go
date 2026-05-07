@@ -3,7 +3,6 @@ package model
 import (
 	"path/filepath"
 
-	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
@@ -80,7 +79,7 @@ func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, e
 // implementation of RuntimeObject interface
 func (b *AppConfig) updateAndValidate(_ bsv1.Backstage) error {
 	updatePodWithAppConfig(b.model.backstageDeployment, b.ConfigMap.Name,
-		b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
+		b.model.backstageDeployment.defaultMountPath(), "", true, utils.SortedKeys(b.ConfigMap.Data))
 	return nil
 }
 
