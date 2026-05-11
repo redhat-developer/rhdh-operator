@@ -140,23 +140,50 @@ spec:
 	assert.Equal(t, "java", model.backstageDeployment.deployable.GetObject().GetLabels()["mylabel"])
 	assert.Equal(t, "backstage", model.backstageDeployment.deployable.PodObjectMeta().GetLabels()["pod"])
 
-	// sidecar added
+	// sidecar prepended
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Containers))
-	assert.Equal(t, "sidecar", model.backstageDeployment.podSpec().Containers[1].Name)
-	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.podSpec().Containers[1].Image)
+	assert.Equal(t, "sidecar", model.backstageDeployment.podSpec().Containers[0].Name)
+	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.podSpec().Containers[0].Image)
 
 	// backstage container resources updated
 	assert.Equal(t, "backstage-backend", model.backstageDeployment.container().Name)
 	assert.Equal(t, "257Mi", model.backstageDeployment.container().Resources.Requests.Memory().String())
 
-	// volumes
-	// dynamic-plugins-root, dynamic-plugins-npmrc, dynamic-plugins-auth, my-vol
+	// volumes: dynamic-plugins-root (merged in-place), my-vol (new), dynamic-plugins-npmrc, dynamic-plugins-registry-auth
 	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
 	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.podSpec().Volumes[0].Name)
 	// overrides StorageClassName
 	assert.Equal(t, "special", *model.backstageDeployment.podSpec().Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
-	// adds new volume
-	assert.Equal(t, "my-vol", model.backstageDeployment.podSpec().Volumes[3].Name)
+	// new volume added
+	assert.Equal(t, "my-vol", model.backstageDeployment.podSpec().Volumes[1].Name)
+}
+
+// https://redhat.atlassian.net/browse/RHDHBUGS-2900
+func TestInitContainerOrderInSpecDeployment(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Deployment = &api.BackstageDeployment{}
+	bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+		Raw: []byte(`
+spec:
+ template:
+   spec:
+     initContainers:
+       - name: my-init
+         image: busybox
+         command: ["sh", "-c", "echo init"]
+`),
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	initContainers := model.backstageDeployment.podSpec().InitContainers
+	assert.Equal(t, 2, len(initContainers))
+	assert.Equal(t, "my-init", initContainers[0].Name)
+	assert.Equal(t, "install-dynamic-plugins", initContainers[1].Name)
 }
 
 func TestImageInCRPrevailsOnEnvVar(t *testing.T) {
