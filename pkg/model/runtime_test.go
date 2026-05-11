@@ -218,5 +218,5 @@ func TestInvalidObjectKind(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("service.yaml", "invalid-service-type.yaml")
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
-	assert.ErrorContains(t, err, "failed to read default value for the key service.yaml")
+	assert.ErrorContains(t, err, "failed to read overlay value for the key service.yaml")
 }
