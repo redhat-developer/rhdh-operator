@@ -837,6 +837,27 @@ spec:
                   claimName: dynamic-plugins-root
 ```
 
+##### List ordering
+
+When the patch introduces **new** list items (containers, init containers, volumes, etc.), they are **prepended** before the existing items in the default configuration. Items that match an existing entry by name are **merged in-place** and retain their original position.
+
+This is particularly relevant for init containers, where execution order [matters](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior). For example, if the default configuration defines an `install-dynamic-plugins` init container, patching in a custom init container will place it **before** `install-dynamic-plugins`:
+
+```yaml
+spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            initContainers:
+              - name: my-init
+                image: busybox
+                command: ["sh", "-c", "echo preparing"]
+```
+
+The resulting init container order will be: `my-init`, then `install-dynamic-plugins`.
+
 ##### Handling Discriminated Unions
 
 When patching Kubernetes resources that contain **discriminated unions** (fields where one field determines which other fields are valid), you may need to use the `$patch: delete` directive to remove conflicting fields.
