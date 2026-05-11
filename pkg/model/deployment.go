@@ -227,7 +227,7 @@ func (b *BackstageDeployment) setDeployment(backstage api.Backstage) error {
 				return fmt.Errorf("can not marshal deployment object: %w", err)
 			}
 
-			merged, err := merge2.MergeStrings(string(conf.Raw), string(deplStr), false, kyaml.MergeOptions{})
+			merged, err := merge2.MergeStrings(string(conf.Raw), string(deplStr), false, kyaml.MergeOptions{ListIncreaseDirection: kyaml.MergeOptionsListPrepend})
 			if err != nil {
 				return fmt.Errorf("can not merge spec.deployment: %w", err)
 			}
