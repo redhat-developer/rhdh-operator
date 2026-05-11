@@ -106,7 +106,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply ServiceMonitor", err)
 	}
 
-	// This creates array of model objects to be reconsiled
+	// This creates array of model objects to be reconciled
 	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)

@@ -138,7 +138,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 
 		if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
-				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
+				return nil, fmt.Errorf("failed to read default value for the key %s, reason: %w", conf.Key, err)
 			}
 		} else if len(objs) > 0 {
 			if obj, err := adjustObject(conf, objs); err != nil {
@@ -155,7 +155,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 			// new object to replace default, not merge
 			if objs, err := utils.ReadYamls([]byte(overlay), nil, *scheme); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
-					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
+					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %w", conf.Key, err)
 				}
 			} else {
 				if obj, err := adjustObject(conf, objs); err != nil {
@@ -168,7 +168,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 
 		// apply spec and add the object to the model and list
 		if added, err := backstageObject.addToModel(model, backstage); err != nil {
-			return nil, fmt.Errorf("failed to initialize backstage, reason: %s", err)
+			return nil, fmt.Errorf("failed to initialize backstage, reason: %w", err)
 		} else if added {
 			backstageObject.setMetaInfo(backstage, scheme)
 		}
@@ -183,14 +183,14 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 	for _, v := range model.RuntimeObjects {
 		err := v.updateAndValidate(backstage)
 		if err != nil {
-			return nil, fmt.Errorf("failed object validation, reason: %s", err)
+			return nil, fmt.Errorf("failed object validation, reason: %w", err)
 		}
 	}
 
 	// Add objects specified in Backstage CR
 	for _, ecc := range ecs {
 		if err := ecc.addExternalConfig(backstage.Spec); err != nil {
-			return nil, fmt.Errorf("failed to contribute external config, reason: %s", err)
+			return nil, fmt.Errorf("failed to contribute external config, reason: %w", err)
 		}
 	}
 

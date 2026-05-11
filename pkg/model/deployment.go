@@ -496,5 +496,8 @@ func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt
 		return nil, fmt.Errorf("failed to parse merged deployment: %w", err)
 	}
 
+	if len(objs) == 0 {
+		return nil, fmt.Errorf("no objects found in merged deployment")
+	}
 	return []client.Object{objs[0]}, nil
 }

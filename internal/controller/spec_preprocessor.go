@@ -215,7 +215,7 @@ func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj clien
 		if _, ok := obj.(*corev1.Secret); ok && k8serrors.IsForbidden(err) {
 			return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
 		}
-		return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
+		return fmt.Errorf("failed to get external config from %s: %w", objectName, err)
 	}
 	return nil
 }
