@@ -858,6 +858,24 @@ spec:
 
 The resulting init container order will be: `my-init`, then `install-dynamic-plugins`.
 
+To place a custom init container **after** an existing one, reference the existing container by name in the patch before your custom entry:
+
+```yaml
+spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            initContainers:
+              - name: install-dynamic-plugins
+              - name: my-init
+                image: busybox
+                command: ["sh", "-c", "echo preparing"]
+```
+
+The resulting init container order will be: `install-dynamic-plugins`, then `my-init`. Listing `install-dynamic-plugins` by name (without any other fields) anchors it in position, and new items listed after it are placed accordingly.
+
 ##### Handling Discriminated Unions
 
 When patching Kubernetes resources that contain **discriminated unions** (fields where one field determines which other fields are valid), you may need to use the `$patch: delete` directive to remove conflicting fields.
