@@ -70,6 +70,17 @@ jobs:
         # run this stage only if there are changes that match the includes and not the excludes
         run: make test
 
+      - name: Upload coverage to Codecov
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
+        with:
+          files: cover.out
+          flags: unittests,nightly
+          fail_ci_if_error: false
+          override_branch: ${{ matrix.branch }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Create Kind cluster (integration tests)
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
