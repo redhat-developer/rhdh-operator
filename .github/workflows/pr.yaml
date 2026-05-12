@@ -80,6 +80,18 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make test
 
+      - name: Upload coverage to Codecov
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
+        with:
+          files: cover.out
+          flags: unittests
+          fail_ci_if_error: false
+          override_commit: ${{ github.event.pull_request.head.sha }}
+          override_pr: ${{ github.event.number }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Create Kind cluster
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
