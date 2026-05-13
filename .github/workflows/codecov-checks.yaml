@@ -1,0 +1,34 @@
+name: Codecov config validator
+
+on:
+  push:
+    paths:
+      - 'codecov.yml'
+      - '.github/workflows/codecov-checks.yaml'
+  pull_request:
+    paths:
+      - 'codecov.yml'
+      - '.github/workflows/codecov-checks.yaml'
+
+jobs:
+  codecov_validate:
+    runs-on: ubuntu-latest
+    env:
+      CODECOV_CONFIG_FILE: codecov.yml
+      CODECOV_VALIDATE_URL: https://codecov.io/validate
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Validate codecov.yml
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}")
+          if [ "$response" -eq 200 ]; then
+            echo "${CODECOV_CONFIG_FILE} is valid"
+            exit 0
+          fi
+          if [ "$response" -eq 400 ]; then
+            echo "${CODECOV_CONFIG_FILE} is invalid (HTTP $response)"
+            curl --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}"
+            exit 1
+          fi
+          echo "::warning ::Codecov validation endpoint returned HTTP $response. This may be a transient issue — please retry."
+          exit 1
