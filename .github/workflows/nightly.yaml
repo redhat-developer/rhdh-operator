@@ -71,7 +71,7 @@ jobs:
         with:
           files: cover.out
           flags: unittests,nightly
-          fail_ci_if_error: false
+          fail_ci_if_error: true
           override_branch: ${{ matrix.branch }}
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
