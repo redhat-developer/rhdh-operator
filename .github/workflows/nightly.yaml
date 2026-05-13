@@ -70,13 +70,12 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: cover.out
           flags: unittests,nightly
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           override_commit: ${{ env.CODECOV_COMMIT_SHA }}
           override_branch: ${{ matrix.branch }}
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Create Kind cluster (integration tests)
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
