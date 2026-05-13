@@ -86,7 +86,7 @@ jobs:
         with:
           files: cover.out
           flags: unittests
-          fail_ci_if_error: false
+          fail_ci_if_error: true
           override_commit: ${{ github.event.pull_request.head.sha }}
           override_pr: ${{ github.event.number }}
         env:
