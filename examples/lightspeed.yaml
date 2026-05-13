@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: llama-stack-secrets
+  name: lightspeed-secrets
 type: Opaque
 stringData:
   ENABLE_VLLM: ""
@@ -30,7 +30,7 @@ spec:
   application:
     extraEnvs:
       secrets:
-        - name: llama-stack-secrets
+        - name: lightspeed-secrets
           containers:
             - lightspeed-core
 
