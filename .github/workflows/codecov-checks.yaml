@@ -19,16 +19,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Validate codecov.yml
+        env:
+          CURL_OPTS: "--connect-timeout 10 --max-time 30 --retry 3 --retry-all-errors"
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}")
+          response=$(curl -s -o /dev/null -w "%{http_code}" ${CURL_OPTS} --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}")
           if [ "$response" -eq 200 ]; then
             echo "${CODECOV_CONFIG_FILE} is valid"
             exit 0
           fi
           if [ "$response" -eq 400 ]; then
             echo "${CODECOV_CONFIG_FILE} is invalid (HTTP $response)"
-            curl --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}"
+            curl ${CURL_OPTS} --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}"
             exit 1
           fi
-          echo "::warning ::Codecov validation endpoint returned HTTP $response. This may be a transient issue — please retry."
-          exit 1
+          echo "::warning ::Codecov validation endpoint returned HTTP $response after retries. This may be a transient issue — please re-run the job."
