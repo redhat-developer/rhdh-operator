@@ -23,6 +23,11 @@ comment:
   require_base: false
   require_head: true
 
+flag_management:
+  individual_flags:
+    - name: unittests
+      carryforward: true
+
 ignore:
   - "api/**"
   - "**/zz_generated*.go"
