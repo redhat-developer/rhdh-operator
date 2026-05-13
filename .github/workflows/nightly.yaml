@@ -30,6 +30,7 @@ jobs:
 
       - name: Set env vars
         run: |
+          echo "CODECOV_COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           OPERATOR_MANIFEST="${{ github.workspace }}/dist/rhdh/install.yaml"
           echo "OPERATOR_MANIFEST=${OPERATOR_MANIFEST}" >> $GITHUB_ENV
           OPERATOR_IMAGE=$(curl -s "file://${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
@@ -72,6 +73,7 @@ jobs:
           files: cover.out
           flags: unittests,nightly
           fail_ci_if_error: true
+          override_commit: ${{ env.CODECOV_COMMIT_SHA }}
           override_branch: ${{ matrix.branch }}
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
