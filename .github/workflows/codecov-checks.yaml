@@ -35,5 +35,5 @@ jobs:
             exit 1
           fi
           echo "::warning ::Codecov validation endpoint returned HTTP $http_code after retries. This may be a transient issue — please re-run the job."
-          # Don't fail the job on transient Codecov API issues
-          exit 0
+          # Fail earlier on transient Codecov API issues, so we can catch the issue and eventually retry
+          exit 1
