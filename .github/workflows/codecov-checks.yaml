@@ -22,14 +22,18 @@ jobs:
         env:
           CURL_OPTS: "--connect-timeout 10 --max-time 30 --retry 3 --retry-all-errors"
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" ${CURL_OPTS} --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}")
-          if [ "$response" -eq 200 ]; then
+          output=$(curl -s -w "\n%{http_code}" ${CURL_OPTS} --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}")
+          http_code=$(echo "$output" | tail -1)
+          body=$(echo "$output" | sed '$d')
+          echo "$body"
+          if [ "$http_code" -eq 200 ]; then
             echo "${CODECOV_CONFIG_FILE} is valid"
             exit 0
           fi
-          if [ "$response" -eq 400 ]; then
-            echo "${CODECOV_CONFIG_FILE} is invalid (HTTP $response)"
-            curl ${CURL_OPTS} --data-binary @"${CODECOV_CONFIG_FILE}" "${CODECOV_VALIDATE_URL}"
+          if [ "$http_code" -eq 400 ]; then
+            echo "${CODECOV_CONFIG_FILE} is invalid (HTTP $http_code)"
             exit 1
           fi
-          echo "::warning ::Codecov validation endpoint returned HTTP $response after retries. This may be a transient issue — please re-run the job."
+          echo "::warning ::Codecov validation endpoint returned HTTP $http_code after retries. This may be a transient issue — please re-run the job."
+          # Don't fail the job on transient Codecov API issues
+          exit 0

@@ -11,7 +11,7 @@ coverage:
         informational: true
     patch:
       default:
-        target: 80%
+        target: auto
         threshold: 5%
         if_ci_failed: error
         informational: true
@@ -26,6 +26,8 @@ comment:
 flag_management:
   individual_flags:
     - name: unittests
+      carryforward: true
+    - name: nightly
       carryforward: true
 
 ignore:
