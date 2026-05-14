@@ -5,22 +5,13 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"k8s.io/utils/ptr"
 
-	openshift "github.com/openshift/api/route/v1"
-
-	"k8s.io/apimachinery/pkg/api/meta"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	corev1 "k8s.io/api/core/v1"
-
-	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
@@ -123,10 +114,6 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply backstage objects", err)
 	}
 
-	if err := r.cleanObjects(ctx, backstage); err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to clean backstage objects ", err)
-	}
-
 	r.setDeploymentStatus(ctx, &backstage, *bsModel)
 	return ctrl.Result{}, nil
 }
@@ -184,50 +171,6 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 		return fmt.Errorf("failed to apply object: %w", err)
 	}
 	lg.V(1).Info("apply object ", objDispKind(obj, r.Scheme), obj.GetName())
-	return nil
-}
-
-func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage api.Backstage) error {
-
-	const failedToCleanup = "failed to cleanup runtime"
-	// check if local database disabled, respective objects have to deleted/unowned
-	if !backstage.Spec.IsLocalDbEnabled() {
-		if err := r.tryToDelete(ctx, &appsv1.StatefulSet{}, model.DbStatefulSetName(backstage.Name), backstage.Namespace); err != nil {
-			return fmt.Errorf("%s %w", failedToCleanup, err)
-		}
-		if err := r.tryToDelete(ctx, &corev1.Service{}, model.DbServiceName(backstage.Name), backstage.Namespace); err != nil {
-			return fmt.Errorf("%s %w", failedToCleanup, err)
-		}
-		if err := r.tryToDelete(ctx, &corev1.Secret{}, model.DbSecretDefaultName(backstage.Name), backstage.Namespace); err != nil {
-			return fmt.Errorf("%s %w", failedToCleanup, err)
-		}
-	}
-
-	//// check if route disabled, respective objects have to deleted/unowned
-	if r.Platform.IsOpenshift() && !backstage.Spec.IsRouteEnabled() {
-		if err := r.tryToDelete(ctx, &openshift.Route{}, model.RouteName(backstage.Name), backstage.Namespace); err != nil {
-			return fmt.Errorf("%s %w", failedToCleanup, err)
-		}
-	}
-
-	return nil
-}
-
-// tryToDelete tries to delete the object by name and namespace, does not throw error if object not found or CRD does not exist
-func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object, name string, ns string) error {
-	obj.SetName(name)
-	obj.SetNamespace(ns)
-	if err := r.Delete(ctx, obj); err != nil {
-		if meta.IsNoMatchError(err) {
-			// RHDHBUGS-1990: no match for kind or resource, which can happen for example if the Prometheus CRDs
-			// are not installed when trying to delete a ServiceMonitor resource
-			return nil
-		}
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to delete %s: %w", name, err)
-	}
 	return nil
 }
 
