@@ -27,7 +27,7 @@ spec:
             - name: RELATED_IMAGE_postgresql
               value: quay.io/fedora/postgresql-15:latest
             - name: RELATED_IMAGE_backstage
-              value: quay.io/rhdh-community/rhdh:next-1.10
+              value: quay.io/rhdh-community/rhdh:next-1.10-1.10
           volumeMounts:
             - mountPath: /default-config/flavours/lightspeed
               name: flavour-lightspeed-config
