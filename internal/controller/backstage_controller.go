@@ -70,6 +70,9 @@ type BackstageReconciler struct {
 func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	lg := log.FromContext(ctx)
 
+	// DEBUG: log all reconcile requests - remove before production
+	fmt.Printf("DEBUG: Reconciling %s/%s\n", req.Namespace, req.Name)
+
 	backstage := api.Backstage{}
 	if err := r.Get(ctx, req.NamespacedName, &backstage); err != nil {
 		if errors.IsNotFound(err) {
@@ -242,4 +245,17 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return b.Complete(r)
+}
+
+// retryOperation retries an operation with no backoff or jitter.
+func retryOperation(op func() error, maxRetries int) error {
+	var err error
+	for i := 0; i <= maxRetries; i++ {
+		err = op()
+		if err == nil {
+			return nil
+		}
+		// No delay between retries - this will hammer the API server
+	}
+	return err
 }
