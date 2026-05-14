@@ -1,0 +1,41 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        if_ci_failed: error
+        informational: true
+    patch:
+      default:
+        target: auto
+        threshold: 5%
+        if_ci_failed: error
+        informational: true
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+flag_management:
+  individual_flags:
+    - name: unittests
+      carryforward: true
+    - name: nightly
+      carryforward: true
+
+ignore:
+  - "api/**"
+  - "**/zz_generated*.go"
+  - "bundle/**"
+  - "config/**"
+  - "tests/**"
+  - "integration_tests/**"
+  - "hack/**"
+  - "cmd/main.go"

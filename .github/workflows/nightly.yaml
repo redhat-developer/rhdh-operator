@@ -30,6 +30,7 @@ jobs:
 
       - name: Set env vars
         run: |
+          echo "COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           OPERATOR_MANIFEST="${{ github.workspace }}/dist/rhdh/install.yaml"
           echo "OPERATOR_MANIFEST=${OPERATOR_MANIFEST}" >> $GITHUB_ENV
           OPERATOR_IMAGE=$(curl -s "file://${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
@@ -55,20 +56,26 @@ jobs:
           rm_cmd: "rmz"
 
       - name: Setup Go
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: 'go.mod'
 
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: Build
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: make lint
 
       - name: Test
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        # run this stage only if there are changes that match the includes and not the excludes
         run: make test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: cover.out
+          flags: unittests,nightly
+          fail_ci_if_error: false
+          override_commit: ${{ env.COMMIT_SHA }}
+          override_branch: ${{ matrix.branch }}
 
       - name: Create Kind cluster (integration tests)
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
