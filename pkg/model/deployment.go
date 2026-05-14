@@ -227,7 +227,20 @@ func (b *BackstageDeployment) setDeployment(backstage api.Backstage) error {
 				return fmt.Errorf("can not marshal deployment object: %w", err)
 			}
 
-			merged, err := merge2.MergeStrings(string(conf.Raw), string(deplStr), false, kyaml.MergeOptions{})
+			// TODO(asoro): once https://github.com/kubernetes-sigs/kustomize/issues/6146 is resolved,
+			// remove this two-pass merge and use only ListPrepend.
+			//
+			// RHDHBUGS-2900: Two-pass merge to work around a kyaml bug where ListPrepend
+			// silently breaks $patch directives (e.g. $patch: replace).
+			// Pass 1: ListPrepend to get correct ordering of new list items.
+			// Pass 2: default options to apply $patch directives. All items
+			// already exist from pass 1 so positions are preserved.
+			merged, err := merge2.MergeStrings(string(conf.Raw), string(deplStr), false, kyaml.MergeOptions{ListIncreaseDirection: kyaml.MergeOptionsListPrepend})
+			if err != nil {
+				return fmt.Errorf("can not merge spec.deployment: %w", err)
+			}
+
+			merged, err = merge2.MergeStrings(string(conf.Raw), merged, false, kyaml.MergeOptions{})
 			if err != nil {
 				return fmt.Errorf("can not merge spec.deployment: %w", err)
 			}
