@@ -839,9 +839,11 @@ spec:
 
 ##### List ordering
 
-When the patch introduces **new** list items (containers, init containers, volumes, etc.), they are **prepended** before the existing items in the default configuration. Items that match an existing entry by name are **merged in-place** and retain their original position.
+If the ordering of list items matters (e.g., init containers, where execution order is [significant](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior)), include **all** init containers in the patch in the desired order — including any existing ones like `install-dynamic-plugins`.
 
-This is particularly relevant for init containers, where execution order [matters](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior). For example, if the default configuration defines an `install-dynamic-plugins` init container, patching in a custom init container will place it **before** `install-dynamic-plugins`:
+> **Note:** The `$setElementOrder` directive from the Kubernetes Strategic Merge Patch specification is **not supported** by the [kyaml](https://github.com/kubernetes-sigs/kustomize/tree/master/kyaml) (kustomize) library used by this operator. Listing all items explicitly in the patch is the recommended way to control ordering.
+
+For example, to run a custom init container **before** `install-dynamic-plugins`:
 
 ```yaml
 spec:
@@ -854,11 +856,12 @@ spec:
               - name: my-init
                 image: busybox
                 command: ["sh", "-c", "echo preparing"]
+              - name: install-dynamic-plugins
 ```
 
 The resulting init container order will be: `my-init`, then `install-dynamic-plugins`.
 
-To place a custom init container **after** an existing one, reference the existing container by name in the patch before your custom entry:
+To run a custom init container **after** `install-dynamic-plugins`:
 
 ```yaml
 spec:
