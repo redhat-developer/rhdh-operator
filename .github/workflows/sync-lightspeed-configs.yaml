@@ -5,14 +5,21 @@ on:
     - cron: '0 4 * * *'
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: true
-
 jobs:
   sync-lightspeed:
-    name: Sync Lightspeed Configs
+    name: Sync Lightspeed Configs (${{ matrix.branch }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - main
+          - release-1.10
+
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.branch }}
+      cancel-in-progress: true
 
     permissions:
       contents: write
@@ -22,6 +29,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          ref: ${{ matrix.branch }}
           fetch-depth: 0
 
       - name: Setup Go
@@ -40,7 +48,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Sync Lightspeed config files
-        run: ./hack/sync-lightspeed-configs.sh
+        run: ./hack/sync-lightspeed-configs.sh --ref ${{ matrix.branch }}
 
       - name: Check for changes
         id: changes
@@ -61,11 +69,12 @@ jobs:
         if: steps.changes.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_BRANCH: ${{ matrix.branch }}
         run: |
           TITLE="chore(lightspeed): sync config files from upstream"
-          BRANCH="chore/sync-lightspeed-configs"
+          BRANCH="chore/sync-lightspeed-configs-${TARGET_BRANCH}"
 
-          EXISTING_PR=$(gh pr list --head "${BRANCH}" --state open --json number --jq '.[0].number // empty')
+          EXISTING_PR=$(gh pr list --head "${BRANCH}" --base "${TARGET_BRANCH}" --state open --json number --jq '.[0].number // empty')
 
           git checkout -b "${BRANCH}"
 
@@ -83,7 +92,7 @@ jobs:
             git push origin "${BRANCH}"
 
             BODY=$(cat <<EOF
-          Automated nightly sync of Lightspeed config files from [redhat-ai-dev/lightspeed-configs](https://github.com/redhat-ai-dev/lightspeed-configs).
+          Automated nightly sync of Lightspeed config files from [redhat-ai-dev/lightspeed-configs @ ${TARGET_BRANCH}](https://github.com/redhat-ai-dev/lightspeed-configs/tree/${TARGET_BRANCH}).
 
           ### Synced files
           - \`config/profile/rhdh/default-config/flavours/lightspeed/configmap-files.yaml\`
@@ -97,5 +106,5 @@ jobs:
             gh pr create \
               --title "${TITLE}" \
               --body "${BODY}" \
-              --base "${{ github.ref_name }}"
+              --base "${TARGET_BRANCH}"
           fi

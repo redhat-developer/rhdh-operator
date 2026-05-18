@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -76,7 +76,7 @@ func (b *AppConfig) updateAndValidate(_ api.Backstage) error {
 		}
 
 		updatePodWithAppConfig(b.model.backstageDeployment, cm.Name,
-			b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(cm.Data))
+			b.model.backstageDeployment.defaultMountPath(), "", true, utils.SortedKeys(cm.Data))
 	}
 	return nil
 }

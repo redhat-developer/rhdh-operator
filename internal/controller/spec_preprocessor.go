@@ -16,8 +16,6 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	"golang.org/x/exp/maps"
-
 	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -85,7 +83,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage api.
 			if hashingData, err = r.addExtConfig(ctx, cm, backstage.Name, ac.Name, ns, addToWatch(ac), hashingData); err != nil {
 				return result, err
 			}
-			result.AppConfigKeys[ac.Name] = maps.Keys(cm.Data)
+			result.AppConfigKeys[ac.Name] = utils.SortedKeys(cm.Data)
 		}
 	}
 
@@ -217,7 +215,7 @@ func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj clien
 		if _, ok := obj.(*corev1.Secret); ok && k8serrors.IsForbidden(err) {
 			return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
 		}
-		return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
+		return fmt.Errorf("failed to get external config from %s: %w", objectName, err)
 	}
 	return nil
 }
