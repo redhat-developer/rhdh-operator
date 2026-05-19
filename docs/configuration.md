@@ -843,7 +843,7 @@ By default, new list items in the patch (containers, init containers, volumes, e
 
 If the ordering of list items matters (e.g., init containers, where execution order is [significant](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior)), you can opt in to **prepend** mode by setting the `rhdh.redhat.com/deployment-patch-list-merge-mode` annotation on the Backstage CR. In prepend mode, you can control the exact ordering by listing all items (including existing ones) explicitly in the patch in the desired order.
 
-> **Note:** The `$setElementOrder` directive from the Kubernetes Strategic Merge Patch specification is **not supported** by the [kyaml](https://github.com/kubernetes-sigs/kustomize/tree/master/kyaml) (kustomize) library used by this operator. Listing all items explicitly in the patch is the recommended way to control ordering.
+> **Note:** The `$setElementOrder`, `$deleteFromPrimitiveList`, and `$retainKeys` directives from the Kubernetes Strategic Merge Patch specification are **not supported** by the [kyaml](https://github.com/kubernetes-sigs/kustomize/tree/master/kyaml) (kustomize) library used by this operator. Listing all items explicitly in the patch is the recommended way to control ordering.
 
 For example, to run a custom init container **before** `install-dynamic-plugins`:
 
