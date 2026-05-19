@@ -140,22 +140,23 @@ spec:
 	assert.Equal(t, "java", model.backstageDeployment.deployable.GetObject().GetLabels()["mylabel"])
 	assert.Equal(t, "backstage", model.backstageDeployment.deployable.PodObjectMeta().GetLabels()["pod"])
 
-	// sidecar prepended
+	// sidecar appended (default merge behavior — no prepend annotation)
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Containers))
-	assert.Equal(t, "sidecar", model.backstageDeployment.podSpec().Containers[0].Name)
-	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.podSpec().Containers[0].Image)
+	assert.Equal(t, "backstage-backend", model.backstageDeployment.podSpec().Containers[0].Name)
+	assert.Equal(t, "sidecar", model.backstageDeployment.podSpec().Containers[1].Name)
+	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.podSpec().Containers[1].Image)
 
 	// backstage container resources updated
 	assert.Equal(t, "backstage-backend", model.backstageDeployment.container().Name)
 	assert.Equal(t, "257Mi", model.backstageDeployment.container().Resources.Requests.Memory().String())
 
-	// volumes: dynamic-plugins-root (merged in-place), my-vol (new), dynamic-plugins-npmrc, dynamic-plugins-registry-auth
+	// volumes: dynamic-plugins-root (merged in-place), dynamic-plugins-npmrc, dynamic-plugins-registry-auth, my-vol (appended)
 	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
 	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.podSpec().Volumes[0].Name)
 	// overrides StorageClassName
 	assert.Equal(t, "special", *model.backstageDeployment.podSpec().Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
-	// new volume added
-	assert.Equal(t, "my-vol", model.backstageDeployment.podSpec().Volumes[1].Name)
+	// new volume appended at end
+	assert.Equal(t, "my-vol", model.backstageDeployment.podSpec().Volumes[3].Name)
 }
 
 // https://redhat.atlassian.net/browse/RHDHBUGS-2900
@@ -228,6 +229,9 @@ spec:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bs := *deploymentTestBackstage.DeepCopy()
+			bs.ObjectMeta.Annotations = map[string]string{
+				ListMergeAnnotation: "prepend",
+			}
 			bs.Spec.Deployment = &api.BackstageDeployment{}
 			bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
 				Raw: []byte(tt.patch),
