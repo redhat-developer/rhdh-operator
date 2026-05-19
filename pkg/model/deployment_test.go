@@ -229,7 +229,7 @@ spec:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bs := *deploymentTestBackstage.DeepCopy()
-			bs.ObjectMeta.Annotations = map[string]string{
+			bs.Annotations = map[string]string{
 				ListMergeAnnotation: "prepend",
 			}
 			bs.Spec.Deployment = &api.BackstageDeployment{}
