@@ -837,6 +837,62 @@ spec:
                   claimName: dynamic-plugins-root
 ```
 
+##### List ordering
+
+By default, new list items in the patch (containers, init containers, volumes, etc.) are **appended** after existing items. Items that match an existing entry by name are merged in-place and retain their original position — their placement in the patch does not reorder them in the result.
+
+If the ordering of list items matters (e.g., init containers, where execution order is [significant](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior)), you can opt in to **prepend** mode by setting the `rhdh.redhat.com/deployment-patch-list-merge-mode` annotation on the Backstage CR. In prepend mode, you can control the exact ordering by listing all items (including existing ones) explicitly in the patch in the desired order.
+
+> **Note:** The `$setElementOrder`, `$deleteFromPrimitiveList`, and `$retainKeys` directives from the Kubernetes Strategic Merge Patch specification are **not supported** by the [kyaml](https://github.com/kubernetes-sigs/kustomize/tree/master/kyaml) (kustomize) library used by this operator. Listing all items explicitly in the patch is the recommended way to control ordering.
+
+For example, to run a custom init container **before** `install-dynamic-plugins`:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-rhdh
+  annotations:
+    rhdh.redhat.com/deployment-patch-list-merge-mode: prepend
+spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            initContainers:
+              - name: my-init
+                image: busybox
+                command: ["sh", "-c", "echo preparing"]
+              - name: install-dynamic-plugins
+```
+
+The resulting init container order will be: `my-init`, then `install-dynamic-plugins`.
+
+To run a custom init container **after** `install-dynamic-plugins`:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-rhdh
+  annotations:
+    rhdh.redhat.com/deployment-patch-list-merge-mode: prepend
+spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            initContainers:
+              - name: install-dynamic-plugins
+              - name: my-init
+                image: busybox
+                command: ["sh", "-c", "echo preparing"]
+```
+
+The resulting init container order will be: `install-dynamic-plugins`, then `my-init`. Listing `install-dynamic-plugins` by name (without any other fields) anchors it in position, and new items listed after it are placed accordingly.
+
 ##### Handling Discriminated Unions
 
 When patching Kubernetes resources that contain **discriminated unions** (fields where one field determines which other fields are valid), you may need to use the `$patch: delete` directive to remove conflicting fields.

@@ -140,8 +140,9 @@ spec:
 	assert.Equal(t, "java", model.backstageDeployment.deployable.GetObject().GetLabels()["mylabel"])
 	assert.Equal(t, "backstage", model.backstageDeployment.deployable.PodObjectMeta().GetLabels()["pod"])
 
-	// sidecar added
+	// sidecar appended (default merge behavior — no prepend annotation)
 	assert.Equal(t, 2, len(model.backstageDeployment.podSpec().Containers))
+	assert.Equal(t, "backstage-backend", model.backstageDeployment.podSpec().Containers[0].Name)
 	assert.Equal(t, "sidecar", model.backstageDeployment.podSpec().Containers[1].Name)
 	assert.Equal(t, "my-image:1.0.0", model.backstageDeployment.podSpec().Containers[1].Image)
 
@@ -149,14 +150,106 @@ spec:
 	assert.Equal(t, "backstage-backend", model.backstageDeployment.container().Name)
 	assert.Equal(t, "257Mi", model.backstageDeployment.container().Resources.Requests.Memory().String())
 
-	// volumes
-	// dynamic-plugins-root, dynamic-plugins-npmrc, dynamic-plugins-auth, my-vol
+	// volumes: dynamic-plugins-root (merged in-place), dynamic-plugins-npmrc, dynamic-plugins-registry-auth, my-vol (appended)
 	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
 	assert.Equal(t, "dynamic-plugins-root", model.backstageDeployment.podSpec().Volumes[0].Name)
 	// overrides StorageClassName
 	assert.Equal(t, "special", *model.backstageDeployment.podSpec().Volumes[0].Ephemeral.VolumeClaimTemplate.Spec.StorageClassName)
-	// adds new volume
+	// new volume appended at end
 	assert.Equal(t, "my-vol", model.backstageDeployment.podSpec().Volumes[3].Name)
+}
+
+// https://redhat.atlassian.net/browse/RHDHBUGS-2900
+func TestInitContainerOrderInSpecDeployment(t *testing.T) {
+	tests := []struct {
+		name     string
+		patch    string
+		expected []string
+	}{
+		{
+			name: "new init container runs before existing",
+			patch: `
+spec:
+ template:
+   spec:
+     initContainers:
+       - name: my-init
+         image: busybox
+         command: ["sh", "-c", "echo init"]
+`,
+			expected: []string{"my-init", "install-dynamic-plugins"},
+		},
+		{
+			name: "new init container runs before existing by anchoring",
+			patch: `
+spec:
+ template:
+   spec:
+     initContainers:
+       - name: my-init
+         image: busybox
+         command: ["sh", "-c", "echo init"]
+       - name: install-dynamic-plugins
+`,
+			expected: []string{"my-init", "install-dynamic-plugins"},
+		},
+		{
+			name: "new init container runs after existing by anchoring",
+			patch: `
+spec:
+ template:
+   spec:
+     initContainers:
+       - name: install-dynamic-plugins
+       - name: my-init
+         image: busybox
+         command: ["sh", "-c", "echo init"]
+`,
+			expected: []string{"install-dynamic-plugins", "my-init"},
+		},
+		{
+			name: "multiple new init containers with mixed ordering",
+			patch: `
+spec:
+ template:
+   spec:
+     initContainers:
+       - name: pre-init
+         image: busybox
+         command: ["sh", "-c", "echo pre"]
+       - name: install-dynamic-plugins
+       - name: post-init
+         image: busybox
+         command: ["sh", "-c", "echo post"]
+`,
+			expected: []string{"pre-init", "install-dynamic-plugins", "post-init"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bs := *deploymentTestBackstage.DeepCopy()
+			bs.Annotations = map[string]string{
+				ListMergeAnnotation: "prepend",
+			}
+			bs.Spec.Deployment = &api.BackstageDeployment{}
+			bs.Spec.Deployment.Patch = &apiextensionsv1.JSON{
+				Raw: []byte(tt.patch),
+			}
+
+			testObj := createBackstageTest(bs).withDefaultConfig(true).
+				addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+			model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+			assert.NoError(t, err)
+
+			initContainers := model.backstageDeployment.podSpec().InitContainers
+			assert.Equal(t, len(tt.expected), len(initContainers))
+			for i, name := range tt.expected {
+				assert.Equal(t, name, initContainers[i].Name)
+			}
+		})
+	}
 }
 
 func TestImageInCRPrevailsOnEnvVar(t *testing.T) {
