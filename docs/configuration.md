@@ -839,7 +839,7 @@ spec:
 
 ##### List ordering
 
-By default, new list items in the patch (containers, init containers, volumes, etc.) are **appended** after existing items. The position of new items in the patch does not affect their placement in the result.
+By default, new list items in the patch (containers, init containers, volumes, etc.) are **appended** after existing items. Items that match an existing entry by name are merged in-place and retain their original position — their placement in the patch does not reorder them in the result.
 
 If the ordering of list items matters (e.g., init containers, where execution order is [significant](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior)), you can opt in to **prepend** mode by setting the `rhdh.redhat.com/deployment-patch-list-merge-mode` annotation on the Backstage CR. In prepend mode, you can control the exact ordering by listing all items (including existing ones) explicitly in the patch in the desired order.
 
