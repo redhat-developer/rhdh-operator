@@ -839,13 +839,21 @@ spec:
 
 ##### List ordering
 
-If the ordering of list items matters (e.g., init containers, where execution order is [significant](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior)), include **all** init containers in the patch in the desired order — including any existing ones like `install-dynamic-plugins`.
+By default, new list items in the patch (containers, init containers, volumes, etc.) are **appended** after existing items. The position of new items in the patch does not affect their placement in the result.
+
+If the ordering of list items matters (e.g., init containers, where execution order is [significant](https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#detailed-behavior)), you can opt in to **prepend** mode by setting the `rhdh.redhat.com/deployment-patch-list-merge-mode` annotation on the Backstage CR. In prepend mode, you can control the exact ordering by listing all items (including existing ones) explicitly in the patch in the desired order.
 
 > **Note:** The `$setElementOrder` directive from the Kubernetes Strategic Merge Patch specification is **not supported** by the [kyaml](https://github.com/kubernetes-sigs/kustomize/tree/master/kyaml) (kustomize) library used by this operator. Listing all items explicitly in the patch is the recommended way to control ordering.
 
 For example, to run a custom init container **before** `install-dynamic-plugins`:
 
 ```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-rhdh
+  annotations:
+    rhdh.redhat.com/deployment-patch-list-merge-mode: prepend
 spec:
   deployment:
     patch:
@@ -864,6 +872,12 @@ The resulting init container order will be: `my-init`, then `install-dynamic-plu
 To run a custom init container **after** `install-dynamic-plugins`:
 
 ```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-rhdh
+  annotations:
+    rhdh.redhat.com/deployment-patch-list-merge-mode: prepend
 spec:
   deployment:
     patch:
