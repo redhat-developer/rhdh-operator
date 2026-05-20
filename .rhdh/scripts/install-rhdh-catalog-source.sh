@@ -155,6 +155,8 @@ function k8s_check_bundle_manifest_default_config() {
 # Skips the expensive skopeo inspect — attempts the copy directly and handles failure.
 # Writes sed replacement commands to a file for the caller to apply to render.yaml after all bundles complete.
 function process_bundle() {
+  set -euo pipefail
+
   local bundleImg="$1"
   local originalBundleImg="$2"
   local digest="$3"
@@ -167,8 +169,8 @@ function process_bundle() {
   mkdir -p "${bundle_dir}"
 
   # Failed copies are faster than successful inspects.
-  if ! skopeo copy "docker://$bundleImg" "oci:./${bundle_dir}/src:latest" 2>/dev/null; then
-    debugf "bundle #${bundle_id}: image not found on quay, skipping" >&2
+  if ! skopeo copy "docker://$bundleImg" "oci:./${bundle_dir}/src:latest" 2>"${bundle_dir}/copy.err"; then
+    debugf "bundle #${bundle_id}: skopeo copy failed, skipping (see ${bundle_dir}/copy.err)" >&2
     return 0
   fi
   debugf "bundle #${bundle_id}: pulled ${bundleImg}" >&2
