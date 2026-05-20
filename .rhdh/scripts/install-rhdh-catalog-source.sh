@@ -151,9 +151,7 @@ function k8s_check_bundle_manifest_default_config() {
   echo "ok"
 }
 
-# Process a single bundle: pull, rewrite refs, repack, push.
-# Skips the expensive skopeo inspect — attempts the copy directly and handles failure.
-# Writes sed replacement commands to a file for the caller to apply to render.yaml after all bundles complete.
+# Writes sed replacement commands to sed_commands_dir for the caller to batch-apply after all bundles complete.
 function process_bundle() {
   set -euo pipefail
 
@@ -226,7 +224,7 @@ function update_refs_in_iib_bundles() {
     bundleImg="${bundleImg/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
     debugf "bundle #${bundle_count}/${total_bundles}: $originalBundleImg => $bundleImg" >&2
 
-    # Throttle: wait until a slot opens (portable, no wait -n needed)
+    # Portable alternative to `wait -n` (not available in all bash versions)
     while true; do
       local running=0
       for pid in ${pids[@]+"${pids[@]}"}; do
@@ -244,7 +242,6 @@ function update_refs_in_iib_bundles() {
     pids+=($!)
   done
 
-  # Wait for all remaining background bundle jobs
   local failed=0
   for pid in ${pids[@]+"${pids[@]}"}; do
     if ! wait "$pid"; then
@@ -256,7 +253,6 @@ function update_refs_in_iib_bundles() {
     return 1
   fi
 
-  # Apply all sed replacements to render.yaml
   local sed_files
   sed_files=$(find "$sed_commands_dir" -name '*.sed' 2>/dev/null)
   if [[ -n "$sed_files" ]]; then
@@ -285,7 +281,7 @@ function ocp_install() {
 
   set -euo pipefail
 
-  # Run opm render and registry setup in parallel — they're independent.
+  # render_iib is independent of registry setup below, so run concurrently.
   render_iib >&2 &
   local render_pid=$!
 
@@ -317,7 +313,6 @@ function ocp_install() {
   oc policy add-role-to-user system:image-puller system:serviceaccount:openshift-marketplace:default -n openshift-marketplace >&2 || true
   oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:default -n rhdh-operator >&2 || true
 
-  # Wait for opm render to finish before processing bundles
   if ! wait "$render_pid"; then
     errorf "opm render failed" >&2
     return 1
