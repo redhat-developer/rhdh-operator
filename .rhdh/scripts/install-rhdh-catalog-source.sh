@@ -14,7 +14,7 @@ NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 UPSTREAM_IIB_OVERRIDE=""
 INSTALL_PLAN_APPROVAL="Automatic"
-MAX_PARALLEL="${MAX_PARALLEL:-10}" # processes bundles in parallel.
+MAX_PARALLEL="${MAX_PARALLEL:-10}" # max concurrent bundle workers in process_bundle
 
 function logf() {
   set -euo pipefail
