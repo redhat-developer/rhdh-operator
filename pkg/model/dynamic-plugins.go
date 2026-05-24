@@ -39,12 +39,12 @@ func (f DynamicPluginsFactory) newBackstageObject() RuntimeObject {
 }
 
 type DynamicPlugins struct {
-	ConfigMap             *corev1.ConfigMap
-	model                 *BackstageModel
-	EffectivePlugins      *corev1.ConfigMap
-	EffectiveAppConfig    *corev1.ConfigMap
-	EffectiveDependencies []PluginDependency
-	dynaPlugins           []DynaPlugin
+	ConfigMap *corev1.ConfigMap
+	model     *BackstageModel
+	//EffectivePlugins      *corev1.ConfigMap
+	//EffectiveAppConfig    *corev1.ConfigMap
+	//EffectiveDependencies []PluginDependency
+	//dynaPlugins           []DynaPlugin
 }
 
 type DynaPluginsConfig struct {
@@ -74,11 +74,15 @@ func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
 }
 
+// TODO to be used later
 func (d *DynaPlugin) isReference() bool {
 	return strings.HasPrefix(d.Package, "ref://")
 }
 
+// TODO to be used later
 func (d *DynaPlugin) getName() string {
+	packageURL := d.Package
+
 	// OCI multi-plugin: oci://host/path:tag!plugin-name
 	if strings.Contains(packageURL, "!") {
 		parts := strings.Split(packageURL, "!")
@@ -93,19 +97,16 @@ func (d *DynaPlugin) getName() string {
 		}
 	}
 
-	// NPM: npm://@scope/plugin-name@version or npm://plugin-name@version
-	if strings.HasPrefix(packageURL, "npm://") {
-		packageURL = strings.TrimPrefix(packageURL, "npm://")
-		// Remove scope if present
-		if strings.HasPrefix(packageURL, "@") {
-			parts := strings.Split(packageURL, "/")
-			if len(parts) > 1 {
-				packageURL = parts[1]
-			}
+	// NPM: @scope/plugin-name@version
+	if strings.HasPrefix(packageURL, "@") {
+		// Remove scope
+		parts := strings.Split(packageURL, "/")
+		if len(parts) > 1 {
+			packageURL = parts[1]
+			// Remove @version
+			versionParts := strings.Split(packageURL, "@")
+			return versionParts[0]
 		}
-		// Remove @version
-		parts := strings.Split(packageURL, "@")
-		return parts[0]
 	}
 
 	// Local: ./dynamic-plugins/dist/plugin-name
@@ -117,7 +118,6 @@ func (d *DynaPlugin) getName() string {
 
 	return ""
 }
-
 
 // implementation of RuntimeObject interface
 func (p *DynamicPlugins) Object() runtime.Object {
@@ -146,15 +146,16 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 			return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
 		}
 
-		// resolve references
-		plugins, err := GetPluginsData(specPlugins)
-		if err != nil {
-			return err
-		}
-		for _, plugin := range plugins {
-			if plugin.Package
-
-		}
+		//// resolve references
+		// TODO
+		//plugins, err := GetPluginsData(specPlugins)
+		//if err != nil {
+		//	return err
+		//}
+		//for _, plugin := range plugins {
+		//	if plugin.Package
+		//
+		//}
 
 		if p.ConfigMap != nil {
 			// Merge user's config with default config
@@ -170,14 +171,6 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		}
 	}
 
-	var err error
-	p.dynaPlugins, err = p.GetPlugins()
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("DYNA PLUGINS", p.dynaPlugins)
-
 	p.setMetaInfo(backstage, scheme)
 	// Always add wrapper to model (unconditional)
 	model.setRuntimeObject(DynamicPluginsKey, p)
@@ -187,6 +180,9 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 
 // implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
+// TODO
+// extract pluginConfigs
+// merge with app-config (deep merge)
 func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 
 	// Only proceed if there's a ConfigMap to mount or dynamic plugins config in spec
@@ -220,17 +216,13 @@ func (p *DynamicPlugins) setMetaInfo(backstage api.Backstage, scheme *runtime.Sc
 	}
 }
 
-func (p *DynamicPlugins) initResources(backstage api.Backstage, scheme *runtime.Scheme) error {
-	// 0. At this stage
-	// 1.
-}
-
 // Dependencies returns a list of plugin dependencies
 func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
-	ps := p.dynaPlugins
-	//if err != nil {
-	//	return nil, err
-	//}
+	//ps := p.dynaPlugins
+	ps, err := GetPluginsData(p.ConfigMap)
+	if err != nil {
+		return nil, err
+	}
 
 	result := make([]PluginDependency, 0)
 
@@ -264,19 +256,6 @@ func GetPluginsData(cm *corev1.ConfigMap) ([]DynaPlugin, error) {
 
 	return pluginsConfig.Plugins, nil
 }
-
-
-
-//func (p *DynamicPlugins) mergeWith(specData string) (string, error) {
-//
-//	if p.ConfigMap == nil {
-//		return "", fmt.Errorf("dynamic plugins ConfigMap is not set")
-//	}
-//	modelData := p.ConfigMap.Data[DynamicPluginsFile]
-//
-//	return MergePluginsData(modelData, specData)
-//
-//}
 
 func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 	deployment := p.model.getDeployment()

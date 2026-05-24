@@ -433,20 +433,33 @@ plugins:
       - ref: "dependency-4"
 `
 
-	dpWithDeps := &DynamicPlugins{
-		ConfigMap: &corev1.ConfigMap{
-			Data: map[string]string{
-				DynamicPluginsFile: yamlDataWithDeps,
-			},
+	//dpWithDeps := &DynamicPlugins{
+	//	ConfigMap: &corev1.ConfigMap{
+	//		Data: map[string]string{
+	//			DynamicPluginsFile: yamlDataWithDeps,
+	//		},
+	//	},
+	//}
+
+	dpCM := corev1.ConfigMap{
+		Data: map[string]string{
+			DynamicPluginsFile: yamlDataWithDeps,
 		},
 	}
 
-	deps, err := dpWithDeps.Dependencies()
+	dynaPlugins, err := GetPluginsData(&dpCM)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(deps))
-	assert.Equal(t, "dependency-1", deps[0].Ref)
-	assert.Equal(t, "dependency-2", deps[1].Ref)
-	assert.Equal(t, "dependency-3", deps[2].Ref)
+
+	deps := dynaPlugins[0].Dependencies
+
+	//deps, err := dpWithDeps.Dependencies()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(dynaPlugins[0].Dependencies))
+	assert.Equal(t, "dependency-1", dynaPlugins[0].Dependencies[0].Ref)
+	assert.Equal(t, "dependency-2", dynaPlugins[0].Dependencies[1].Ref)
+	assert.Equal(t, 1, len(dynaPlugins[1].Dependencies))
+	assert.Equal(t, "dependency-3", dynaPlugins[1].Dependencies[0].Ref)
 
 	// Case 2: Plugins without dependencies
 	yamlDataWithoutDeps := `
