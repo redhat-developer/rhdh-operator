@@ -14,7 +14,11 @@ NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 UPSTREAM_IIB_OVERRIDE=""
 INSTALL_PLAN_APPROVAL="Automatic"
-MAX_PARALLEL="${MAX_PARALLEL:-10}" # max concurrent bundle workers in process_bundle
+MAX_PARALLEL="${MAX_PARALLEL:-10}"
+if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
+  echo "[ERROR] MAX_PARALLEL must be a positive integer, got: '$MAX_PARALLEL'" >&2
+  exit 1
+fi
 
 function logf() {
   set -euo pipefail
@@ -475,7 +479,6 @@ EOF
       cat "${registry_port_fwd_out}"
       return 1
   fi
-  trap '[[ -n "${port_fwd_pid:-}" ]] && kill ${port_fwd_pid} || true' EXIT
 
   local portFwdLocalPort
   portFwdLocalPort=$(grep -oP '127\.0\.0\.1:\K[0-9]+' "${registry_port_fwd_out}")
@@ -526,7 +529,6 @@ EOF
   local timestamp
   local kanikoJobName
   local kanikoPod
-  local kanikoLogsPid
   local localContext
   timestamp=$(date +%s)
   kanikoJobName="kaniko-build-${timestamp}"
@@ -590,8 +592,6 @@ EOF
   debugf "Waiting for Kaniko pod $kanikoPod to be ready..." >&2
   invoke_cluster_cli -n "${namespace}" wait --for=condition=Ready "pod/$kanikoPod" --timeout=60s >&2
   invoke_cluster_cli -n "${namespace}" logs -f "${kanikoPod}" >&2 &
-  kanikoLogsPid=$!
-  trap '[[ -n "${kanikoLogsPid:-}" ]] && kill ${kanikoLogsPid} &>/dev/null || true' EXIT
 
   localContext=context.tar.gz
   tar -czf "${localContext}" -C rhdh . >&2
@@ -624,8 +624,9 @@ fi
 TMPDIR=$(mktemp -d)
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
+
 # shellcheck disable=SC2064
-trap "rm -fr $TMPDIR || true" EXIT
+trap "rm -fr $TMPDIR || true; kill 0" EXIT INT TERM
 
 detect_ocp_and_set_env_var
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
