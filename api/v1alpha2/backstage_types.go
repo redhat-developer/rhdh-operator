@@ -1,4 +1,4 @@
-package v1alpha6
+package v1alpha2
 
 import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -20,7 +20,6 @@ const (
 
 // BackstageSpec defines the desired state of Backstage
 type BackstageSpec struct {
-
 	// Configuration for Backstage. Optional.
 	Application *Application `json:"application,omitempty"`
 
@@ -30,27 +29,9 @@ type BackstageSpec struct {
 	// Configuration for database access. Optional.
 	Database *Database `json:"database,omitempty"`
 
-	// Monitoring config to enable ServiceMonitor for metrics
-	// +optional
-	// +kubebuilder:default={enabled:false}
-	Monitoring Monitoring `json:"monitoring,omitempty"`
-
-	// Valid fragment of Deployment to be merged with default/raw configuration.
-	// Set the Deployment's metadata and|or spec fields you want to override or add.
+	// Configuration for Backstage Deployment resource.
 	// Optional.
 	Deployment *BackstageDeployment `json:"deployment,omitempty"`
-
-	// Flavours specifies which pre-configured templates to enable.
-	// Flavours are variations of the default configuration that extend and override
-	// base defaults with domain-specific customizations.
-	//
-	// If not specified (nil), flavours with enabledByDefault: true in their metadata are used.
-	// If specified as empty array ([]), default flavours are disabled.
-	// To disable a default flavour, explicitly list it with enabled: false.
-	//
-	// Multiple flavours can be enabled - configs are merged in the order specified.
-	// +optional
-	Flavours []Flavour `json:"flavours,omitempty"`
 }
 
 type BackstageDeployment struct {
@@ -59,11 +40,6 @@ type BackstageDeployment struct {
 	// Optional.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Patch *apiextensionsv1.JSON `json:"patch,omitempty"`
-
-	// Kind of the deployment object. Can be Deployment or StatefulSet.
-	// +optional
-	// +kubebuilder:validation:Enum=Deployment;StatefulSet
-	Kind string `json:"kind,omitempty"`
 }
 
 type RuntimeConfig struct {
@@ -89,13 +65,6 @@ type Database struct {
 	// "POSTGRESQL_ADMIN_PASSWORD": "rl4s3Fh4ng3M4"
 	// "POSTGRES_HOST": "backstage-psql-bs1"  # For local database, set to "backstage-psql-<CR name>".
 	AuthSecretName string `json:"authSecretName,omitempty"`
-}
-
-type Monitoring struct {
-	// Enable ServiceMonitor for Prometheus scraping
-	// +optional
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled,omitempty"`
 }
 
 type Application struct {
@@ -126,6 +95,21 @@ type Application struct {
 	// +optional
 	ExtraEnvs *ExtraEnvs `json:"extraEnvs,omitempty"`
 
+	// Number of desired replicas to set in the Backstage Deployment.
+	// Defaults to 1.
+	// +optional
+	//+kubebuilder:default=1
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Custom image to use in all containers (including Init Containers).
+	// It is your responsibility to make sure the image is from trusted sources and has been validated for security compliance
+	// +optional
+	Image *string `json:"image,omitempty"`
+
+	// Image Pull Secrets to use in all containers (including Init Containers)
+	// +optional
+	ImagePullSecrets []string `json:"imagePullSecrets,omitempty"`
+
 	// Route configuration. Used for OpenShift only.
 	Route *Route `json:"route,omitempty"`
 }
@@ -143,7 +127,7 @@ type AppConfig struct {
 	// environment variables (which you can set with the ExtraEnvs field) and/or include extra files (see the ExtraFiles field).
 	// More details on https://backstage.io/docs/conf/writing/.
 	// +optional
-	ConfigMaps []FileObjectRef `json:"configMaps,omitempty"`
+	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
 }
 
 type ExtraFiles struct {
@@ -156,17 +140,12 @@ type ExtraFiles struct {
 	// For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be mounted as files.
 	// Otherwise, only the specified key will be mounted as a file.
 	// +optional
-	ConfigMaps []FileObjectRef `json:"configMaps,omitempty"`
+	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
 
 	// List of references to Secrets objects mounted as extra files under the MountPath specified.
 	// For each item in this array, a key must be specified that will be mounted as a file.
 	// +optional
-	Secrets []FileObjectRef `json:"secrets,omitempty"`
-
-	// List of references to Persistent Volume Claim objects mounted as extra files
-	// For each item in this array, a key must be specified that will be mounted as a file.
-	// +optional
-	Pvcs []PvcRef `json:"pvcs,omitempty"`
+	Secrets []ObjectKeyRef `json:"secrets,omitempty"`
 }
 
 type ExtraEnvs struct {
@@ -174,20 +153,20 @@ type ExtraEnvs struct {
 	// For each item in this array, if a key is not specified, it means that all keys in the ConfigMap will be injected as additional environment variables.
 	// Otherwise, only the specified key will be injected as an additional environment variable.
 	// +optional
-	ConfigMaps []EnvObjectRef `json:"configMaps,omitempty"`
+	ConfigMaps []ObjectKeyRef `json:"configMaps,omitempty"`
 
 	// List of references to Secrets objects to inject as additional environment variables.
 	// For each item in this array, if a key is not specified, it means that all keys in the Secret will be injected as additional environment variables.
 	// Otherwise, only the specified key will be injected as environment variable.
 	// +optional
-	Secrets []EnvObjectRef `json:"secrets,omitempty"`
+	Secrets []ObjectKeyRef `json:"secrets,omitempty"`
 
 	// List of name and value pairs to add as environment variables.
 	// +optional
 	Envs []Env `json:"envs,omitempty"`
 }
 
-type EnvObjectRef struct {
+type ObjectKeyRef struct {
 	// Name of the object
 	// We support only ConfigMaps and Secrets.
 	//+kubebuilder:validation:Required
@@ -196,52 +175,6 @@ type EnvObjectRef struct {
 	// Key in the object
 	// +optional
 	Key string `json:"key,omitempty"`
-
-	// If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
-	// If it contains only "*", it means all containers and no other names are allowed.
-	// +optional
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
-	Containers []string `json:"containers,omitempty"`
-}
-
-type FileObjectRef struct {
-	// Name of the object
-	// Supported ConfigMaps and Secrets
-	//+kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Key in the object
-	// +optional
-	Key string `json:"key,omitempty"`
-
-	// Path to mount the Object. If not specified default-path/Name will be used
-	// +optional
-	MountPath string `json:"mountPath"`
-
-	// If set, the file will be mounted only in the specified containers, otherwise in backstage container only.
-	// If it contains only "*", it means all containers and no other names are allowed.
-	// +optional
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
-	Containers []string `json:"containers,omitempty"`
-}
-
-type PvcRef struct {
-	// Name of the object
-	//+kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Path to mount PVC. If not specified default-path/Name will be used
-	// +optional
-	MountPath string `json:"mountPath"`
-
-	// If set, the file will be mounted only in the specified containers, otherwise in backstage container only.
-	// If it contains only "*", it means all containers and no other names are allowed.
-	// +optional
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
-	Containers []string `json:"containers,omitempty"`
 }
 
 type Env struct {
@@ -252,13 +185,6 @@ type Env struct {
 	// Value of the environment variable
 	//+kubebuilder:validation:Required
 	Value string `json:"value"`
-
-	// If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
-	// If it contains only "*", it means all containers and no other names are allowed.
-	// +optional
-	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
-	Containers []string `json:"containers,omitempty"`
 }
 
 // BackstageStatus defines the observed state of Backstage
@@ -268,9 +194,10 @@ type BackstageStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+//+kubebuilder:unservedversion
+//+kubebuilder:deprecatedversion:warning="v1alpha2 is not served"
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:storageversion
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"
 
 // Backstage is the Schema for the Red Hat Developer Hub backstages API.
@@ -349,22 +276,6 @@ type TLS struct {
 	CACertificate string `json:"caCertificate,omitempty"`
 }
 
-// Flavour represents a pre-configured template that extends the default configuration.
-// Flavours provide domain-specific customizations (e.g., Orchestrator, Lightspeed)
-// while falling back to base defaults for everything else.
-type Flavour struct {
-	// Name of the flavour to enable (e.g., "orchestrator", "lightspeed")
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Enabled controls whether this flavour is active.
-	// Defaults to true when not specified.
-	// Set to false to explicitly disable a flavour (including default flavours).
-	// +optional
-	// +kubebuilder:default=true
-	Enabled bool `json:"enabled,omitempty"`
-}
-
 func init() {
 	SchemeBuilder.Register(&Backstage{}, &BackstageList{})
 }
@@ -387,11 +298,4 @@ func (s *BackstageSpec) IsRouteEnabled() bool {
 
 func (s *BackstageSpec) IsAuthSecretSpecified() bool {
 	return s.Database != nil && s.Database.AuthSecretName != ""
-}
-
-// IsMonitoringEnabled checks if monitoring is explicitly enabled in the BackstageSpec.
-// Returns false if the Monitoring field is nil (not configured) or explicitly disabled.
-// Returns true only when spec.monitoring.enabled is set to true in the CR
-func (s *BackstageSpec) IsMonitoringEnabled() bool {
-	return s.Monitoring.Enabled
 }

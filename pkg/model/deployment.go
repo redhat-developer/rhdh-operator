@@ -29,9 +29,9 @@ const (
 )
 
 const BackstageImageEnvVar = "RELATED_IMAGE_backstage"
-const CatalogIndexImageEnvVar = "RELATED_IMAGE_catalog_index"
 const DefaultMountDir = "/opt/app-root/src"
 const ExtConfigHashAnnotation = "rhdh.redhat.com/ext-config-hash"
+const ListMergeAnnotation = "rhdh.redhat.com/deployment-patch-list-merge-mode"
 
 type BackstageDeploymentFactory struct{}
 
@@ -115,6 +115,8 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 		if err := b.setDeployment(backstage); err != nil {
 			return err
 		}
+	if err := b.setDeployment(backstage); err != nil {
+		return false, err
 	}
 
 	return nil
@@ -237,9 +239,26 @@ func (b *BackstageDeployment) setDeployment(backstage api.Backstage) error {
 				return fmt.Errorf("can not marshal deployment object: %w", err)
 			}
 
-			merged, err := merge2.MergeStrings(string(conf.Raw), string(deplStr), false, kyaml.MergeOptions{})
+			mergeOpts := kyaml.MergeOptions{}
+			switch backstage.GetAnnotations()[ListMergeAnnotation] {
+			case "prepend":
+				mergeOpts.ListIncreaseDirection = kyaml.MergeOptionsListPrepend
+			case "append":
+				mergeOpts.ListIncreaseDirection = kyaml.MergeOptionsListAppend
+			}
+
+			merged, err := merge2.MergeStrings(string(conf.Raw), string(deplStr), false, mergeOpts)
 			if err != nil {
 				return fmt.Errorf("can not merge spec.deployment: %w", err)
+			}
+
+			// TODO(asoro): once https://github.com/kubernetes-sigs/kustomize/issues/6146 is resolved,
+			// remove this second pass and use only ListPrepend above.
+			if mergeOpts.ListIncreaseDirection == kyaml.MergeOptionsListPrepend {
+				merged, err = merge2.MergeStrings(string(conf.Raw), merged, false, kyaml.MergeOptions{})
+				if err != nil {
+					return fmt.Errorf("can not merge spec.deployment: %w", err)
+				}
 			}
 
 			b.deployable.SetEmpty()
@@ -494,5 +513,12 @@ func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt
 		return nil, fmt.Errorf("failed to parse merged deployment: %w", err)
 	}
 
+	if len(objs) == 0 {
+		paths := make([]string, len(sources))
+		for i, s := range sources {
+			paths[i] = s.path
+		}
+		return nil, fmt.Errorf("no objects found after merging deployment sources: %v", paths)
+	}
 	return []client.Object{objs[0]}, nil
 }

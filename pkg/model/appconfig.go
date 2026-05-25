@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -72,9 +72,8 @@ func (b *AppConfig) updateAndValidate(backstage api.Backstage, scheme *runtime.S
 				return fmt.Errorf("payload is not ConfigMap kind: %T", item)
 			}
 
-			updatePodWithAppConfig(deployment, cm.Name,
-				deployment.defaultMountPath(), "", true, maps.Keys(cm.Data))
-		}
+		updatePodWithAppConfig(b.model.backstageDeployment, cm.Name,
+			b.model.backstageDeployment.defaultMountPath(), "", true, utils.SortedKeys(cm.Data))
 	}
 
 	// Process ConfigMaps from CR spec

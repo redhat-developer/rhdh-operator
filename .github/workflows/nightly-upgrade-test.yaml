@@ -15,8 +15,10 @@ jobs:
         from_branch:
           - release-1.8
           - release-1.9
+          - release-1.10
         to_branch:
           - main
+          - release-1.10
           - release-1.9
           - release-1.8
 

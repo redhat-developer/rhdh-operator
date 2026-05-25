@@ -3,10 +3,11 @@ package model
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-	"golang.org/x/exp/maps"
-	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -68,7 +69,7 @@ func (p *ConfigMapFiles) updateAndValidate(backstage api.Backstage, scheme *runt
 				return fmt.Errorf("payload is not ConfigMap kind: %T", item)
 			}
 
-			keys := append(maps.Keys(cm.Data), maps.Keys(cm.BinaryData)...)
+			keys := append(utils.SortedKeys(cm.Data), utils.SortedKeys(cm.BinaryData)...)
 			mountPath, subPath, fileName := deployment.getDefConfigMountPath(cm)
 			err := deployment.mountFilesFrom(containersFilter{annotation: cm.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
 				cm.Name, mountPath, fileName, subPath != "", keys)

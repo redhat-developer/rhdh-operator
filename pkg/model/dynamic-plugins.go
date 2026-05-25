@@ -8,8 +8,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"golang.org/x/exp/maps"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"

@@ -14,6 +14,7 @@ import (
 	"github.com/redhat-developer/rhdh-operator/api"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -328,14 +329,37 @@ var _ = When("create default rhdh", func() {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			// check if contains Lightspeed sidecars
-			foundContainers := false
+			foundLightspeedCore := false
 			for _, c := range deploy.PodSpec().Containers {
-				if c.Name == "llama-stack" || c.Name == "lightspeed-core" {
-					foundContainers = true
+				if c.Name == "lightspeed-core" {
+					foundLightspeedCore = true
+					cpuRequest := c.Resources.Requests[corev1.ResourceCPU]
+					memoryRequest := c.Resources.Requests[corev1.ResourceMemory]
+					cpuLimit := c.Resources.Limits[corev1.ResourceCPU]
+					memoryLimit := c.Resources.Limits[corev1.ResourceMemory]
+					g.Expect(cpuRequest.Cmp(resource.MustParse("100m"))).To(Equal(0))
+					g.Expect(memoryRequest.Cmp(resource.MustParse("512Mi"))).To(Equal(0))
+					g.Expect(cpuLimit.Cmp(resource.MustParse("1000m"))).To(Equal(0))
+					g.Expect(memoryLimit.Cmp(resource.MustParse("2Gi"))).To(Equal(0))
 				}
 			}
-			g.Expect(foundContainers).To(BeTrue())
+			g.Expect(foundLightspeedCore).To(BeTrue())
+
+			foundInitRagData := false
+			for _, c := range deploy.PodSpec().InitContainers {
+				if c.Name == "init-rag-data" {
+					foundInitRagData = true
+					cpuRequest := c.Resources.Requests[corev1.ResourceCPU]
+					memoryRequest := c.Resources.Requests[corev1.ResourceMemory]
+					cpuLimit := c.Resources.Limits[corev1.ResourceCPU]
+					memoryLimit := c.Resources.Limits[corev1.ResourceMemory]
+					g.Expect(cpuRequest.Cmp(resource.MustParse("50m"))).To(Equal(0))
+					g.Expect(memoryRequest.Cmp(resource.MustParse("150Mi"))).To(Equal(0))
+					g.Expect(cpuLimit.Cmp(resource.MustParse("100m"))).To(Equal(0))
+					g.Expect(memoryLimit.Cmp(resource.MustParse("500Mi"))).To(Equal(0))
+				}
+			}
+			g.Expect(foundInitRagData).To(BeTrue())
 
 		}, 20*time.Second, time.Second).Should(Succeed())
 

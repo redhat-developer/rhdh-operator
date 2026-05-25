@@ -20,6 +20,7 @@ const (
 
 // BackstageSpec defines the desired state of Backstage
 type BackstageSpec struct {
+
 	// Configuration for Backstage. Optional.
 	Application *Application `json:"application,omitempty"`
 
@@ -38,6 +39,18 @@ type BackstageSpec struct {
 	// Set the Deployment's metadata and|or spec fields you want to override or add.
 	// Optional.
 	Deployment *BackstageDeployment `json:"deployment,omitempty"`
+
+	// Flavours specifies which pre-configured templates to enable.
+	// Flavours are variations of the default configuration that extend and override
+	// base defaults with domain-specific customizations.
+	//
+	// If not specified (nil), flavours with enabledByDefault: true in their metadata are used.
+	// If specified as empty array ([]), default flavours are disabled.
+	// To disable a default flavour, explicitly list it with enabled: false.
+	//
+	// Multiple flavours can be enabled - configs are merged in the order specified.
+	// +optional
+	Flavours []Flavour `json:"flavours,omitempty"`
 }
 
 type BackstageDeployment struct {
@@ -257,6 +270,7 @@ type BackstageStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"
 
 // Backstage is the Schema for the Red Hat Developer Hub backstages API.
@@ -333,6 +347,22 @@ type TLS struct {
 
 	// caCertificate provides the cert authority certificate contents
 	CACertificate string `json:"caCertificate,omitempty"`
+}
+
+// Flavour represents a pre-configured template that extends the default configuration.
+// Flavours provide domain-specific customizations (e.g., Orchestrator, Lightspeed)
+// while falling back to base defaults for everything else.
+type Flavour struct {
+	// Name of the flavour to enable (e.g., "orchestrator", "lightspeed")
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Enabled controls whether this flavour is active.
+	// Defaults to true when not specified.
+	// Set to false to explicitly disable a flavour (including default flavours).
+	// +optional
+	// +kubebuilder:default=true
+	Enabled bool `json:"enabled,omitempty"`
 }
 
 func init() {

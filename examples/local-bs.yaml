@@ -11,7 +11,7 @@ data:
       cors:
         origin: "${BACKSTAGE_URL}"
 ---
-apiVersion: rhdh.redhat.com/v1alpha6
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: local-bs
