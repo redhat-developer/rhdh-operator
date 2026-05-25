@@ -44,8 +44,8 @@ var _ = When("create backstage with CR configured", func() {
 
 	It("creates Backstage with external configuration", func() {
 
-		appConfig1 := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
-		appConfig2 := generateConfigMap(ctx, k8sClient, "app-config2", ns, map[string]string{"key21": "app:", "key22": "app:"}, nil, nil)
+		appConfig1 := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:"}, nil, nil)
+		appConfig2 := generateConfigMap(ctx, k8sClient, "app-config2", ns, map[string]string{"key21": "app:"}, nil, nil)
 		appConfig3 := generateConfigMap(ctx, k8sClient, "app-config3.dot", ns, map[string]string{"key.31": "app31:"}, nil, nil)
 
 		cmFile1 := generateConfigMap(ctx, k8sClient, "cm-file1", ns, map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
@@ -138,16 +138,16 @@ spec:
 
 			By("checking if app-config volumes are mounted to the Backstage container")
 			g.Expect("/my/mount/path/key11").To(BeMountedToContainer(backstageContainer))
-			g.Expect("/my/mount/path/key12").To(BeMountedToContainer(backstageContainer))
+			//g.Expect("/my/mount/path/key12").To(BeMountedToContainer(backstageContainer))
 			g.Expect("/my/mount/path/key21").To(BeMountedToContainer(backstageContainer))
-			g.Expect("/my/mount/path/key22").NotTo(BeMountedToContainer(backstageContainer))
+			//g.Expect("/my/mount/path/key22").NotTo(BeMountedToContainer(backstageContainer))
 			g.Expect("/my/mount/path/key.31").To(BeMountedToContainer(backstageContainer))
 
 			By("checking if app-config args are added to the Backstage container")
 			g.Expect("/my/mount/path/key11").To(BeAddedAsArgToContainer(backstageContainer))
-			g.Expect("/my/mount/path/key12").To(BeAddedAsArgToContainer(backstageContainer))
+			//g.Expect("/my/mount/path/key12").To(BeAddedAsArgToContainer(backstageContainer))
 			g.Expect("/my/mount/path/key21").To(BeAddedAsArgToContainer(backstageContainer))
-			g.Expect("/my/mount/path/key22").NotTo(BeAddedAsArgToContainer(backstageContainer))
+			//g.Expect("/my/mount/path/key22").NotTo(BeAddedAsArgToContainer(backstageContainer))
 			g.Expect("/my/mount/path/key.31").To(BeAddedAsArgToContainer(backstageContainer))
 
 			By("checking if extra-cm-file volumes are added to PodSpec")
@@ -193,7 +193,7 @@ spec:
 
 	It("generates label and annotation", func() {
 
-		appConfig := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
+		appConfig := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:"}, nil, nil)
 
 		bs := api.BackstageSpec{
 			Application: &api.Application{

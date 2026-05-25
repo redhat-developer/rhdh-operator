@@ -72,16 +72,22 @@ func (b *AppConfig) updateAndValidate(backstage api.Backstage, scheme *runtime.S
 				return fmt.Errorf("payload is not ConfigMap kind: %T", item)
 			}
 
-			updatePodWithAppConfig(b.model.getDeployment(), cm.Name,
+			err := updatePodWithAppConfig(b.model.getDeployment(), cm.Name,
 				b.model.getDeployment().defaultMountPath(), "", true, utils.SortedKeys(cm.Data))
+			if err != nil {
+				return err
+			}
 		}
 
 		// Process ConfigMaps from CR spec
 		if backstage.Spec.Application != nil && backstage.Spec.Application.AppConfig != nil && backstage.Spec.Application.AppConfig.ConfigMaps != nil {
 			for _, specCm := range backstage.Spec.Application.AppConfig.ConfigMaps {
 				mp, wSubpath := deployment.mountPath(specCm.MountPath, specCm.Key, backstage.Spec.Application.AppConfig.MountPath)
-				updatePodWithAppConfig(deployment, specCm.Name,
+				err := updatePodWithAppConfig(deployment, specCm.Name,
 					mp, specCm.Key, wSubpath, b.model.ExternalConfig.AppConfigKeys[specCm.Name])
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -94,7 +100,12 @@ func (b *AppConfig) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme)
 }
 
 // updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args
-func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key string, withSubPath bool, cmData []string) {
+func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key string, withSubPath bool, cmData []string) error {
+
+	// TODO, enable this check
+	//if len(cmData) > 1 {
+	//	return fmt.Errorf("multiple fields is not allowed for app-config ConfigMap %s", cmName)
+	//}
 
 	_ = bsd.mountFilesFrom(containersFilter{}, ConfigMapObjectKind,
 		cmName, mountPath, key, withSubPath, cmData)
@@ -105,4 +116,5 @@ func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key str
 			container.Args = append(container.Args, []string{"--config", filepath.Join(mountPath, file)}...)
 		}
 	}
+	return nil
 }
