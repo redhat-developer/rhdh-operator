@@ -247,7 +247,7 @@ spec:
 			model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 			assert.NoError(t, err)
 
-			initContainers := model.backstageDeployment.podSpec().InitContainers
+			initContainers := model.getDeployment().podSpec().InitContainers
 			assert.Equal(t, len(tt.expected), len(initContainers))
 			for i, name := range tt.expected {
 				assert.Equal(t, name, initContainers[i].Name)

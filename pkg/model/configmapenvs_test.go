@@ -227,7 +227,7 @@ func TestMultiObjectConfigMapEnvsInDefaultConfig(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.container()
+	bscontainer := model.getDeployment().container()
 	assert.NotNil(t, bscontainer)
 
 	// Should have 2 ConfigMap EnvFrom sources (cm-envs-1, cm-envs-2)
@@ -279,7 +279,7 @@ func TestMultiObjectConfigMapEnvsInSpec(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	bscontainer := model.backstageDeployment.container()
+	bscontainer := model.getDeployment().container()
 	assert.NotNil(t, bscontainer)
 
 	// Should have 2 ConfigMap EnvFrom sources (cm1, cm2)

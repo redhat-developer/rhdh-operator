@@ -141,7 +141,7 @@ func TestConfigMapFilesMountPathReplacement(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	deployment := model.backstageDeployment
+	deployment := model.getDeployment()
 	assert.NotNil(t, deployment)
 
 	// Should have only 1 volume mount (CR replaced default at same path)
@@ -280,7 +280,7 @@ func TestMultiObjectConfigMapFilesInDefaultConfig(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	deployment := model.backstageDeployment
+	deployment := model.getDeployment()
 	assert.NotNil(t, deployment)
 
 	// Should have 2 volume mounts for the 2 ConfigMaps
@@ -315,7 +315,7 @@ func TestMultiObjectConfigMapFilesInSpec(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	deployment := model.backstageDeployment
+	deployment := model.getDeployment()
 	assert.NotNil(t, deployment)
 
 	// Should have 2 volume mounts for the 2 ConfigMaps

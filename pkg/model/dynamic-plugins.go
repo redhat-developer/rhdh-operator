@@ -200,7 +200,7 @@ func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, scheme *runt
 	}
 
 	if err := deployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
-		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, maps.Keys(p.ConfigMap.Data)); err != nil {
+		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, utils.SortedKeys(p.ConfigMap.Data)); err != nil {
 		return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)
 	}
 
