@@ -174,7 +174,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 		{
 			name: "empty spec.Flavours returns no defaults",
 			spec: api.BackstageSpec{
-				Flavours: []api.Flavour{},
+				Flavours: &[]api.Flavour{},
 			},
 			wantFlavours: []string{},
 			wantErr:      false,
@@ -182,7 +182,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 		{
 			name: "explicit enabled flavour",
 			spec: api.BackstageSpec{
-				Flavours: []api.Flavour{
+				Flavours: &[]api.Flavour{
 					{Name: "flavor2", Enabled: true},
 				},
 			},
@@ -193,7 +193,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 		{
 			name: "default enabled flavour disabled explicitly",
 			spec: api.BackstageSpec{
-				Flavours: []api.Flavour{
+				Flavours: &[]api.Flavour{
 					{Name: "flavor1", Enabled: false},
 				},
 			},
@@ -204,7 +204,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 		{
 			name: "default disabled flavour enabled explicitly",
 			spec: api.BackstageSpec{
-				Flavours: []api.Flavour{
+				Flavours: &[]api.Flavour{
 					{Name: "flavor2", Enabled: true},
 				},
 			},
@@ -215,7 +215,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 		{
 			name: "mix of explicit enabled, disabled, and defaults",
 			spec: api.BackstageSpec{
-				Flavours: []api.Flavour{
+				Flavours: &[]api.Flavour{
 					{Name: "flavor2", Enabled: true},  // default=false, spec=enabled
 					{Name: "flavor1", Enabled: false}, // default=true, spec=disabled
 					{Name: "flavor3", Enabled: true},  // default=true, spec=enabled
@@ -228,7 +228,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 		{
 			name: "all flavours explicitly enabled",
 			spec: api.BackstageSpec{
-				Flavours: []api.Flavour{
+				Flavours: &[]api.Flavour{
 					{Name: "flavor3", Enabled: true},
 					{Name: "flavor2", Enabled: true},
 					{Name: "flavor1", Enabled: true},
@@ -241,7 +241,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 		{
 			name: "nonexistent flavour returns error",
 			spec: api.BackstageSpec{
-				Flavours: []api.Flavour{
+				Flavours: &[]api.Flavour{
 					{Name: "nonexistent", Enabled: true},
 				},
 			},
