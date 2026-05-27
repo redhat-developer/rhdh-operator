@@ -178,7 +178,6 @@ func createAndReconcileBackstage(ctx context.Context, ns string, spec api.Backst
 
 	found := &api.Backstage{}
 	Eventually(func() error {
-		//found := &api.Backstage{}
 		return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 	}, time.Minute, time.Second).Should(Succeed())
 
