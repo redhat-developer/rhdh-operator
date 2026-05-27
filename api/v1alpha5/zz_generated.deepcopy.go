@@ -172,8 +172,12 @@ func (in *BackstageSpec) DeepCopyInto(out *BackstageSpec) {
 	}
 	if in.Flavours != nil {
 		in, out := &in.Flavours, &out.Flavours
-		*out = make([]Flavour, len(*in))
-		copy(*out, *in)
+		*out = new([]Flavour)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make([]Flavour, len(*in))
+			copy(*out, *in)
+		}
 	}
 }
 

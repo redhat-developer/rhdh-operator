@@ -50,7 +50,7 @@ type BackstageSpec struct {
 	//
 	// Multiple flavours can be enabled - configs are merged in the order specified.
 	// +optional
-	Flavours []Flavour `json:"flavours,omitempty"`
+	Flavours *[]Flavour `json:"flavours,omitempty"`
 }
 
 type BackstageDeployment struct {

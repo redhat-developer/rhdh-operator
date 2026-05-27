@@ -27,7 +27,6 @@ type BackstagePvcs struct {
 	model *BackstageModel
 }
 
-// implementation of RuntimeObject interface
 func (b *BackstagePvcs) Object() runtime.Object {
 	if b.pvcs != nil && len(b.pvcs.Items) > 0 {
 		return b.pvcs
@@ -36,6 +35,10 @@ func (b *BackstagePvcs) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (b *BackstagePvcs) GetKey() string {
+	return PvcsKey
+}
+
 func (b *BackstagePvcs) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
 	if config != nil {
@@ -43,7 +46,7 @@ func (b *BackstagePvcs) addToModel(model *BackstageModel, backstage api.Backstag
 	}
 
 	// Always add wrapper to model (unconditional)
-	model.setRuntimeObject(PvcsKey, b)
+	model.setRuntimeObject(b)
 
 	// Only set metadata if underlying object exists
 	if b.pvcs != nil && len(b.pvcs.Items) > 0 {
@@ -52,7 +55,6 @@ func (b *BackstagePvcs) addToModel(model *BackstageModel, backstage api.Backstag
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (b *BackstagePvcs) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 	deployment := b.model.getDeployment()
 	if deployment == nil {

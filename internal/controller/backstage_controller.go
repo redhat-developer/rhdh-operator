@@ -123,7 +123,7 @@ func errorAndStatus(backstage *api.Backstage, msg string, err error) error {
 	return fmt.Errorf("%s: %w", msg, err)
 }
 
-func (r *BackstageReconciler) applyObjects(ctx context.Context, objects map[string]model.RuntimeObject) error {
+func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.RuntimeObject) error {
 
 	for _, obj := range objects {
 

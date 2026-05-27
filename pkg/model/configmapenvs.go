@@ -25,7 +25,6 @@ func init() {
 	registerConfig(ConfigMapEnvsKey, ConfigMapEnvsFactory{}, true, mergeMultiObjectConfigs)
 }
 
-// implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) Object() runtime.Object {
 	if p.ConfigMaps != nil && len(p.ConfigMaps.Items) > 0 {
 		return p.ConfigMaps
@@ -34,6 +33,10 @@ func (p *ConfigMapEnvs) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (p *ConfigMapEnvs) GetKey() string {
+	return ConfigMapEnvsKey
+}
+
 func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	p.model = model
 	if config != nil {
@@ -45,14 +48,13 @@ func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstag
 	//}
 
 	// Always add to model so updateAndValidate is called (may process spec ConfigMaps)
-	model.setRuntimeObject(ConfigMapEnvsKey, p)
+	model.setRuntimeObject(p)
 	if p.ConfigMaps != nil && len(p.ConfigMaps.Items) > 0 {
 		p.setMetaInfo(backstage, scheme)
 	}
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 	deployment := p.model.getDeployment()
 	if deployment == nil {
@@ -86,7 +88,6 @@ func (p *ConfigMapEnvs) updateAndValidate(backstage api.Backstage, scheme *runti
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (p *ConfigMapEnvs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	setMultiObjectConfigMetaInfo(p.ConfigMaps, "envs", backstage, scheme)
 }

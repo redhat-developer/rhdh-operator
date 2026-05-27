@@ -56,48 +56,36 @@ type BackstageModel struct {
 	localDbEnabled bool
 	isOpenshift    bool
 
-	// Single source of truth - contains ALL object wrappers
-	// Key is the config file name (e.g., "deployment.yaml", "service.yaml")
-	runtimeObjects map[string]RuntimeObject
+	// RuntimeObjects contains all object wrappers in deterministic order.
+	// Order is determined by init() registration (alphabetical by source file name).
+	RuntimeObjects []RuntimeObject
 
 	ExternalConfig ExternalConfig
 }
 
-// setRuntimeObject adds an object to the model by key.
-// Objects are only added if they should be applied (no placeholders).
-func (m *BackstageModel) setRuntimeObject(key string, object RuntimeObject) {
-	if m.runtimeObjects == nil {
-		m.runtimeObjects = make(map[string]RuntimeObject)
-	}
-	m.runtimeObjects[key] = object
+// setRuntimeObject adds an object to the model.
+func (m *BackstageModel) setRuntimeObject(object RuntimeObject) {
+	m.RuntimeObjects = append(m.RuntimeObjects, object)
 }
 
 // GetRuntimeObject retrieves an object from the model by key.
 // Returns nil if the object doesn't exist or shouldn't be applied (Object() returns nil).
 func (m *BackstageModel) GetRuntimeObject(key string) RuntimeObject {
-	if m.runtimeObjects == nil {
-		return nil
-	}
-	obj := m.runtimeObjects[key]
-	if obj != nil && obj.Object() != nil {
-		return obj
+	for _, obj := range m.RuntimeObjects {
+		if obj.GetKey() == key && obj.Object() != nil {
+			return obj
+		}
 	}
 	return nil
 }
 
 // GetRuntimeObjects returns only objects that should be applied (where Object() != nil).
-// Returns an empty map if no objects should be applied.
-func (m *BackstageModel) GetRuntimeObjects() map[string]RuntimeObject {
-	result := make(map[string]RuntimeObject)
-	if m.runtimeObjects == nil {
-		return result
-	}
-
-	// Filter: only return objects where Object() returns non-nil (should be applied)
-	for key, obj := range m.runtimeObjects {
-		objResult := obj.Object()
-		if objResult != nil {
-			result[key] = obj
+// Objects are returned in the deterministic order they were registered (via init() functions).
+func (m *BackstageModel) GetRuntimeObjects() []RuntimeObject {
+	result := make([]RuntimeObject, 0)
+	for _, obj := range m.RuntimeObjects {
+		if obj.Object() != nil {
+			result = append(result, obj)
 		}
 	}
 	return result
@@ -144,7 +132,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		ExternalConfig: externalConfig,
 		localDbEnabled: backstage.Spec.IsLocalDbEnabled(),
 		isOpenshift:    platform.IsOpenshift(),
-		runtimeObjects: make(map[string]RuntimeObject),
+		RuntimeObjects: make([]RuntimeObject, 0),
 	}
 
 	// Get enabled flavours once for all configs
@@ -206,8 +194,9 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 
 	// Phase 2: updateAndValidate all objects
 	// All objects are now in model, so cross-references are safe
-	for _, v := range model.runtimeObjects {
-		err := v.updateAndValidate(backstage, scheme)
+	// Iterate over RuntimeObjects in their registration order (deterministic)
+	for _, obj := range model.RuntimeObjects {
+		err := obj.updateAndValidate(backstage, scheme)
 		if err != nil {
 			return nil, fmt.Errorf("failed object validation, reason: %s", err)
 		}

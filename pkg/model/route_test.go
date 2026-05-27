@@ -364,7 +364,7 @@ func TestBackstageRoute_updateAppConfigWithBaseUrls(t *testing.T) {
 							},
 						},
 					}
-					m.setRuntimeObject(AppConfigKey, appConfig)
+					m.setRuntimeObject(appConfig)
 					return m
 				}(),
 				backstage: api.Backstage{
@@ -424,7 +424,7 @@ organization:
 							},
 						},
 					}
-					m.setRuntimeObject(AppConfigKey, appConfig)
+					m.setRuntimeObject(appConfig)
 					return m
 				}(),
 				backstage: api.Backstage{

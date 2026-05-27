@@ -78,7 +78,6 @@ func init() {
 	registerConfig(RouteKey, BackstageRouteFactory{}, false, nil)
 }
 
-// implementation of RuntimeObject interface
 func (b *BackstageRoute) Object() runtime.Object {
 	if b.route == nil {
 		return nil
@@ -87,6 +86,10 @@ func (b *BackstageRoute) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (b *BackstageRoute) GetKey() string {
+	return RouteKey
+}
+
 func (b *BackstageRoute) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 
 	b.model = model
@@ -118,7 +121,7 @@ func (b *BackstageRoute) addToModel(model *BackstageModel, backstage api.Backsta
 	}
 
 	// Always add wrapper to model (unconditional)
-	model.setRuntimeObject(RouteKey, b)
+	model.setRuntimeObject(b)
 
 	// Only set metadata if underlying object exists
 	if b.route != nil {
@@ -128,7 +131,6 @@ func (b *BackstageRoute) addToModel(model *BackstageModel, backstage api.Backsta
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (b *BackstageRoute) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 	if b.route != nil {
 		backstageService := b.model.GetRuntimeObject(ServiceKey)

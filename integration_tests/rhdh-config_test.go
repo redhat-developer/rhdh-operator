@@ -307,7 +307,7 @@ var _ = When("create default rhdh", func() {
 		ctx := context.Background()
 		ns := createNamespace(ctx)
 		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
-			Flavours: []api.Flavour{
+			Flavours: &[]api.Flavour{
 				{Name: "lightspeed", Enabled: true},
 			},
 		}, "")

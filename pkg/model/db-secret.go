@@ -31,7 +31,6 @@ func DbSecretDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql-secret")
 }
 
-// implementation of RuntimeObject interface
 func (b *DbSecret) Object() runtime.Object {
 	if b.secret == nil {
 		return nil
@@ -40,6 +39,10 @@ func (b *DbSecret) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (b *DbSecret) GetKey() string {
+	return DbSecretKey
+}
+
 func (b *DbSecret) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
 
@@ -49,7 +52,7 @@ func (b *DbSecret) addToModel(model *BackstageModel, backstage api.Backstage, co
 	}
 
 	// Always add wrapper to model (unconditional)
-	model.setRuntimeObject(DbSecretKey, b)
+	model.setRuntimeObject(b)
 
 	// Only set metadata if underlying object exists
 	if b.secret != nil {
@@ -58,7 +61,6 @@ func (b *DbSecret) addToModel(model *BackstageModel, backstage api.Backstage, co
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (b *DbSecret) updateAndValidate(_ api.Backstage, _ *runtime.Scheme) error {
 
 	// If no secret, nothing to do

@@ -36,6 +36,11 @@ func (b *BackstageService) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (b *BackstageService) GetKey() string {
+	return ServiceKey
+}
+
+// implementation of RuntimeObject interface
 func (b *BackstageService) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
 	if config != nil {
@@ -45,7 +50,7 @@ func (b *BackstageService) addToModel(model *BackstageModel, backstage api.Backs
 		return fmt.Errorf("backstage Service is not initialized, make sure there is service.yaml in default or raw configuration")
 	}
 	// Service is required, so always add to model
-	model.setRuntimeObject(ServiceKey, b)
+	model.setRuntimeObject(b)
 	b.setMetaInfo(backstage, scheme)
 	return nil
 }

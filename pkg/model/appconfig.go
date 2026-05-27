@@ -39,6 +39,11 @@ func (b *AppConfig) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (b *AppConfig) GetKey() string {
+	return AppConfigKey
+}
+
+// implementation of RuntimeObject interface
 func (b *AppConfig) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
 	if config != nil {
@@ -49,7 +54,7 @@ func (b *AppConfig) addToModel(model *BackstageModel, backstage api.Backstage, c
 	}
 
 	// Always add to model so updateAndValidate is called (may process spec ConfigMaps)
-	model.setRuntimeObject(AppConfigKey, b)
+	model.setRuntimeObject(b)
 	b.setMetaInfo(backstage, scheme)
 
 	return nil

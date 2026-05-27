@@ -74,6 +74,11 @@ func (b *BackstageDeployment) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (b *BackstageDeployment) GetKey() string {
+	return DeploymentKey
+}
+
+// implementation of RuntimeObject interface
 func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	// Set the deployment from config parameter if not nil
 	if config != nil {
@@ -88,7 +93,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 
 	// Call setMetaInfo if deployment is not nil
 	if b.deployable.GetObject() != nil {
-		model.setRuntimeObject(DeploymentKey, b)
+		model.setRuntimeObject(b)
 		b.setMetaInfo(backstage, scheme)
 
 		if BackstageContainerIndex(b.podSpec()) < 0 {

@@ -88,14 +88,14 @@ func TestIfEmptyObjectIsValid(t *testing.T) {
 
 	t.Logf("model.localDbEnabled: %v, model.isOpenshift: %v", model.localDbEnabled, model.isOpenshift)
 
-	// With the new map-based API, only objects to be applied are in the map
+	// With the new slice-based API, only objects to be applied are in the slice
 	objs := model.GetRuntimeObjects()
-	for key, obj := range objs {
-		t.Logf("Object in map: %s, Object(): %v", key, obj.Object())
+	for i, obj := range objs {
+		t.Logf("Object at index %d, Object(): %v", i, obj.Object())
 	}
 
 	// Debug db-service
-	dbSvc := model.runtimeObjects[DbServiceKey]
+	dbSvc := model.GetRuntimeObject(DbServiceKey)
 	if dbSvc != nil {
 		t.Logf("DbService wrapper exists, service: %v, Object(): %v", dbSvc.(*DbService).service, dbSvc.Object())
 	}

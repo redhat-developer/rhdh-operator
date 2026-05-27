@@ -35,6 +35,8 @@ type RuntimeObject interface {
 	// Object returns the underlying Kubernetes object.
 	// Only objects that should be applied are added to the model, so this never returns nil.
 	Object() runtime.Object
+	// GetKey returns the unique key identifying this object type (e.g., "deployment.yaml")
+	GetKey() string
 	// addToModel initializes the object from config and conditionally registers it in model.
 	// config parameter is the chosen configuration (overlay OR default, selected by runtime.go)
 	// Objects are only added to model (via setRuntimeObject) if they should be applied to cluster.

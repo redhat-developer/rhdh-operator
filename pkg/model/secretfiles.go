@@ -28,7 +28,6 @@ func init() {
 	registerConfig(SecretFilesKey, SecretFilesFactory{}, true, nil)
 }
 
-// implementation of RuntimeObject interface
 func (p *SecretFiles) Object() runtime.Object {
 	if p.secrets != nil && len(p.secrets.Items) > 0 {
 		return p.secrets
@@ -37,6 +36,10 @@ func (p *SecretFiles) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (p *SecretFiles) GetKey() string {
+	return SecretFilesKey
+}
+
 func (p *SecretFiles) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	p.model = model
 	if config != nil {
@@ -47,14 +50,13 @@ func (p *SecretFiles) addToModel(model *BackstageModel, backstage api.Backstage,
 	}
 
 	// Always add to model so updateAndValidate is called (may process spec secrets)
-	model.setRuntimeObject(SecretFilesKey, p)
+	model.setRuntimeObject(p)
 	if p.secrets != nil && len(p.secrets.Items) > 0 {
 		p.setMetaInfo(backstage, scheme)
 	}
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (p *SecretFiles) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 	deployment := p.model.getDeployment()
 	if deployment == nil {
@@ -99,7 +101,6 @@ func (p *SecretFiles) updateAndValidate(backstage api.Backstage, scheme *runtime
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (p *SecretFiles) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	setMultiObjectConfigMetaInfo(p.secrets, "files", backstage, scheme)
 }

@@ -34,7 +34,6 @@ func DbStatefulSetName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql")
 }
 
-// implementation of RuntimeObject interface
 func (b *DbStatefulSet) Object() runtime.Object {
 	if b.statefulSet == nil {
 		return nil
@@ -43,6 +42,10 @@ func (b *DbStatefulSet) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (b *DbStatefulSet) GetKey() string {
+	return DbStatefulSetKey
+}
+
 func (b *DbStatefulSet) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
 
@@ -52,7 +55,7 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, backstage api.Backstag
 	}
 
 	// Always add wrapper to model (unconditional)
-	model.setRuntimeObject(DbStatefulSetKey, b)
+	model.setRuntimeObject(b)
 
 	// Only set metadata if underlying object exists
 	if b.statefulSet != nil {
@@ -67,7 +70,6 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, backstage api.Backstag
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 	if b.statefulSet == nil {
 		return nil

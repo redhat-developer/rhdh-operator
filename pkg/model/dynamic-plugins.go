@@ -117,7 +117,6 @@ func (d *DynaPlugin) getName() string {
 	return ""
 }
 
-// implementation of RuntimeObject interface
 func (p *DynamicPlugins) Object() runtime.Object {
 	if p.ConfigMap == nil {
 		return nil
@@ -126,6 +125,10 @@ func (p *DynamicPlugins) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (p *DynamicPlugins) GetKey() string {
+	return DynamicPluginsKey
+}
+
 func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	p.model = model
 	if config != nil {
@@ -171,12 +174,11 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 
 	p.setMetaInfo(backstage, scheme)
 	// Always add wrapper to model (unconditional)
-	model.setRuntimeObject(DynamicPluginsKey, p)
+	model.setRuntimeObject(p)
 
 	return nil
 }
 
-// implementation of RuntimeObject interface
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
 // TODO
 // extract pluginConfigs

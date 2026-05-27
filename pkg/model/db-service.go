@@ -28,7 +28,6 @@ func DbServiceName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql")
 }
 
-// implementation of RuntimeObject interface
 func (b *DbService) Object() runtime.Object {
 	if b.service == nil {
 		return nil
@@ -37,6 +36,10 @@ func (b *DbService) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
+func (b *DbService) GetKey() string {
+	return DbServiceKey
+}
+
 func (b *DbService) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
 
@@ -46,7 +49,7 @@ func (b *DbService) addToModel(model *BackstageModel, backstage api.Backstage, c
 	}
 
 	// Always add wrapper to model (unconditional)
-	model.setRuntimeObject(DbServiceKey, b)
+	model.setRuntimeObject(b)
 
 	// Only set metadata if underlying object exists
 	if b.service != nil {
@@ -58,7 +61,6 @@ func (b *DbService) addToModel(model *BackstageModel, backstage api.Backstage, c
 	return nil
 }
 
-// implementation of RuntimeObject interface
 func (b *DbService) updateAndValidate(_ api.Backstage, _ *runtime.Scheme) error {
 	return nil
 }
