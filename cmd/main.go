@@ -65,8 +65,8 @@ func main() {
 		"If set, the metrics endpoint is served securely over HTTPS and requires authentication and authorization.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.BoolVar(&enableCacheLabelFilter, "enable-cache-label-filter", false,
-		"If set, the cache will only store Secrets and ConfigMaps with the label 'rhdh.redhat.com/external-config=true'. This reduces memory consumption.")
+	flag.BoolVar(&enableCacheLabelFilter, "enable-cache-label-filter", os.Getenv("ENABLE_CACHE_LABEL_FILTER") == "true",
+		"If set, the cache will only store Secrets and ConfigMaps with the label 'rhdh.redhat.com/external-config=true'. This reduces memory consumption. Can also be set via ENABLE_CACHE_LABEL_FILTER env var.")
 
 	opts := zap.Options{
 		Development: true,

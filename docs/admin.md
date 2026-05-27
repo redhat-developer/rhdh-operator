@@ -86,11 +86,27 @@ This allows the operator to only cache Secrets and ConfigMaps that are explicitl
 
 #### Configuration
 
-Cache-level label filtering can be enabled through the `--enable-cache-label-filter` command-line flag. When enabled, the manager's cache is configured to only store Secrets and ConfigMaps that have the label `rhdh.redhat.com/external-config=true`. This happens at the cache initialization level, preventing unwanted resources from ever being loaded into memory, rather than just filtering events after caching.
+Cache-level label filtering can be enabled through:
+* `ENABLE_CACHE_LABEL_FILTER=true` environment variable
+* `--enable-cache-label-filter` command-line flag.
+
+When enabled, the manager's cache is configured to only store Secrets and ConfigMaps that have the label `rhdh.redhat.com/external-config=true`. This happens at the cache initialization level, preventing unwanted resources from ever being loaded into memory, rather than just filtering events after caching.
 
 **For OLM-based deployments:**
 
-Edit the Subscription or CSV to add the argument:
+**Option 1:**
+Edit the Subscription to add the environment variable:
+
+```yaml
+spec:
+  config:
+    env:
+      - name: "ENABLE_CACHE_LABEL_FILTER"
+        value: "true"
+```
+
+**Option 2:**
+Edit the CSV to add the argument:
 ```yaml
 spec:
   template:
