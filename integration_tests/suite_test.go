@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -199,17 +198,18 @@ func createAndReconcileBackstage(ctx context.Context, ns string, spec api.Backst
 	return backstageName
 }
 
-func createAndReconcileEmptyBackstage(ctx context.Context, ns string, spec api.BackstageSpec, name string) string {
-	cmName := generateRandName(name)
-
-	specData := `
-includes: []
-`
-	generateConfigMap(ctx, k8sClient, cmName, ns, map[string]string{model.DynamicPluginsFile: specData}, nil, nil)
-	spec.Flavours = &[]api.Flavour{}
-	spec.Application.DynamicPluginsConfigMapName = cmName
-	return createAndReconcileBackstage(ctx, ns, spec, name)
-}
+// TODO: it is not working as Backstage app is starting faster than DB and failed.
+//func createAndReconcileEmptyBackstage(ctx context.Context, ns string, spec api.BackstageSpec, name string) string {
+//	cmName := generateRandName(name)
+//
+//	specData := `
+//includes: []
+//`
+//	generateConfigMap(ctx, k8sClient, cmName, ns, map[string]string{model.DynamicPluginsFile: specData}, nil, nil)
+//	spec.Flavours = &[]api.Flavour{}
+//	spec.Application.DynamicPluginsConfigMapName = cmName
+//	return createAndReconcileBackstage(ctx, ns, spec, name)
+//}
 
 func createNamespace(ctx context.Context) string {
 	ns := fmt.Sprintf("ns-%d-%s", GinkgoParallelProcess(), randString(5))
