@@ -30,6 +30,12 @@ type enabledFlavour struct {
 //
 // This should be called once per Backstage reconciliation and the result reused for all config files.
 func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
+
+	// if explicit empty array specified - disable all
+	if spec.Flavours != nil && len(*spec.Flavours) == 0 {
+		return []enabledFlavour{}, nil
+	}
+
 	localBin := os.Getenv("LOCALBIN")
 	flavoursDir := filepath.Join(localBin, "default-config", "flavours")
 
