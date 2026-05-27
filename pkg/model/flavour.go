@@ -39,24 +39,15 @@ func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
 		return nil, err
 	}
 
-	// Debug logging
-	if spec.Flavours == nil {
-		fmt.Println("DEBUG GetEnabledFlavours: spec.Flavours=nil (not specified, using defaults)")
-	} else {
-		fmt.Printf("DEBUG GetEnabledFlavours: spec.Flavours=&%v (len=%d)\n", *spec.Flavours, len(*spec.Flavours))
-	}
-
 	// Step 2: Override enabled status from spec
 	if spec.Flavours != nil {
-		flavours := *spec.Flavours
 
-		// Empty array explicitly disables all flavours
-		if len(flavours) == 0 {
-			fmt.Println("DEBUG: Empty flavours array specified - disabling all flavours")
+		// No specified returns empty list
+		if len(spec.Flavours) == 0 {
 			return make([]enabledFlavour, 0), nil
 		}
 
-		for _, f := range flavours {
+		for _, f := range spec.Flavours {
 			flavour, exists := allFlavours[f.Name]
 			if !exists {
 				return nil, fmt.Errorf("flavour '%s' not found in %s", f.Name, flavoursDir)

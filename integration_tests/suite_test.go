@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -173,13 +172,11 @@ func createBackstage(ctx context.Context, spec api.BackstageSpec, ns string, nam
 }
 
 func createAndReconcileBackstage(ctx context.Context, ns string, spec api.BackstageSpec, name string) string {
-
 	backstageName, err := createBackstage(ctx, spec, ns, name)
 	Expect(err).To(Not(HaveOccurred()))
 
-	found := &api.Backstage{}
 	Eventually(func() error {
-		//found := &api.Backstage{}
+		found := &api.Backstage{}
 		return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 	}, time.Minute, time.Second).Should(Succeed())
 
@@ -197,18 +194,6 @@ func createAndReconcileBackstage(ctx context.Context, ns string, spec api.Backst
 	Expect(err).To(Not(HaveOccurred()))
 
 	return backstageName
-}
-
-func createAndReconcileEmptyBackstage(ctx context.Context, ns string, spec api.BackstageSpec, name string) string {
-	cmName := generateRandName(name)
-
-	specData := `
-includes: []
-`
-	generateConfigMap(ctx, k8sClient, cmName, ns, map[string]string{model.DynamicPluginsFile: specData}, nil, nil)
-	spec.Flavours = &[]api.Flavour{}
-	spec.Application.DynamicPluginsConfigMapName = cmName
-	return createAndReconcileBackstage(ctx, ns, spec, name)
 }
 
 func createNamespace(ctx context.Context) string {
