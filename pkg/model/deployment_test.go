@@ -87,17 +87,6 @@ func TestSpecImagePullSecrets(t *testing.T) {
 	assert.Equal(t, 2, len(deployment.podSpec().ImagePullSecrets))
 	assert.Equal(t, "ips1", deployment.podSpec().ImagePullSecrets[0].Name)
 
-	//bs.Spec.Application.ImagePullSecrets = []string{}
-	//
-	//testObj = createBackstageTest(bs).withDefaultConfig(true).
-	//	addToDefaultConfig("deployment.yaml", "ips-deployment.yaml")
-	//
-	//model, err = InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
-	//assert.NoError(t, err)
-	//
-	//// if explicitly set empty slice - they are empty
-	//assert.Equal(t, 0, len(model.backstageDeployment.deployment.Spec.Template.Spec.ImagePullSecrets))
-
 }
 
 func TestMergeFromSpecDeployment(t *testing.T) {

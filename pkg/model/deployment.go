@@ -110,13 +110,6 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 			b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
 		}
 
-		// Set CATALOG_INDEX_IMAGE from operator env var BEFORE extraEnvs are applied, so user-specified extraEnvs can still override this value
-		//if catalogIndexImage := os.Getenv(CatalogIndexImageEnvVar); catalogIndexImage != "" {
-		//	if i, _ := DynamicPluginsInitContainer(b.podSpec().InitContainers); i >= 0 {
-		//		b.setOrAppendEnvVar(&b.podSpec().InitContainers[i], "CATALOG_INDEX_IMAGE", catalogIndexImage)
-		//	}
-		//}
-
 		if err := b.setDeployment(backstage); err != nil {
 			return err
 		}
@@ -297,12 +290,8 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 	if subPath != "" && subPath != "*" {
 		fileName = subPath
 	}
-	//if mountPath == "" {
-	//	return
-	//}
-	//return mountPath, subPath, fileName
-	return
 
+	return
 }
 
 // sets container image name of Backstage Container

@@ -44,10 +44,6 @@ func (p *ConfigMapFiles) addToModel(model *BackstageModel, backstage api.Backsta
 	if config != nil {
 		p.ConfigMaps = config.(*multiobject.MultiObject)
 	}
-	//} else {
-	//	// Create empty ConfigMaps - might be populated later from spec
-	//	p.ConfigMaps = &multiobject.MultiObject{Items: []client.Object{}}
-	//}
 
 	// Always add to model so updateAndValidate is called (may process spec ConfigMaps)
 	model.setRuntimeObject(p)

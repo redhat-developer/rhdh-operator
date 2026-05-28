@@ -352,8 +352,6 @@ plugins:
 
 	deps := dynaPlugins[0].Dependencies
 
-	//deps, err := dpWithDeps.Dependencies()
-
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(dynaPlugins[0].Dependencies))
 	assert.Equal(t, "dependency-1", dynaPlugins[0].Dependencies[0].Ref)
@@ -445,8 +443,6 @@ includes:
 	// Call the function
 	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
 
-	//mergedData, err := defDynamicPlugins.mergeWith(specData)
-
 	// Assertions
 	assert.NoError(t, err)
 	assert.NotNil(t, mergedData)
@@ -523,8 +519,6 @@ plugins:
   - package: "plugin-a"
 includes: []
 `
-	// Call the function
-	//mergedData, err := defDynamicPlugins.mergeWith(specData)
 	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
 
 	// Assertions
@@ -568,7 +562,6 @@ plugins:
      key1: "overridden"
    dependencies: []
 `
-	//mergedData, err := defDynamicPlugins.mergeWith(specData)
 	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
 
 	assert.NoError(t, err)
