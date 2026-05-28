@@ -14,6 +14,11 @@ NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 UPSTREAM_IIB_OVERRIDE=""
 INSTALL_PLAN_APPROVAL="Automatic"
+MAX_PARALLEL="${MAX_PARALLEL:-10}"
+if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
+  echo "[ERROR] MAX_PARALLEL must be a positive integer, got: '$MAX_PARALLEL'" >&2
+  exit 1
+fi
 
 function logf() {
   set -euo pipefail
@@ -150,56 +155,120 @@ function k8s_check_bundle_manifest_default_config() {
   echo "ok"
 }
 
+# Writes sed replacement commands to sed_commands_dir for the caller to batch-apply after all bundles complete.
+function process_bundle() {
+  set -euo pipefail
+
+  local bundleImg="$1"
+  local originalBundleImg="$2"
+  local digest="$3"
+  local my_registry="$4"
+  local internal_registry_url="$5"
+  local sed_commands_dir="$6"
+  local bundle_id="$7"
+
+  local bundle_dir="bundles/${digest}"
+  mkdir -p "${bundle_dir}"
+
+  # Failed copies are faster than successful inspects.
+  if ! skopeo copy "docker://$bundleImg" "oci:./${bundle_dir}/src:latest" 2>"${bundle_dir}/copy.err"; then
+    debugf "bundle #${bundle_id}: skopeo copy failed, skipping (see ${bundle_dir}/copy.err)" >&2
+    return 0
+  fi
+  debugf "bundle #${bundle_id}: pulled ${bundleImg}" >&2
+
+  umoci unpack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked" --rootless
+
+  for folder in manifests metadata; do
+    for file in "./${bundle_dir}/unpacked/rootfs/${folder}"/*; do
+      if [ -f "$file" ]; then
+        sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file"
+        sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file"
+        sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file"
+      fi
+    done
+  done
+
+  umoci repack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked"
+
+  local newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
+  skopeo copy --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}"
+  debugf "bundle #${bundle_id}: pushed to ${newBundleImage}" >&2
+
+  local newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"
+  # Each worker writes to its own file (keyed by digest) — no locking needed.
+  echo "s#${originalBundleImg}#${newBundleImageAsInt}#g" > "${sed_commands_dir}/${digest}.sed"
+}
+
 function update_refs_in_iib_bundles() {
   set -euo pipefail
 
   local internal_registry_url="$1"
   local my_registry="$2"
-  # 2. Render the IIB locally, modify any references to the internal registries with their mirrors on Quay
-  # and push the updates to the internal cluster registry
-  for bundleImg in $(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq); do
-    originalBundleImg="$bundleImg"
-    digest="${originalBundleImg##*@sha256:}"
+
+  local bundle_images
+  bundle_images=$(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
+
+  local total_bundles
+  total_bundles=$(echo "$bundle_images" | wc -l | tr -d ' ')
+  infof "Processing ${total_bundles} bundles (max ${MAX_PARALLEL} parallel)..." >&2
+
+  local sed_commands_dir="${TMPDIR}/sed_commands"
+  mkdir -p "$sed_commands_dir"
+
+  local bundle_count=0
+  local pids=()
+
+  for bundleImg in $bundle_images; do
+    bundle_count=$((bundle_count + 1))
+    local originalBundleImg="$bundleImg"
+    local digest="${originalBundleImg##*@sha256:}"
     bundleImg="${bundleImg/registry.stage.redhat.io/quay.io}"
     bundleImg="${bundleImg/registry.redhat.io/quay.io}"
     bundleImg="${bundleImg/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
-    debugf "$originalBundleImg => $bundleImg"
-    if skopeo inspect "docker://$bundleImg" &> /dev/null; then
-      newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
-      newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"
-      mkdir -p "bundles/$digest"
+    debugf "bundle #${bundle_count}/${total_bundles}: $originalBundleImg => $bundleImg" >&2
 
-      debugf "Copying and unpacking image $bundleImg locally..."
-      skopeo copy "docker://$bundleImg" "oci:./bundles/${digest}/src:latest"
-      umoci unpack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked" --rootless
-
-      # Replace the occurrences in the .csv.yaml or .clusterserviceversion.yaml files
-      debugf "Replacing refs to internal registry in bundle image $bundleImg..."
-      for folder in manifests metadata; do
-        for file in "./bundles/${digest}/unpacked/rootfs/${folder}"/*; do
-          if [ -f "$file" ]; then
-            debugf "replacing refs to internal registries in file '${file}'"
-            sed -i 's#registry.redhat.io/rhdh#quay.io/rhdh#g' "$file"
-            sed -i 's#registry.stage.redhat.io/rhdh#quay.io/rhdh#g' "$file"
-            sed -i 's#registry-proxy.engineering.redhat.com/rh-osbs/rhdh-#quay.io/rhdh/#g' "$file"
-          fi
-        done
+    # Portable alternative to `wait -n` (not available in all bash versions)
+    while true; do
+      local running=0
+      for pid in ${pids[@]+"${pids[@]}"}; do
+        if kill -0 "$pid" 2>/dev/null; then
+          running=$((running + 1))
+        fi
       done
+      if [[ $running -lt $MAX_PARALLEL ]]; then
+        break
+      fi
+      sleep 0.2
+    done
 
-      # repack the image with the changes
-      debugf "Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
-      umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked"
-
-      # Push the bundle to the internal cluster registry
-      debugf "Pushing updated image: ./bundles/${digest}/src => ${newBundleImage}..."
-      skopeo copy --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
-
-      sed -i "s#${originalBundleImg}#${newBundleImageAsInt}#g" "${TMPDIR}/rhdh/rhdh/render.yaml"
-    fi
+    process_bundle "$bundleImg" "$originalBundleImg" "$digest" "$my_registry" "$internal_registry_url" "$sed_commands_dir" "$bundle_count" &
+    pids+=($!)
   done
 
-  # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
-  debugf "Regenerating IIB Dockerfile with updated refs..."
+  local failed=0
+  for pid in ${pids[@]+"${pids[@]}"}; do
+    if ! wait "$pid"; then
+      failed=$((failed + 1))
+    fi
+  done
+  if [[ $failed -gt 0 ]]; then
+    errorf "${failed} bundle(s) failed to process" >&2
+    return 1
+  fi
+
+  local sed_files
+  sed_files=$(find "$sed_commands_dir" -name '*.sed' 2>/dev/null)
+  if [[ -n "$sed_files" ]]; then
+    local combined_sed="${TMPDIR}/combined_sed_commands.txt"
+    cat "$sed_commands_dir"/*.sed > "$combined_sed"
+    local replacement_count
+    replacement_count=$(wc -l < "$combined_sed" | tr -d ' ')
+    infof "Applying ${replacement_count} image ref replacements to render.yaml..." >&2
+    sed -i -f "$combined_sed" "${TMPDIR}/rhdh/rhdh/render.yaml"
+  fi
+
+  debugf "Regenerating IIB Dockerfile with updated refs..." >&2
   opm generate dockerfile rhdh/rhdh
 }
 
@@ -216,7 +285,9 @@ function ocp_install() {
 
   set -euo pipefail
 
-  render_iib >&2
+  # render_iib is independent of registry setup below, so run concurrently.
+  render_iib >&2 &
+  local render_pid=$!
 
   # 1. Expose the internal cluster registry if not done already
   debugf "Exposing cluster registry..." >&2
@@ -224,12 +295,8 @@ function ocp_install() {
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
   skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
-  if oc -n openshift-marketplace get secret internal-reg-auth-for-rhdh &> /dev/null; then
-    oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh >&2
-  fi
-  if oc -n openshift-marketplace get secret internal-reg-ext-auth-for-rhdh &> /dev/null; then
-    oc -n openshift-marketplace delete secret internal-reg-ext-auth-for-rhdh >&2
-  fi
+  oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh --ignore-not-found >&2
+  oc -n openshift-marketplace delete secret internal-reg-ext-auth-for-rhdh --ignore-not-found >&2
   oc -n openshift-marketplace create secret docker-registry internal-reg-ext-auth-for-rhdh \
     --docker-server="${my_registry}" \
     --docker-username=kubeadmin \
@@ -249,6 +316,11 @@ function ocp_install() {
   done
   oc policy add-role-to-user system:image-puller system:serviceaccount:openshift-marketplace:default -n openshift-marketplace >&2 || true
   oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:default -n rhdh-operator >&2 || true
+
+  if ! wait "$render_pid"; then
+    errorf "opm render failed" >&2
+    return 1
+  fi
 
   # 3. Regenerate the IIB image with the local changes to the render.yaml file and build and push it from within the cluster
   update_refs_in_iib_bundles "$internal_registry_url" "$my_registry" >&2
@@ -407,7 +479,6 @@ EOF
       cat "${registry_port_fwd_out}"
       return 1
   fi
-  trap '[[ -n "${port_fwd_pid:-}" ]] && kill ${port_fwd_pid} || true' EXIT
 
   local portFwdLocalPort
   portFwdLocalPort=$(grep -oP '127\.0\.0\.1:\K[0-9]+' "${registry_port_fwd_out}")
@@ -458,7 +529,6 @@ EOF
   local timestamp
   local kanikoJobName
   local kanikoPod
-  local kanikoLogsPid
   local localContext
   timestamp=$(date +%s)
   kanikoJobName="kaniko-build-${timestamp}"
@@ -522,8 +592,6 @@ EOF
   debugf "Waiting for Kaniko pod $kanikoPod to be ready..." >&2
   invoke_cluster_cli -n "${namespace}" wait --for=condition=Ready "pod/$kanikoPod" --timeout=60s >&2
   invoke_cluster_cli -n "${namespace}" logs -f "${kanikoPod}" >&2 &
-  kanikoLogsPid=$!
-  trap '[[ -n "${kanikoLogsPid:-}" ]] && kill ${kanikoLogsPid} &>/dev/null || true' EXIT
 
   localContext=context.tar.gz
   tar -czf "${localContext}" -C rhdh . >&2
@@ -556,8 +624,10 @@ fi
 TMPDIR=$(mktemp -d)
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
+
 # shellcheck disable=SC2064
-trap "rm -fr $TMPDIR || true" EXIT
+trap "rm -fr '$TMPDIR' || true; jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null" EXIT
+trap "exit 1" INT TERM
 
 detect_ocp_and_set_env_var
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
@@ -749,6 +819,10 @@ NAMESPACE_CATALOGSOURCE="olm"
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   NAMESPACE_CATALOGSOURCE="openshift-marketplace"
 fi
+
+# Delete existing CatalogSource first to force OLM to re-pull the image.
+# Without this, if the tag is unchanged but the digest changed (rebuilt IIB), OLM reports "unchanged" and never re-indexes.
+invoke_cluster_cli delete catalogsource "${CATALOGSOURCE_NAME}" -n "${NAMESPACE_CATALOGSOURCE}" --ignore-not-found
 
 echo "apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
