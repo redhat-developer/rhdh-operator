@@ -69,7 +69,7 @@ func TestFlavoursWithDefaultsEnabled(t *testing.T) {
 
 func TestFlavoursWithExplicitEnabled(t *testing.T) {
 	bs := testFlavoursBackstage.DeepCopy()
-	bs.Spec.Flavours = []api.Flavour{
+	bs.Spec.Flavours = &[]api.Flavour{
 		{Name: "flavor2", Enabled: true},
 	}
 
@@ -119,7 +119,7 @@ func TestFlavoursWithExplicitEnabled(t *testing.T) {
 
 func TestFlavoursWithDefaultDisabled(t *testing.T) {
 	bs := testFlavoursBackstage.DeepCopy()
-	bs.Spec.Flavours = []api.Flavour{
+	bs.Spec.Flavours = &[]api.Flavour{
 		{Name: "flavor1", Enabled: false}, // Disable default flavour
 	}
 
@@ -162,7 +162,7 @@ func TestFlavoursWithDefaultDisabled(t *testing.T) {
 
 func TestFlavoursOnlyNoBase(t *testing.T) {
 	bs := testFlavoursBackstage.DeepCopy()
-	bs.Spec.Flavours = []api.Flavour{
+	bs.Spec.Flavours = &[]api.Flavour{
 		{Name: "flavor3", Enabled: true}, // Enable flavour when no base config exists
 	}
 
@@ -199,7 +199,7 @@ func TestFlavoursOnlyNoBase(t *testing.T) {
 
 func TestFlavoursWithEmptyArray(t *testing.T) {
 	bs := testFlavoursBackstage.DeepCopy()
-	bs.Spec.Flavours = []api.Flavour{} // Empty array - disable ALL flavours
+	bs.Spec.Flavours = &[]api.Flavour{} // Empty array - disable ALL flavours
 
 	testObj := createBackstageTest(*bs).withConfigPath("./testdata/testflavours").withLocalDb(false)
 
