@@ -350,8 +350,6 @@ plugins:
 	dynaPlugins, err := GetPluginsData(&dpCM)
 	assert.NoError(t, err)
 
-	deps := dynaPlugins[0].Dependencies
-
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(dynaPlugins[0].Dependencies))
 	assert.Equal(t, "dependency-1", dynaPlugins[0].Dependencies[0].Ref)
@@ -376,7 +374,7 @@ plugins:
 		},
 	}
 
-	deps, err = dpWithoutDeps.Dependencies()
+	deps, err := dpWithoutDeps.Dependencies()
 	assert.NoError(t, err)
 	assert.NotNil(t, deps)
 	assert.Equal(t, 0, len(deps)) // Ensure it returns an empty slice, not nil

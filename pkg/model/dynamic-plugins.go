@@ -3,8 +3,6 @@ package model
 import (
 	"fmt"
 	"os"
-	"regexp"
-	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -70,51 +68,6 @@ func init() {
 
 func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
-}
-
-// TODO to be used later
-func (d *DynaPlugin) isReference() bool {
-	return strings.HasPrefix(d.Package, "ref://")
-}
-
-// TODO to be used later
-func (d *DynaPlugin) getName() string {
-	packageURL := d.Package
-
-	// OCI multi-plugin: oci://host/path:tag!plugin-name
-	if strings.Contains(packageURL, "!") {
-		parts := strings.Split(packageURL, "!")
-		return parts[len(parts)-1]
-	}
-
-	// OCI single plugin: oci://host/path/plugin-name:tag or @digest
-	if strings.HasPrefix(packageURL, "oci://") {
-		re := regexp.MustCompile(`^oci://[^/]+/(?:.*/)?([^/:@]+)[:@]`)
-		if matches := re.FindStringSubmatch(packageURL); len(matches) > 1 {
-			return matches[1]
-		}
-	}
-
-	// NPM: @scope/plugin-name@version
-	if strings.HasPrefix(packageURL, "@") {
-		// Remove scope
-		parts := strings.Split(packageURL, "/")
-		if len(parts) > 1 {
-			packageURL = parts[1]
-			// Remove @version
-			versionParts := strings.Split(packageURL, "@")
-			return versionParts[0]
-		}
-	}
-
-	// Local: ./dynamic-plugins/dist/plugin-name
-	// Reference: ref://plugin-name
-	if strings.HasPrefix(packageURL, "./") || strings.HasPrefix(d.Package, "ref://") {
-		parts := strings.Split(packageURL, "/")
-		return parts[len(parts)-1]
-	}
-
-	return ""
 }
 
 func (p *DynamicPlugins) Object() runtime.Object {
