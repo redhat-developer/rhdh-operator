@@ -1,8 +1,6 @@
 module github.com/redhat-developer/rhdh-operator
 
-go 1.23.0
-
-toolchain go1.23.9
+go 1.23.10
 
 require (
 	github.com/onsi/ginkgo/v2 v2.22.2
