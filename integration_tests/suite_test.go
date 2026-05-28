@@ -172,11 +172,12 @@ func createBackstage(ctx context.Context, spec api.BackstageSpec, ns string, nam
 }
 
 func createAndReconcileBackstage(ctx context.Context, ns string, spec api.BackstageSpec, name string) string {
+
 	backstageName, err := createBackstage(ctx, spec, ns, name)
 	Expect(err).To(Not(HaveOccurred()))
 
+	found := &api.Backstage{}
 	Eventually(func() error {
-		found := &api.Backstage{}
 		return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 	}, time.Minute, time.Second).Should(Succeed())
 
@@ -195,6 +196,19 @@ func createAndReconcileBackstage(ctx context.Context, ns string, spec api.Backst
 
 	return backstageName
 }
+
+// TODO: it is not working as Backstage app is starting faster than DB and failed.
+//func createAndReconcileEmptyBackstage(ctx context.Context, ns string, spec api.BackstageSpec, name string) string {
+//	cmName := generateRandName(name)
+//
+//	specData := `
+//includes: []
+//`
+//	generateConfigMap(ctx, k8sClient, cmName, ns, map[string]string{model.DynamicPluginsFile: specData}, nil, nil)
+//	spec.Flavours = &[]api.Flavour{}
+//	spec.Application.DynamicPluginsConfigMapName = cmName
+//	return createAndReconcileBackstage(ctx, ns, spec, name)
+//}
 
 func createNamespace(ctx context.Context) string {
 	ns := fmt.Sprintf("ns-%d-%s", GinkgoParallelProcess(), randString(5))

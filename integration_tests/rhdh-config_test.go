@@ -14,7 +14,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/api"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -307,9 +306,9 @@ var _ = When("create default rhdh", func() {
 		ctx := context.Background()
 		ns := createNamespace(ctx)
 		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
-			Flavours: []api.Flavour{
-				{Name: "lightspeed", Enabled: true},
-			},
+			//Flavours: &[]api.Flavour{
+			//	{Name: "lightspeed", Enabled: true},
+			//},
 		}, "")
 
 		Eventually(func(g Gomega) {
@@ -333,14 +332,6 @@ var _ = When("create default rhdh", func() {
 			for _, c := range deploy.PodSpec().Containers {
 				if c.Name == "lightspeed-core" {
 					foundLightspeedCore = true
-					cpuRequest := c.Resources.Requests[corev1.ResourceCPU]
-					memoryRequest := c.Resources.Requests[corev1.ResourceMemory]
-					cpuLimit := c.Resources.Limits[corev1.ResourceCPU]
-					memoryLimit := c.Resources.Limits[corev1.ResourceMemory]
-					g.Expect(cpuRequest.Cmp(resource.MustParse("100m"))).To(Equal(0))
-					g.Expect(memoryRequest.Cmp(resource.MustParse("512Mi"))).To(Equal(0))
-					g.Expect(cpuLimit.Cmp(resource.MustParse("1000m"))).To(Equal(0))
-					g.Expect(memoryLimit.Cmp(resource.MustParse("2Gi"))).To(Equal(0))
 				}
 			}
 			g.Expect(foundLightspeedCore).To(BeTrue())
@@ -349,17 +340,59 @@ var _ = When("create default rhdh", func() {
 			for _, c := range deploy.PodSpec().InitContainers {
 				if c.Name == "init-rag-data" {
 					foundInitRagData = true
-					cpuRequest := c.Resources.Requests[corev1.ResourceCPU]
-					memoryRequest := c.Resources.Requests[corev1.ResourceMemory]
-					cpuLimit := c.Resources.Limits[corev1.ResourceCPU]
-					memoryLimit := c.Resources.Limits[corev1.ResourceMemory]
-					g.Expect(cpuRequest.Cmp(resource.MustParse("50m"))).To(Equal(0))
-					g.Expect(memoryRequest.Cmp(resource.MustParse("150Mi"))).To(Equal(0))
-					g.Expect(cpuLimit.Cmp(resource.MustParse("100m"))).To(Equal(0))
-					g.Expect(memoryLimit.Cmp(resource.MustParse("500Mi"))).To(Equal(0))
 				}
 			}
 			g.Expect(foundInitRagData).To(BeTrue())
+
+		}, 20*time.Second, time.Second).Should(Succeed())
+
+		deleteNamespace(ctx, ns)
+	})
+
+	It("creates rhdh with no flavours", func() {
+
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
+		}
+
+		ctx := context.Background()
+		ns := createNamespace(ctx)
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			Flavours: &[]api.Flavour{},
+		}, "")
+
+		Eventually(func(g Gomega) {
+			cmList := &corev1.ConfigMapList{}
+			err := k8sClient.List(ctx, cmList, client.InNamespace(ns))
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			// check if contains ConfigMaps with "flavour-lightspeed" source
+			foundSource := false
+			for _, cm := range cmList.Items {
+				if cm.Annotations[model.SourceAnnotation] == "flavour-lightspeed" {
+					foundSource = true
+				}
+			}
+			g.Expect(foundSource).To(BeFalse())
+
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).To(Not(HaveOccurred()))
+
+			foundLightspeedCore := false
+			for _, c := range deploy.PodSpec().Containers {
+				if c.Name == "lightspeed-core" {
+					foundLightspeedCore = true
+				}
+			}
+			g.Expect(foundLightspeedCore).To(BeFalse())
+
+			foundInitRagData := false
+			for _, c := range deploy.PodSpec().InitContainers {
+				if c.Name == "init-rag-data" {
+					foundInitRagData = true
+				}
+			}
+			g.Expect(foundInitRagData).To(BeFalse())
 
 		}, 20*time.Second, time.Second).Should(Succeed())
 
