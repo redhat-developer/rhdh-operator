@@ -626,7 +626,8 @@ pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
 # shellcheck disable=SC2064
-trap "rm -fr $TMPDIR || true; kill 0" EXIT INT TERM
+trap "rm -fr '$TMPDIR' || true; jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null" EXIT
+trap "exit 1" INT TERM
 
 detect_ocp_and_set_env_var
 if [[ "${IS_OPENSHIFT}" = "true" ]]; then
