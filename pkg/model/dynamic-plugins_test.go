@@ -573,3 +573,51 @@ plugins:
 	assert.Equal(t, 0, len(mergedConfig.Plugins[0].Dependencies))
 
 }
+
+// TestExternalConfigMapMetadataNotReused verifies that when DynamicPluginsConfigMapName is set
+// and there is no default dynamic-plugins config, the code creates a fresh ConfigMap
+// and does NOT reuse the external ConfigMap's ObjectMeta (resourceVersion, uid, etc.).
+// This is critical for SSA apply to work correctly when creating new objects.
+func TestExternalConfigMapMetadataNotReused(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	bs.Spec.Application.DynamicPluginsConfigMapName = "external-dp-config"
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		// Note: NO dynamic-plugins.yaml in default config - this triggers the else branch
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	// Simulate an external ConfigMap as returned by client.Get (with cluster metadata)
+	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "external-dp-config",
+			Namespace:         "ns123",
+			ResourceVersion:   "12345",                              // Set by cluster
+			UID:               "abc-def-123",                        // Set by cluster
+			Generation:        2,                                    // Set by cluster
+			CreationTimestamp: metav1.Time{Time: metav1.Now().Time}, // Set by cluster
+		},
+		Data: map[string]string{DynamicPluginsFile: "plugins: []"},
+	}
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	// Get the DynamicPlugins object from model
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey)
+	assert.NotNil(t, dpObj)
+
+	dp := dpObj.(*DynamicPlugins)
+	assert.NotNil(t, dp.ConfigMap)
+
+	// Verify that cluster metadata is NOT present on the model's ConfigMap
+	assert.Empty(t, dp.ConfigMap.ResourceVersion, "ResourceVersion should not be copied from external ConfigMap")
+	assert.Empty(t, dp.ConfigMap.UID, "UID should not be copied from external ConfigMap")
+
+	// Verify that the Data IS preserved
+	assert.Equal(t, "plugins: []", dp.ConfigMap.Data[DynamicPluginsFile], "Data should be copied from external ConfigMap")
+
+	// Verify the name is set to the operator-managed name (not the external name)
+	assert.Equal(t, DynamicPluginsDefaultName(bs.Name), dp.ConfigMap.Name, "Name should be set to operator-managed name")
+}

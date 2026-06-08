@@ -120,8 +120,13 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 			}
 			p.ConfigMap.Data[DynamicPluginsFile] = mergedData
 		} else {
-			// No default config, point to user's config
-			p.ConfigMap = specPlugins
+			// No default config - create a fresh ConfigMap copying only Data/BinaryData.
+			// We must NOT reuse the external ConfigMap's ObjectMeta (resourceVersion, uid,
+			// managedFields, etc.) as it would cause SSA apply to fail on create.
+			p.ConfigMap = &corev1.ConfigMap{
+				Data:       specPlugins.Data,
+				BinaryData: specPlugins.BinaryData,
+			}
 		}
 	}
 
