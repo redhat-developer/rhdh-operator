@@ -87,6 +87,8 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 		if err != nil {
 			return fmt.Errorf("cannot set deployment object: %w", err)
 		}
+	} else {
+		return fmt.Errorf("deployment object is not set")
 	}
 
 	b.model = model
@@ -119,7 +121,7 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
 
 	//DbSecret
 	var err error
