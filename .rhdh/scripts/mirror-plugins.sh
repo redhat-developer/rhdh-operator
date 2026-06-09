@@ -497,7 +497,8 @@ function mirror_catalog_index() {
       . | with_entries(
         .value.registryReference |= (
           if . then
-            . | sub("^[^/]+(/[^/]+)*/(?<last2>[^/]+/[^/]+)$"; $target_reg + "/" + .last2)
+            (try capture("^[^/]+(/[^/]+)*/(?<last2>[^/]+/[^/]+)$") catch null) as $m
+            | if $m then $target_reg + "/" + $m.last2 else . end
           else
             .
           end
@@ -960,7 +961,8 @@ function mirror_plugins_from_dir() {
       . | with_entries(
         .value.registryReference |= (
           if . then
-            . | sub("^[^/]+(/[^/]+)*/(?<last2>[^/]+/[^/]+)$"; $target_reg + "/" + .last2)
+            (try capture("^[^/]+(/[^/]+)*/(?<last2>[^/]+/[^/]+)$") catch null) as $m
+            | if $m then $target_reg + "/" + $m.last2 else . end
           else
             .
           end
