@@ -491,13 +491,14 @@ function mirror_catalog_index() {
     infof "Updating plugin registry references in index.json..."
     
     # Use jq to update all registryReference values
-    # Replace the registry domain (first component before /) with target registry
+    # Replace the full registry path (hostname + any path prefix) with target registry,
+    # preserving only the last two path elements (org/image) and tag/digest
     if ! jq --arg target_reg "$target_registry" '
       . | with_entries(
         .value.registryReference |= (
           if . then
-            # Remove everything up to and including first slash, then prepend target registry
-            . | sub("^[^/]+/"; $target_reg + "/")
+            (try capture("^[^/]+(/[^/]+)*/(?<last2>[^/]+/[^/]+)$") catch null) as $m
+            | if $m then $target_reg + "/" + $m.last2 else . end
           else
             .
           end
@@ -516,9 +517,10 @@ function mirror_catalog_index() {
     # Update OCI references in dynamic-plugins.default.yaml
     infof "Updating OCI references in dynamic-plugins.default.yaml..."
     if [[ -f "$catalog_data_dir/dynamic-plugins.default.yaml" ]]; then
-      # Replace OCI registry references (preserves path and tag)
-      # Pattern: oci://REGISTRY/PATH:TAG -> oci://NEW_REGISTRY/PATH:TAG
-      sed -i -E "s|oci://[^/]+/|oci://$target_registry/|g" "$catalog_data_dir/dynamic-plugins.default.yaml"
+      # Replace OCI registry references (preserves last two path elements and tag)
+      # Pattern: oci://REGISTRY/org/image:TAG -> oci://NEW_REGISTRY/org/image:TAG
+      # Matches full registry path (hostname + any path prefix) before the last two elements
+      sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$target_registry\2|g" "$catalog_data_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
     fi
     
@@ -527,7 +529,7 @@ function mirror_catalog_index() {
     local yaml_count=0
     while IFS= read -r yaml_file; do
       if [[ -n "$yaml_file" && -f "$yaml_file" ]]; then
-        sed -i -E "s|oci://[^/]+/|oci://$target_registry/|g" "$yaml_file"
+        sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$target_registry\2|g" "$yaml_file"
         ((yaml_count++)) || true
       fi
     done < <(find "$catalog_data_dir/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
@@ -959,8 +961,8 @@ function mirror_plugins_from_dir() {
       . | with_entries(
         .value.registryReference |= (
           if . then
-            # Remove everything up to and including first slash, then prepend target registry
-            . | sub("^[^/]+/"; $target_reg + "/")
+            (try capture("^[^/]+(/[^/]+)*/(?<last2>[^/]+/[^/]+)$") catch null) as $m
+            | if $m then $target_reg + "/" + $m.last2 else . end
           else
             .
           end
@@ -977,7 +979,7 @@ function mirror_plugins_from_dir() {
     # Update OCI references in dynamic-plugins.default.yaml
     infof "Updating OCI references in dynamic-plugins.default.yaml..."
     if [[ -f "$catalog_dir/dynamic-plugins.default.yaml" ]]; then
-      sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$catalog_dir/dynamic-plugins.default.yaml"
+      sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$TO_REGISTRY\2|g" "$catalog_dir/dynamic-plugins.default.yaml"
       debugf "Updated OCI references in dynamic-plugins.default.yaml"
     fi
     
@@ -986,7 +988,7 @@ function mirror_plugins_from_dir() {
     local yaml_count=0
     while IFS= read -r yaml_file; do
       if [[ -n "$yaml_file" && -f "$yaml_file" ]]; then
-        sed -i -E "s|oci://[^/]+/|oci://$TO_REGISTRY/|g" "$yaml_file"
+        sed -i -E "s|oci://[^/]+(/[^/]+)*(/[^/]+/[^[:space:]\"']+)|oci://$TO_REGISTRY\2|g" "$yaml_file"
         ((yaml_count++)) || true
       fi
     done < <(find "$catalog_dir/catalog-entities" -name "*.yaml" -type f 2>/dev/null)
