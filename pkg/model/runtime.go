@@ -198,7 +198,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 	for _, obj := range model.RuntimeObjects {
 		err := obj.updateAndValidate(backstage, scheme)
 		if err != nil {
-			return nil, fmt.Errorf("failed object validation, reason: %s", err)
+			return nil, fmt.Errorf("failed object validation, reason: %w", err)
 		}
 	}
 
