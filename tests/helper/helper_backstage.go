@@ -90,6 +90,21 @@ func GuestAuth(baseUrl string) (string, error) {
 	return authResponse.BackstageIdentity.Token, nil
 }
 
+// GetBackstageCRDStorageVersion returns the storage API version from the installed Backstage CRD.
+func GetBackstageCRDStorageVersion() (string, error) {
+	cmd := exec.Command(GetPlatformTool(), "get", "crd", "backstages.rhdh.redhat.com",
+		"-o", `jsonpath={.spec.versions[?(@.storage==true)].name}`) // #nosec G204
+	out, err := Run(cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Backstage CRD storage version: %w", err)
+	}
+	version := strings.TrimSpace(string(out))
+	if version == "" {
+		return "", fmt.Errorf("no storage version found in Backstage CRD")
+	}
+	return version, nil
+}
+
 func VerifyBackstagePodStatus(g Gomega, ns string, crName string, expectedStatus string) {
 	cmd := exec.Command("kubectl", "get", "pods",
 		"-l", "rhdh.redhat.com/app=backstage-"+crName,
