@@ -81,12 +81,12 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
+	assert.NotNil(t, model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment))
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
 	//dynamic-plugins-auth
 	//vol-default-dynamic-plugins
-	assert.Equal(t, 4, len(model.backstageDeployment.podSpec().Volumes))
+	assert.Equal(t, 4, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).podSpec().Volumes))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
@@ -96,7 +96,7 @@ func TestDefaultDynamicPlugins(t *testing.T) {
 	//vol-default-dynamic-plugins
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 
-	deps, err := model.DynamicPlugins.Dependencies()
+	deps, err := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(deps))
 
@@ -130,7 +130,7 @@ func TestDefaultAndSpecifiedDynamicPlugins(t *testing.T) {
 	assert.Equal(t, 4, len(ic.VolumeMounts))
 	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(DynamicPluginsDefaultName(bs.Name)), ic.VolumeMounts[3].Name)
 
-	deps, err := model.DynamicPlugins.Dependencies()
+	deps, err := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(deps))
 }
@@ -158,11 +158,11 @@ func TestSpecifiedOnlyDynamicPlugins(t *testing.T) {
 	//dynamic-plugins-root
 	//dynamic-plugins-npmrc
 	//dynamic-plugins-auth
-	//dplugin
+	//backstage-dynamic-plugins-{name} (operator-managed ConfigMap with user's data)
 	assert.Equal(t, 4, len(ic.VolumeMounts))
-	assert.Equal(t, bs.Spec.Application.DynamicPluginsConfigMapName, ic.VolumeMounts[3].Name)
+	assert.Equal(t, utils.GenerateVolumeNameFromCmOrSecret(DynamicPluginsDefaultName(bs.Name)), ic.VolumeMounts[3].Name)
 
-	deps, err := model.DynamicPlugins.Dependencies()
+	deps, err := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(deps))
 }
@@ -190,11 +190,9 @@ func TestNotConfiguredDPsNotInTheModel(t *testing.T) {
 	m, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	for _, obj := range m.RuntimeObjects {
-		if _, ok := obj.(*DynamicPlugins); ok {
-			assert.Fail(t, "Model contains DynamicPlugins object")
-		}
-	}
+	// DynamicPlugins should not be returned when not configured
+	dpObj := m.GetRuntimeObject(DynamicPluginsKey)
+	assert.Nil(t, dpObj, "DynamicPlugins should not be returned when not configured")
 }
 
 func TestWithDynamicPluginsDeps(t *testing.T) {
@@ -228,18 +226,18 @@ plugins:
 	// dependencies from external config
 	//  - ref: "dependency-1"
 	//  - ref: "dependency-2"
-	deps, err := model.DynamicPlugins.Dependencies()
+	deps, err := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(deps))
 
-	depends, err := (model.getRuntimeObjectByType(&DynamicPlugins{})).(*DynamicPlugins).Dependencies()
+	depends, err := (model.GetRuntimeObject(DynamicPluginsKey)).(*DynamicPlugins).Dependencies()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(depends))
 
 }
 
 func initContainer(model *BackstageModel) *corev1.Container {
-	for _, v := range model.backstageDeployment.podSpec().InitContainers {
+	for _, v := range model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).podSpec().InitContainers {
 		if v.Name == dynamicPluginInitContainerName {
 			return &v
 		}
@@ -258,7 +256,7 @@ func TestCatalogIndexImageFromDefaultConfig(t *testing.T) {
 
 	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
-	assert.NotNil(t, model.backstageDeployment)
+	assert.NotNil(t, model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment))
 
 	ic := initContainer(model)
 	assert.NotNil(t, ic)
@@ -335,20 +333,29 @@ plugins:
       - ref: "dependency-4"
 `
 
-	dpWithDeps := &DynamicPlugins{
-		ConfigMap: &corev1.ConfigMap{
-			Data: map[string]string{
-				DynamicPluginsFile: yamlDataWithDeps,
-			},
+	//dpWithDeps := &DynamicPlugins{
+	//	ConfigMap: &corev1.ConfigMap{
+	//		Data: map[string]string{
+	//			DynamicPluginsFile: yamlDataWithDeps,
+	//		},
+	//	},
+	//}
+
+	dpCM := corev1.ConfigMap{
+		Data: map[string]string{
+			DynamicPluginsFile: yamlDataWithDeps,
 		},
 	}
 
-	deps, err := dpWithDeps.Dependencies()
+	dynaPlugins, err := GetPluginsData(&dpCM)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(deps))
-	assert.Equal(t, "dependency-1", deps[0].Ref)
-	assert.Equal(t, "dependency-2", deps[1].Ref)
-	assert.Equal(t, "dependency-3", deps[2].Ref)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(dynaPlugins[0].Dependencies))
+	assert.Equal(t, "dependency-1", dynaPlugins[0].Dependencies[0].Ref)
+	assert.Equal(t, "dependency-2", dynaPlugins[0].Dependencies[1].Ref)
+	assert.Equal(t, 1, len(dynaPlugins[1].Dependencies))
+	assert.Equal(t, "dependency-3", dynaPlugins[1].Dependencies[0].Ref)
 
 	// Case 2: Plugins without dependencies
 	yamlDataWithoutDeps := `
@@ -367,7 +374,7 @@ plugins:
 		},
 	}
 
-	deps, err = dpWithoutDeps.Dependencies()
+	deps, err := dpWithoutDeps.Dependencies()
 	assert.NoError(t, err)
 	assert.NotNil(t, deps)
 	assert.Equal(t, 0, len(deps)) // Ensure it returns an empty slice, not nil
@@ -432,7 +439,7 @@ includes:
 `
 
 	// Call the function
-	mergedData, err := defDynamicPlugins.mergeWith(specData)
+	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
 
 	// Assertions
 	assert.NoError(t, err)
@@ -510,8 +517,7 @@ plugins:
   - package: "plugin-a"
 includes: []
 `
-	// Call the function
-	mergedData, err := defDynamicPlugins.mergeWith(specData)
+	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
 
 	// Assertions
 	assert.NoError(t, err)
@@ -554,7 +560,7 @@ plugins:
      key1: "overridden"
    dependencies: []
 `
-	mergedData, err := defDynamicPlugins.mergeWith(specData)
+	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, mergedData)
@@ -566,4 +572,52 @@ plugins:
 	assert.Equal(t, 1, len(mergedConfig.Plugins))
 	assert.Equal(t, 0, len(mergedConfig.Plugins[0].Dependencies))
 
+}
+
+// TestExternalConfigMapMetadataNotReused verifies that when DynamicPluginsConfigMapName is set
+// and there is no default dynamic-plugins config, the code creates a fresh ConfigMap
+// and does NOT reuse the external ConfigMap's ObjectMeta (resourceVersion, uid, etc.).
+// This is critical for SSA apply to work correctly when creating new objects.
+func TestExternalConfigMapMetadataNotReused(t *testing.T) {
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	bs.Spec.Application.DynamicPluginsConfigMapName = "external-dp-config"
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		// Note: NO dynamic-plugins.yaml in default config - this triggers the else branch
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	// Simulate an external ConfigMap as returned by client.Get (with cluster metadata)
+	testObj.externalConfig.DynamicPlugins = corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "external-dp-config",
+			Namespace:         "ns123",
+			ResourceVersion:   "12345",                              // Set by cluster
+			UID:               "abc-def-123",                        // Set by cluster
+			Generation:        2,                                    // Set by cluster
+			CreationTimestamp: metav1.Time{Time: metav1.Now().Time}, // Set by cluster
+		},
+		Data: map[string]string{DynamicPluginsFile: "plugins: []"},
+	}
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	// Get the DynamicPlugins object from model
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey)
+	assert.NotNil(t, dpObj)
+
+	dp := dpObj.(*DynamicPlugins)
+	assert.NotNil(t, dp.ConfigMap)
+
+	// Verify that cluster metadata is NOT present on the model's ConfigMap
+	assert.Empty(t, dp.ConfigMap.ResourceVersion, "ResourceVersion should not be copied from external ConfigMap")
+	assert.Empty(t, dp.ConfigMap.UID, "UID should not be copied from external ConfigMap")
+
+	// Verify that the Data IS preserved
+	assert.Equal(t, "plugins: []", dp.ConfigMap.Data[DynamicPluginsFile], "Data should be copied from external ConfigMap")
+
+	// Verify the name is set to the operator-managed name (not the external name)
+	assert.Equal(t, DynamicPluginsDefaultName(bs.Name), dp.ConfigMap.Name, "Name should be set to operator-managed name")
 }

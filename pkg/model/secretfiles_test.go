@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -39,13 +39,13 @@ func TestDefaultSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretFilesObjectKey, "raw-secret-files.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretFilesKey, "raw-secret-files.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
@@ -67,22 +67,25 @@ func TestDefaultMultiSecretFiles(t *testing.T) {
 	}
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
-		addToDefaultConfig(SecretFilesObjectKey, "raw-multi-secret.yaml")
+		addToDefaultConfig(SecretFilesKey, "raw-multi-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	mo := model.getRuntimeObjectByType(&SecretFiles{}).Object().(*multiobject.MultiObject)
+	secretFiles := model.GetRuntimeObject(SecretFilesKey)
+	assert.NotNil(t, secretFiles)
+	obj := secretFiles.Object()
+	mo := obj.(*multiobject.MultiObject)
 	assert.Equal(t, 3, len(mo.Items))
 	// data1+data2,data3+data4,data5
-	assert.Equal(t, 3, len(model.backstageDeployment.container().VolumeMounts))
+	assert.Equal(t, 3, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).container().VolumeMounts))
 	// data1+data2,data5
-	assert.Equal(t, 2, len(model.backstageDeployment.containerByName("install-dynamic-plugins").VolumeMounts))
+	assert.Equal(t, 2, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("install-dynamic-plugins").VolumeMounts))
 	// data5
-	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-container").VolumeMounts))
-	assert.Equal(t, 3, len(model.backstageDeployment.podSpec().Volumes))
+	assert.Equal(t, 1, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("another-container").VolumeMounts))
+	assert.Equal(t, 3, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).podSpec().Volumes))
 }
 
 func TestSpecifiedSecretFiles(t *testing.T) {
@@ -105,9 +108,9 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 3, len(deployment.container().VolumeMounts))
@@ -153,9 +156,9 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
@@ -176,9 +179,9 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
@@ -207,9 +210,9 @@ func TestSpecifiedSecretFilesWithContainers(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 3, len(deployment.containerByName("install-dynamic-plugins").VolumeMounts))
@@ -254,7 +257,7 @@ func TestReplaceSecretFiles(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	// secret1 is replacing secret from default

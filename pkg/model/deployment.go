@@ -47,7 +47,7 @@ type BackstageDeployment struct {
 }
 
 func init() {
-	registerConfig("deployment.yaml", BackstageDeploymentFactory{}, false, mergeDeployments)
+	registerConfig(DeploymentKey, BackstageDeploymentFactory{}, false, mergeDeployments)
 }
 
 func DeploymentName(backstageName string) string {
@@ -74,55 +74,64 @@ func (b *BackstageDeployment) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) setObject(obj runtime.Object) {
-
-	var err error
-	b.deployable, err = CreateDeployable(obj)
-	if err != nil {
-		panic(fmt.Sprintf("cannot set deployment object: %v", err))
-	}
+func (b *BackstageDeployment) GetKey() string {
+	return DeploymentKey
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
-	if b.deployable.GetObject() == nil {
-		return false, fmt.Errorf("backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
+func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
+	// Set the deployment from config parameter if not nil
+	if config != nil {
+		var err error
+		b.deployable, err = CreateDeployable(config)
+		if err != nil {
+			return fmt.Errorf("cannot set deployment object: %w", err)
+		}
+	} else {
+		return fmt.Errorf("deployment object is not set")
 	}
 
-	if BackstageContainerIndex(b.podSpec()) < 0 {
-		return false, fmt.Errorf("backstage Deployment is not initialized, Backstage Container is not identified")
-	}
-
-	if b.deployable.PodObjectMeta().Annotations == nil {
-		b.deployable.PodObjectMeta().Annotations = map[string]string{}
-	}
-	b.deployable.PodObjectMeta().Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
-
-	model.backstageDeployment = b
-	model.setRuntimeObject(b)
 	b.model = model
 
-	// override image with env var
-	if os.Getenv(BackstageImageEnvVar) != "" {
-		b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
+	// Call setMetaInfo if deployment is not nil
+	if b.deployable.GetObject() != nil {
+		model.setRuntimeObject(b)
+		b.setMetaInfo(backstage, scheme)
+
+		if BackstageContainerIndex(b.podSpec()) < 0 {
+			return fmt.Errorf("backstage Deployment is not initialized, Backstage Container is not identified")
+		}
+
+		if b.deployable.PodObjectMeta().Annotations == nil {
+			b.deployable.PodObjectMeta().Annotations = map[string]string{}
+		}
+		b.deployable.PodObjectMeta().Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
+
+		// override image with env var
+		if os.Getenv(BackstageImageEnvVar) != "" {
+			b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
+		}
+
+		if err := b.setDeployment(backstage); err != nil {
+			return err
+		}
 	}
 
-	if err := b.setDeployment(backstage); err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return nil
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage) error {
+func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
 
 	//DbSecret
 	var err error
 	if backstage.Spec.IsAuthSecretSpecified() {
 		err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, backstage.Spec.Database.AuthSecretName, "")
-	} else if b.model.LocalDbSecret != nil {
-		err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, b.model.LocalDbSecret.secret.Name, "")
+	} else if dbSecret := b.model.GetRuntimeObject(DbSecretKey); dbSecret != nil {
+		secret := dbSecret.(*DbSecret).secret
+		if secret != nil {
+			err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, secret.Name, "")
+		}
 	}
 
 	if err != nil {
@@ -283,25 +292,9 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 	if subPath != "" && subPath != "*" {
 		fileName = subPath
 	}
-	//if mountPath == "" {
-	//	return
-	//}
-	//return mountPath, subPath, fileName
+
 	return
-
 }
-
-//func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath string, subPath string) {
-//
-//	mountPath, ok := obj.GetAnnotations()[DefaultMountPathAnnotation]
-//	subPath = ""
-//	if !ok {
-//		volName := utils.ToRFC1123Label(obj.GetName())
-//		mountPath = filepath.Join(b.defaultMountPath(), volName)
-//		subPath = volName
-//	}
-//	return
-//}
 
 // sets container image name of Backstage Container
 func (b *BackstageDeployment) setImage(image *string) {

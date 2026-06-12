@@ -6,15 +6,14 @@ import (
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type ConfigMapEnvsFactory struct{}
 
 func (f ConfigMapEnvsFactory) newBackstageObject() RuntimeObject {
-	return &ConfigMapEnvs{ConfigMaps: &multiobject.MultiObject{}}
+	return &ConfigMapEnvs{}
 }
 
 type ConfigMapEnvs struct {
@@ -23,62 +22,68 @@ type ConfigMapEnvs struct {
 }
 
 func init() {
-	registerConfig("configmap-envs.yaml", ConfigMapEnvsFactory{}, true, mergeMultiObjectConfigs)
+	registerConfig(ConfigMapEnvsKey, ConfigMapEnvsFactory{}, true, mergeMultiObjectConfigs)
 }
 
-func (p *ConfigMapEnvs) addExternalConfig(spec api.BackstageSpec) error {
-	if spec.Application == nil || spec.Application.ExtraEnvs == nil || spec.Application.ExtraEnvs.ConfigMaps == nil {
-		return nil
-	}
-
-	for _, specCm := range spec.Application.ExtraEnvs.ConfigMaps {
-		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{names: specCm.Containers}, ConfigMapObjectKind, specCm.Name, specCm.Key)
-		if err != nil {
-			return fmt.Errorf("failed to add env vars on config map %s: %w", specCm.Name, err)
-		}
-	}
-	return nil
-}
-
-// Object implements RuntimeObject interface
 func (p *ConfigMapEnvs) Object() runtime.Object {
-	return p.ConfigMaps
-}
-
-func (p *ConfigMapEnvs) setObject(obj runtime.Object) {
-	p.ConfigMaps = nil
-	if obj != nil {
-		p.ConfigMaps = obj.(*multiobject.MultiObject)
-	}
-}
-
-// implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
-	p.model = model
 	if p.ConfigMaps != nil && len(p.ConfigMaps.Items) > 0 {
-		model.setRuntimeObject(p)
-		return true, nil
-	}
-	return false, nil
-}
-
-// implementation of RuntimeObject interface
-func (p *ConfigMapEnvs) updateAndValidate(_ api.Backstage) error {
-	for _, item := range p.ConfigMaps.Items {
-		cm, ok := item.(*corev1.ConfigMap)
-		if !ok {
-			return fmt.Errorf("expected ConfigMap, got %T", item)
-		}
-		err := p.model.backstageDeployment.addEnvVarsFrom(containersFilter{annotation: cm.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind,
-			cm.Name, "")
-		if err != nil {
-			return fmt.Errorf("failed to add env vars on configmap %s: %w", cm.Name, err)
-		}
+		return p.ConfigMaps
 	}
 	return nil
 }
 
 // implementation of RuntimeObject interface
+func (p *ConfigMapEnvs) GetKey() string {
+	return ConfigMapEnvsKey
+}
+
+func (p *ConfigMapEnvs) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
+	p.model = model
+	if config != nil {
+		p.ConfigMaps = config.(*multiobject.MultiObject)
+	}
+
+	// Always add to model so updateAndValidate is called (may process spec ConfigMaps)
+	model.setRuntimeObject(p)
+	if p.ConfigMaps != nil && len(p.ConfigMaps.Items) > 0 {
+		p.setMetaInfo(backstage, scheme)
+	}
+	return nil
+}
+
+func (p *ConfigMapEnvs) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+	deployment := p.model.getDeployment()
+	if deployment == nil {
+		return fmt.Errorf("backstage deployment not found in model")
+	}
+
+	// Process configmaps from config files
+	if p.ConfigMaps != nil {
+		for _, item := range p.ConfigMaps.Items {
+			cm, ok := item.(*corev1.ConfigMap)
+			if !ok {
+				return fmt.Errorf("payload is not ConfigMap kind: %T", item)
+			}
+			err := deployment.addEnvVarsFrom(containersFilter{annotation: cm.GetAnnotations()[ContainersAnnotation]}, ConfigMapObjectKind, cm.Name, "")
+			if err != nil {
+				return fmt.Errorf("failed to add env vars from configmap %s: %w", cm.Name, err)
+			}
+		}
+	}
+
+	// Process configmaps from CR spec (formerly addExternalConfig)
+	if backstage.Spec.Application != nil && backstage.Spec.Application.ExtraEnvs != nil && backstage.Spec.Application.ExtraEnvs.ConfigMaps != nil {
+		for _, specCm := range backstage.Spec.Application.ExtraEnvs.ConfigMaps {
+			err := deployment.addEnvVarsFrom(containersFilter{names: specCm.Containers}, ConfigMapObjectKind, specCm.Name, specCm.Key)
+			if err != nil {
+				return fmt.Errorf("failed to add env vars on config map %s: %w", specCm.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 func (p *ConfigMapEnvs) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	setMultiObjectConfigMetaInfo(p.ConfigMaps, "envs", backstage, scheme)
 }

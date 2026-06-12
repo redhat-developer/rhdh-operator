@@ -30,7 +30,7 @@ var (
 			Name:      "app-config2",
 			Namespace: "ns123",
 		},
-		Data: map[string]string{"conf21.yaml": "", "conf22.yaml": ""},
+		Data: map[string]string{"conf21.yaml": ""},
 	}
 
 	appConfigTestCm3 = corev1.ConfigMap{
@@ -38,7 +38,7 @@ var (
 			Name:      "app-config3",
 			Namespace: "ns123",
 		},
-		Data: map[string]string{"conf31.yaml": "", "conf32.yaml": ""},
+		Data: map[string]string{"conf31.yaml": ""},
 	}
 
 	appConfigTestBackstage = api.Backstage{
@@ -67,9 +67,9 @@ func TestDefaultAppConfig(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Kubernetes, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
@@ -100,9 +100,9 @@ func TestSpecifiedAppConfig(t *testing.T) {
 		platform.Kubernetes, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	// /app/src/conf.yaml
@@ -111,7 +111,7 @@ func TestSpecifiedAppConfig(t *testing.T) {
 	assert.Equal(t, 3, len(deployment.container().VolumeMounts))
 	assert.Contains(t, deployment.container().VolumeMounts[0].MountPath,
 		bs.Spec.Application.AppConfig.MountPath)
-	assert.Equal(t, 8, len(deployment.container().Args))
+	assert.Equal(t, 6, len(deployment.container().Args))
 	assert.Equal(t, 3, len(deployment.podSpec().Volumes))
 
 	assert.Equal(t, "/app/src/conf.yaml", deployment.container().VolumeMounts[0].MountPath)
@@ -133,9 +133,9 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))

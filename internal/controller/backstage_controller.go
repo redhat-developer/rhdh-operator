@@ -104,12 +104,12 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Apply the plugin dependencies
-	if err := r.applyPluginDeps(ctx, backstage, bsModel.DynamicPlugins); err != nil {
+	if err := r.applyPluginDeps(ctx, backstage, bsModel); err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply plugin dependencies", err)
 	}
 
 	// Apply the runtime objects
-	err = r.applyObjects(ctx, bsModel.RuntimeObjects)
+	err = r.applyObjects(ctx, bsModel.GetRuntimeObjects())
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply backstage objects", err)
 	}
@@ -126,14 +126,16 @@ func errorAndStatus(backstage *api.Backstage, msg string, err error) error {
 func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.RuntimeObject) error {
 
 	for _, obj := range objects {
-		switch v := obj.Object().(type) {
+
+		k8sObj := obj.Object()
+		switch v := k8sObj.(type) {
 		case client.Object:
 			_, immutable := obj.(*model.DbSecret)
-			if err := r.applyPayload(ctx, obj.Object().(client.Object), immutable); err != nil {
+			if err := r.applyPayload(ctx, k8sObj.(client.Object), immutable); err != nil {
 				return err
 			}
 		case *multiobject.MultiObject:
-			mo := obj.Object().(*multiobject.MultiObject)
+			mo := k8sObj.(*multiobject.MultiObject)
 			for _, singleObject := range mo.Items {
 				if err := r.applyPayload(ctx, singleObject, false); err != nil {
 					return err

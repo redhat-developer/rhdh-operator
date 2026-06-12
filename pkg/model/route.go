@@ -75,62 +75,72 @@ func (b *BackstageRoute) setRoute(specified *api.Route) {
 }
 
 func init() {
-	registerConfig("route.yaml", BackstageRouteFactory{}, false, nil)
+	registerConfig(RouteKey, BackstageRouteFactory{}, false, nil)
 }
 
-// implementation of RuntimeObject interface
 func (b *BackstageRoute) Object() runtime.Object {
+	if b.route == nil {
+		return nil
+	}
 	return b.route
 }
 
-func (b *BackstageRoute) setObject(obj runtime.Object) {
-	b.route = nil
-	if obj != nil {
-		b.route = obj.(*openshift.Route)
-	}
+// implementation of RuntimeObject interface
+func (b *BackstageRoute) GetKey() string {
+	return RouteKey
 }
 
-// implementation of RuntimeObject interface
-func (b *BackstageRoute) addToModel(model *BackstageModel, backstage api.Backstage) (bool, error) {
+func (b *BackstageRoute) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 
 	b.model = model
-	// not Openshift
-	if !model.isOpenshift {
-		return false, nil
+
+	if config != nil {
+		b.route = config.(*openshift.Route)
 	}
 
-	// route explicitly disabled
-	if !backstage.Spec.IsRouteEnabled() {
-		return false, nil
-	}
-
+	// Determine if route should be created based on platform and spec
 	specDefined := backstage.Spec.Application != nil && backstage.Spec.Application.Route != nil
 
-	// no default route and not defined
-	if b.route == nil && !specDefined {
-		return false, nil
+	// Create route if:
+	// - is OpenShift
+	// - route is enabled (not explicitly disabled)
+	// - either default route exists or route is defined in spec
+	if model.isOpenshift && backstage.Spec.IsRouteEnabled() {
+		if b.route == nil && specDefined {
+			// no default route but defined in the spec -> create default
+			b.route = &openshift.Route{}
+		}
+
+		// merge with specified (pieces) if any
+		if b.route != nil && specDefined {
+			b.setRoute(backstage.Spec.Application.Route)
+		}
+	} else {
+		// Route is disabled or not OpenShift - clear the route
+		b.route = nil
 	}
 
-	// no default route but defined in the spec -> create default
-	if b.route == nil {
-		b.route = &openshift.Route{}
-	}
-
-	// merge with specified (pieces) if any
-	if specDefined {
-		b.setRoute(backstage.Spec.Application.Route)
-	}
-
-	model.route = b
+	// Always add wrapper to model (unconditional)
 	model.setRuntimeObject(b)
 
-	return true, nil
+	// Only set metadata if underlying object exists
+	if b.route != nil {
+		b.setMetaInfo(backstage, scheme)
+	}
+
+	return nil
 }
 
-// implementation of RuntimeObject interface
-func (b *BackstageRoute) updateAndValidate(backstage api.Backstage) error {
-	b.route.Spec.To.Name = b.model.backstageService.service.Name
-	b.updateAppConfigWithBaseUrls(b.model, backstage)
+func (b *BackstageRoute) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+	if b.route != nil {
+		backstageService := b.model.GetRuntimeObject(ServiceKey)
+		if backstageService == nil {
+			return fmt.Errorf("backstage service not found in model")
+		}
+		service := backstageService.(*BackstageService).service
+		b.route.Spec.To.Name = service.Name
+		b.updateAppConfigWithBaseUrls(b.model, backstage)
+	}
 	return nil
 }
 
@@ -143,7 +153,15 @@ func (b *BackstageRoute) setMetaInfo(backstage api.Backstage, scheme *runtime.Sc
 // Note that this is purposely done on a best effort basis. So it is not considered an issue if the cluster ingress domain
 // could not be determined, since the user can always set it explicitly in their custom app-config.
 func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstage api.Backstage) {
-	if m.appConfig == nil || m.appConfig.ConfigMaps == nil {
+	appConfigObj := m.GetRuntimeObject(AppConfigKey)
+	if appConfigObj == nil {
+		klog.V(1).Infof(
+			"Default app-config ConfigMap not initialized yet - skipping automatic population of base URLS in the default app-config for Backstage %s",
+			backstage.Name)
+		return
+	}
+	appConfig := appConfigObj.(*AppConfig)
+	if appConfig.ConfigMaps == nil {
 		klog.V(1).Infof(
 			"Default app-config ConfigMap not initialized yet - skipping automatic population of base URLS in the default app-config for Backstage %s",
 			backstage.Name)
@@ -188,7 +206,7 @@ func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstag
 		return string(updated), nil
 	}
 
-	if len(m.appConfig.ConfigMaps.Items) == 0 {
+	if len(appConfig.ConfigMaps.Items) == 0 {
 		klog.V(1).Infof(
 			"No app-config ConfigMaps to update - skipping automatic population of base URLS in the default app-config for Backstage %s",
 			backstage.Name)
@@ -196,7 +214,7 @@ func (b *BackstageRoute) updateAppConfigWithBaseUrls(m *BackstageModel, backstag
 	}
 
 	// Update only the first ConfigMap (base config) with baseUrl
-	cm := m.appConfig.ConfigMaps.Items[0].(*corev1.ConfigMap)
+	cm := appConfig.ConfigMaps.Items[0].(*corev1.ConfigMap)
 	for k, v := range cm.Data {
 		updated, err := updateFn(v)
 		if err != nil {

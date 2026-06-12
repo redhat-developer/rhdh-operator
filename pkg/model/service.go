@@ -23,7 +23,7 @@ type BackstageService struct {
 }
 
 func init() {
-	registerConfig("service.yaml", BackstageServiceFactory{}, false, nil)
+	registerConfig(ServiceKey, BackstageServiceFactory{}, false, nil)
 }
 
 func ServiceName(backstageName string) string {
@@ -35,28 +35,28 @@ func (b *BackstageService) Object() runtime.Object {
 	return b.service
 }
 
-func (b *BackstageService) setObject(obj runtime.Object) {
-	b.service = nil
-	if obj != nil {
-		b.service = obj.(*corev1.Service)
-	}
+// implementation of RuntimeObject interface
+func (b *BackstageService) GetKey() string {
+	return ServiceKey
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) addToModel(model *BackstageModel, _ api.Backstage) (bool, error) {
+func (b *BackstageService) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
-	if b.service == nil {
-		return false, fmt.Errorf("backstage Service is not initialized, make sure there is service.yaml in default or raw configuration")
+	if config != nil {
+		b.service = config.(*corev1.Service)
 	}
-	model.backstageService = b
+	if b.service == nil {
+		return fmt.Errorf("backstage Service is not initialized, make sure there is service.yaml in default or raw configuration")
+	}
+	// Service is required, so always add to model
 	model.setRuntimeObject(b)
-
-	return true, nil
-
+	b.setMetaInfo(backstage, scheme)
+	return nil
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageService) updateAndValidate(_ api.Backstage) error {
+func (b *BackstageService) updateAndValidate(_ api.Backstage, _ *runtime.Scheme) error {
 	return nil
 }
 
