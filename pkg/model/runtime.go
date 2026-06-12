@@ -163,7 +163,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		if overlayExist {
 			if objs, err := utils.ReadYamls([]byte(overlay), nil, *scheme); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
-					return nil, fmt.Errorf("failed to read overlay config for the key %s, reason: %s", conf.Key, err)
+					return nil, fmt.Errorf("failed to read overlay config for the key %s, reason: %w", conf.Key, err)
 				}
 			} else {
 				if obj, err := adjustObject(conf, objs); err != nil {
@@ -178,7 +178,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		if chosenConfig == nil {
 			if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
-					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
+					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %w", conf.Key, err)
 				}
 			} else if len(objs) > 0 {
 				if obj, err := adjustObject(conf, objs); err != nil {
@@ -191,7 +191,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 
 		// Add object to model (always added, even if config is nil - placeholder pattern)
 		if err := backstageObject.addToModel(model, backstage, chosenConfig, scheme); err != nil {
-			return nil, fmt.Errorf("failed to add object to model for key %s, reason: %s", conf.Key, err)
+			return nil, fmt.Errorf("failed to add object to model for key %s, reason: %w", conf.Key, err)
 		}
 	}
 
@@ -201,7 +201,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 	for _, obj := range model.RuntimeObjects {
 		err := obj.updateAndValidate(backstage, scheme)
 		if err != nil {
-			return nil, fmt.Errorf("failed object validation, reason: %s", err)
+			return nil, fmt.Errorf("failed object validation, reason: %w", err)
 		}
 	}
 
