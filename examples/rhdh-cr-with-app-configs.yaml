@@ -96,9 +96,9 @@ data:
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-module-utils-dynamic
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/roadiehq-scaffolder-backend-module-utils:bs_1.45.3__4.1.1'
         disabled: false
-      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-catalog-backend-module-github:bs_1.45.3__0.11.2'
         disabled: false
         pluginConfig:
           catalog:
@@ -112,20 +112,7 @@ data:
                     # supports ISO duration, "human duration (used below)
                     timeout: { minutes: 3}
                     initialDelay: { seconds: 15}
-      - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
-        disabled: false
-        pluginConfig:
-          # Reference documentation https://backstage.io/docs/features/techdocs/configuration
-          # Note: After experimenting with basic setup, use CI/CD to generate docs
-          # and an external cloud storage when deploying TechDocs for production use-case.
-          # https://backstage.io/docs/features/techdocs/how-to-guides#how-to-migrate-from-techdocs-basic-to-recommended-deployment-approach
-          techdocs:
-            builder: local
-            generator:
-              runIn: local
-            publisher:
-              type: local
-      - package: ./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-gitlab-dynamic
+      - package: 'oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-catalog-backend-module-gitlab:bs_1.45.3__0.7.5'
         disabled: false
         pluginConfig:
           catalog:

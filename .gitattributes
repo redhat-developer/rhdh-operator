@@ -1,0 +1,17 @@
+# Attributes per path
+
+# This allows for example for customizing how changed files appear on GitHub.
+# See https://docs.github.com/en/repositories/working-with-files/managing-files/customizing-how-changed-files-appear-on-github
+
+# linguist-generated marks matching paths as ignored for the repo language stats and hidden by default in diffs.
+# See https://github.com/github-linguist/linguist/blob/master/docs/overrides.md#overrides
+
+api/**/groupversion_info.go linguist-generated=true
+api/**/zz_generated.deepcopy.go linguist-generated=true
+bundle/**/* linguist-generated=true
+config/crd/bases/rhdh.redhat.com_backstages.yaml linguist-generated=true
+config/rbac/role.yaml linguist-generated=true
+dist/**/* linguist-generated=true
+go.sum linguist-generated=true
+rpms.lock.yaml linguist-generated=true
+vendor/**/* linguist-generated=true

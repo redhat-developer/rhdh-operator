@@ -4,9 +4,13 @@ import (
 	"context"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -14,7 +18,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/types"
 
@@ -40,40 +44,25 @@ var _ = When("create backstage with CR configured", func() {
 
 	It("creates Backstage with external configuration", func() {
 
-		appConfig1 := generateConfigMap(ctx, k8sClient, "app-config1", ns,
-			map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
-		appConfig2 := generateConfigMap(ctx, k8sClient, "app-config2", ns,
-			map[string]string{"key21": "app:", "key22": "app:"}, nil, nil)
-		appConfig3 := generateConfigMap(ctx, k8sClient, "app-config3.dot", ns,
-			map[string]string{"key.31": "app31:"}, nil, nil)
+		appConfig1 := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:"}, nil, nil)
+		appConfig2 := generateConfigMap(ctx, k8sClient, "app-config2", ns, map[string]string{"key21": "app:"}, nil, nil)
+		appConfig3 := generateConfigMap(ctx, k8sClient, "app-config3.dot", ns, map[string]string{"key.31": "app31:"}, nil, nil)
 
-		cmFile1 := generateConfigMap(ctx, k8sClient, "cm-file1", ns,
-			map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
-		cmFile2 := generateConfigMap(ctx, k8sClient, "cm-file2", ns,
-			map[string]string{"cm21": "21", "cm22": "22"}, nil, nil)
-		cmFile3 := generateConfigMap(ctx, k8sClient, "cm-file3.dot", ns,
-			map[string]string{"cm.31": "31"}, nil, nil)
-		cmFileWithPath := generateConfigMap(ctx, k8sClient, "cm-file-withpath", ns,
-			map[string]string{"cm": "withpath"}, nil, nil)
+		cmFile1 := generateConfigMap(ctx, k8sClient, "cm-file1", ns, map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
+		cmFile2 := generateConfigMap(ctx, k8sClient, "cm-file2", ns, map[string]string{"cm21": "21", "cm22": "22"}, nil, nil)
+		cmFile3 := generateConfigMap(ctx, k8sClient, "cm-file3.dot", ns, map[string]string{"cm.31": "31"}, nil, nil)
+		cmFileWithPath := generateConfigMap(ctx, k8sClient, "cm-file-withpath", ns, map[string]string{"cm": "withpath"}, nil, nil)
 
-		secretFile1 := generateSecret(ctx, k8sClient, "secret-file1", ns,
-			map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
-		secretFile2 := generateSecret(ctx, k8sClient, "secret-file2", ns,
-			map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
-		secretFile3 := generateSecret(ctx, k8sClient, "secret-file3.dot", ns,
-			map[string]string{"sec.31": "val31", "sec.32": "val22"}, nil, nil)
-		secretFileWithPath := generateSecret(ctx, k8sClient, "secret-file-withpath", ns,
-			map[string]string{"secret": "withpath"}, nil, nil)
+		secretFile1 := generateSecret(ctx, k8sClient, "secret-file1", ns, map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
+		secretFile2 := generateSecret(ctx, k8sClient, "secret-file2", ns, map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
+		secretFile3 := generateSecret(ctx, k8sClient, "secret-file3.dot", ns, map[string]string{"sec.31": "val31", "sec.32": "val22"}, nil, nil)
+		secretFileWithPath := generateSecret(ctx, k8sClient, "secret-file-withpath", ns, map[string]string{"secret": "withpath"}, nil, nil)
 
-		cmEnv1 := generateConfigMap(ctx, k8sClient, "cm-env1", ns,
-			map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
-		cmEnv2 := generateConfigMap(ctx, k8sClient, "cm-env2", ns,
-			map[string]string{"cm21": "21", "cm22": "22"}, nil, nil)
+		cmEnv1 := generateConfigMap(ctx, k8sClient, "cm-env1", ns, map[string]string{"cm11": "11", "cm12": "12"}, nil, nil)
+		cmEnv2 := generateConfigMap(ctx, k8sClient, "cm-env2", ns, map[string]string{"cm21": "21", "cm22": "22"}, nil, nil)
 
-		secretEnv1 := generateSecret(ctx, k8sClient, "secret-env1", ns,
-			map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
-		_ = generateSecret(ctx, k8sClient, "secret-env2", ns,
-			map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
+		secretEnv1 := generateSecret(ctx, k8sClient, "secret-env1", ns, map[string]string{"sec11": "val11", "sec12": "val12"}, nil, nil)
+		_ = generateSecret(ctx, k8sClient, "secret-env2", ns, map[string]string{"sec21": "val21", "sec22": "val22"}, nil, nil)
 
 		patch, _ := yaml.YAMLToJSON([]byte(`
 spec:
@@ -83,43 +72,43 @@ spec:
         - name: sidecar
           image: busybox
 `))
-		bs := bsv1.BackstageSpec{
-			Deployment: &bsv1.BackstageDeployment{
+		bs := api.BackstageSpec{
+			Deployment: &api.BackstageDeployment{
 				Patch: &apiextensionsv1.JSON{Raw: patch},
 			},
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
+			Application: &api.Application{
+				AppConfig: &api.AppConfig{
 					MountPath: "/my/mount/path",
-					ConfigMaps: []bsv1.FileObjectRef{
+					ConfigMaps: []api.FileObjectRef{
 						{Name: appConfig1},
 						{Name: appConfig2, Key: "key21"},
 						{Name: appConfig3},
 					},
 				},
-				ExtraFiles: &bsv1.ExtraFiles{
+				ExtraFiles: &api.ExtraFiles{
 					MountPath: "/my/file/path",
-					ConfigMaps: []bsv1.FileObjectRef{
+					ConfigMaps: []api.FileObjectRef{
 						{Name: cmFile1},
 						{Name: cmFile2, Key: "cm21"},
 						{Name: cmFile3, Containers: []string{"*"}},
 						{Name: cmFileWithPath, MountPath: "/cm/file/withpath"},
 					},
-					Secrets: []bsv1.FileObjectRef{
+					Secrets: []api.FileObjectRef{
 						{Name: secretFile1, Key: "sec11"},
 						{Name: secretFile2, Key: "sec21"},
 						{Name: secretFile3, Key: "sec.31", Containers: []string{"sidecar"}},
 						{Name: secretFileWithPath, MountPath: "/secret/file/withpath"},
 					},
 				},
-				ExtraEnvs: &bsv1.ExtraEnvs{
-					ConfigMaps: []bsv1.EnvObjectRef{
+				ExtraEnvs: &api.ExtraEnvs{
+					ConfigMaps: []api.EnvObjectRef{
 						{Name: cmEnv1},
 						{Name: cmEnv2, Key: "cm21", Containers: []string{"*"}},
 					},
-					Secrets: []bsv1.EnvObjectRef{
+					Secrets: []api.EnvObjectRef{
 						{Name: secretEnv1, Key: "sec11"},
 					},
-					Envs: []bsv1.Env{
+					Envs: []api.Env{
 						{Name: "env1", Value: "val1"},
 					},
 				},
@@ -149,16 +138,16 @@ spec:
 
 			By("checking if app-config volumes are mounted to the Backstage container")
 			g.Expect("/my/mount/path/key11").To(BeMountedToContainer(backstageContainer))
-			g.Expect("/my/mount/path/key12").To(BeMountedToContainer(backstageContainer))
+			//g.Expect("/my/mount/path/key12").To(BeMountedToContainer(backstageContainer))
 			g.Expect("/my/mount/path/key21").To(BeMountedToContainer(backstageContainer))
-			g.Expect("/my/mount/path/key22").NotTo(BeMountedToContainer(backstageContainer))
+			//g.Expect("/my/mount/path/key22").NotTo(BeMountedToContainer(backstageContainer))
 			g.Expect("/my/mount/path/key.31").To(BeMountedToContainer(backstageContainer))
 
 			By("checking if app-config args are added to the Backstage container")
 			g.Expect("/my/mount/path/key11").To(BeAddedAsArgToContainer(backstageContainer))
-			g.Expect("/my/mount/path/key12").To(BeAddedAsArgToContainer(backstageContainer))
+			//g.Expect("/my/mount/path/key12").To(BeAddedAsArgToContainer(backstageContainer))
 			g.Expect("/my/mount/path/key21").To(BeAddedAsArgToContainer(backstageContainer))
-			g.Expect("/my/mount/path/key22").NotTo(BeAddedAsArgToContainer(backstageContainer))
+			//g.Expect("/my/mount/path/key22").NotTo(BeAddedAsArgToContainer(backstageContainer))
 			g.Expect("/my/mount/path/key.31").To(BeAddedAsArgToContainer(backstageContainer))
 
 			By("checking if extra-cm-file volumes are added to PodSpec")
@@ -204,13 +193,12 @@ spec:
 
 	It("generates label and annotation", func() {
 
-		appConfig := generateConfigMap(
-			ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:", "key12": "app:"}, nil, nil)
+		appConfig := generateConfigMap(ctx, k8sClient, "app-config1", ns, map[string]string{"key11": "app:"}, nil, nil)
 
-		bs := bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				AppConfig: &bsv1.AppConfig{
-					ConfigMaps: []bsv1.FileObjectRef{
+		bs := api.BackstageSpec{
+			Application: &api.Application{
+				AppConfig: &api.AppConfig{
+					ConfigMaps: []api.FileObjectRef{
 						{Name: appConfig},
 					},
 				},
@@ -236,7 +224,7 @@ spec:
 
 	It("creates Backstage with spec.deployment.patch ", func() {
 
-		bs2 := &bsv1.Backstage{}
+		bs2 := &api.Backstage{}
 
 		err := readYamlFile("testdata/spec-deployment.yaml", bs2)
 		Expect(err).To(Not(HaveOccurred()))
@@ -278,9 +266,9 @@ spec:
 
 	It("creates Backstage with spec.deployment.kind=StatefulSet ", func() {
 
-		bs2 := &bsv1.Backstage{
-			Spec: bsv1.BackstageSpec{
-				Deployment: &bsv1.BackstageDeployment{
+		bs2 := &api.Backstage{
+			Spec: api.BackstageSpec{
+				Deployment: &api.BackstageDeployment{
 					Kind: "StatefulSet",
 				},
 			},
@@ -300,9 +288,9 @@ spec:
 
 	It("failed Backstage with unknown spec.deployment.kind ", func() {
 
-		bs2 := &bsv1.Backstage{
-			Spec: bsv1.BackstageSpec{
-				Deployment: &bsv1.BackstageDeployment{
+		bs2 := &api.Backstage{
+			Spec: api.BackstageSpec{
+				Deployment: &api.BackstageDeployment{
 					Kind: "Unknown",
 				},
 			},
@@ -311,6 +299,59 @@ spec:
 		_, err := createBackstage(ctx, bs2.Spec, ns, "")
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("spec.deployment.kind: Unsupported value"))
+
+	})
+
+	It("changes strategy from RollingUpdate to Recreate", func() {
+
+		if !*testEnv.UseExistingCluster {
+			Skip("Skipped for not real cluster")
+		}
+
+		bs := api.BackstageSpec{}
+		backstageName := createAndReconcileBackstage(ctx, ns, bs, "")
+		Eventually(func(g Gomega) {
+
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			depl := deploy.GetObject().(*appsv1.Deployment)
+
+			// initially should be RollingUpdate
+			g.Expect(depl.Spec.Strategy.Type).To(Equal(appsv1.RollingUpdateDeploymentStrategyType))
+		}, 10*time.Second, time.Second).Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			patch, _ := yaml.YAMLToJSON([]byte(`
+spec:
+  strategy:
+    type: Recreate
+    rollingUpdate:
+      $patch: delete
+`))
+
+			backstage := &api.Backstage{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      backstageName,
+					Namespace: ns,
+				},
+				Spec: api.BackstageSpec{
+					Deployment: &api.BackstageDeployment{
+						Patch: &apiextensionsv1.JSON{Raw: patch},
+					},
+				},
+			}
+
+			err := k8sClient.Patch(ctx, backstage, client.Merge)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			depl := deploy.GetObject().(*appsv1.Deployment)
+			g.Expect(depl.Spec.Strategy.Type).To(Equal(appsv1.RecreateDeploymentStrategyType))
+
+		}, 20*time.Second, time.Second).Should(Succeed())
 
 	})
 

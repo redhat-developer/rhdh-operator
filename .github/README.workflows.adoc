@@ -2,6 +2,5 @@ NOTE: If you rename any of the tests in this folder, or want to add new required
 
 For example:
 
-* link:https://github.com/openshift/release/tree/master/core-services/prow/02_config/janus-idp/[core-services/prow/02_config/janus-idp/]
 * link:https://github.com/openshift/release/tree/master/core-services/prow/02_config/redhat-developer[core-services/prow/02_config/redhat-developer]
 

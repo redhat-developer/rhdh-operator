@@ -8,8 +8,8 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 
-	bsv1prev "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
+	bsv1prev "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -45,14 +45,14 @@ var _ = When("testing API version compatibility", func() {
 		}
 
 		// test prev version backward compatibility
-		By("creating a Backstage resource using v1alpha3 API")
-		backstageNameV3 := generateRandName("bs-v1alpha3")
+		By("creating a Backstage resource using v1alpha4 API")
+		backstageNameV3 := generateRandName("bs-v1alpha4")
 
 		// create ConfigMap for prev version test
 		generateConfigMap(ctx, k8sClient, "default-app-config", ns,
 			map[string]string{
 				"app-config.yaml": `app:
-					title: Test App v1alpha3
+					title: Test App v1alpha4
 					baseUrl: http://localhost:3000`,
 			}, nil, nil)
 
@@ -102,15 +102,15 @@ var _ = When("testing API version compatibility", func() {
 					baseUrl: http://localhost:3000`,
 			}, nil, nil)
 
-		bsV1Alpha5 := &bsv1.Backstage{
+		bsV1Alpha5 := &api.Backstage{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      backstageNameV4,
 				Namespace: ns,
 			},
-			Spec: bsv1.BackstageSpec{
-				Application: &bsv1.Application{
-					AppConfig: &bsv1.AppConfig{
-						ConfigMaps: []bsv1.FileObjectRef{
+			Spec: api.BackstageSpec{
+				Application: &api.Application{
+					AppConfig: &api.AppConfig{
+						ConfigMaps: []api.FileObjectRef{
 							{Name: "default-app-config-v4"},
 						},
 					},
@@ -123,7 +123,7 @@ var _ = When("testing API version compatibility", func() {
 
 		By("verifying the operator reconciles the current version resource")
 		Eventually(func(g Gomega) {
-			fetched := &bsv1.Backstage{}
+			fetched := &api.Backstage{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Name: backstageNameV4, Namespace: ns}, fetched)
 			g.Expect(err).ShouldNot(HaveOccurred())
 		}, 2*time.Minute, 10*time.Second).Should(Succeed())

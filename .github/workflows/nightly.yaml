@@ -14,8 +14,9 @@ jobs:
       matrix:
         branch:
           - main
+          - release-1.10
+          - release-1.9
           - release-1.8
-          - release-1.7
     name: 'Nightly Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
@@ -23,32 +24,18 @@ jobs:
     env:
       CONTAINER_TOOL: podman
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ matrix.branch }}
           fetch-depth: 0
 
       - name: Set env vars
         run: |
-          branch=${{ matrix.branch }}
-          distLocation="dist/rhdh/install.yaml"
-          OPERATOR_MANIFEST="${{ github.workspace }}/${distLocation}"
-          proto="file://"
-          if [[ "${branch}" != "main" ]]; then
-            version="${branch#release-}"
-            major=$(echo $version | cut -d. -f1)
-            minor=$(echo $version | cut -d. -f2)
-            OPERATOR_MANIFEST="${{ github.workspace }}/tests/e2e/testdata/rhdh-operator-${version}.yaml"
-            # TODO(rm3l): remove this once 1.6 is the minimal supported version
-            if [[ $major -ge 1 && $minor -ge 6 ]]; then
-              OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${branch}/${distLocation}"
-              proto=""
-            fi
-          fi
+          echo "COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          OPERATOR_MANIFEST="${{ github.workspace }}/dist/rhdh/install.yaml"
           echo "OPERATOR_MANIFEST=${OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          OPERATOR_IMAGE=$(curl -s "${proto}${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          OPERATOR_IMAGE=$(curl -s "file://${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> $GITHUB_ENV
-          echo "BUILD_TIME=$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
 
       - name: Check if operator image exists in remote registry
         id: operator-image-existence-checker
@@ -62,7 +49,7 @@ jobs:
 
       - name: Remove unnecessary files to free up disk space
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: endersonmenezes/free-disk-space@e6ed9b02e683a3b55ed0252f1ee469ce3b39a885 # v3
+        uses: endersonmenezes/free-disk-space@7901478139cff6e9d44df5972fd8ab8fcade4db1 # v3
         with:
           remove_android: true
           remove_dotnet: true
@@ -70,20 +57,26 @@ jobs:
           rm_cmd: "rmz"
 
       - name: Setup Go
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: 'go.mod'
 
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: Build
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: make lint
 
       - name: Test
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        # run this stage only if there are changes that match the includes and not the excludes
         run: make test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: cover.out
+          flags: unittests,nightly
+          fail_ci_if_error: false
+          override_commit: ${{ env.COMMIT_SHA }}
+          override_branch: ${{ matrix.branch }}
 
       - name: Create Kind cluster (integration tests)
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}

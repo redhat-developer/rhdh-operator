@@ -8,7 +8,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -16,9 +16,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, backstage bs.Backstage, plugins model.DynamicPlugins) error {
+func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, backstage api.Backstage, bsModel *model.BackstageModel) error {
 
 	lg := log.FromContext(ctx)
+
+	obj := bsModel.GetRuntimeObject(model.DynamicPluginsKey)
+	if obj == nil {
+		return nil
+	}
+	plugins := *obj.(*model.DynamicPlugins)
 
 	objects, err := model.GetPluginDeps(backstage, plugins, r.Scheme)
 	if err != nil {

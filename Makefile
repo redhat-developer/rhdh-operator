@@ -16,7 +16,7 @@ PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 # Set a default VERSION if it is not defined
 ifeq ($(origin VERSION), undefined)
-VERSION ?= 0.9.0
+VERSION ?= 0.11.0
 DEFAULT_VERSION := true
 else
 DEFAULT_VERSION := false
@@ -96,6 +96,8 @@ OPERATOR_SDK_VERSION ?= v1.42.0
 OPM_VERSION ?= v1.55.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG_VERSION)
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION ?= $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -232,7 +234,7 @@ build: manifests generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	mkdir -p $(LOCALBIN)/default-config/ &&	rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config/
 	mkdir -p $(LOCALBIN)/plugin-deps/ &&	rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps/ 2>/dev/null || :
-	go run -C $(LOCALBIN) ../cmd/main.go
+	go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
@@ -475,9 +477,8 @@ GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
-CONTROLLER_TOOLS_VERSION ?= v0.18.0
-ENVTEST_VERSION := $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
-ENVTEST_K8S_VERSION := $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
+CONTROLLER_TOOLS_VERSION ?= v0.20.0
+ENVTEST_VERSION ?= $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 GOLANGCI_LINT_VERSION ?= v2.6.2
 GOIMPORTS_VERSION ?= v0.40.0
 GOSEC_VERSION ?= v2.22.11

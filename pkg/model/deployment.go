@@ -18,7 +18,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
@@ -29,9 +29,9 @@ const (
 )
 
 const BackstageImageEnvVar = "RELATED_IMAGE_backstage"
-const CatalogIndexImageEnvVar = "RELATED_IMAGE_catalog_index"
 const DefaultMountDir = "/opt/app-root/src"
 const ExtConfigHashAnnotation = "rhdh.redhat.com/ext-config-hash"
+const ListMergeAnnotation = "rhdh.redhat.com/deployment-patch-list-merge-mode"
 
 type BackstageDeploymentFactory struct{}
 
@@ -47,15 +47,14 @@ type BackstageDeployment struct {
 }
 
 func init() {
-	registerConfig("deployment.yaml", BackstageDeploymentFactory{}, false)
+	registerConfig(DeploymentKey, BackstageDeploymentFactory{}, false, mergeDeployments)
 }
 
 func DeploymentName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage")
 }
 
-// BackstageContainerIndex returns the index of backstage container
-// in from deployment.spec.template.spec.containers array
+// BackstageContainerIndex returns the index of backstage container in from deployment.spec.template.spec.containers array
 func BackstageContainerIndex(bsdPod *corev1.PodSpec) int {
 	for i, c := range bsdPod.Containers {
 		if c.Name == BackstageContainerName() {
@@ -75,69 +74,64 @@ func (b *BackstageDeployment) Object() runtime.Object {
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) setObject(obj runtime.Object) {
-
-	// b.deployable = DeploymentObj{}
-
-	// if obj != nil {
-	// 	b.deployable.setObject(obj)
-	// }
-	var err error
-	b.deployable, err = CreateDeployable(obj)
-	if err != nil {
-		panic(fmt.Sprintf("cannot set deployment object: %v", err))
-	}
+func (b *BackstageDeployment) GetKey() string {
+	return DeploymentKey
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
-	if b.deployable.GetObject() == nil {
-		return false, fmt.Errorf(
-			"backstage Deployment is not initialized, make sure there is deployment.yaml in default or raw configuration")
+func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
+	// Set the deployment from config parameter if not nil
+	if config != nil {
+		var err error
+		b.deployable, err = CreateDeployable(config)
+		if err != nil {
+			return fmt.Errorf("cannot set deployment object: %w", err)
+		}
+	} else {
+		return fmt.Errorf("deployment object is not set")
 	}
 
-	if BackstageContainerIndex(b.podSpec()) < 0 {
-		return false, fmt.Errorf("backstage Deployment is not initialized, Backstage Container is not identified")
-	}
-
-	if b.deployable.PodObjectMeta().Annotations == nil {
-		b.deployable.PodObjectMeta().Annotations = map[string]string{}
-	}
-	b.deployable.PodObjectMeta().Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
-
-	model.backstageDeployment = b
-	model.setRuntimeObject(b)
 	b.model = model
 
-	// override image with env var
-	if os.Getenv(BackstageImageEnvVar) != "" {
-		b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
-	}
+	// Call setMetaInfo if deployment is not nil
+	if b.deployable.GetObject() != nil {
+		model.setRuntimeObject(b)
+		b.setMetaInfo(backstage, scheme)
 
-	// Set CATALOG_INDEX_IMAGE from operator env var BEFORE extraEnvs are applied,
-	// so user-specified extraEnvs can still override this value
-	if catalogIndexImage := os.Getenv(CatalogIndexImageEnvVar); catalogIndexImage != "" {
-		if i, _ := DynamicPluginsInitContainer(b.podSpec().InitContainers); i >= 0 {
-			b.setOrAppendEnvVar(&b.podSpec().InitContainers[i], "CATALOG_INDEX_IMAGE", catalogIndexImage)
+		if BackstageContainerIndex(b.podSpec()) < 0 {
+			return fmt.Errorf("backstage Deployment is not initialized, Backstage Container is not identified")
+		}
+
+		if b.deployable.PodObjectMeta().Annotations == nil {
+			b.deployable.PodObjectMeta().Annotations = map[string]string{}
+		}
+		b.deployable.PodObjectMeta().Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
+
+		// override image with env var
+		if os.Getenv(BackstageImageEnvVar) != "" {
+			b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
+		}
+
+		if err := b.setDeployment(backstage); err != nil {
+			return err
 		}
 	}
 
-	if err := b.setDeployment(backstage); err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return nil
 }
 
 // implementation of RuntimeObject interface
-func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error {
+func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
 
-	// DbSecret
+	//DbSecret
 	var err error
 	if backstage.Spec.IsAuthSecretSpecified() {
 		err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, backstage.Spec.Database.AuthSecretName, "")
-	} else if b.model.LocalDbSecret != nil {
-		err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, b.model.LocalDbSecret.secret.Name, "")
+	} else if dbSecret := b.model.GetRuntimeObject(DbSecretKey); dbSecret != nil {
+		secret := dbSecret.(*DbSecret).secret
+		if secret != nil {
+			err = b.addEnvVarsFrom(containersFilter{}, SecretObjectKind, secret.Name, "")
+		}
 	}
 
 	if err != nil {
@@ -147,10 +141,9 @@ func (b *BackstageDeployment) updateAndValidate(backstage bsv1.Backstage) error 
 	return nil
 }
 
-func (b *BackstageDeployment) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *BackstageDeployment) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.deployable.GetObject().SetName(DeploymentName(backstage.Name))
-	utils.GenerateLabel(
-		&b.deployable.PodObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
+	utils.GenerateLabel(&b.deployable.PodObjectMeta().Labels, BackstageAppLabel, utils.BackstageAppLabelValue(backstage.Name))
 
 	b.deployable.SpecSelector().MatchLabels[BackstageAppLabel] = utils.BackstageAppLabelValue(backstage.Name)
 	setMetaInfo(b.deployable.GetObject(), backstage, scheme)
@@ -224,7 +217,7 @@ func (b *BackstageDeployment) mountPath(objectMountPath, objectKey, sharedMountP
 
 // setDeployment sets the deployment object from the backstage configuration
 // it merges the deployment object with the patch from the backstage configuration
-func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
+func (b *BackstageDeployment) setDeployment(backstage api.Backstage) error {
 
 	// set from backstage.Spec.Deployment
 	if backstage.Spec.Deployment != nil {
@@ -244,9 +237,26 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 				return fmt.Errorf("can not marshal deployment object: %w", err)
 			}
 
-			merged, err := merge2.MergeStrings(string(conf.Raw), string(deplStr), false, kyaml.MergeOptions{})
+			mergeOpts := kyaml.MergeOptions{}
+			switch backstage.GetAnnotations()[ListMergeAnnotation] {
+			case "prepend":
+				mergeOpts.ListIncreaseDirection = kyaml.MergeOptionsListPrepend
+			case "append":
+				mergeOpts.ListIncreaseDirection = kyaml.MergeOptionsListAppend
+			}
+
+			merged, err := merge2.MergeStrings(string(conf.Raw), string(deplStr), false, mergeOpts)
 			if err != nil {
 				return fmt.Errorf("can not merge spec.deployment: %w", err)
+			}
+
+			// TODO(asoro): once https://github.com/kubernetes-sigs/kustomize/issues/6146 is resolved,
+			// remove this second pass and use only ListPrepend above.
+			if mergeOpts.ListIncreaseDirection == kyaml.MergeOptionsListPrepend {
+				merged, err = merge2.MergeStrings(string(conf.Raw), merged, false, kyaml.MergeOptions{})
+				if err != nil {
+					return fmt.Errorf("can not merge spec.deployment: %w", err)
+				}
 			}
 
 			b.deployable.SetEmpty()
@@ -267,15 +277,22 @@ func (b *BackstageDeployment) setDeployment(backstage bsv1.Backstage) error {
 }
 
 // getDefConfigMountPath returns the mount path and subpath (defined in default configuration)
-func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath string, subPath string) {
+func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPath, subPath, fileName string) {
 
-	mountPath, ok := obj.GetAnnotations()[DefaultMountPathAnnotation]
-	subPath = ""
-	if !ok {
-		volName := utils.ToRFC1123Label(obj.GetName())
-		mountPath = filepath.Join(b.defaultMountPath(), volName)
-		subPath = volName
+	// mountPath, no subPath or subPath="" - mount folder
+	// mountPath, subPath="*" (must not work for Secrets?) or "list,of,keys" - mount files one-by-one to mountPath
+	// no mountPath (subPath does not matter) - mount files to defaultMountPath()
+
+	mountPath = obj.GetAnnotations()[DefaultMountPathAnnotation]
+	if mountPath == "" {
+		mountPath = b.defaultMountPath()
 	}
+	subPath = obj.GetAnnotations()[DefaultSubPathAnnotation]
+	fileName = ""
+	if subPath != "" && subPath != "*" {
+		fileName = subPath
+	}
+
 	return
 }
 
@@ -283,7 +300,7 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 func (b *BackstageDeployment) setImage(image *string) {
 	if image != nil {
 		b.container().Image = *image
-		// this is a workaround for RHDH/Janus configuration
+		// this is a workaround for RHDH configuration
 		// it is not a fact that all the containers should be updated
 		// in general case need something smarter
 		// to mark/recognize containers for update
@@ -298,7 +315,7 @@ func (b *BackstageDeployment) setImage(image *string) {
 
 // adds environment from source to the Backstage Container
 // If an env var with the same name already exists, it will be replaced (not duplicated)
-func (b *BackstageDeployment) addExtraEnvs(extraEnvs *bsv1.ExtraEnvs) error {
+func (b *BackstageDeployment) addExtraEnvs(extraEnvs *api.ExtraEnvs) error {
 	if extraEnvs == nil {
 		return nil
 	}
@@ -326,19 +343,16 @@ func (b *BackstageDeployment) setOrAppendEnvVar(container *corev1.Container, nam
 	container.Env = append(container.Env, corev1.EnvVar{Name: name, Value: value})
 }
 
-// MountFilesFrom adds Volume to specified podSpec and related VolumeMounts
-// to specified belonging to this podSpec container from ConfigMap or Secret volume source
+// MountFilesFrom adds Volume to specified podSpec and related VolumeMounts to specified belonging to this podSpec container
+// from ConfigMap or Secret volume source
 // containers - array of containers to add VolumeMount(s) to
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // mountPath - mount path, default one or  as it specified in BackstageCR.spec.Application.AppConfig|ExtraFiles
 // fileName - file name which fits one of the object's key, otherwise error will be returned.
-// withSubPath - if true will be mounted file-by-file with subpath, otherwise will be mounted as directory
+// withSubPath - if true will be mounted file-by-file with subpath, otherwise will be mounted as directory to specified path
 // dataKeys - keys for ConfigMap/Secret data
-func (b *BackstageDeployment) mountFilesFrom(
-	containersFilter containersFilter, kind ObjectKind, objectName, mountPath, fileName string,
-	withSubPath bool, dataKeys []string,
-) error {
+func (b *BackstageDeployment) mountFilesFrom(containersFilter containersFilter, kind ObjectKind, objectName, mountPath, fileName string, withSubPath bool, dataKeys []string) error {
 
 	containers, err := containersFilter.getContainers(b)
 	if err != nil {
@@ -382,8 +396,7 @@ func (b *BackstageDeployment) mountFilesFrom(
 				}
 			}
 		} else {
-			mountsToAdd = []corev1.VolumeMount{{
-				Name: volName, MountPath: filepath.Join(mountPath, fileName), SubPath: fileName, ReadOnly: true}}
+			mountsToAdd = []corev1.VolumeMount{{Name: volName, MountPath: filepath.Join(mountPath, fileName), SubPath: fileName, ReadOnly: true}}
 		}
 
 		// Replace or append
@@ -415,12 +428,7 @@ func (b *BackstageDeployment) mountFilesFrom(
 // kind - kind of source, can be ConfigMap or Secret
 // objectName - name of source object
 // varName - name of env variable
-
-func (b *BackstageDeployment) addEnvVarsFrom(
-	containersFilter containersFilter,
-	kind ObjectKind,
-	objectName, varName string,
-) error {
+func (b *BackstageDeployment) addEnvVarsFrom(containersFilter containersFilter, kind ObjectKind, objectName, varName string) error {
 
 	containers, err := containersFilter.getContainers(b)
 	if err != nil {
@@ -468,4 +476,43 @@ func (b *BackstageDeployment) addEnvVarsFrom(
 		}
 	}
 	return nil
+}
+
+// mergeDeployments merges deployment configurations from base and flavours
+// Uses merge2.MergeStrings to merge YAML, then applies platform patch
+func mergeDeployments(sources []configSource, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+	if len(sources) == 0 {
+		return []client.Object{}, nil
+	}
+	mergedYAML := sources[0].content
+
+	// Merge with flavour patches
+	for i := 1; i < len(sources); i++ {
+		mergedStr, err := merge2.MergeStrings(string(sources[i].content), string(mergedYAML), false, kyaml.MergeOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to merge deployment from %s: %w", sources[i].path, err)
+		}
+		mergedYAML = []byte(mergedStr)
+	}
+
+	// Apply platform patch to the merged result
+	platformPatch, err := utils.ReadPlatformPatch(sources[0].path, platformExt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read platform patch: %w", err)
+	}
+
+	// Parse with platform patch applied
+	objs, err := utils.ReadYamls(mergedYAML, platformPatch, scheme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse merged deployment: %w", err)
+	}
+
+	if len(objs) == 0 {
+		paths := make([]string, len(sources))
+		for i, s := range sources {
+			paths[i] = s.path
+		}
+		return nil, fmt.Errorf("no objects found after merging deployment sources: %v", paths)
+	}
+	return []client.Object{objs[0]}, nil
 }

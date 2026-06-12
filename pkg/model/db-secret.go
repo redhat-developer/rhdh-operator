@@ -1,11 +1,12 @@
 package model
 
 import (
+	"fmt"
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -23,68 +24,70 @@ type DbSecret struct {
 }
 
 func init() {
-	registerConfig("db-secret.yaml", DbSecretFactory{}, false)
+	registerConfig(DbSecretKey, DbSecretFactory{}, false, nil)
 }
 
 func DbSecretDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql-secret")
 }
 
-// implementation of RuntimeObject interface
 func (b *DbSecret) Object() runtime.Object {
+	if b.secret == nil {
+		return nil
+	}
 	return b.secret
 }
 
 // implementation of RuntimeObject interface
-func (b *DbSecret) setObject(obj runtime.Object) {
-	b.secret = nil
-	if obj != nil {
-		b.secret = obj.(*corev1.Secret)
-	}
+func (b *DbSecret) GetKey() string {
+	return DbSecretKey
 }
 
-// implementation of RuntimeObject interface
-func (b *DbSecret) addToModel(model *BackstageModel, backstage bsv1.Backstage) (bool, error) {
-
+func (b *DbSecret) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
-	// do not add if specified
-	if backstage.Spec.IsAuthSecretSpecified() {
-		return false, nil
+
+	// Only set secret if localDb is enabled and auth secret not specified
+	if !backstage.Spec.IsAuthSecretSpecified() && model.localDbEnabled && config != nil {
+		b.secret = config.(*corev1.Secret)
 	}
 
-	if b.secret != nil && model.localDbEnabled {
-		model.setRuntimeObject(b)
-		model.LocalDbSecret = b
-		return true, nil
-	}
+	// Always add wrapper to model (unconditional)
+	model.setRuntimeObject(b)
 
-	return false, nil
+	// Only set metadata if underlying object exists
+	if b.secret != nil {
+		b.setMetaInfo(backstage, scheme)
+	}
+	return nil
 }
 
-// implementation of RuntimeObject interface
-// func (b *DbSecret) EmptyObject() client.Object {
-// 	return &corev1.Secret{}
-// }
+func (b *DbSecret) updateAndValidate(_ api.Backstage, _ *runtime.Scheme) error {
 
-// implementation of RuntimeObject interface
-func (b *DbSecret) updateAndValidate(_ bsv1.Backstage) error {
+	// If no secret, nothing to do
+	if b.secret == nil {
+		return nil
+	}
 
 	pswd, _ := utils.GeneratePassword(24)
 
-	service := b.model.LocalDbService
+	dbService := b.model.GetRuntimeObject(DbServiceKey)
+	if dbService == nil {
+		return fmt.Errorf("database service not found in model")
+	}
+	service := dbService.(*DbService).service
 
 	b.secret.StringData = map[string]string{
 		"POSTGRES_PASSWORD":         pswd,
 		"POSTGRESQL_ADMIN_PASSWORD": pswd,
 		"POSTGRES_USER":             "postgres",
-		"POSTGRES_HOST":             service.service.GetName(),
-		"POSTGRES_PORT":             strconv.FormatInt(int64(service.service.Spec.Ports[0].Port), 10),
+		"POSTGRES_HOST":             service.GetName(),
+		"POSTGRES_PORT":             strconv.FormatInt(int64(service.Spec.Ports[0].Port), 10),
 	}
 
 	return nil
 }
 
-func (b *DbSecret) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (b *DbSecret) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	b.secret.SetName(DbSecretDefaultName(backstage.Name))
 	setMetaInfo(b.secret, backstage, scheme)
 }

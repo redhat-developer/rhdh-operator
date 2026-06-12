@@ -16,15 +16,13 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	"golang.org/x/exp/maps"
-
 	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
@@ -34,9 +32,8 @@ import (
 
 // Add additional details to the Backstage Spec helping in making Backstage RuntimeObjects Model
 // Validates Backstage Spec and fails fast if something not correct
-// nolint:gocyclo // TODO: refactor this function to reduce cyclomatic complexity
-func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1.Backstage) (model.ExternalConfig, error) {
-	// lg := log.FromContext(ctx)
+func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage api.Backstage) (model.ExternalConfig, error) {
+	//lg := log.FromContext(ctx)
 
 	bsSpec := backstage.Spec
 	ns := backstage.Namespace
@@ -76,7 +73,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 	}
 
 	if bsSpec.Application == nil {
-		bsSpec.Application = &bsv1.Application{}
+		bsSpec.Application = &api.Application{}
 	}
 
 	// Process AppConfigs
@@ -86,7 +83,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 			if hashingData, err = r.addExtConfig(ctx, cm, backstage.Name, ac.Name, ns, addToWatch(ac), hashingData); err != nil {
 				return result, err
 			}
-			result.AppConfigKeys[ac.Name] = maps.Keys(cm.Data)
+			result.AppConfigKeys[ac.Name] = utils.SortedKeys(cm.Data)
 		}
 	}
 
@@ -130,7 +127,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 			if hashingData, err = r.addExtConfig(ctx, secret, backstage.Name, ee.Name, ns, true, hashingData); err != nil {
 				return result, err
 			}
-			// result.ExtraEnvSecrets[secret.Name] = *secret
+			//result.ExtraEnvSecrets[secret.Name] = *secret
 			result.ExtraEnvSecretKeys[ee.Name] = model.NewDataObjectKeys(secret.StringData, secret.Data)
 		}
 	}
@@ -142,7 +139,7 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage bsv1
 			if err := r.checkExternalObject(ctx, pvc, ep.Name, ns); err != nil {
 				return result, err
 			}
-			// result.ExtraPvcs[pvc.Name] = *pvc
+			//result.ExtraPvcs[pvc.Name] = *pvc
 			result.ExtraPvcKeys = append(result.ExtraPvcKeys, pvc.Name)
 		}
 	}
@@ -218,12 +215,12 @@ func (r *BackstageReconciler) checkExternalObject(ctx context.Context, obj clien
 		if _, ok := obj.(*corev1.Secret); ok && k8serrors.IsForbidden(err) {
 			return fmt.Errorf("warning: Secrets GET is forbidden, updating Secrets may not cause Pod recreating")
 		}
-		return fmt.Errorf("failed to get external config from %s: %s", objectName, err)
+		return fmt.Errorf("failed to get external config from %s: %w", objectName, err)
 	}
 	return nil
 }
 
-func addToWatch(fileObjectRef bsv1.FileObjectRef) bool {
+func addToWatch(fileObjectRef api.FileObjectRef) bool {
 	// it will contain subPath either as specified key or as a list of all keys if only mountPath specified
 	if (fileObjectRef.MountPath == "" || fileObjectRef.Key != "") && utils.BoolEnvVar(WatchExtConfig, true) {
 		return true

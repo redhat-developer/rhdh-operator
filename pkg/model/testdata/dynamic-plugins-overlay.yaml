@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-dynamic-plugins
+data:
+  "dynamic-plugins.yaml": |
+    includes:
+      - dynamic-plugins.custom.yaml
+    plugins:
+      - package: "plugin-b"
+        disabled: false
+        integrity: "sha512-overlay"
+      - package: "plugin-c"
+        disabled: false

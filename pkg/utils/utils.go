@@ -1,15 +1,23 @@
 package utils
 
 import (
+	//"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
+
+	//"io"
 	"os"
 	"path/filepath"
+
+	//"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+
+	"golang.org/x/exp/maps"
 
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
@@ -57,8 +65,7 @@ func AddAnnotation(object client.Object, name string, value string) {
 	object.GetAnnotations()[name] = value
 }
 
-// GenerateRuntimeObjectName generates name using BackstageCR name and objectType
-// which is ConfigObject Key without '.yaml' (like 'deployment')
+// GenerateRuntimeObjectName generates name using BackstageCR name and objectType which is ConfigObject Key without '.yaml' (like 'deployment')
 func GenerateRuntimeObjectName(backstageCRName string, objectType string) string {
 	return fmt.Sprintf("%s-%s", objectType, backstageCRName)
 }
@@ -84,52 +91,7 @@ func BackstageDbAppLabelValue(backstageName string) string {
 // ReadYamls reads and unmarshalls yaml with potentially multiple objects of the same type
 // manifest - yaml content
 // platformPatch - yaml content with platform specific patch, to be merged with manifest if exists
-// templ - template object to create new objects
 // scheme - runtime.Scheme
-//
-//nolint:lll
-// func ReadYamls(manifest, platformPatch []byte, templ runtime.Object, scheme runtime.Scheme) ([]client.Object, error) {
-//
-//	dec := yaml.NewYAMLOrJSONDecoder(bytes.NewReader(manifest), 1000)
-//
-//	objects := []client.Object{}
-//	for {
-//		// make a new object from template
-//		obj := reflect.New(reflect.ValueOf(templ).Elem().Type()).Interface().(client.Object)
-//
-//		err := dec.Decode(obj)
-//
-//		if errors.Is(err, io.EOF) {
-//			break
-//		}
-//		if err != nil {
-//			return nil, fmt.Errorf("failed to decode YAML: %w", err)
-//		}
-//
-//		if err := checkObjectKind(obj, &scheme); err != nil {
-//			return nil, err
-//		}
-//
-//		// merge platform patch if exists
-//		if platformPatch != nil {
-//
-//			merged, err := merge2.MergeStrings(string(platformPatch), string(manifest), false, kyaml.MergeOptions{})
-//			if err != nil {
-//				return nil, fmt.Errorf("failed to merge platform patch: %w", err)
-//			}
-//
-//			err = yaml.Unmarshal([]byte(merged), obj)
-//			if err != nil {
-//				return nil, fmt.Errorf("failed to unmarshal merged YAML: %w", err)
-//			}
-//		}
-//
-//		objects = append(objects, obj)
-//	}
-//
-//	return objects, nil
-// }
-
 func ReadYamls(manifest []byte, platformPatch []byte, scheme runtime.Scheme) ([]client.Object, error) {
 	sep := regexp.MustCompile(`(?m)^---\s*$`)
 	rawDocs := sep.Split(string(manifest), -1)
@@ -193,14 +155,15 @@ func ReadYamlFiles(path string, scheme runtime.Scheme, platformExt string) ([]cl
 	}
 
 	// Read platform patch if exists
-	pp, err := readPlatformPatch(fpath, platformExt)
+	pp, err := ReadPlatformPatch(fpath, platformExt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read platform patch: %w", err)
 	}
 	return ReadYamls(conf, pp, scheme)
 }
 
-func readPlatformPatch(path string, platformExt string) ([]byte, error) {
+// ReadPlatformPatch reads the platform-specific patch file if it exists
+func ReadPlatformPatch(path string, platformExt string) ([]byte, error) {
 	fpath := filepath.Clean(path + "." + platformExt)
 	b, err := os.ReadFile(fpath)
 	if err != nil {
@@ -224,8 +187,7 @@ func checkObjectKind(object client.Object, scheme *runtime.Scheme) error {
 		}
 	}
 
-	return fmt.Errorf(
-		"GroupVersionKind not match, found: %v, expected: %v", object.GetObjectKind().GroupVersionKind(), gvks)
+	return fmt.Errorf("GroupVersionKind not match, found: %v, expected: %v", object.GetObjectKind().GroupVersionKind(), gvks)
 
 }
 
@@ -279,6 +241,13 @@ func ToRFC1123Label(str string) string {
 	return name
 }
 
+// SortedKeys returns the keys of a map in sorted order.
+func SortedKeys[M ~map[K]V, K ~string, V any](m M) []K {
+	keys := maps.Keys(m)
+	slices.Sort(keys)
+	return keys
+}
+
 func BoolEnvVar(envvar string, def bool) bool {
 	if envValue, ok := os.LookupEnv(envvar); ok {
 		if ret, err := strconv.ParseBool(envValue); err == nil {
@@ -300,21 +269,3 @@ func ParseCommaSeparated(input string) []string {
 	}
 	return result
 }
-
-// func FilterContainers(allContainers []string, filter string) []string {
-//	if filter == "*" {
-//		return allContainers
-//	} else if filter == "" {
-//		return nil
-//	}
-//
-//	filtered := []string{}
-//	for _, c := range allContainers {
-//		for _, cname := range strings.Split(filter, ",") {
-//			if c == strings.TrimSpace(cname) {
-//				filtered = append(filtered, c)
-//			}
-//		}
-//	}
-//	return filtered
-// }

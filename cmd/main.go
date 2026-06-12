@@ -12,10 +12,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -55,6 +59,7 @@ func main() {
 	var enableHTTP2 bool
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
+	var enableCacheLabelFilter bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -75,6 +80,8 @@ func main() {
 	flag.StringVar(&metricsCertName, "metrics-cert-name", "tls.crt",
 		"The name of the metrics server certificate file.")
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
+	flag.BoolVar(&enableCacheLabelFilter, "enable-cache-label-filter", os.Getenv("ENABLE_CACHE_LABEL_FILTER") == "true",
+		"If set, the cache will only store Secrets and ConfigMaps with the label 'rhdh.redhat.com/external-config=true'. This reduces memory consumption. Can also be set via ENABLE_CACHE_LABEL_FILTER env var.")
 
 	opts := zap.Options{
 		Development: true,
@@ -172,7 +179,7 @@ func main() {
 		})
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgrOpts := ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
@@ -190,7 +197,34 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
-	})
+	}
+
+	// Configure cache to only watch labeled Secrets and ConfigMaps if flag is enabled
+	if enableCacheLabelFilter {
+		setupLog.Info("Enabling cache label filter for Secrets and ConfigMaps")
+		labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"rhdh.redhat.com/external-config": "true",
+			},
+		})
+		if err != nil {
+			setupLog.Error(err, "failed to create label selector")
+			os.Exit(1)
+		}
+
+		mgrOpts.Cache = cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Secret{}: {
+					Label: labelSelector,
+				},
+				&corev1.ConfigMap{}: {
+					Label: labelSelector,
+				},
+			},
+		}
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)

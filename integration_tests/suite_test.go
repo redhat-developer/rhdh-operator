@@ -35,8 +35,8 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	bsv1alpha3 "github.com/redhat-developer/rhdh-operator/api/v1alpha3"
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
+	bsv1prev "github.com/redhat-developer/rhdh-operator/api/v1alpha4"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 
@@ -117,9 +117,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = bsv1alpha3.AddToScheme(scheme.Scheme)
+	err = bsv1prev.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	err = bsv1.AddToScheme(scheme.Scheme)
+	err = api.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = monitoringv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
@@ -172,11 +172,11 @@ func generateRandName(name string) string {
 	return "test-backstage-" + randString(5)
 }
 
-func createBackstage(ctx context.Context, spec bsv1.BackstageSpec, ns string, name string) (string, error) {
+func createBackstage(ctx context.Context, spec api.BackstageSpec, ns string, name string) (string, error) {
 
 	backstageName := generateRandName(name)
 
-	err := k8sClient.Create(ctx, &bsv1.Backstage{
+	err := k8sClient.Create(ctx, &api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backstageName,
 			Namespace: ns,
@@ -190,12 +190,13 @@ func createBackstage(ctx context.Context, spec bsv1.BackstageSpec, ns string, na
 	return backstageName, err
 }
 
-func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1.BackstageSpec, name string) string {
+func createAndReconcileBackstage(ctx context.Context, ns string, spec api.BackstageSpec, name string) string {
+
 	backstageName, err := createBackstage(ctx, spec, ns, name)
 	Expect(err).To(Not(HaveOccurred()))
 
+	found := &api.Backstage{}
 	Eventually(func() error {
-		found := &bsv1.Backstage{}
 		return k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, found)
 	}, time.Minute, time.Second).Should(Succeed())
 
@@ -214,6 +215,19 @@ func createAndReconcileBackstage(ctx context.Context, ns string, spec bsv1.Backs
 
 	return backstageName
 }
+
+// TODO: it is not working as Backstage app is starting faster than DB and failed.
+//func createAndReconcileEmptyBackstage(ctx context.Context, ns string, spec api.BackstageSpec, name string) string {
+//	cmName := generateRandName(name)
+//
+//	specData := `
+//includes: []
+//`
+//	generateConfigMap(ctx, k8sClient, cmName, ns, map[string]string{model.DynamicPluginsFile: specData}, nil, nil)
+//	spec.Flavours = &[]api.Flavour{}
+//	spec.Application.DynamicPluginsConfigMapName = cmName
+//	return createAndReconcileBackstage(ctx, ns, spec, name)
+//}
 
 func createNamespace(ctx context.Context) string {
 	ns := fmt.Sprintf("ns-%d-%s", GinkgoParallelProcess(), randString(5))

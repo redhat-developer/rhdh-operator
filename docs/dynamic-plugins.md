@@ -47,8 +47,42 @@ TODO: Dynamic plugins can be configured to use container registries for authenti
 
 The operator supports loading default plugin configurations from an OCI container image (catalog index). For general information about how the catalog index works, see [Using a Catalog Index Image for Default Plugin Configurations](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-a-catalog-index-image-for-default-plugin-configurations).
 
-By default, the `rhdh` profile of operator [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable in the RHDH `install-dynamic-plugins` init containers.
+By default, the `rhdh` profile of operator [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable in the RHDH `install-dynamic-plugins` init container.
 To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for a complete example.
+
+### Extra catalog index images
+
+In addition to the primary catalog index image, you can configure extra catalog index images using the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. This allows loading plugin configurations from multiple catalog index images. See [Using extra catalog index images](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-extra-catalog-index-images) for more details on how RHDH handles this environment variables.
+
+The value is a comma-separated list of entries. Each entry supports two forms:
+- **`name=image_ref`**: Assigns an explicit name to the catalog index image, which controls the extraction subdirectory under `/extensions/extra/<name>/`.
+- **`image_ref`**: A direct image reference without a name; the extraction directory is auto-generated from the image reference.
+
+To configure extra catalog index images, use the `extraEnvs` field in your Backstage CR:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    extraEnvs:
+      envs:
+        - name: EXTRA_CATALOG_INDEX_IMAGES
+          value: "rhdh-community=quay.io/rhdh-community/plugin-catalog-index:1.10,registry.example.com/rhdh-catalog:latest"
+          containers:
+            - install-dynamic-plugins
+```
+
+### Extensions Catalog Entities
+
+Starting from version 1.9, the `rhdh` profile of the operator instructs the RHDH `install-dynamic-plugins` init container to extract catalog entities from the catalog index image to a new `/extensions` volume mount by default.
+This allows the extensions backend providers to automatically discover plugin metadata for display in the RHDH Extensions UI.
+
+The extraction directory can be configured via the `CATALOG_ENTITIES_EXTRACT_DIR` environment variable in the `install-dynamic-plugins` init container.
+
+More details in [Catalog Entities Extraction](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#catalog-entities-extraction).
 
 ## Dynamic plugins dependency management
 
@@ -114,5 +148,8 @@ data:
 ```
 
 In this example, both example-dep1.yaml and example-dep1.yaml will be picked and operator create the resources described in the files. 
+
+Same as other plugin configuration options, the dependencies can be defined in the default configuration for the profile or in the ConfigMap referenced in the Backstage CR. If a dependency is defined in both places, the operator will replace the one defined in the default configuration with the one defined in the Backstage CR.
+So if you want to define dependencies in CR, you need to redefine all of them in the CR, even if some of them are already defined in the default configuration. In a case if you want to clean up the dependencies defined in the default configuration, you can set `dependencies: []` in the CR.
 
 See also [Orchestrator plugin dependencies](orchestrator.md#plugin-dependencies) as an example.

@@ -15,7 +15,7 @@ jobs:
     # see list of approvers in OWNERS file
     environment:
       ${{ (github.event.pull_request.head.repo.full_name == github.repository ||
-        contains(fromJSON('["gazarenkov","nickboldt","rm3l","kim-tsao","kadel","Fortune-Ndlovu","subhashkhileri","zdrapela","openshift-cherrypick-robot"]'), github.event.pull_request.user.login)) && 'internal' || 'external' }}
+        contains(fromJSON('["gazarenkov","nickboldt","rm3l","kim-tsao","kadel","Fortune-Ndlovu","subhashkhileri","zdrapela","openshift-cherrypick-robot", "OpinionatedHeron"]'), github.event.pull_request.user.login)) && 'internal' || 'external' }}
     runs-on: ubuntu-latest
     steps:
       - name: approved
@@ -28,7 +28,7 @@ jobs:
     needs: authorize
     steps:
       - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
           repository: ${{github.event.pull_request.head.repo.full_name}}
@@ -37,7 +37,7 @@ jobs:
       # check changes in this commit for regex include and exclude matches
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@e0021407031f5be11a464abee9a0776171c79891 # v47.0.1
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
         with:
           files: |
             .github/workflows/pr.yaml
@@ -62,7 +62,7 @@ jobs:
 
       - name: Setup Go
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: 'go.mod'
 
@@ -79,6 +79,17 @@ jobs:
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
         run: make test
+
+      - name: Upload coverage to Codecov
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: cover.out
+          flags: unittests
+          fail_ci_if_error: false
+          override_commit: ${{ github.event.pull_request.head.sha }}
+          override_pr: ${{ github.event.number }}
 
       - name: Create Kind cluster
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -114,7 +125,7 @@ jobs:
 
       - name: Upload SARIF file
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7 # v4
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: gosec.sarif
