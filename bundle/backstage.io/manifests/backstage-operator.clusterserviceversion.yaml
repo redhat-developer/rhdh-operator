@@ -25,9 +25,9 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-05-27T12:26:15Z"
+    createdAt: "2026-06-12T13:10:37Z"
     description: Backstage Operator
-    operators.operatorframework.io/builder: operator-sdk-v1.37.0
+    operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   labels:
     operatorframework.io/arch.amd64: supported
@@ -211,9 +211,8 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --metrics-bind-address=:8443
-                - --metrics-secure=true
                 - --leader-elect
+                - --metrics-bind-address=:8443
                 command:
                 - /manager
                 image: quay.io/rhdh-community/operator:0.11.0
