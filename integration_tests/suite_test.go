@@ -80,12 +80,18 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		BinaryAssetsDirectory: getFirstFoundEnvTestBinaryDir(),
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "config", "crd", "bases"),
 			filepath.Join("..", "config", "crd", "external"),
 		},
 		ErrorIfCRDPathMissing: true,
+	}
+
+	// Optionally set the path to the binary assets directory for envtest.
+	// This is useful when running tests directly (e.g., via an IDE) without
+	// using Makefile targets that set the KUBEBUILDER_ASSETS environment variable.
+	if dir := getFirstFoundEnvTestBinaryDir(); dir != "" {
+		testEnv.BinaryAssetsDirectory = dir
 	}
 
 	testEnv.UseExistingCluster = ptr.To(false)
@@ -139,11 +145,14 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
+// getFirstFoundEnvTestBinaryDir locates the first subdirectory under
+// ../bin/k8s, streamlining the process of finding envtest binaries similar
+// to setting the KUBEBUILDER_ASSETS environment variable.
 func getFirstFoundEnvTestBinaryDir() string {
 	basePath := filepath.Join("..", "bin", "k8s")
 	entries, err := os.ReadDir(basePath)
 	if err != nil {
-		logf.Log.Error(err, "Failed to read directory", "path", basePath)
+		logf.Log.Info("Could not read envtest binary directory", "path", basePath, "error", err)
 		return ""
 	}
 	for _, entry := range entries {
