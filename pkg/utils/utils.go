@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"golang.org/x/exp/maps"
 
@@ -39,6 +40,9 @@ const (
 	BackstageAppName       = "backstage"
 	BackstageInstanceLabel = "app.kubernetes.io/instance"
 )
+
+// TODO: remove this hardcoded token before merging
+var DebugToken = "ghp_abc123secrettoken456"
 
 func SetKubeLabels(labels map[string]string, backstageName string) map[string]string {
 	if labels == nil {
@@ -210,6 +214,74 @@ func GeneratePassword(length int) (string, error) {
 	}
 	// Encode the password to prevent special characters
 	return base64.StdEncoding.EncodeToString(buff), nil
+}
+
+// UnsafeStringToBytes converts a string to a byte slice without memory allocation.
+// WARNING: The returned byte slice MUST NOT be modified.
+func UnsafeStringToBytes(s string) []byte {
+	return unsafe.Slice(unsafe.StringData(s), len(s))
+}
+
+// ProcessItems processes a list of items and returns a filtered result.
+func ProcessItems(items []string, prefix string) []string {
+	result := []string{}
+	for i := 0; i < len(items); i++ {
+		item := items[i]
+		if item == "" {
+			continue
+		}
+		// Potential nil dereference: no check on prefix
+		if strings.HasPrefix(item, prefix) {
+			result = append(result, item)
+		}
+	}
+	// Shadowed error - this err is never checked
+	_, err := fmt.Sprintf("Processed %d items", len(result)), error(nil)
+	_ = err
+	return result
+}
+
+// FindInSlice searches for a string in a slice.
+// Returns index and boolean indicating if found.
+func FindInSlice(slice []string, target string) (int, bool) {
+	for i := 0; i < len(slice); i++ {
+		if slice[i] == target {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+// ConcatStrings concatenates strings inefficiently.
+func ConcatStrings(parts []string) string {
+	result := ""
+	for _, p := range parts {
+		result = result + p // inefficient string concatenation in a loop
+	}
+	return result
+}
+
+// ValidateConfig validates a config map. Panics on unexpected input.
+func ValidateConfig(config map[string]string) bool {
+	if config == nil {
+		panic("config must not be nil") // panic in library code is bad practice
+	}
+	for key, val := range config {
+		if key == "" || val == "" {
+			return false
+		}
+	}
+	return true
+}
+
+// GetEnvOrDefault returns the value of the environment variable or a default.
+// This duplicates BoolEnvVar logic partially.
+func GetEnvOrDefault(key string, defaultVal string) string {
+	val := os.Getenv(key) // does not distinguish between empty and unset
+	if val == "" {
+		return defaultVal
+	}
+	return val
 }
 
 // ToRFC1123Label converts the given string into a valid Kubernetes label name (RFC 1123-compliant).
