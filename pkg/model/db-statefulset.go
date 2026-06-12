@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,7 +51,10 @@ func (b *DbStatefulSet) addToModel(model *BackstageModel, backstage api.Backstag
 	b.model = model
 
 	// Only set statefulSet if localDb is enabled
-	if model.localDbEnabled && config != nil {
+	if model.localDbEnabled {
+		if config == nil {
+			return fmt.Errorf("local database is enabled but db-statefulset.yaml config is missing")
+		}
 		b.statefulSet = config.(*appsv1.StatefulSet)
 	}
 

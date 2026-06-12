@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -44,7 +46,10 @@ func (b *DbService) addToModel(model *BackstageModel, backstage api.Backstage, c
 	b.model = model
 
 	// Only set service if localDb is enabled
-	if model.localDbEnabled && config != nil {
+	if model.localDbEnabled {
+		if config == nil {
+			return fmt.Errorf("local database is enabled but db-service.yaml config is missing")
+		}
 		b.service = config.(*corev1.Service)
 	}
 
