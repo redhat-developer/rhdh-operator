@@ -5,7 +5,7 @@ spec:
     spec:
       initContainers:
         - name: init-rag-data
-          image: quay.io/redhat-ai-dev/rag-content:release-1.9-lls-0.5.0
+          image: quay.io/redhat-ai-dev/rag-content:release-1.10-lls-0.5.0
           command:
             - "sh"
             - "-c"
