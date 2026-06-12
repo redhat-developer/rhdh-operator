@@ -210,6 +210,7 @@ func HaveAppConfigBaseUrl(expected any) types.GomegaMatcher {
 		}
 		return true, nil
 	}).WithTemplate(
-		"Expected the default app-config ConfigMap:\n{{.FormattedActual}}\n{{.To}} have the default baseUrls and CORS origin meet the expectations:\n{{format .Data 1}}",
+		"Expected the default app-config ConfigMap:\n{{.FormattedActual}}\n{{.To}} "+
+			"have the default baseUrls and CORS origin meet the expectations:\n{{format .Data 1}}",
 		expected)
 }

@@ -13,14 +13,14 @@ import (
 func FindDeployment(ctx context.Context, k8sClient client.Client, namespace, backstageName string) (model.Deployable, error) {
 	nn := client.ObjectKey{Namespace: namespace, Name: model.DeploymentName(backstageName)}
 	deploy := &appsv1.Deployment{}
-	//lg := log.FromContext(ctx)
-	//lg.V(1).Info("Looking for Deployment", "namespace", namespace, "name", nn.Name)
+	// lg := log.FromContext(ctx)
+	// lg.V(1).Info("Looking for Deployment", "namespace", namespace, "name", nn.Name)
 	err := k8sClient.Get(ctx, nn, deploy)
 	if err == nil {
 		return model.CreateDeployable(deploy)
 	} else if errors.IsNotFound(err) {
 		ss := &appsv1.StatefulSet{}
-		//lg.V(1).Info("Deployment not found, looking for StatefulSet", "namespace", namespace, "name", nn.Name)
+		// lg.V(1).Info("Deployment not found, looking for StatefulSet", "namespace", namespace, "name", nn.Name)
 		err = k8sClient.Get(ctx, nn, ss)
 		if err == nil {
 			return model.CreateDeployable(ss)

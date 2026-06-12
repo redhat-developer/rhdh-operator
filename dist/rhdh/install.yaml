@@ -4019,9 +4019,8 @@ spec:
       containers:
       - args:
         - --health-probe-bind-address=:8081
-        - --metrics-bind-address=:8443
-        - --metrics-secure=true
         - --leader-elect
+        - --metrics-bind-address=:8443
         command:
         - /manager
         env:

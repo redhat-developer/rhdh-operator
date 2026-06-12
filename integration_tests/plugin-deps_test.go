@@ -46,7 +46,7 @@ var _ = When("test plugin deps", func() {
 
 		dynapluginCm := map[string]string{"dynamic-plugins.yaml": readTestYamlFile("raw-dynaplugins-with-deps.yaml")}
 
-		bsRaw := generateConfigMap(ctx, k8sClient, "dynaplugins", ns, dynapluginCm, nil, nil)
+		bsRaw := generateConfigMap(ctx, k8sClient, "dynaplugins", ns, dynapluginCm, map[string]string{}, map[string]string{})
 
 		createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
 			RawRuntimeConfig: &api.RuntimeConfig{
