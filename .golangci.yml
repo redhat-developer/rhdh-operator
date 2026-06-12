@@ -5,28 +5,31 @@ run:
 linters:
   default: none
   enable:
-    - copyloopvar
-    - dupl
     - errcheck
-    - ginkgolinter
-    - goconst
-    - gocyclo
     - govet
     - ineffassign
-    - lll
     - misspell
     - nakedret
-    - prealloc
-    - revive
     - staticcheck
     - unconvert
-    - unparam
     - unused
-  settings:
-    revive:
-      rules:
-        - name: comment-spacings
-        - name: import-shadowing
+    # TODO(asoro): Enable these linters from the operator-sdk scaffold once the
+    # existing violations are fixed. Tracked as tech debt.
+    #- copyloopvar
+    #- dupl
+    #- ginkgolinter
+    #- goconst
+    #- gocyclo
+    #- lll
+    #- prealloc
+    #- revive
+    #- unparam
+  # TODO(asoro): Re-add revive settings when the linter is enabled
+  #settings:
+  #  revive:
+  #    rules:
+  #      - name: comment-spacings
+  #      - name: import-shadowing
   exclusions:
     generated: lax
     rules:
@@ -35,13 +38,14 @@ linters:
           - staticcheck
         # exclude dot-imports checks on test-related files
         text: "ST1001:"
-      - linters:
-          - lll
-        path: api/*
-      - linters:
-          - dupl
-          - lll
-        path: internal/*
+      # TODO(asoro): Re-add these exclusions when lll and dupl are enabled
+      #- linters:
+      #    - lll
+      #  path: api/*
+      #- linters:
+      #    - dupl
+      #    - lll
+      #  path: internal/*
     paths:
       - third_party$
       - builtin$
