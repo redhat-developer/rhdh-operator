@@ -92,7 +92,7 @@ endif
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.42.0
+OPERATOR_SDK_VERSION ?= v1.42.2
 OPM_VERSION ?= v1.55.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG_VERSION)
@@ -482,7 +482,7 @@ ENVTEST_VERSION ?= $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{e
 GOLANGCI_LINT_VERSION ?= v2.6.2
 GOIMPORTS_VERSION ?= v0.40.0
 GOSEC_VERSION ?= v2.22.11
-GINKGO_VERSION ?= v2.27.3
+GINKGO_VERSION ?= v2.28.1
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
