@@ -93,7 +93,7 @@ endif
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.42.2
-OPM_VERSION ?= v1.55.0
+OPM_VERSION ?= v1.72.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG_VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -476,12 +476,12 @@ GOSEC ?= $(LOCALBIN)/gosec
 GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.3
-CONTROLLER_TOOLS_VERSION ?= v0.20.0
+KUSTOMIZE_VERSION ?= v5.8.1
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
 ENVTEST_VERSION ?= $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
-GOLANGCI_LINT_VERSION ?= v2.6.2
-GOIMPORTS_VERSION ?= v0.40.0
-GOSEC_VERSION ?= v2.22.11
+GOLANGCI_LINT_VERSION ?= v2.12.2
+GOIMPORTS_VERSION ?= v0.46.0
+GOSEC_VERSION ?= v2.27.1
 GINKGO_VERSION ?= v2.28.1
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
