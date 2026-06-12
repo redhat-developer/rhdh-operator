@@ -188,7 +188,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 
 		// Add object to model (always added, even if config is nil - placeholder pattern)
 		if err := backstageObject.addToModel(model, backstage, chosenConfig, scheme); err != nil {
-			return nil, fmt.Errorf("failed to add object to model for key %s, reason: %s", conf.Key, err)
+			return nil, fmt.Errorf("failed to add object to model for key %s, reason: %w", conf.Key, err)
 		}
 	}
 
