@@ -175,7 +175,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		if chosenConfig == nil {
 			if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
-					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %s", conf.Key, err)
+					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %w", conf.Key, err)
 				}
 			} else if len(objs) > 0 {
 				if obj, err := adjustObject(conf, objs); err != nil {
