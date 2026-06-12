@@ -49,6 +49,10 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).WithArguments("app=rhdh-operator").Should(Succeed())
 
+			apiVersion, err := helper.GetBackstageCRDStorageVersion()
+			ExpectWithOffset(1, err).NotTo(HaveOccurred(), "could not determine Backstage CRD storage version")
+			GinkgoWriter.Printf("Using Backstage CRD API version: %s\n", apiVersion)
+
 			cmd = exec.Command(helper.GetPlatformTool(), "-n", ns, "apply", "-f", "-")
 			stdin, err := cmd.StdinPipe()
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
@@ -59,12 +63,12 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 					}
 				}()
 				_, _ = io.WriteString(stdin, fmt.Sprintf(`
-apiVersion: rhdh.redhat.com/v1alpha3
+apiVersion: rhdh.redhat.com/%s
 kind: Backstage
 metadata:
   name: my-backstage-app
   namespace: %s
-`, ns))
+`, apiVersion, ns))
 			}()
 			_, err = helper.Run(cmd)
 			Expect(err).ShouldNot(HaveOccurred())
