@@ -56,8 +56,6 @@ type BackstageModel struct {
 	localDbEnabled bool
 	isOpenshift    bool
 
-	// RuntimeObjects contains all object wrappers in deterministic order.
-	// Order is determined by init() registration (alphabetical by source file name).
 	RuntimeObjects []RuntimeObject
 
 	ExternalConfig ExternalConfig
@@ -108,6 +106,11 @@ func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
 
 // Registers config object
 func registerConfig(key string, factory ObjectFactory, multiple bool, mergeFunc MergeConfigFunc) {
+	for _, obj := range runtimeConfig {
+		if obj.Key == key {
+			panic("duplicate object key " + key)
+		}
+	}
 	runtimeConfig = append(runtimeConfig, ObjectConfig{
 		Key:           key,
 		ObjectFactory: factory,
