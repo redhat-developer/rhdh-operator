@@ -3104,7 +3104,7 @@ data:
     \     backends:\n        kv_default:\n          type: kv_sqlite\n          db_path:
     /tmp/kvstore.db\n        sql_default:\n          type: sql_sqlite\n          db_path:
     /tmp/sql_store.db\n        kv_rag:\n          type: kv_sqlite\n          db_path:
-    /rag-content/vector_db/rhdh_product_docs/1.9/faiss_store.db\n        kv_notebooks:\n
+    /rag-content/vector_db/rhdh_product_docs/1.10/faiss_store.db\n        kv_notebooks:\n
     \         type: kv_sqlite\n          db_path: /rag-content/vector_db/notebooks/faiss_store.db\n
     \     stores:\n        metadata:\n          namespace: registry\n          backend:
     kv_default\n        inference:\n          table_name: inference_store\n          backend:
@@ -3115,7 +3115,7 @@ data:
     embedding\n          provider_id: sentence-transformers\n          provider_model_id:
     /rag-content/embeddings_model\n      tool_groups:\n        - provider_id: rag-runtime\n
     \         toolgroup_id: builtin::rag\n      vector_stores:\n        - vector_store_id:
-    vs_cda156a6-64fe-436d-bc51-566fb1b09702 # see readme for this value\n          embedding_model:
+    vs_757285d9-b657-4bed-b18c-3359844e8c0d # see readme for this value\n          embedding_model:
     sentence-transformers//rag-content/embeddings_model\n          embedding_dimension:
     768\n          provider_id: rhdh-docs\n      shields:\n        - shield_id: lightspeed_question_validity-shield\n
     \         provider_id: ${env.ENABLE_VALIDATION:+lightspeed_question_validity}\n
