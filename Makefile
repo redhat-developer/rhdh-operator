@@ -126,8 +126,8 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-# Source packages outside of tests
-PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|api/v1alpha([1-9]+))')
+# Source packages outside of tests and unserved API versions (v1alpha1-3)
+PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|api/v1alpha[1-3]$$)')
 
 .PHONY: all
 all: build
