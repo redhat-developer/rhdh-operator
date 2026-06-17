@@ -107,10 +107,10 @@ func (b *AppConfig) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme)
 // updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args
 func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key string, withSubPath bool, cmData []string) error {
 
-	// TODO, enable this check
-	//if len(cmData) > 1 {
-	//	return fmt.Errorf("multiple fields is not allowed for app-config ConfigMap %s", cmName)
-	//}
+	// allow only single entry configMap to ensure predictable order in app-config chain
+	if len(cmData) > 1 {
+		return fmt.Errorf("multiple entries (%d) not allowed for app-config ConfigMap: %s", len(cmData), cmName)
+	}
 
 	_ = bsd.mountFilesFrom(containersFilter{}, ConfigMapObjectKind,
 		cmName, mountPath, key, withSubPath, cmData)
