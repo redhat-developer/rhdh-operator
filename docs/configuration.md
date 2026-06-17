@@ -458,8 +458,7 @@ The ConfigMap key/value defines the file name and content, and this app-config w
 --config /my/path/my-app-config.yaml
 ```
 
-**Note**: It is possible to define several **app-config** files inside one ConfigMap, but the keys are sorted alphabetically to ensure a deterministic order in the pod spec across reconciliations (otherwise, the iteration order would not be guaranteed). This may not match the intended merge order.
-Since Backstage merges the chain of **app-config** files from first to last and order matters, keeping several **app-config** files inside one ConfigMap is **NOT recommended**. For this case consider defining several one-entry ConfigMaps instead.
+**Important**: Each app-config ConfigMap must contain exactly one data entry. This ensures predictable merge order, as Kubernetes does not guarantee iteration order for ConfigMap data entries. ConfigMaps with multiple entries will be rejected with an error. If you need multiple app-config files, define separate single-entry ConfigMaps and reference them in the desired order.
 
 [Includes and Dynamic Data](https://backstage.io/docs/conf/writing/#includes-and-dynamic-data) (including [extra files](#extra-files) and [extra environment variables](#extra-environment-variables)) support configuring additional ConfigMaps and Secrets.
 
