@@ -146,3 +146,28 @@ func TestDefaultAndSpecifiedAppConfig(t *testing.T) {
 		deployment.container().VolumeMounts[0].Name)
 
 }
+
+// TestMultiEntryAppConfigNotAllowed verifies that ConfigMaps with multiple entries
+// are rejected to ensure predictable order in the app-config chain.
+func TestMultiEntryAppConfigNotAllowed(t *testing.T) {
+	bs := *appConfigTestBackstage.DeepCopy()
+
+	// Reference a ConfigMap with multiple entries
+	multiEntryCmName := "multi-entry-config"
+	bs.Spec.Application.AppConfig.ConfigMaps = []api.FileObjectRef{
+		{Name: multiEntryCmName},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	// Simulate a ConfigMap with multiple data entries
+	testObj.externalConfig.AppConfigKeys = map[string][]string{
+		multiEntryCmName: {"config1.yaml", "config2.yaml"}, // Multiple entries - should fail
+	}
+
+	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple entries")
+	assert.Contains(t, err.Error(), multiEntryCmName)
+}
