@@ -15,7 +15,7 @@
     "/^release-1\\..*/"
   ],
   "constraints": {
-    "go": "1.25"
+    "go": "1.26"
   },
   "kustomize": {
     "enabled": false
