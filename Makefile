@@ -477,8 +477,7 @@ GINKGO ?= $(LOCALBIN)/ginkgo
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
-# TODO(asoro): bump to v0.21.0+ once we switch to Go 1.26 (RHIDP-12020)
-CONTROLLER_TOOLS_VERSION ?= v0.20.0
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
 ENVTEST_VERSION ?= $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 GOLANGCI_LINT_VERSION ?= v2.12.2
 GOIMPORTS_VERSION ?= v0.46.0
