@@ -109,7 +109,7 @@ func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key str
 
 	// allow only single entry configMap to ensure predictable order in app-config chain
 	if len(cmData) > 1 {
-		return fmt.Errorf("multiple entries (%d) not allowed for app-config ConfigMap: %s", len(cmData), cmName)
+		return fmt.Errorf("multiple entries (%d) not allowed for app-config ConfigMap: %s; split into separate single-entry ConfigMaps", len(cmData), cmName)
 	}
 
 	_ = bsd.mountFilesFrom(containersFilter{}, ConfigMapObjectKind,
