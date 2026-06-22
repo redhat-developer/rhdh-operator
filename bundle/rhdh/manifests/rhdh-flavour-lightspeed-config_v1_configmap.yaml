@@ -270,7 +270,7 @@ data:
               command:
                 - "sh"
                 - "-c"
-                - "echo 'Copying RAG data...'; cp -r /rag/. /data/ && chmod -R 777 /data/vector_db && echo 'Copy complete.'"
+                - "echo 'Copying RAG data...'; cp -r /rag/. /data/ && mkdir -p /data/vector_db/notebooks && chmod -R 777 /data/vector_db && echo 'Copy complete.'"
               resources:
                 requests:
                   memory: 150Mi
