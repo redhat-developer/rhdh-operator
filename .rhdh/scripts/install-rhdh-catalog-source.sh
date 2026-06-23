@@ -889,18 +889,22 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
     exit 1
   fi
 
-  # Create pull secret in catalogd namespace for internal registry access
-  invoke_cluster_cli -n "${NAMESPACE_CATALOGD}" delete secret internal-reg-auth-for-rhdh --ignore-not-found
-  invoke_cluster_cli -n "${NAMESPACE_CATALOGD}" create secret docker-registry internal-reg-auth-for-rhdh \
-    --docker-server="image-registry.openshift-image-registry.svc:5000" \
-    --docker-username=kubeadmin \
-    --docker-password="$(oc whoami -t)" \
-    --docker-email="admin@internal-registry.example.com"
+  # Detect operator-controller namespace
+  NAMESPACE_OLM_CONTROLLER=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=operator-controller' \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+  if [[ -z "${NAMESPACE_OLM_CONTROLLER}" ]]; then
+    NAMESPACE_OLM_CONTROLLER="openshift-operator-controller"
+  fi
+  debugf "Using operator-controller namespace: ${NAMESPACE_OLM_CONTROLLER}"
+
+  # Grant image-puller access to OLM v1 controller SAs so they can pull images from the internal registry
+  oc policy add-role-to-user system:image-puller system:serviceaccount:${NAMESPACE_CATALOGD}:catalogd-controller-manager -n rhdh || true
+  oc policy add-role-to-user system:image-puller system:serviceaccount:${NAMESPACE_OLM_CONTROLLER}:operator-controller-controller-manager -n rhdh || true
 
   # Delete existing ClusterCatalog to force re-index
   invoke_cluster_cli delete clustercatalog "${CATALOGSOURCE_NAME}" --ignore-not-found
 
-  echo "apiVersion: catalogd.operatorframework.io/v1
+  echo "apiVersion: olm.operatorframework.io/v1
 kind: ClusterCatalog
 metadata:
   name: ${CATALOGSOURCE_NAME}
@@ -909,7 +913,6 @@ spec:
     type: Image
     image:
       ref: ${newIIBImage}
-      pullSecret: internal-reg-auth-for-rhdh
 " > "$TMPDIR"/ClusterCatalog.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterCatalog.yml
 
   if [ -z "${TO_INSTALL}" ]; then
@@ -950,6 +953,9 @@ subjects:
   namespace: ${NAMESPACE_SUBSCRIPTION}
 " > "$TMPDIR"/ClusterRoleBinding.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterRoleBinding.yml
 
+  # Grant installer SA image-puller access so it can pull operator images from the internal registry
+  oc policy add-role-to-user system:image-puller system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME} -n rhdh || true
+
   # Create ClusterExtension
   echo "apiVersion: olm.operatorframework.io/v1
 kind: ClusterExtension
@@ -964,7 +970,7 @@ spec:
     catalog:
       packageName: ${OPERATOR_NAME_IN_CS}
       channels:
-      - name: ${OLM_CHANNEL}
+      - ${OLM_CHANNEL}
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: ${CATALOGSOURCE_NAME}
