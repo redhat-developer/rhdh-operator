@@ -1,8 +1,8 @@
 module github.com/redhat-developer/rhdh-operator
 
-go 1.25.0
+go 1.26
 
-toolchain go1.25.11
+toolchain go1.26.4
 
 require (
 	github.com/onsi/ginkgo/v2 v2.22.2
@@ -18,7 +18,7 @@ require (
 	k8s.io/apimachinery v0.35.4
 	k8s.io/client-go v0.35.4
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
+	k8s.io/utils v0.0.0-20260617174310-a95e086a2553
 	sigs.k8s.io/controller-runtime v0.19.4
 	sigs.k8s.io/kustomize/kyaml v0.18.1
 	sigs.k8s.io/yaml v1.6.0
