@@ -3286,13 +3286,15 @@ data:
     spec:
       template:
         spec:
+          securityContext:
+            fsGroup: 1001
           initContainers:
             - name: init-rag-data
               image: quay.io/redhat-ai-dev/rag-content:release-1.10-lls-0.5.0
               command:
                 - "sh"
                 - "-c"
-                - "echo 'Copying RAG data...'; cp -r /rag/. /data/ && mkdir -p /data/vector_db/notebooks && chmod -R 777 /data/vector_db && echo 'Copy complete.'"
+                - "echo 'Copying RAG data...'; cp -r --no-preserve=mode,ownership /rag/. /data/ && mkdir -p /data/vector_db/notebooks && chmod -R 777 /data/vector_db && echo 'Copy complete.'"
               resources:
                 requests:
                   memory: 150Mi
