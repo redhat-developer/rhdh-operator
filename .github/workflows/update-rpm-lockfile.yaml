@@ -11,14 +11,14 @@ on:
       - release-1.**
     paths:
       - 'rpms.in.yaml'
-      - '.rhdh/docker/Dockerfile'
+      - 'Dockerfile'
       - '.github/workflows/update-rpm-lockfile.yaml'
 
 permissions:
   contents: write
 
 env:
-  DOCKERFILE_PATH: .rhdh/docker/Dockerfile
+  DOCKERFILE_PATH: Dockerfile
 
 jobs:
   update-lockfile:

@@ -1,6 +1,6 @@
 # RHDH Operator RPM dependencies
 # after editing, run (https://github.com/konflux-ci/rpm-lockfile-prototype):
-#   rpm-lockfile-prototype -f .rhdh/docker/Dockerfile rpms.in.yaml
+#   rpm-lockfile-prototype -f Dockerfile rpms.in.yaml
 # to regenerate rpms.lock.yaml
 #
 # Note that the repoid values are special, and must be from here:
