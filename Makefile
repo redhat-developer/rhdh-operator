@@ -245,6 +245,10 @@ PLATFORM ?= linux/amd64
 image-build: ## Build container image with the manager.
 	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(IMG) --label $(LABEL) .
 
+.PHONY: image-build-hermetic
+image-build-hermetic: ## Build container image in hermetic mode (simulates Konflux+Cachi2).
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(IMG) --label $(LABEL) --build-arg HERMETIC=true .
+
 .PHONY: image-push
 image-push: ## Push container image with the manager.
 	$(CONTAINER_TOOL) push $(IMG)

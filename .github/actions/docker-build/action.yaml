@@ -1,0 +1,132 @@
+# Copyright Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Docker Build (Hermetic)
+description: Build operator image hermetically using Hermeto (simulates Konflux+Cachi2)
+inputs:
+  imageName:
+    description: The full image name including registry (e.g., quay.io/rhdh-community/operator)
+    required: true
+  imageTags:
+    description: The tags to apply to the image
+    required: true
+  imageLabels:
+    description: The labels for the Docker image
+    required: false
+  platform:
+    description: "Target given CPU platform architecture (default: linux/amd64)"
+    required: false
+    default: linux/amd64
+
+runs:
+  using: composite
+  steps:
+    - name: Extract metadata (tags, labels) for Docker
+      id: meta
+      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+      with:
+        images: ${{ inputs.imageName }}
+        tags: |
+          ${{ inputs.imageTags }}
+        labels: |
+          ${{ inputs.imageLabels }}
+
+    - name: Set up hermetic build variables
+      shell: bash
+      run: |
+        echo "HERMETO_IMAGE=quay.io/konflux-ci/hermeto:latest" >> $GITHUB_ENV
+        echo "LOCAL_CACHE_DIR=./hermeto-cache" >> $GITHUB_ENV
+
+    - name: Cache dependencies with Hermeto
+      shell: bash
+      run: |
+        set -ex
+
+        echo "::group::Creating local cache directory"
+        mkdir -p ${{ env.LOCAL_CACHE_DIR }}
+        echo "::endgroup::"
+
+        echo "::group::Fetching dependencies with Hermeto (rpm + gomod)"
+        podman run --rm \
+          -v "$PWD:/source:z" \
+          -v "${{ env.LOCAL_CACHE_DIR }}:/cachi2:z" \
+          -w /source \
+          "${{ env.HERMETO_IMAGE }}" \
+          --log-level DEBUG \
+          fetch-deps --dev-package-managers \
+          --source . \
+          --output /cachi2/output \
+          '[{"type": "rpm"}, {"type": "gomod", "path": "."}]'
+        echo "::endgroup::"
+
+        echo "::group::Generating environment file"
+        podman run --rm \
+          -v "$PWD:/source:z" \
+          -v "${{ env.LOCAL_CACHE_DIR }}:/cachi2:z" \
+          -w /source \
+          "${{ env.HERMETO_IMAGE }}" \
+          --log-level DEBUG \
+          generate-env --format env \
+          --output /cachi2/cachi2.env /cachi2/output
+        echo "::endgroup::"
+
+        echo "::group::Injecting files"
+        podman run --rm \
+          -v "$PWD:/source:z" \
+          -v "${{ env.LOCAL_CACHE_DIR }}:/cachi2:z" \
+          -w /source \
+          "${{ env.HERMETO_IMAGE }}" \
+          --log-level DEBUG \
+          inject-files /cachi2/output
+        echo "::endgroup::"
+
+        echo LOCAL_CACHE_DIR_REALPATH=$(realpath "${{ env.LOCAL_CACHE_DIR }}") >> $GITHUB_ENV
+
+    - name: Fix cache ownership for non-root buildah
+      shell: bash
+      run: |
+        sudo chown -R runner ${{ env.LOCAL_CACHE_DIR_REALPATH }}
+
+    - name: Transform Dockerfile for hermetic build
+      shell: bash
+      id: transform-dockerfile
+      env:
+        TRANSFORMED_DOCKERFILE: Dockerfile.hermeto
+      run: |
+        set -x
+
+        echo "::group::Transforming Dockerfile for hermetic build"
+        cp Dockerfile "$TRANSFORMED_DOCKERFILE"
+
+        # Configure dnf/microdnf to use the hermeto repo
+        sed -i '/RUN *\(dnf\|microdnf\) install/i RUN rm -r /etc/yum.repos.d/* && cp /cachi2/output/deps/rpm/$(uname -m)/repos.d/hermeto.repo /etc/yum.repos.d/' "$TRANSFORMED_DOCKERFILE"
+
+        # Inject cachi2 env variables into every RUN command
+        sed -i 's/^\s*RUN /RUN . \/cachi2\/cachi2.env \&\& /' "$TRANSFORMED_DOCKERFILE"
+        echo "::endgroup::"
+
+        echo "transformed_dockerfile=$TRANSFORMED_DOCKERFILE" >> $GITHUB_OUTPUT
+
+    - name: Build Docker image (hermetic)
+      id: build
+      uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2.13
+      with:
+        containerfiles: ${{ steps.transform-dockerfile.outputs.transformed_dockerfile }}
+        context: .
+        platform: ${{ inputs.platform }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        extra-args: |
+          --network=none
+          --volume ${{ env.LOCAL_CACHE_DIR_REALPATH }}:/cachi2:z
