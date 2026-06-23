@@ -14,6 +14,7 @@ NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 UPSTREAM_IIB_OVERRIDE=""
 INSTALL_PLAN_APPROVAL="Automatic"
+OLM_VERSION="auto"
 MAX_PARALLEL="${MAX_PARALLEL:-10}"
 if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
   echo "[ERROR] MAX_PARALLEL must be a positive integer, got: '$MAX_PARALLEL'" >&2
@@ -70,6 +71,7 @@ Options:
   --catalog-source                    : Install from specified catalog source, like brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.18
   --install-operator <NAME>           : Install operator named \$NAME after creating CatalogSource
   --install-plan-approval <STRATEGY>  : Specify the install plan strategy for the subscription (default: Automatic)
+  --olm-version v0|v1|auto            : Force OLM version for catalog/operator resources (default: auto-detect)
 
 Examples:
   $0 \\
@@ -110,6 +112,43 @@ function invoke_cluster_cli() {
     fi
   else
     kubectl "$command" "$@"
+  fi
+}
+
+function detect_olm_v1() {
+  invoke_cluster_cli get crd clusterextensions.olm.operatorframework.io &> /dev/null
+}
+
+function resolve_olm_version() {
+  set -euo pipefail
+
+  if [[ "${IS_OPENSHIFT}" != "true" ]]; then
+    if [[ "${OLM_VERSION}" == "v1" ]]; then
+      warnf "OLM v1 is not supported on Kubernetes clusters; falling back to v0"
+    fi
+    RESOLVED_OLM_VERSION="v0"
+    return
+  fi
+
+  if [[ "${OLM_VERSION}" == "v0" ]]; then
+    RESOLVED_OLM_VERSION="v0"
+    infof "Using OLM v0 (forced via --olm-version)"
+  elif [[ "${OLM_VERSION}" == "v1" ]]; then
+    if ! detect_olm_v1; then
+      errorf "OLM v1 requested but ClusterExtension CRD not found on this cluster"
+      exit 1
+    fi
+    RESOLVED_OLM_VERSION="v1"
+    infof "Using OLM v1 (forced via --olm-version)"
+  else
+    # auto-detect
+    if detect_olm_v1; then
+      RESOLVED_OLM_VERSION="v1"
+      infof "Auto-detected OLM v1 (ClusterExtension CRD found)"
+    else
+      RESOLVED_OLM_VERSION="v0"
+      infof "Auto-detected OLM v0 (ClusterExtension CRD not found)"
+    fi
   fi
 }
 
@@ -705,6 +744,15 @@ while [[ "$#" -gt 0 ]]; do
       INSTALL_PLAN_APPROVAL="$2"
       shift 1
       ;;
+    '--olm-version')
+      if [[ "$2" != "v0" && "$2" != "v1" && "$2" != "auto" ]]; then
+        errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
+        usage
+        exit 1
+      fi
+      OLM_VERSION="$2"
+      shift 1
+      ;;
     '-h'|'--help')
       usage
       exit 0
@@ -734,6 +782,8 @@ else
   IIB_IMAGE="${UPSTREAM_IIB}"
 fi
 
+resolve_olm_version
+
 # Add CatalogSource for the IIB
 IIB_NAME="${UPSTREAM_IIB##*:}"
 IIB_NAME="${IIB_NAME//_/-}"
@@ -750,7 +800,7 @@ fi
 
 OPERATOR_GROUP_NAME="${OPERATOR_NAME_TO_INSTALL}-operator-group"
 
-if [ -n "$TO_INSTALL" ]; then
+if [ -n "$TO_INSTALL" ] && [[ "${RESOLVED_OLM_VERSION}" == "v0" ]]; then
   # OLM allows a single OperatorGroup per namespace.
   # Err out early if there are existing OperatorGroups in the Operator namespace.
   existing_ogs=$(invoke_cluster_cli get operatorgroup -n "${NAMESPACE_SUBSCRIPTION}" --no-headers -o custom-columns=":metadata.name" || true)
@@ -816,16 +866,165 @@ fi
 
 debugf "newIIBImage=${newIIBImage}"
 
-NAMESPACE_CATALOGSOURCE="olm"
-if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-  NAMESPACE_CATALOGSOURCE="openshift-marketplace"
+# RHIDP-6408: The `spec.name` field in the Subscription has to be `rhdh`, which is the name of the package in the Catalog Source.
+# If a CatalogSource is specified ($UPSTREAM_IIB_OVERRIDE), we may want to install a different operator.
+# See https://issues.redhat.com/browse/RHIDP-6408
+OPERATOR_NAME_IN_CS="rhdh"
+if [ -n "$UPSTREAM_IIB_OVERRIDE" ]; then
+  OPERATOR_NAME_IN_CS="${OPERATOR_NAME_TO_INSTALL}"
 fi
 
-# Delete existing CatalogSource first to force OLM to re-pull the image.
-# Without this, if the tag is unchanged but the digest changed (rebuilt IIB), OLM reports "unchanged" and never re-indexes.
-invoke_cluster_cli delete catalogsource "${CATALOGSOURCE_NAME}" -n "${NAMESPACE_CATALOGSOURCE}" --ignore-not-found
+if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+  # ===== OLM v1 path: ClusterCatalog + ClusterExtension =====
 
-echo "apiVersion: operators.coreos.com/v1alpha1
+  NAMESPACE_CATALOGD=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+  if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
+    NAMESPACE_CATALOGD="openshift-catalogd"
+  fi
+  debugf "Using catalogd namespace: ${NAMESPACE_CATALOGD}"
+
+  if ! invoke_cluster_cli get namespace "${NAMESPACE_CATALOGD}" &>/dev/null; then
+    errorf "Catalogd namespace '${NAMESPACE_CATALOGD}' not found. Is OLM v1 installed correctly?"
+    exit 1
+  fi
+
+  # Create pull secret in catalogd namespace for internal registry access
+  invoke_cluster_cli -n "${NAMESPACE_CATALOGD}" delete secret internal-reg-auth-for-rhdh --ignore-not-found
+  invoke_cluster_cli -n "${NAMESPACE_CATALOGD}" create secret docker-registry internal-reg-auth-for-rhdh \
+    --docker-server="image-registry.openshift-image-registry.svc:5000" \
+    --docker-username=kubeadmin \
+    --docker-password="$(oc whoami -t)" \
+    --docker-email="admin@internal-registry.example.com"
+
+  # Delete existing ClusterCatalog to force re-index
+  invoke_cluster_cli delete clustercatalog "${CATALOGSOURCE_NAME}" --ignore-not-found
+
+  echo "apiVersion: catalogd.operatorframework.io/v1
+kind: ClusterCatalog
+metadata:
+  name: ${CATALOGSOURCE_NAME}
+spec:
+  source:
+    type: Image
+    image:
+      ref: ${newIIBImage}
+      pullSecret: internal-reg-auth-for-rhdh
+" > "$TMPDIR"/ClusterCatalog.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterCatalog.yml
+
+  if [ -z "${TO_INSTALL}" ]; then
+    echo
+    echo "Done. ClusterCatalog '${CATALOGSOURCE_NAME}' created."
+    echo "To install the operator, create a ClusterExtension, ServiceAccount, and ClusterRoleBinding."
+    exit 0
+  fi
+
+  # Create namespace if needed
+  if ! invoke_cluster_cli get namespace "$NAMESPACE_SUBSCRIPTION" > /dev/null 2>&1; then
+    debugf "Namespace $NAMESPACE_SUBSCRIPTION does not exist; creating it"
+    invoke_cluster_cli create namespace "$NAMESPACE_SUBSCRIPTION"
+  fi
+
+  # ServiceAccount for ClusterExtension installer
+  SA_NAME="${OPERATOR_NAME_TO_INSTALL}-installer"
+  echo "apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${SA_NAME}
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+" > "$TMPDIR"/ServiceAccount.yml && invoke_cluster_cli apply -f "$TMPDIR"/ServiceAccount.yml
+
+  # ClusterRoleBinding granting cluster-admin to the installer SA
+  CRB_NAME="${OPERATOR_NAME_TO_INSTALL}-installer-binding"
+  echo "apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${CRB_NAME}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: ${SA_NAME}
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+" > "$TMPDIR"/ClusterRoleBinding.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterRoleBinding.yml
+
+  # Create ClusterExtension
+  echo "apiVersion: olm.operatorframework.io/v1
+kind: ClusterExtension
+metadata:
+  name: ${OPERATOR_NAME_TO_INSTALL}
+spec:
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+  serviceAccount:
+    name: ${SA_NAME}
+  source:
+    sourceType: Catalog
+    catalog:
+      packageName: ${OPERATOR_NAME_IN_CS}
+      channels:
+      - name: ${OLM_CHANNEL}
+      selector:
+        matchLabels:
+          olm.operatorframework.io/metadata.name: ${CATALOGSOURCE_NAME}
+  install:
+    preflight:
+      crdUpgradeSafety:
+        enforcement: None
+" > "$TMPDIR"/ClusterExtension.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterExtension.yml
+
+  # Post-install output
+  OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}' 2>/dev/null || true)
+  CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
+
+  CR_EXAMPLE="
+cat <<EOF | oc apply -f -
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: developer-hub
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+    extraFiles:
+      mountPath: /opt/app-root/src
+    replicas: 1
+    route:
+      enabled: true
+  database:
+    enableLocalDb: true
+EOF"
+
+  echo "
+Done. ClusterExtension '${OPERATOR_NAME_TO_INSTALL}' created via OLM v1.
+
+To create an RHDH instance:
+${CR_EXAMPLE}
+"
+
+  if [[ -n "${CLUSTER_ROUTER_BASE}" ]]; then
+    echo "
+Once deployed, Developer Hub will be available at
+https://backstage-developer-hub-${NAMESPACE_SUBSCRIPTION}.${CLUSTER_ROUTER_BASE}
+"
+  fi
+
+else
+  # ===== OLM v0 path: CatalogSource + Subscription + OperatorGroup =====
+
+  NAMESPACE_CATALOGSOURCE="olm"
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    NAMESPACE_CATALOGSOURCE="openshift-marketplace"
+  fi
+
+  # Delete existing CatalogSource first to force OLM to re-pull the image.
+  # Without this, if the tag is unchanged but the digest changed (rebuilt IIB), OLM reports "unchanged" and never re-indexes.
+  invoke_cluster_cli delete catalogsource "${CATALOGSOURCE_NAME}" -n "${NAMESPACE_CATALOGSOURCE}" --ignore-not-found
+
+  echo "apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
   name: ${CATALOGSOURCE_NAME}
@@ -840,7 +1039,7 @@ spec:
   displayName: ${DISPLAY_NAME_SUFFIX}
 " > "$TMPDIR"/CatalogSource.yml && invoke_cluster_cli apply -f "$TMPDIR"/CatalogSource.yml
 
-OPERATOR_GROUP_MANIFEST="
+  OPERATOR_GROUP_MANIFEST="
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -848,14 +1047,7 @@ metadata:
   namespace: ${NAMESPACE_SUBSCRIPTION}
 "
 
-# RHIDP-6408: The `spec.name` field in the Subscription has to be `rhdh`, which is the name of the package in the Catalog Source.
-# If a CatalogSource is specified ($UPSTREAM_IIB_OVERRIDE), we may want to install a different operator.
-# See https://issues.redhat.com/browse/RHIDP-6408
-OPERATOR_NAME_IN_CS="rhdh"
-if [ -n "$UPSTREAM_IIB_OVERRIDE" ]; then
-  OPERATOR_NAME_IN_CS="${OPERATOR_NAME_TO_INSTALL}"
-fi
-SUBSCRIPTION_MANIFEST="
+  SUBSCRIPTION_MANIFEST="
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -869,13 +1061,13 @@ spec:
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 "
 
-if [ -z "${TO_INSTALL}" ]; then
-  echo
-  echo -n "Done. "
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
-  else
-    echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following command:
+  if [ -z "${TO_INSTALL}" ]; then
+    echo
+    echo -n "Done. "
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
+    else
+      echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following command:
 
 cat <<EOF | kubectl -n ${NAMESPACE_SUBSCRIPTION} apply -f -
 ${OPERATOR_GROUP_MANIFEST}
@@ -883,34 +1075,34 @@ ${OPERATOR_GROUP_MANIFEST}
 ${SUBSCRIPTION_MANIFEST}
 EOF
 "
+    fi
+    exit 0
   fi
-  exit 0
-fi
 
-# Create project if necessary
-if ! invoke_cluster_cli get namespace "$NAMESPACE_SUBSCRIPTION" > /dev/null 2>&1; then
-  debugf "Namespace $NAMESPACE_SUBSCRIPTION does not exist; creating it"
-  invoke_cluster_cli create namespace "$NAMESPACE_SUBSCRIPTION"
-fi
+  # Create project if necessary
+  if ! invoke_cluster_cli get namespace "$NAMESPACE_SUBSCRIPTION" > /dev/null 2>&1; then
+    debugf "Namespace $NAMESPACE_SUBSCRIPTION does not exist; creating it"
+    invoke_cluster_cli create namespace "$NAMESPACE_SUBSCRIPTION"
+  fi
 
-# Create OperatorGroup to allow installing all-namespaces operators in $NAMESPACE_SUBSCRIPTION
-debugf "Creating OperatorGroup to allow all-namespaces operators to be installed"
-echo "${OPERATOR_GROUP_MANIFEST}" > "$TMPDIR"/OperatorGroup.yml && invoke_cluster_cli apply -f "$TMPDIR"/OperatorGroup.yml
+  # Create OperatorGroup to allow installing all-namespaces operators in $NAMESPACE_SUBSCRIPTION
+  debugf "Creating OperatorGroup to allow all-namespaces operators to be installed"
+  echo "${OPERATOR_GROUP_MANIFEST}" > "$TMPDIR"/OperatorGroup.yml && invoke_cluster_cli apply -f "$TMPDIR"/OperatorGroup.yml
 
-# Create subscription for operator
-echo "${SUBSCRIPTION_MANIFEST}" > "$TMPDIR"/Subscription.yml && invoke_cluster_cli apply -f "$TMPDIR"/Subscription.yml
+  # Create subscription for operator
+  echo "${SUBSCRIPTION_MANIFEST}" > "$TMPDIR"/Subscription.yml && invoke_cluster_cli apply -f "$TMPDIR"/Subscription.yml
 
-if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-  OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
-  CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
-  echo -n "
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
+    CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
+    echo -n "
 
 To install, go to:
 https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_SUBSCRIPTION}?catalogType=OperatorBackedService
 
 Or "
-else
-  echo -n "
+  else
+    echo -n "
 
 To install on Kubernetes:
 
@@ -929,13 +1121,13 @@ kubectl -n ${NAMESPACE_SUBSCRIPTION} create secret docker-registry rh-pull-secre
 kubectl -n ${NAMESPACE_SUBSCRIPTION} patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"rh-pull-secret\"}]}'
 
 4. And then "
-fi
+  fi
 
-CLI_TOOL="kubectl"
-if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-  CLI_TOOL="oc"
-fi
-CR_EXAMPLE="
+  CLI_TOOL="kubectl"
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    CLI_TOOL="oc"
+  fi
+  CR_EXAMPLE="
 cat <<EOF | ${CLI_TOOL} apply -f -
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
@@ -955,13 +1147,14 @@ spec:
     enableLocalDb: true
 EOF"
 
-echo "run this to create an RHDH instance:
+  echo "run this to create an RHDH instance:
 ${CR_EXAMPLE}
 "
 
-if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-  echo "
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    echo "
 Once deployed, Developer Hub will be available at
 https://backstage-developer-hub-${NAMESPACE_SUBSCRIPTION}.${CLUSTER_ROUTER_BASE}
 "
+  fi
 fi
