@@ -17,6 +17,8 @@ IS_HOSTED_CONTROL_PLANE=""
 NAMESPACE_OPERATOR="rhdh-operator"
 INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
 FILTERED_VERSIONS=(*)
+OLM_VERSION="auto"
+RESOLVED_OLM_VERSION=""
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
@@ -112,6 +114,10 @@ Options:
                                             --to-registry together.
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
+  --olm-version v0|v1|auto               : Force OLM version for catalog/operator resources (default: auto-detect).
+                                            'auto' detects OLM v1 by checking for the ClusterExtension CRD on the cluster.
+                                            When v1 is detected or forced, generates ClusterCatalog + ClusterExtension
+                                            instead of CatalogSource + Subscription.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
 
 Examples:
@@ -265,7 +271,16 @@ while [[ "$#" -gt 0 ]]; do
     OC_MIRROR_FLAGS="$2"
     shift 1
     ;;
-  '--install-yq') 
+  '--olm-version')
+    if [[ "$2" != "v0" && "$2" != "v1" && "$2" != "auto" ]]; then
+      errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
+      usage
+      exit 1
+    fi
+    OLM_VERSION="$2"
+    shift 1
+    ;;
+  '--install-yq')
     INSTALL_YQ=1 ;;
   '-h' | '--help')
     usage
@@ -325,6 +340,82 @@ function invoke_cluster_cli() {
   else
     kubectl "$command" "$@"
   fi
+}
+
+function detect_olm_v1() {
+  invoke_cluster_cli get crd clusterextensions.olm.operatorframework.io &>/dev/null
+}
+
+function resolve_olm_version() {
+  set -euo pipefail
+
+  if [[ "${IS_OPENSHIFT}" != "true" ]]; then
+    if [[ "${OLM_VERSION}" == "v1" ]]; then
+      warnf "OLM v1 is not supported on Kubernetes clusters; falling back to v0"
+    fi
+    RESOLVED_OLM_VERSION="v0"
+    return
+  fi
+
+  if [[ "${OLM_VERSION}" == "v0" ]]; then
+    RESOLVED_OLM_VERSION="v0"
+    infof "Using OLM v0 (forced via --olm-version)"
+  elif [[ "${OLM_VERSION}" == "v1" ]]; then
+    if ! detect_olm_v1; then
+      errorf "OLM v1 requested but ClusterExtension CRD not found on this cluster"
+      exit 1
+    fi
+    RESOLVED_OLM_VERSION="v1"
+    infof "Using OLM v1 (forced via --olm-version)"
+  else
+    # auto-detect
+    if detect_olm_v1; then
+      RESOLVED_OLM_VERSION="v1"
+      infof "Auto-detected OLM v1 (ClusterExtension CRD found)"
+    else
+      RESOLVED_OLM_VERSION="v0"
+      infof "Auto-detected OLM v0 (ClusterExtension CRD not found)"
+    fi
+  fi
+}
+
+function prepare_olm_v1_secrets() {
+  set -euo pipefail
+
+  if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]]; then
+    return
+  fi
+
+  NAMESPACE_CATALOGD=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+  if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
+    NAMESPACE_CATALOGD="openshift-catalogd"
+  fi
+  debugf "Using catalogd namespace: ${NAMESPACE_CATALOGD}"
+
+  if ! invoke_cluster_cli get namespace "${NAMESPACE_CATALOGD}" &>/dev/null; then
+    errorf "Catalogd namespace '${NAMESPACE_CATALOGD}' not found. Is OLM v1 installed correctly?"
+    exit 1
+  fi
+
+  for ns in "${NAMESPACE_CATALOGD}" "${NAMESPACE_OPERATOR}"; do
+    if invoke_cluster_cli -n "${ns}" get secret internal-reg-ext-auth-for-rhdh &>/dev/null; then
+      invoke_cluster_cli -n "${ns}" delete secret internal-reg-ext-auth-for-rhdh >&2
+    fi
+    invoke_cluster_cli -n "${ns}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
+      --docker-server="$(buildRegistryUrl)" \
+      --docker-username=kubeadmin \
+      --docker-password="$(oc whoami -t)" \
+      --docker-email="admin@internal-registry-ext.example.com" >&2
+    if invoke_cluster_cli -n "${ns}" get secret internal-reg-auth-for-rhdh &>/dev/null; then
+      invoke_cluster_cli -n "${ns}" delete secret internal-reg-auth-for-rhdh >&2
+    fi
+    invoke_cluster_cli -n "${ns}" create secret docker-registry internal-reg-auth-for-rhdh \
+      --docker-server="image-registry.openshift-image-registry.svc:5000" \
+      --docker-username=kubeadmin \
+      --docker-password="$(oc whoami -t)" \
+      --docker-email="admin@internal-registry.example.com" >&2
+  done
 }
 
 ##########################################################################################
@@ -875,6 +966,18 @@ if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
   ocp_prepare_internal_registry
 fi
 
+if [[ -n "${TO_REGISTRY}" ]]; then
+  resolve_olm_version
+  if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" && "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    prepare_olm_v1_secrets
+  fi
+else
+  if [[ "${OLM_VERSION}" != "auto" ]]; then
+    RESOLVED_OLM_VERSION="${OLM_VERSION}"
+  else
+    RESOLVED_OLM_VERSION="v0"
+  fi
+fi
 
 manifestsTargetDir="${TMPDIR}"
 if [[ -n "${FROM_DIR}" ]]; then
@@ -1030,13 +1133,30 @@ EOF
       # oc-mirror v2 generates files with pattern: cs-*.yaml
       for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
         if [[ -f "${manifest}" ]]; then
-          debugf "Processing CatalogSource: ${manifest}"
-          # Replace some metadata and add the default list of secrets
-          "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
-          "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
-          "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
-          "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
-          invoke_cluster_cli apply -f "${manifest}"
+          if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+            debugf "Converting CatalogSource to ClusterCatalog: ${manifest}"
+            catalogImage=$("$YQ" '.spec.image' "${manifest}")
+            catalogImage=$(echo "$catalogImage" | sed 's|default-route-openshift-image-registry\.apps\.[^/]*|image-registry.openshift-image-registry.svc:5000|')
+            cat <<EOF | invoke_cluster_cli apply -f -
+apiVersion: catalogd.operatorframework.io/v1
+kind: ClusterCatalog
+metadata:
+  name: rhdh-catalog
+spec:
+  source:
+    type: Image
+    image:
+      ref: ${catalogImage}
+      pullSecret: internal-reg-auth-for-rhdh
+EOF
+          else
+            debugf "Processing CatalogSource: ${manifest}"
+            "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
+            "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
+            "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
+            "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
+            invoke_cluster_cli apply -f "${manifest}"
+          fi
           foundResources=true
         fi
       done
@@ -1089,12 +1209,21 @@ else
       fi
       debugf "Falling back to a standard K8s cluster"
       # Check that OLM is installed
-      if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
-        errorf "
+      if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+        if ! invoke_cluster_cli get crd clusterextensions.olm.operatorframework.io &>/dev/null; then
+          errorf "
+    OLM v1 not installed (ClusterExtension CRD not found) or you don't have enough permissions.
+    Check that you are correctly logged into the cluster and that OLM v1 is installed."
+          exit 1
+        fi
+      else
+        if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
+          errorf "
     OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
     Check that you are correctly logged into the cluster and that OLM is installed.
     See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
-        exit 1
+          exit 1
+        fi
       fi
     fi
 
@@ -1106,7 +1235,23 @@ else
     my_operator_index="$(buildCatalogImageUrl "internal")"
   fi
 
-  cat <<EOF >"${manifestsTargetDir}/catalogSource.yaml"
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }; then
+    cat <<EOF >"${manifestsTargetDir}/clusterCatalog.yaml"
+apiVersion: catalogd.operatorframework.io/v1
+kind: ClusterCatalog
+metadata:
+  name: rhdh-catalog
+spec:
+  source:
+    type: Image
+    image:
+      ref: ${my_operator_index}
+      pullSecret: internal-reg-auth-for-rhdh
+EOF
+  fi
+
+  if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }; then
+    cat <<EOF >"${manifestsTargetDir}/catalogSource.yaml"
   apiVersion: operators.coreos.com/v1alpha1
   kind: CatalogSource
   metadata:
@@ -1123,6 +1268,7 @@ else
     publisher: "Red Hat"
     displayName: "Red Hat Developer Hub (Airgapped)"
 EOF
+  fi
 
   if [[ -n "${TO_REGISTRY}" ]]; then
     # IDMS will only work on regular OCP clusters. It doesn't work on ROSA or clusters with hosted control planes like on IBM Cloud.
@@ -1205,7 +1351,11 @@ EOF
       invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     fi
     debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
-    invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
+    if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/clusterCatalog.yaml"
+    else
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
+    fi
   fi
 fi
 
@@ -1224,7 +1374,73 @@ metadata:
   name: ${NAMESPACE_OPERATOR}
 EOF
 
-cat <<EOF >"${manifestsTargetDir}/operatorGroup.yaml"
+if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
+  # Export-only mode with auto-detection: generate both v0 and v1 manifest templates
+  # so the user has them available when importing on the target cluster.
+  # During import (--from-dir + --to-registry), manifests are regenerated with real values.
+  infof "Generating both OLM v0 and v1 manifest templates for export."
+fi
+
+if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }; then
+  # shellcheck disable=SC2016
+  SA_NAME='${SA_NAME}'
+  # shellcheck disable=SC2016
+  CRB_NAME='${CRB_NAME}'
+  if [[ -n "${TO_REGISTRY}" ]]; then
+    SA_NAME="rhdh-operator-installer"
+    CRB_NAME="rhdh-operator-installer-binding"
+  fi
+
+  cat <<EOF >"${manifestsTargetDir}/serviceAccount.yaml"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${SA_NAME}
+  namespace: ${NAMESPACE_OPERATOR}
+EOF
+
+  cat <<EOF >"${manifestsTargetDir}/clusterRoleBinding.yaml"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${CRB_NAME}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: ${SA_NAME}
+  namespace: ${NAMESPACE_OPERATOR}
+EOF
+
+  cat <<EOF >"${manifestsTargetDir}/clusterExtension.yaml"
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterExtension
+metadata:
+  name: rhdh-operator
+spec:
+  namespace: ${NAMESPACE_OPERATOR}
+  serviceAccount:
+    name: ${SA_NAME}
+  source:
+    sourceType: Catalog
+    catalog:
+      packageName: rhdh
+      channels:
+      - name: fast
+      selector:
+        matchLabels:
+          olm.operatorframework.io/metadata.name: rhdh-catalog
+  install:
+    preflight:
+      crdUpgradeSafety:
+        enforcement: None
+EOF
+fi
+
+if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }; then
+  cat <<EOF >"${manifestsTargetDir}/operatorGroup.yaml"
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -1232,7 +1448,7 @@ metadata:
   namespace: ${NAMESPACE_OPERATOR}
 EOF
 
-cat <<EOF >"${manifestsTargetDir}/subscription.yaml"
+  cat <<EOF >"${manifestsTargetDir}/subscription.yaml"
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -1245,6 +1461,7 @@ spec:
   source: rhdh-catalog
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 EOF
+fi
 
 if [[ "$INSTALL_OPERATOR" != "true" ]]; then
   echo
@@ -1264,7 +1481,15 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
     "
   fi
   if [[ -n "${TO_REGISTRY}" ]]; then
-    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+      echo "To install the operator via OLM v1, apply the following manifests:
+
+      kubectl apply -f ${manifestsTargetDir}/namespace.yaml
+      kubectl apply -f ${manifestsTargetDir}/serviceAccount.yaml
+      kubectl apply -f ${manifestsTargetDir}/clusterRoleBinding.yaml
+      kubectl apply -f ${manifestsTargetDir}/clusterExtension.yaml
+      "
+    elif [[ "${IS_OPENSHIFT}" = "true" ]]; then
       echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
     else
       echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following commands:
@@ -1281,33 +1506,29 @@ fi
 if [[ -n "${TO_REGISTRY}" ]]; then
 
   # Install the operator
-  for manifest in namespace operatorGroup subscription; do
-    invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
-  done
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    for manifest in namespace serviceAccount clusterRoleBinding clusterExtension; do
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
+    done
+  else
+    for manifest in namespace operatorGroup subscription; do
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
+    done
+  fi
 
   invoke_cluster_cli -n ${NAMESPACE_OPERATOR} patch serviceaccount default \
     -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
-
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
-    CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
-    echo -n "
-
-  To install, go to:
-  https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_OPERATOR}?catalogType=OperatorBackedService
-
-  Or "
-  else
-    echo -n "
-
-  To install on Kubernetes: "
-  fi
 
   CLI_TOOL="kubectl"
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     CLI_TOOL="oc"
   fi
-  CR_EXAMPLE="
+
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}' 2>/dev/null || true)
+    CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
+
+    CR_EXAMPLE="
   cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
   apiVersion: rhdh.redhat.com/v1alpha5
   kind: Backstage
@@ -1326,7 +1547,62 @@ if [[ -n "${TO_REGISTRY}" ]]; then
       enableLocalDb: true
   EOF"
 
-  echo "run this to create an RHDH instance:
+    echo "
+Done. ClusterExtension 'rhdh-operator' created via OLM v1.
+
+To create an RHDH instance:
+  ${CR_EXAMPLE}
+
+Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
+pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
+
+${CLI_TOOL} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
+
+More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  "
+
+    if [[ -n "${CLUSTER_ROUTER_BASE}" ]]; then
+      echo "
+  Once deployed, Developer Hub will be available at
+  https://backstage-developer-hub-${NAMESPACE_OPERATOR}.${CLUSTER_ROUTER_BASE}
+  "
+    fi
+  else
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
+      CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
+      echo -n "
+
+  To install, go to:
+  https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_OPERATOR}?catalogType=OperatorBackedService
+
+  Or "
+    else
+      echo -n "
+
+  To install on Kubernetes: "
+    fi
+
+    CR_EXAMPLE="
+  cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
+  apiVersion: rhdh.redhat.com/v1alpha5
+  kind: Backstage
+  metadata:
+    name: developer-hub
+  spec:
+    application:
+      appConfig:
+        mountPath: /opt/app-root/src
+      extraFiles:
+        mountPath: /opt/app-root/src
+      replicas: 1
+      route:
+        enabled: true
+    database:
+      enableLocalDb: true
+  EOF"
+
+    echo "run this to create an RHDH instance:
   ${CR_EXAMPLE}
 
 Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
@@ -1337,10 +1613,11 @@ ${CLI_TOOL} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSec
 More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
   "
 
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    echo "
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      echo "
   Once deployed, Developer Hub will be available at
   https://backstage-developer-hub-${NAMESPACE_OPERATOR}.${CLUSTER_ROUTER_BASE}
   "
+    fi
   fi
 fi
