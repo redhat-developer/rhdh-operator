@@ -88,7 +88,7 @@ Replace `<tag>` with the tag from the pull request (for example, `9.8-1777889793
 To confirm the Go version linked into a shipped operator binary, inspect the software bill of materials:
 
 ```
-cosign download sbom --platform=linux/amd64 quay.io/rhdh/rhdh-rhel9-operator:<tag> 2>/dev/null | \
+cosign download sbom --platform=linux/amd64 quay.io/rhdh/rhdh-rhel9-operator:<tag> | \
   jq -r '.packages[] | select(.name == "stdlib") | .versionInfo'
 ```
 
