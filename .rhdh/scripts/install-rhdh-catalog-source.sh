@@ -874,6 +874,31 @@ if [ -n "$UPSTREAM_IIB_OVERRIDE" ]; then
   OPERATOR_NAME_IN_CS="${OPERATOR_NAME_TO_INSTALL}"
 fi
 
+CLI_TOOL="kubectl"
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  CLI_TOOL="oc"
+fi
+
+CR_EXAMPLE="
+cat <<EOF | ${CLI_TOOL} apply -f -
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: developer-hub
+  namespace: ${NAMESPACE_SUBSCRIPTION}
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+    extraFiles:
+      mountPath: /opt/app-root/src
+    replicas: 1
+    route:
+      enabled: true
+  database:
+    enableLocalDb: true
+EOF"
+
 if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   # ===== OLM v1 path: ClusterCatalog + ClusterExtension =====
 
@@ -898,8 +923,8 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   debugf "Using operator-controller namespace: ${NAMESPACE_OLM_CONTROLLER}"
 
   # Grant image-puller access to OLM v1 controller SAs so they can pull images from the internal registry
-  oc policy add-role-to-user system:image-puller system:serviceaccount:${NAMESPACE_CATALOGD}:catalogd-controller-manager -n rhdh || true
-  oc policy add-role-to-user system:image-puller system:serviceaccount:${NAMESPACE_OLM_CONTROLLER}:operator-controller-controller-manager -n rhdh || true
+  oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:catalogd-controller-manager" -n rhdh || true
+  oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_OLM_CONTROLLER}:operator-controller-controller-manager" -n rhdh || true
 
   # Delete existing ClusterCatalog to force re-index
   invoke_cluster_cli delete clustercatalog "${CATALOGSOURCE_NAME}" --ignore-not-found
@@ -954,7 +979,7 @@ subjects:
 " > "$TMPDIR"/ClusterRoleBinding.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterRoleBinding.yml
 
   # Grant installer SA image-puller access so it can pull operator images from the internal registry
-  oc policy add-role-to-user system:image-puller system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME} -n rhdh || true
+  oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME}" -n rhdh || true
 
   # Create ClusterExtension
   echo "apiVersion: olm.operatorframework.io/v1
@@ -981,28 +1006,7 @@ spec:
 " > "$TMPDIR"/ClusterExtension.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterExtension.yml
 
   # Post-install output
-  OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}' 2>/dev/null || true)
   CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
-
-  CR_EXAMPLE="
-cat <<EOF | oc apply -f -
-apiVersion: rhdh.redhat.com/v1alpha5
-kind: Backstage
-metadata:
-  name: developer-hub
-  namespace: ${NAMESPACE_SUBSCRIPTION}
-spec:
-  application:
-    appConfig:
-      mountPath: /opt/app-root/src
-    extraFiles:
-      mountPath: /opt/app-root/src
-    replicas: 1
-    route:
-      enabled: true
-  database:
-    enableLocalDb: true
-EOF"
 
   echo "
 Done. ClusterExtension '${OPERATOR_NAME_TO_INSTALL}' created via OLM v1.
@@ -1128,30 +1132,6 @@ kubectl -n ${NAMESPACE_SUBSCRIPTION} patch serviceaccount default -p '{\"imagePu
 
 4. And then "
   fi
-
-  CLI_TOOL="kubectl"
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    CLI_TOOL="oc"
-  fi
-  CR_EXAMPLE="
-cat <<EOF | ${CLI_TOOL} apply -f -
-apiVersion: rhdh.redhat.com/v1alpha5
-kind: Backstage
-metadata:
-  name: developer-hub
-  namespace: ${NAMESPACE_SUBSCRIPTION}
-spec:
-  application:
-    appConfig:
-      mountPath: /opt/app-root/src
-    extraFiles:
-      mountPath: /opt/app-root/src
-    replicas: 1
-    route:
-      enabled: true
-  database:
-    enableLocalDb: true
-EOF"
 
   echo "run this to create an RHDH instance:
 ${CR_EXAMPLE}
