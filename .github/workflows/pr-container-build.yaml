@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: React to comment
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             await github.rest.reactions.createForIssueComment({
@@ -40,7 +40,7 @@ jobs:
 
       - name: Get PR details
         id: pr
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const pr = await github.rest.pulls.get({
@@ -127,7 +127,7 @@ jobs:
 
       - name: Comment image links in PR
         if: success()
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         # 5. SCRIPT HARDENING: Pass data as environment variables
         env:
           BASE_VERSION: ${{ env.BASE_VERSION }}
@@ -160,7 +160,7 @@ jobs:
 
       - name: Comment on failure
         if: failure()
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           USER_LOGIN: ${{ github.event.comment.user.login }}
         with:
