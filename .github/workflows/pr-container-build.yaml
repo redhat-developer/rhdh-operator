@@ -52,30 +52,36 @@ jobs:
             // Extract SHA from the comment, or default to the PR HEAD
             const commentBody = context.payload.comment.body.trim();
             const match = commentBody.match(/^\/build-images\s+([a-f0-9]{7,40})/);
-            const requestedSha = match ? match[1] : pr.data.head.sha;
 
-            // Validate that the SHA belongs to this PR's commits
-            const commits = [];
-            let page = 1;
-            while (true) {
-              const resp = await github.rest.pulls.listCommits({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.issue.number,
-                per_page: 100,
-                page,
-              });
-              commits.push(...resp.data.map(c => c.sha));
-              if (resp.data.length < 100) break;
-              page++;
-            }
+            let fullSha;
+            if (!match) {
+              fullSha = pr.data.head.sha;
+            } else {
+              const requestedSha = match[1];
 
-            const fullSha = commits.find(
-              sha => sha === requestedSha || sha.startsWith(requestedSha)
-            );
-            if (!fullSha) {
-              core.setFailed(`❌ Security Gate: SHA ${requestedSha} is not part of PR #${context.issue.number}. Only commits in this PR can be built.`);
-              return;
+              // Validate that the SHA belongs to this PR's commits
+              const commits = [];
+              let page = 1;
+              while (true) {
+                const resp = await github.rest.pulls.listCommits({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  per_page: 100,
+                  page,
+                });
+                commits.push(...resp.data.map(c => c.sha));
+                if (resp.data.length < 100) break;
+                page++;
+              }
+
+              fullSha = commits.find(
+                sha => sha === requestedSha || sha.startsWith(requestedSha)
+              );
+              if (!fullSha) {
+                core.setFailed(`❌ Security Gate: SHA ${requestedSha} is not part of PR #${context.issue.number}. Only commits in this PR can be built.`);
+                return;
+              }
             }
 
             // Output the frozen, trusted data
