@@ -58,7 +58,7 @@ type RuntimeConfig struct {
 type Database struct {
 	// Control the creation of a local PostgreSQL DB. Set to false if using for example an external Database for Backstage.
 	// +optional
-	//+kubebuilder:default=true
+	// +kubebuilder:default=true
 	EnableLocalDb *bool `json:"enableLocalDb,omitempty"`
 
 	// Name of the secret for database authentication. Optional.
@@ -111,7 +111,7 @@ type Application struct {
 	// Number of desired replicas to set in the Backstage Deployment.
 	// Defaults to 1.
 	// +optional
-	//+kubebuilder:default=1
+	// +kubebuilder:default=1
 	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Custom image to use in all containers (including Init Containers).
@@ -187,7 +187,7 @@ type ExtraEnvs struct {
 type EnvObjectRef struct {
 	// Name of the object
 	// We support only ConfigMaps and Secrets.
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Key in the object
@@ -205,7 +205,7 @@ type EnvObjectRef struct {
 type FileObjectRef struct {
 	// Name of the object
 	// Supported ConfigMaps and Secrets
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Key in the object
@@ -226,7 +226,7 @@ type FileObjectRef struct {
 
 type PvcRef struct {
 	// Name of the object
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Path to mount PVC. If not specified default-path/Name will be used
@@ -243,11 +243,11 @@ type PvcRef struct {
 
 type Env struct {
 	// Name of the environment variable
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Value of the environment variable
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Value string `json:"value"`
 
 	// If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
@@ -265,8 +265,8 @@ type BackstageStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"
 
 // Backstage is the Schema for the Red Hat Developer Hub backstages API.
@@ -281,7 +281,7 @@ type Backstage struct {
 	Status BackstageStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackstageList contains a list of Backstage
 type BackstageList struct {
@@ -295,7 +295,7 @@ type BackstageList struct {
 type Route struct {
 	// Control the creation of a Route on OpenShift.
 	// +optional
-	//+kubebuilder:default=true
+	// +kubebuilder:default=true
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// Host is an alias/DNS that points to the service. Optional.
