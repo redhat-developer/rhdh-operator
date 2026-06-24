@@ -285,7 +285,12 @@ func IsOpenShift() bool {
 	return _isOpenShift
 }
 
-func StartPortForward(ctx context.Context, svc string, ns string, svcPort int) (localPort int, cancelFunc context.CancelFunc, err error) {
+func StartPortForward(
+	ctx context.Context,
+	svc string,
+	ns string,
+	svcPort int,
+) (localPort int, cancelFunc context.CancelFunc, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	cmd := exec.CommandContext(
 		ctx,

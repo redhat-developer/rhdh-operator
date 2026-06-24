@@ -1,14 +1,62 @@
-# Configuration for the golangci-lint tool - ensuring that dot imports do not trigger an ST1001 warning.
-
 version: "2"
+run:
+  allow-parallel-runners: true
 
 linters:
+  default: none
   enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
     - staticcheck
+    - unconvert
+    - unused
+    # TODO(asoro): Enable these linters from the operator-sdk scaffold once the
+    # existing violations are fixed. Tracked as tech debt.
+    #- copyloopvar
+    #- dupl
+    #- ginkgolinter
+    #- goconst
+    #- gocyclo
+    #- lll
+    #- prealloc
+    #- revive
+    #- unparam
+  # TODO(asoro): Re-add revive settings when the linter is enabled
+  #settings:
+  #  revive:
+  #    rules:
+  #      - name: comment-spacings
+  #      - name: import-shadowing
   exclusions:
+    generated: lax
     rules:
       - path: '^integration_tests/|^tests/|[^/]+_test\.go'
         linters:
           - staticcheck
         # exclude dot-imports checks on test-related files
         text: "ST1001:"
+      # TODO(asoro): Re-add these exclusions when lll and dupl are enabled
+      #- linters:
+      #    - lll
+      #  path: api/*
+      #- linters:
+      #    - dupl
+      #    - lll
+      #  path: internal/*
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
