@@ -5,8 +5,8 @@
 | Control | Main branch | Release branches |
 |---|---|---|
 | `go` directive in `go.mod` | Bump to match the latest Go version available in go-toolset | Frozen at branch-cut value; do not bump |
-| `toolchain` directive in `go.mod` | Update to the latest patch release of the declared `go` version | Frozen at branch-cut value; do not bump |
-| go-toolset builder image | Track the latest available image | Track the latest available image (security patches) |
+| `toolchain` directive in `go.mod` | Update to the latest patch release of the declared `go` version | Patch-level updates via Renovate while the declared `go` version is supported |
+| go-toolset builder image | Track the latest available image | Track the latest available image |
 | `constraints.go` in Renovate config | Must match the `go` directive value | Must match the `go` directive value on that branch |
 | Dependency updates requiring a `go` bump | Allowed if go-toolset has the required version | Skip the update; escalate to Security if it is a CVE fix |
 
@@ -22,13 +22,13 @@ The `go` directive on the main branch is eventually bumped to match the latest G
 
 A new Go version is considered available for the operator when a go-toolset image containing that version appears in the [Red Hat Ecosystem Catalog](https://catalog.redhat.com/en/software/containers/ubi9/go-toolset/61e5c00b4ec9945c18787690). Maintainers can monitor availability by checking the catalog for new tags or by observing when Renovate opens a Docker minor update pull request for the go-toolset image in the operator repository. Updates to the `go` directive are driven by this availability, not by upstream Go release dates.
 
-When the `go` directive is bumped, the `toolchain` directive should be updated to track the latest patch release of the declared version. Both changes are deliberate and tracked via a Jira issue each release cycle (for example, [RHIDP-12020](https://redhat.atlassian.net/browse/RHIDP-12020) tracks the update to Go 1.26). At the same time, the [`constraints.go` setting](https://docs.renovatebot.com/golang/#go-binary-version) in the Renovate configuration at [`.github/renovate.json`](.github/renovate.json) must be updated to match the new `go` directive value. This constraint controls which Go dependency versions Renovate is permitted to propose, and a mismatch will cause Renovate to offer updates that may be incompatible with the declared language version.
+When the `go` directive is bumped, the `toolchain` directive should be updated to track the latest patch release of the declared version. Both changes are deliberate and tracked via a Jira issue each release cycle (for example, [RHIDP-12020](https://redhat.atlassian.net/browse/RHIDP-12020) tracks the update to Go 1.26). At the same time, the [`constraints.go` setting](https://docs.renovatebot.com/golang/#go-binary-version) in the Renovate configuration at [`.github/renovate.json`](../.github/renovate.json) must be updated to match the new `go` directive value. This constraint controls which Go dependency versions Renovate is permitted to propose, and a mismatch will cause Renovate to offer updates that may be incompatible with the declared language version.
 
 It is also acceptable to update the `go` and `toolchain` directives on the main branch before the scheduled release cycle bump if a dependency update requires a newer Go version and that version is available in go-toolset.
 
 ## Language Version Policy on Release Branches
 
-The `go` and `toolchain` directives on release branches are frozen at the values present when the branch was cut. Maintainers must not bump these directives on release branches, even if the declared Go version becomes unsupported by the upstream Go project.
+The `go` directive on release branches is frozen at the value present when the branch was cut. Maintainers must not bump the `go` directive on release branches, even if the declared Go version becomes unsupported by the upstream Go project. The `toolchain` directive is also set at branch-cut time, but patch-level updates (for example, `go1.25.9` to `go1.25.10`) are permitted and automated by Renovate for as long as the declared `go` version remains supported.
 
 This is safe because the Go version declared in `go.mod` does not determine the standard library linked into the shipped binary. The binary's standard library comes from the go-toolset compiler used at build time. As long as the go-toolset image is kept current (see the next section), the shipped binary continues to receive Go standard library and compiler security patches regardless of what `go.mod` declares.
 
@@ -38,9 +38,9 @@ The [GODEBUG mechanism](https://go.dev/doc/godebug) ensures that a newer compile
 
 The go-toolset image must track the latest available version on all branches, including release branches. This is the primary mechanism by which the operator's shipped binary receives security patches in the Go standard library and compiler. Holding back the go-toolset image to match the `go.mod` version would deprive release branches of security fixes and is explicitly not part of this policy.
 
-UBI images are rebuilt and distributed on approximately a six-week cadence, or sooner when triggered by a Critical or Important CVE. The go-toolset image inherits this cadence. When a new RHEL minor version is released (for example, RHEL 9.8), the go-toolset image is rebuilt on the updated UBI, and the image tag reflects the new RHEL version. These updates may also include a newer Go compiler version.
+UBI images are rebuilt and distributed on approximately a six-week cadence, or sooner when triggered by a Critical or Important CVE. The go-toolset image inherits this cadence. When a new RHEL minor version is released, the go-toolset image is rebuilt on the updated UBI, and the image tag reflects the new RHEL version. These updates may also include a newer Go compiler version.
 
-The operator's Dockerfile references the go-toolset image from the unauthenticated registry (for example, `registry.access.redhat.com/ubi9/go-toolset`). The `#@follow_tag` annotation in the Dockerfile indicates the corresponding authenticated registry path and is used by automated tooling to track the latest available tag. The image reference is pinned by digest for reproducibility; the digest is updated when a new go-toolset image becomes available.
+The operator's Dockerfile references the go-toolset image from the unauthenticated registry (currently `registry.access.redhat.com/ubi9/go-toolset`; the UBI base version will change when the project transitions to a newer UBI). The `#@follow_tag` annotation in the Dockerfile indicates the corresponding authenticated registry path and is used by automated tooling to track the latest available tag. The image reference is pinned by digest for reproducibility; the digest is updated when a new go-toolset image becomes available.
 
 The runtime stage of the Dockerfile uses a UBI minimal image, a stripped-down UBI variant that includes only `microdnf` and a minimal set of packages. The compiled operator binary is copied from the builder stage into this minimal image, keeping the final shipped image small and reducing the attack surface.
 
@@ -70,7 +70,7 @@ The `go` and `toolchain` directive bumps in `go.mod` are tracked and executed se
 
 This policy relies on Go's strong backward compatibility guarantees. The [Go 1 compatibility promise](https://go.dev/doc/go1compat) states that `it is intended that programs written to the Go 1 specification will continue to compile and run correctly, unchanged, over the lifetime of that specification.`.
 
-The [GODEBUG mechanism](https://go.dev/doc/godebug), described in the Release Branches section above, provides an additional safety layer by gating backward-incompatible changes behind settings derived from the `go` directive. The nightly test suite provides further coverage against compatibility regressions. If a go-toolset update introduces a behavioral change that affects the operator despite the compatibility promise and GODEBUG protection, the nightly tests are expected to surface the issue before it reaches a release.
+The [GODEBUG mechanism](https://go.dev/doc/godebug), described in the Release Branches section above, provides an additional safety layer. The nightly test suite provides further coverage against compatibility regressions. If a go-toolset update introduces a behavioral change that affects the operator despite the compatibility promise and GODEBUG protection, the nightly tests are expected to surface the issue before it reaches a release.
 
 This policy was first established during the discussion captured in [RHIDP-12347](https://redhat.atlassian.net/browse/RHIDP-12347), when go-toolset shipped Go 1.24 but the release-1.6 branch declared `go 1.22` in its `go.mod`. The conclusion at that time, which this document formalizes, was that building with a newer go-toolset is safe, that the "one version behind" policy applies to the `go` directive and not to the compiler, and that security fixes in the standard library are received through the go-toolset compiler regardless of the `go.mod` version.
 
