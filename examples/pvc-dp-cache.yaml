@@ -38,13 +38,6 @@ data:
         disabled: false
       - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-module-addons-contrib
         disabled: true
-      # Group: Marketplace
-      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-catalog-backend-module-marketplace-dynamic
-        disabled: false
-      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-marketplace-backend-dynamic
-        disabled: false
-      - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-marketplace
-        disabled: false
       
       # Homepage
       - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-dynamic-home-page
@@ -94,6 +87,4 @@ spec:
                   storage: 1Gi
   application:
     dynamicPluginsConfigMapName: dynamic-plugins
-
-
 

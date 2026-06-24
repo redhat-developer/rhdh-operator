@@ -1,0 +1,8 @@
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: lightspeed-disabled
+spec:
+  flavours:
+    - name: lightspeed
+      enabled: false

@@ -5,26 +5,17 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/platform"
-
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"k8s.io/utils/ptr"
 
-	openshift "github.com/openshift/api/route/v1"
-
-	"k8s.io/apimachinery/pkg/api/meta"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	corev1 "k8s.io/api/core/v1"
-
-	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,7 +61,7 @@ type BackstageReconciler struct {
 func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	lg := log.FromContext(ctx)
 
-	backstage := bs.Backstage{}
+	backstage := api.Backstage{}
 	if err := r.Get(ctx, req.NamespacedName, &backstage); err != nil {
 		if errors.IsNotFound(err) {
 			lg.Info("backstage gone from the namespace")
@@ -80,7 +71,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// This update will make sure the status is always updated in case of any errors or successful result
-	defer func(bs *bs.Backstage) {
+	defer func(bs *api.Backstage) {
 		if err := r.Client.Status().Update(ctx, bs); err != nil {
 			if errors.IsConflict(err) {
 				lg.V(1).Info("Backstage object modified, retry syncing status", "Backstage Object", bs)
@@ -91,7 +82,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}(&backstage)
 
 	if len(backstage.Status.Conditions) == 0 {
-		setStatusCondition(&backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonInProgress, "Deployment process started")
+		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Deployment process started")
 	}
 
 	// 1. Preliminary read and prepare external config objects from the specs (configMaps, Secrets)
@@ -106,47 +97,45 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply ServiceMonitor", err)
 	}
 
-	// This creates array of model objects to be reconsiled
+	// This creates array of model objects to be reconciled
 	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
 	}
 
 	// Apply the plugin dependencies
-	if err := r.applyPluginDeps(ctx, backstage, bsModel.DynamicPlugins); err != nil {
+	if err := r.applyPluginDeps(ctx, backstage, bsModel); err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply plugin dependencies", err)
 	}
 
 	// Apply the runtime objects
-	err = r.applyObjects(ctx, bsModel.RuntimeObjects)
+	err = r.applyObjects(ctx, bsModel.GetRuntimeObjects())
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply backstage objects", err)
-	}
-
-	if err := r.cleanObjects(ctx, backstage); err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to clean backstage objects ", err)
 	}
 
 	r.setDeploymentStatus(ctx, &backstage, *bsModel)
 	return ctrl.Result{}, nil
 }
 
-func errorAndStatus(backstage *bs.Backstage, msg string, err error) error {
-	setStatusCondition(backstage, bs.BackstageConditionTypeDeployed, metav1.ConditionFalse, bs.BackstageConditionReasonFailed, fmt.Sprintf("%s %s", msg, err))
+func errorAndStatus(backstage *api.Backstage, msg string, err error) error {
+	setStatusCondition(backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonFailed, fmt.Sprintf("%s %s", msg, err))
 	return fmt.Errorf("%s: %w", msg, err)
 }
 
 func (r *BackstageReconciler) applyObjects(ctx context.Context, objects []model.RuntimeObject) error {
 
 	for _, obj := range objects {
-		switch v := obj.Object().(type) {
+
+		k8sObj := obj.Object()
+		switch v := k8sObj.(type) {
 		case client.Object:
 			_, immutable := obj.(*model.DbSecret)
-			if err := r.applyPayload(ctx, obj.Object().(client.Object), immutable); err != nil {
+			if err := r.applyPayload(ctx, k8sObj.(client.Object), immutable); err != nil {
 				return err
 			}
 		case *multiobject.MultiObject:
-			mo := obj.Object().(*multiobject.MultiObject)
+			mo := k8sObj.(*multiobject.MultiObject)
 			for _, singleObject := range mo.Items {
 				if err := r.applyPayload(ctx, singleObject, false); err != nil {
 					return err
@@ -187,55 +176,11 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 	return nil
 }
 
-func (r *BackstageReconciler) cleanObjects(ctx context.Context, backstage bs.Backstage) error {
-
-	const failedToCleanup = "failed to cleanup runtime"
-	// check if local database disabled, respective objects have to deleted/unowned
-	if !backstage.Spec.IsLocalDbEnabled() {
-		if err := r.tryToDelete(ctx, &appsv1.StatefulSet{}, model.DbStatefulSetName(backstage.Name), backstage.Namespace); err != nil {
-			return fmt.Errorf("%s %w", failedToCleanup, err)
-		}
-		if err := r.tryToDelete(ctx, &corev1.Service{}, model.DbServiceName(backstage.Name), backstage.Namespace); err != nil {
-			return fmt.Errorf("%s %w", failedToCleanup, err)
-		}
-		if err := r.tryToDelete(ctx, &corev1.Secret{}, model.DbSecretDefaultName(backstage.Name), backstage.Namespace); err != nil {
-			return fmt.Errorf("%s %w", failedToCleanup, err)
-		}
-	}
-
-	//// check if route disabled, respective objects have to deleted/unowned
-	if r.Platform.IsOpenshift() && !backstage.Spec.IsRouteEnabled() {
-		if err := r.tryToDelete(ctx, &openshift.Route{}, model.RouteName(backstage.Name), backstage.Namespace); err != nil {
-			return fmt.Errorf("%s %w", failedToCleanup, err)
-		}
-	}
-
-	return nil
-}
-
-// tryToDelete tries to delete the object by name and namespace, does not throw error if object not found or CRD does not exist
-func (r *BackstageReconciler) tryToDelete(ctx context.Context, obj client.Object, name string, ns string) error {
-	obj.SetName(name)
-	obj.SetNamespace(ns)
-	if err := r.Delete(ctx, obj); err != nil {
-		if meta.IsNoMatchError(err) {
-			// RHDHBUGS-1990: no match for kind or resource, which can happen for example if the Prometheus CRDs
-			// are not installed when trying to delete a ServiceMonitor resource
-			return nil
-		}
-		if errors.IsNotFound(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to delete %s: %w", name, err)
-	}
-	return nil
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	b := ctrl.NewControllerManagedBy(mgr).
-		For(&bs.Backstage{})
+		For(&api.Backstage{})
 
 	if err := r.addWatchers(b); err != nil {
 		return err

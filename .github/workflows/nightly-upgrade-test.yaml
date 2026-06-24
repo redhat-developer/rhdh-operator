@@ -15,8 +15,10 @@ jobs:
         from_branch:
           - release-1.8
           - release-1.9
+          - release-1.10
         to_branch:
           - main
+          - release-1.10
           - release-1.9
           - release-1.8
 
@@ -58,7 +60,7 @@ jobs:
           remove_haskell: true
           rm_cmd: "rmz"
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6 # default branch will be checked out by default on scheduled workflows
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0 # default branch will be checked out by default on scheduled workflows
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
         with:
           ref: ${{ matrix.to_branch }}
@@ -66,7 +68,7 @@ jobs:
 
       - name: Setup Go
         if: ${{ steps.upgrade-path-checker.outputs.SHOULD_BE_SKIPPED_BECAUSE_SAME_BRANCH_OR_DOWNGRADE != 'true' }}
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
 

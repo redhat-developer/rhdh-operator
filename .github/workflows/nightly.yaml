@@ -14,6 +14,7 @@ jobs:
       matrix:
         branch:
           - main
+          - release-1.10
           - release-1.9
           - release-1.8
     name: 'Nightly Tests on ${{ matrix.branch }}'
@@ -23,13 +24,14 @@ jobs:
     env:
       CONTAINER_TOOL: podman
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ matrix.branch }}
           fetch-depth: 0
 
       - name: Set env vars
         run: |
+          echo "COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           OPERATOR_MANIFEST="${{ github.workspace }}/dist/rhdh/install.yaml"
           echo "OPERATOR_MANIFEST=${OPERATOR_MANIFEST}" >> $GITHUB_ENV
           OPERATOR_IMAGE=$(curl -s "file://${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
@@ -55,20 +57,26 @@ jobs:
           rm_cmd: "rmz"
 
       - name: Setup Go
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: 'go.mod'
 
       # gosec needs a "build" stage so connect it to the lint step which we always do
       - name: Build
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
         run: make lint
 
       - name: Test
-        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        # run this stage only if there are changes that match the includes and not the excludes
         run: make test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: cover.out
+          flags: unittests,nightly
+          fail_ci_if_error: false
+          override_commit: ${{ env.COMMIT_SHA }}
+          override_branch: ${{ matrix.branch }}
 
       - name: Create Kind cluster (integration tests)
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}

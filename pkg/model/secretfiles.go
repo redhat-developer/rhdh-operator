@@ -4,18 +4,14 @@ import (
 	"fmt"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
-
-	"golang.org/x/exp/maps"
-
-	"k8s.io/apimachinery/pkg/runtime"
-
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/redhat-developer/rhdh-operator/api"
 	corev1 "k8s.io/api/core/v1"
 )
-
-const SecretFilesObjectKey = "secret-files.yaml"
 
 type SecretFilesFactory struct{}
 
@@ -29,92 +25,82 @@ type SecretFiles struct {
 }
 
 func init() {
-	registerConfig(SecretFilesObjectKey, SecretFilesFactory{}, true)
+	registerConfig(SecretFilesKey, SecretFilesFactory{}, true, nil)
 }
 
-func (p *SecretFiles) addExternalConfig(spec bsv1.BackstageSpec) error {
-
-	if spec.Application == nil || spec.Application.ExtraFiles == nil || spec.Application.ExtraFiles.Secrets == nil {
-		return nil
-	}
-
-	for _, specSec := range spec.Application.ExtraFiles.Secrets {
-
-		if specSec.MountPath == "" && specSec.Key == "" {
-			return fmt.Errorf("key or mountPath has to be specified for secret %s", specSec.Name)
-		}
-		mp, wSubpath := p.model.backstageDeployment.mountPath(specSec.MountPath, specSec.Key, spec.Application.ExtraFiles.MountPath)
-		keys := p.model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
-		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{names: specSec.Containers}, SecretObjectKind,
-			specSec.Name, mp, specSec.Key, wSubpath, keys)
-		if err != nil {
-			return fmt.Errorf("failed to mount files on secret %s: %w", specSec.Name, err)
-		}
-	}
-	return nil
-}
-
-// implementation of RuntimeObject interface
 func (p *SecretFiles) Object() runtime.Object {
-	return p.secrets
-}
-
-// implementation of RuntimeObject interface
-func (p *SecretFiles) setObject(obj runtime.Object) {
-	p.secrets = nil
-	if obj != nil {
-		p.secrets = obj.(*multiobject.MultiObject)
-	}
-}
-
-// implementation of RuntimeObject interface
-//func (p *SecretFiles) EmptyObject() client.Object {
-//	return &corev1.Secret{}
-//}
-
-// implementation of RuntimeObject interface
-func (p *SecretFiles) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
-	p.model = model
-	if p.secrets != nil {
-		model.setRuntimeObject(p)
-		return true, nil
-	}
-	return false, nil
-}
-
-// implementation of RuntimeObject interface
-func (p *SecretFiles) updateAndValidate(_ bsv1.Backstage) error {
-
-	for _, item := range p.secrets.Items {
-		secret, ok := item.(*corev1.Secret)
-		if !ok {
-			return fmt.Errorf("payload is not Secret kind: %T", item)
-		}
-
-		keys := append(maps.Keys(secret.Data), maps.Keys(secret.StringData)...)
-		mountPath, subPath := p.model.backstageDeployment.getDefConfigMountPath(item)
-		//containers, err := p.model.backstageDeployment.filterContainerNames(utils.ParseCommaSeparated(item.GetAnnotations()[ContainersAnnotation]))
-		err := p.model.backstageDeployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
-			item.GetName(), mountPath, "", subPath != "", keys)
-		if err != nil {
-			return fmt.Errorf("failed to add files from secret %s: %w", item.GetName(), err)
-		}
+	if p.secrets != nil && len(p.secrets.Items) > 0 {
+		return p.secrets
 	}
 	return nil
 }
 
 // implementation of RuntimeObject interface
-func (p *SecretFiles) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
+func (p *SecretFiles) GetKey() string {
+	return SecretFilesKey
+}
 
-	for _, item := range p.secrets.Items {
-		secret := item.(*corev1.Secret)
-		if len(p.secrets.Items) == 1 {
-			// keep for backward compatibility
-			secret.Name = utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files")
-		} else {
-			utils.AddAnnotation(secret, ConfiguredNameAnnotation, item.GetName())
-			secret.Name = fmt.Sprintf("%s-%s", utils.GenerateRuntimeObjectName(backstage.Name, "backstage-files"), secret.Name)
-		}
-		setMetaInfo(secret, backstage, scheme)
+func (p *SecretFiles) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
+	p.model = model
+	if config != nil {
+		p.secrets = config.(*multiobject.MultiObject)
+	} else {
+		// Create empty secrets - might be populated later from spec
+		p.secrets = &multiobject.MultiObject{Items: []client.Object{}}
 	}
+
+	// Always add to model so updateAndValidate is called (may process spec secrets)
+	model.setRuntimeObject(p)
+	if p.secrets != nil && len(p.secrets.Items) > 0 {
+		p.setMetaInfo(backstage, scheme)
+	}
+	return nil
+}
+
+func (p *SecretFiles) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+	deployment := p.model.getDeployment()
+	if deployment == nil {
+		return fmt.Errorf("backstage deployment not found in model")
+	}
+
+	// Process secrets from config files
+	if p.secrets != nil {
+		for _, item := range p.secrets.Items {
+			secret, ok := item.(*corev1.Secret)
+			if !ok {
+				return fmt.Errorf("payload is not Secret kind: %T", item)
+			}
+
+			keys := append(utils.SortedKeys(secret.Data), utils.SortedKeys(secret.StringData)...)
+			mountPath, subPath, fileName := deployment.getDefConfigMountPath(item)
+			err := deployment.mountFilesFrom(containersFilter{annotation: item.GetAnnotations()[ContainersAnnotation]}, SecretObjectKind,
+				item.GetName(), mountPath, fileName, subPath != "", keys)
+			if err != nil {
+				return fmt.Errorf("failed to add files from secret %s: %w", item.GetName(), err)
+			}
+		}
+	}
+
+	// Process secrets from CR spec (formerly addExternalConfig)
+	if backstage.Spec.Application != nil && backstage.Spec.Application.ExtraFiles != nil && backstage.Spec.Application.ExtraFiles.Secrets != nil {
+		for _, specSec := range backstage.Spec.Application.ExtraFiles.Secrets {
+
+			if specSec.MountPath == "" && specSec.Key == "" {
+				return fmt.Errorf("key or mountPath has to be specified for secret %s", specSec.Name)
+			}
+			mp, wSubpath := deployment.mountPath(specSec.MountPath, specSec.Key, backstage.Spec.Application.ExtraFiles.MountPath)
+			keys := p.model.ExternalConfig.ExtraFileSecretKeys[specSec.Name].All()
+			err := deployment.mountFilesFrom(containersFilter{names: specSec.Containers}, SecretObjectKind,
+				specSec.Name, mp, specSec.Key, wSubpath, keys)
+			if err != nil {
+				return fmt.Errorf("failed to mount files on secret %s: %w", specSec.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (p *SecretFiles) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
+	setMultiObjectConfigMetaInfo(p.secrets, "files", backstage, scheme)
 }

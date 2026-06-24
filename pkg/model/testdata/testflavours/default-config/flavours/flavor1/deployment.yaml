@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    flavor: flavor1
+spec:
+  template:
+    spec:
+      containers:
+        - name: backstage-backend
+          env:
+            - name: FLAVOR1_ENABLED
+              value: "true"

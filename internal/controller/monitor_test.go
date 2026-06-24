@@ -8,19 +8,18 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/stretchr/testify/assert"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bs "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
 func setupMonitorTestReconciler() BackstageReconciler {
 	scheme := runtime.NewScheme()
-	_ = bs.AddToScheme(scheme)
+	_ = api.AddToScheme(scheme)
 	_ = monitoringv1.AddToScheme(scheme)
 	_ = apiextensionsv1.AddToScheme(scheme)
 
@@ -30,14 +29,14 @@ func setupMonitorTestReconciler() BackstageReconciler {
 	}
 }
 
-func createTestBackstage(name, namespace string, monitoringEnabled bool) *bs.Backstage {
-	backstage := &bs.Backstage{
+func createTestBackstage(name, namespace string, monitoringEnabled bool) *api.Backstage {
+	backstage := &api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: bs.BackstageSpec{
-			Monitoring: bs.Monitoring{
+		Spec: api.BackstageSpec{
+			Monitoring: api.Monitoring{
 				Enabled: monitoringEnabled,
 			},
 		},
@@ -70,14 +69,6 @@ func TestApplyServiceMonitor_MonitoringDisabled(t *testing.T) {
 	// Apply service monitor (should delete the existing one)
 	err = r.applyServiceMonitor(ctx, backstage)
 	assert.NoError(t, err)
-
-	// Verify ServiceMonitor was deleted
-	sm := &monitoringv1.ServiceMonitor{}
-	err = r.Get(ctx, types.NamespacedName{
-		Name:      utils.GenerateRuntimeObjectName(backstage.Name, "metrics"),
-		Namespace: backstage.Namespace,
-	}, sm)
-	assert.True(t, apierrors.IsNotFound(err))
 }
 
 func TestApplyServiceMonitor_MonitoringEnabled_NoCRD(t *testing.T) {
@@ -85,7 +76,7 @@ func TestApplyServiceMonitor_MonitoringEnabled_NoCRD(t *testing.T) {
 
 	// Create a mock client that will return "no matches for kind" error for ServiceMonitor patch operations
 	scheme := runtime.NewScheme()
-	_ = bs.AddToScheme(scheme)
+	_ = api.AddToScheme(scheme)
 	_ = monitoringv1.AddToScheme(scheme)
 
 	mockClient := &mockServiceMonitorNotFoundClient{

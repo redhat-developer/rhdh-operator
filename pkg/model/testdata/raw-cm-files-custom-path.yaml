@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: <to_be_replaced> # placeholder for '<cr-name>-files'
+  annotations:
+    rhdh.redhat.com/mount-path: /custom/mount
+data:
+  "default-file.yaml": |
+    config:
+      from: default

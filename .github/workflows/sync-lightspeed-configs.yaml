@@ -1,0 +1,110 @@
+name: Sync Lightspeed Configs
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync-lightspeed:
+    name: Sync Lightspeed Configs (${{ matrix.branch }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - main
+          - release-1.10
+
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.branch }}
+      cancel-in-progress: true
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ matrix.branch }}
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Set up yq
+        uses: mikefarah/yq@1b9b4ac5187171d2e5e3129be0cfa827c7f9d53d # v4.53.3
+        with:
+          cmd: yq --version
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync Lightspeed config files
+        run: ./hack/sync-lightspeed-configs.sh --ref ${{ matrix.branch }}
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet config/profile/rhdh/default-config/flavours/lightspeed/ examples/lightspeed.yaml; then
+            echo "No changes from upstream."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Changes detected from upstream."
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Regenerate manifests
+        if: steps.changes.outputs.has_changes == 'true'
+        run: make bundles build-installers
+
+      - name: Commit changes and open PR
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_BRANCH: ${{ matrix.branch }}
+        run: |
+          TITLE="chore(lightspeed): sync config files from upstream"
+          BRANCH="chore/sync-lightspeed-configs-${TARGET_BRANCH}"
+
+          EXISTING_PR=$(gh pr list --head "${BRANCH}" --base "${TARGET_BRANCH}" --state open --json number --jq '.[0].number // empty')
+
+          git checkout -b "${BRANCH}"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No staged changes to commit."
+            exit 0
+          fi
+          git commit -m "${TITLE}"
+
+          if [ -n "${EXISTING_PR}" ]; then
+            echo "Updating existing PR #${EXISTING_PR}."
+            git push --force origin "${BRANCH}"
+          else
+            git push origin "${BRANCH}"
+
+            BODY=$(cat <<EOF
+          Automated nightly sync of Lightspeed config files from [redhat-ai-dev/lightspeed-configs @ ${TARGET_BRANCH}](https://github.com/redhat-ai-dev/lightspeed-configs/tree/${TARGET_BRANCH}).
+
+          ### Synced files
+          - \`config/profile/rhdh/default-config/flavours/lightspeed/configmap-files.yaml\`
+          - \`examples/lightspeed.yaml\`
+
+          > [!CAUTION]
+          > Please review the upstream changes carefully before merging.
+          EOF
+            )
+
+            gh pr create \
+              --title "${TITLE}" \
+              --body "${BODY}" \
+              --base "${TARGET_BRANCH}"
+          fi

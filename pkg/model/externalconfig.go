@@ -1,7 +1,7 @@
 package model
 
 import (
-	"golang.org/x/exp/maps"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -46,8 +46,8 @@ type DataObjectKeys struct {
 
 func NewDataObjectKeys(stringData map[string]string, binaryData map[string][]byte) DataObjectKeys {
 	return DataObjectKeys{
-		StringDataKey: maps.Keys(stringData),
-		BinaryDataKey: maps.Keys(binaryData),
+		StringDataKey: utils.SortedKeys(stringData),
+		BinaryDataKey: utils.SortedKeys(binaryData),
 	}
 }
 

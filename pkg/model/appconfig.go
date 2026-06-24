@@ -1,14 +1,15 @@
 package model
 
 import (
+	"fmt"
 	"path/filepath"
 
-	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -19,78 +20,97 @@ func (f AppConfigFactory) newBackstageObject() RuntimeObject {
 	return &AppConfig{}
 }
 
-// structure containing ConfigMap where keys are Backstage ConfigApp file names and vaues are contents of the files
-// Mount path is a patch to the follder to place the files to
+// AppConfig represents app-config ConfigMaps from base and flavours
 type AppConfig struct {
-	ConfigMap *corev1.ConfigMap
-	model     *BackstageModel
+	ConfigMaps *multiobject.MultiObject
+	model      *BackstageModel
 }
 
 func init() {
-	registerConfig("app-config.yaml", AppConfigFactory{}, false)
-}
-
-func AppConfigDefaultName(backstageName string) string {
-	return utils.GenerateRuntimeObjectName(backstageName, "backstage-appconfig")
-}
-
-func (b *AppConfig) addExternalConfig(spec bsv1.BackstageSpec) error {
-
-	if spec.Application == nil || spec.Application.AppConfig == nil || spec.Application.AppConfig.ConfigMaps == nil {
-		return nil
-	}
-
-	for _, specCm := range spec.Application.AppConfig.ConfigMaps {
-		mp, wSubpath := b.model.backstageDeployment.mountPath(specCm.MountPath, specCm.Key, spec.Application.AppConfig.MountPath)
-		updatePodWithAppConfig(b.model.backstageDeployment, specCm.Name,
-			mp, specCm.Key, wSubpath, b.model.ExternalConfig.AppConfigKeys[specCm.Name])
-	}
-	return nil
+	registerConfig(AppConfigKey, AppConfigFactory{}, true, mergeMultiObjectConfigs)
 }
 
 // implementation of RuntimeObject interface
 func (b *AppConfig) Object() runtime.Object {
-	return b.ConfigMap
-}
-
-// implementation of RuntimeObject interface
-func (b *AppConfig) setObject(obj runtime.Object) {
-	b.ConfigMap = nil
-	if obj != nil {
-		b.ConfigMap = obj.(*corev1.ConfigMap)
+	if b.ConfigMaps != nil && len(b.ConfigMaps.Items) > 0 {
+		return b.ConfigMaps
 	}
-}
-
-// implementation of RuntimeObject interface
-//func (b *AppConfig) EmptyObject() client.Object {
-//	return &corev1.ConfigMap{}
-//}
-
-// implementation of RuntimeObject interface
-func (b *AppConfig) addToModel(model *BackstageModel, _ bsv1.Backstage) (bool, error) {
-	b.model = model
-	if b.ConfigMap != nil {
-		model.appConfig = b
-		model.setRuntimeObject(b)
-		return true, nil
-	}
-	return false, nil
-}
-
-// implementation of RuntimeObject interface
-func (b *AppConfig) updateAndValidate(_ bsv1.Backstage) error {
-	updatePodWithAppConfig(b.model.backstageDeployment, b.ConfigMap.Name,
-		b.model.backstageDeployment.defaultMountPath(), "", true, maps.Keys(b.ConfigMap.Data))
 	return nil
 }
 
-func (b *AppConfig) setMetaInfo(backstage bsv1.Backstage, scheme *runtime.Scheme) {
-	b.ConfigMap.SetName(AppConfigDefaultName(backstage.Name))
-	setMetaInfo(b.ConfigMap, backstage, scheme)
+// implementation of RuntimeObject interface
+func (b *AppConfig) GetKey() string {
+	return AppConfigKey
+}
+
+// implementation of RuntimeObject interface
+func (b *AppConfig) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
+	b.model = model
+	if config != nil {
+		b.ConfigMaps = config.(*multiobject.MultiObject)
+	} else {
+		// Create empty ConfigMaps - might be populated later from spec
+		b.ConfigMaps = &multiobject.MultiObject{Items: []client.Object{}}
+	}
+
+	// Always add to model so updateAndValidate is called (may process spec ConfigMaps)
+	model.setRuntimeObject(b)
+	b.setMetaInfo(backstage, scheme)
+
+	return nil
+}
+
+// implementation of RuntimeObject interface
+func (b *AppConfig) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+	deployment := b.model.getDeployment()
+	if deployment == nil {
+		return fmt.Errorf("backstage deployment not found in model")
+	}
+
+	// Get plugins app-config CM if any and add to b.ConfigMaps on the first place
+
+	// Process ConfigMaps from config files
+	if b.ConfigMaps != nil {
+		for _, item := range b.ConfigMaps.Items {
+			cm, ok := item.(*corev1.ConfigMap)
+			if !ok {
+				return fmt.Errorf("payload is not ConfigMap kind: %T", item)
+			}
+
+			err := updatePodWithAppConfig(b.model.getDeployment(), cm.Name,
+				b.model.getDeployment().defaultMountPath(), "", true, utils.SortedKeys(cm.Data))
+			if err != nil {
+				return err
+			}
+		}
+
+		// Process ConfigMaps from CR spec
+		if backstage.Spec.Application != nil && backstage.Spec.Application.AppConfig != nil && backstage.Spec.Application.AppConfig.ConfigMaps != nil {
+			for _, specCm := range backstage.Spec.Application.AppConfig.ConfigMaps {
+				mp, wSubpath := deployment.mountPath(specCm.MountPath, specCm.Key, backstage.Spec.Application.AppConfig.MountPath)
+				err := updatePodWithAppConfig(deployment, specCm.Name,
+					mp, specCm.Key, wSubpath, b.model.ExternalConfig.AppConfigKeys[specCm.Name])
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (b *AppConfig) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
+	setMultiObjectConfigMetaInfo(b.ConfigMaps, "appconfig", backstage, scheme)
 }
 
 // updatePodWithAppConfig contributes to Volumes, container.VolumeMounts and container.Args
-func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key string, withSubPath bool, cmData []string) {
+func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key string, withSubPath bool, cmData []string) error {
+
+	// allow only single entry configMap to ensure predictable order in app-config chain
+	if len(cmData) > 1 {
+		return fmt.Errorf("multiple entries (%d) not allowed for app-config ConfigMap: %s; split into separate single-entry ConfigMaps", len(cmData), cmName)
+	}
 
 	_ = bsd.mountFilesFrom(containersFilter{}, ConfigMapObjectKind,
 		cmName, mountPath, key, withSubPath, cmData)
@@ -101,4 +121,5 @@ func updatePodWithAppConfig(bsd *BackstageDeployment, cmName, mountPath, key str
 			container.Args = append(container.Args, []string{"--config", filepath.Join(mountPath, file)}...)
 		}
 	}
+	return nil
 }

@@ -1,0 +1,4 @@
+# Orchestrator flavour metadata
+# This flavour is disabled by default due to heavy infrastructure dependencies
+# (requires Tekton, ArgoCD, Serverless Workflow Operator)
+enabledByDefault: false

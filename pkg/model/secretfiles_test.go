@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
-	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
-	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
+	"github.com/redhat-developer/rhdh-operator/api"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -19,16 +19,16 @@ import (
 )
 
 var (
-	secretFilesTestBackstage = bsv1.Backstage{
+	secretFilesTestBackstage = api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "bs",
 			Namespace: "ns123",
 		},
-		Spec: bsv1.BackstageSpec{
-			Application: &bsv1.Application{
-				ExtraFiles: &bsv1.ExtraFiles{
+		Spec: api.BackstageSpec{
+			Application: &api.Application{
+				ExtraFiles: &api.ExtraFiles{
 					MountPath: "/my/path",
-					Secrets:   []bsv1.FileObjectRef{},
+					Secrets:   []api.FileObjectRef{},
 				},
 			},
 		},
@@ -39,13 +39,13 @@ func TestDefaultSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 
-	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretFilesObjectKey, "raw-secret-files.yaml")
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig(SecretFilesKey, "raw-secret-files.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 1, len(deployment.container().VolumeMounts))
@@ -55,34 +55,37 @@ func TestDefaultSecretFiles(t *testing.T) {
 
 func TestDefaultMultiSecretFiles(t *testing.T) {
 
-	bs := bsv1.Backstage{
+	bs := api.Backstage{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bs",
 		},
-		Spec: bsv1.BackstageSpec{
-			Database: &bsv1.Database{
+		Spec: api.BackstageSpec{
+			Database: &api.Database{
 				EnableLocalDb: ptr.To(false),
 			},
 		},
 	}
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml").
-		addToDefaultConfig(SecretFilesObjectKey, "raw-multi-secret.yaml")
+		addToDefaultConfig(SecretFilesKey, "raw-multi-secret.yaml")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
-	mo := model.getRuntimeObjectByType(&SecretFiles{}).Object().(*multiobject.MultiObject)
+	secretFiles := model.GetRuntimeObject(SecretFilesKey)
+	assert.NotNil(t, secretFiles)
+	obj := secretFiles.Object()
+	mo := obj.(*multiobject.MultiObject)
 	assert.Equal(t, 3, len(mo.Items))
-	// data1,data2,data3+data4,data5
-	assert.Equal(t, 4, len(model.backstageDeployment.container().VolumeMounts))
-	// data1,data2,data5
-	assert.Equal(t, 3, len(model.backstageDeployment.containerByName("install-dynamic-plugins").VolumeMounts))
+	// data1+data2,data3+data4,data5
+	assert.Equal(t, 3, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).container().VolumeMounts))
+	// data1+data2,data5
+	assert.Equal(t, 2, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("install-dynamic-plugins").VolumeMounts))
 	// data5
-	assert.Equal(t, 1, len(model.backstageDeployment.containerByName("another-container").VolumeMounts))
-	assert.Equal(t, 3, len(model.backstageDeployment.podSpec().Volumes))
+	assert.Equal(t, 1, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).containerByName("another-container").VolumeMounts))
+	assert.Equal(t, 3, len(model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment).podSpec().Volumes))
 }
 
 func TestSpecifiedSecretFiles(t *testing.T) {
@@ -90,10 +93,10 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 	// 0 - expected subPath="conf.yaml", expected defaultMountPath=/
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret2", MountPath: "/custom/path"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret2", MountPath: "/custom/path"})
 	// https://issues.redhat.com/browse/RHIDP-2246 - mounting secret/CM with dot in the name
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret.dot", Key: "conf3.yaml"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret.dot", Key: "conf3.yaml"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 
@@ -105,9 +108,9 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 3, len(deployment.container().VolumeMounts))
@@ -133,7 +136,7 @@ func TestSpecifiedSecretFiles(t *testing.T) {
 func TestFailedValidation(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1"})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true)
 	_, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
@@ -145,7 +148,7 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
 	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(map[string]string{"conf.yaml": ""}, nil)}
@@ -153,9 +156,9 @@ func TestDefaultAndSpecifiedSecretFiles(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
@@ -168,7 +171,7 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", Key: "conf.yaml"})
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
 	testObj.externalConfig.ExtraFileSecretKeys = map[string]DataObjectKeys{"secret1": NewDataObjectKeys(nil, map[string][]byte{"conf.yaml": []byte("")})}
@@ -176,9 +179,9 @@ func TestSpecifiedSecretFilesWithDataAndKey(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 2, len(deployment.container().VolumeMounts))
@@ -193,9 +196,9 @@ func TestSpecifiedSecretFilesWithContainers(t *testing.T) {
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
 
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", Key: "conf1.yaml", Containers: []string{"install-dynamic-plugins", "another-container"}})
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret3", MountPath: "rel", Containers: []string{"*"}})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", Key: "conf1.yaml", Containers: []string{"install-dynamic-plugins", "another-container"}})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret2", MountPath: "/custom/path", Containers: []string{"install-dynamic-plugins"}})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret3", MountPath: "rel", Containers: []string{"*"}})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("deployment.yaml", "multicontainer-deployment.yaml")
 
@@ -207,9 +210,9 @@ func TestSpecifiedSecretFilesWithContainers(t *testing.T) {
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 
 	assert.NoError(t, err)
-	assert.True(t, len(model.RuntimeObjects) > 0)
+	assert.True(t, len(model.GetRuntimeObjects()) > 0)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	assert.Equal(t, 3, len(deployment.containerByName("install-dynamic-plugins").VolumeMounts))
@@ -221,9 +224,9 @@ func TestSpecifiedSecretFilesWithContainers(t *testing.T) {
 
 func TestSecretFilesWithNonExistedContainerFailed(t *testing.T) {
 	bs := *configMapFilesTestBackstage.DeepCopy()
-	bs.Spec.Application = &bsv1.Application{
-		ExtraFiles: &bsv1.ExtraFiles{
-			ConfigMaps: []bsv1.FileObjectRef{
+	bs.Spec.Application = &api.Application{
+		ExtraFiles: &api.ExtraFiles{
+			ConfigMaps: []api.FileObjectRef{
 				{
 					Name:       "secretName",
 					Containers: []string{"another-container"},
@@ -244,7 +247,7 @@ func TestReplaceSecretFiles(t *testing.T) {
 
 	bs := *secretFilesTestBackstage.DeepCopy()
 	sf := &bs.Spec.Application.ExtraFiles.Secrets
-	*sf = append(*sf, bsv1.FileObjectRef{Name: "secret1", MountPath: DefaultMountDir})
+	*sf = append(*sf, api.FileObjectRef{Name: "secret1", MountPath: DefaultMountDir})
 
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("secret-files.yaml", "raw-secret-files.yaml")
 
@@ -254,7 +257,7 @@ func TestReplaceSecretFiles(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	deployment := model.backstageDeployment
+	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.NotNil(t, deployment)
 
 	// secret1 is replacing secret from default
