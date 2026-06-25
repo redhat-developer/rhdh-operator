@@ -418,6 +418,14 @@ function prepare_olm_v1_secrets() {
   done
 }
 
+function should_generate_v1_manifests() {
+  [[ "${RESOLVED_OLM_VERSION}" == "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }
+}
+
+function should_generate_v0_manifests() {
+  [[ "${RESOLVED_OLM_VERSION}" != "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }
+}
+
 ##########################################################################################
 # Script start
 ##########################################################################################
@@ -1208,22 +1216,13 @@ else
         exit 1
       fi
       debugf "Falling back to a standard K8s cluster"
-      # Check that OLM is installed
-      if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-        if ! invoke_cluster_cli get crd clusterextensions.olm.operatorframework.io &>/dev/null; then
-          errorf "
-    OLM v1 not installed (ClusterExtension CRD not found) or you don't have enough permissions.
-    Check that you are correctly logged into the cluster and that OLM v1 is installed."
-          exit 1
-        fi
-      else
-        if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
-          errorf "
+      # OLM v1 on Kubernetes is not supported (resolve_olm_version forces v0 for non-OpenShift)
+      if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
+        errorf "
     OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
     Check that you are correctly logged into the cluster and that OLM is installed.
     See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
-          exit 1
-        fi
+        exit 1
       fi
     fi
 
@@ -1235,7 +1234,7 @@ else
     my_operator_index="$(buildCatalogImageUrl "internal")"
   fi
 
-  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }; then
+  if should_generate_v1_manifests; then
     cat <<EOF >"${manifestsTargetDir}/clusterCatalog.yaml"
 apiVersion: catalogd.operatorframework.io/v1
 kind: ClusterCatalog
@@ -1250,7 +1249,7 @@ spec:
 EOF
   fi
 
-  if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }; then
+  if should_generate_v0_manifests; then
     cat <<EOF >"${manifestsTargetDir}/catalogSource.yaml"
   apiVersion: operators.coreos.com/v1alpha1
   kind: CatalogSource
@@ -1381,7 +1380,7 @@ if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
   infof "Generating both OLM v0 and v1 manifest templates for export."
 fi
 
-if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }; then
+if should_generate_v1_manifests; then
   # shellcheck disable=SC2016
   SA_NAME='${SA_NAME}'
   # shellcheck disable=SC2016
@@ -1399,6 +1398,8 @@ metadata:
   namespace: ${NAMESPACE_OPERATOR}
 EOF
 
+  # cluster-admin is used as a convenience for airgap environments.
+  # For production, scope down per: https://operator-framework.github.io/operator-controller/howto/derive-service-account/
   cat <<EOF >"${manifestsTargetDir}/clusterRoleBinding.yaml"
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -1439,7 +1440,7 @@ spec:
 EOF
 fi
 
-if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }; then
+if should_generate_v0_manifests; then
   cat <<EOF >"${manifestsTargetDir}/operatorGroup.yaml"
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
