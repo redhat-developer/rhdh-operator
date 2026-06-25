@@ -219,21 +219,18 @@ jobs:
 
             # Create manifest list for version tag
             docker buildx imagetools create \
-              --annotation "quay.expires-after=14d" \
               -t ${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION} \
               ${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-amd64 \
               ${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-arm64
 
             # Create manifest list for version-sha tag
             docker buildx imagetools create \
-              --annotation "quay.expires-after=14d" \
               -t ${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-${SHORT_SHA} \
               ${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-amd64 \
               ${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-arm64
 
             # Create manifest list for latestNext tag (next or latest)
             docker buildx imagetools create \
-              --annotation "quay.expires-after=14d" \
               -t ${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT} \
               ${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-amd64 \
               ${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-arm64
