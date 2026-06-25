@@ -166,6 +166,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      HAS_QUAY_OAUTH: ${{ secrets.QUAY_OAUTH_TOKEN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -246,7 +248,7 @@ jobs:
           OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
 
       - name: Cleanup per-arch tags
-        if: ${{ secrets.QUAY_OAUTH_TOKEN != '' }}
+        if: env.HAS_QUAY_OAUTH == 'true'
         run: |
           export OPERATOR_IMAGE_NAME=${{ vars.OPERATOR_IMAGE_NAME }}
           OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME:-operator}
