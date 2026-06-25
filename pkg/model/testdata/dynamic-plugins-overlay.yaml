@@ -8,7 +8,7 @@ data:
       - dynamic-plugins.custom.yaml
     plugins:
       - package: "plugin-b"
-        disabled: false
+        enabled: true
         integrity: "sha512-overlay"
       - package: "plugin-c"
-        disabled: false
+        enabled: true
