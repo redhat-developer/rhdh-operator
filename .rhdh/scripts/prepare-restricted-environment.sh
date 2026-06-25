@@ -1399,9 +1399,12 @@ if should_generate_v1_manifests; then
   SA_NAME='${SA_NAME}'
   # shellcheck disable=SC2016
   CRB_NAME='${CRB_NAME}'
+  # shellcheck disable=SC2016
+  CR_NAME='${CR_NAME}'
   if [[ -n "${TO_REGISTRY}" ]]; then
     SA_NAME="rhdh-operator-installer"
     CRB_NAME="rhdh-operator-installer-binding"
+    CR_NAME="rhdh-operator-installer-role"
   fi
 
   cat <<EOF >"${manifestsTargetDir}/serviceAccount.yaml"
@@ -1412,8 +1415,90 @@ metadata:
   namespace: ${NAMESPACE_OPERATOR}
 EOF
 
-  # cluster-admin is used as a convenience for airgap environments.
-  # For production, scope down per: https://operator-framework.github.io/operator-controller/howto/derive-service-account/
+  cat <<EOF >"${manifestsTargetDir}/clusterRole.yaml"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${CR_NAME}
+rules:
+# Bundle resource management: CRDs, RBAC, core resources
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Operator runtime: core resources
+- apiGroups: [""]
+  resources: ["configmaps", "persistentvolumeclaims", "secrets", "services"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: [""]
+  resources: ["persistentvolumes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+# Operator runtime: workloads
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "delete", "patch", "update"]
+# Operator runtime: OpenShift
+- apiGroups: ["config.openshift.io"]
+  resources: ["ingresses"]
+  verbs: ["get"]
+- apiGroups: ["route.openshift.io"]
+  resources: ["routes", "routes/custom-host"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Operator runtime: monitoring
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Operator runtime: RHDH CRDs
+- apiGroups: ["rhdh.redhat.com"]
+  resources: ["backstages"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["rhdh.redhat.com"]
+  resources: ["backstages/finalizers"]
+  verbs: ["update"]
+- apiGroups: ["rhdh.redhat.com"]
+  resources: ["backstages/status"]
+  verbs: ["get", "patch", "update"]
+# Operator runtime: plugin integrations
+- apiGroups: ["sonataflow.org"]
+  resources: ["sonataflowplatforms", "sonataflows"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["tekton.dev"]
+  resources: ["tasks", "pipelines"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["argoproj.io"]
+  resources: ["appprojects"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Operator runtime: auth
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+# Operator runtime: leader election
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# OLM v1 lifecycle
+- apiGroups: ["olm.operatorframework.io"]
+  resources: ["clusterextensions/finalizers"]
+  verbs: ["update"]
+EOF
+
   cat <<EOF >"${manifestsTargetDir}/clusterRoleBinding.yaml"
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -1422,7 +1507,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: ${CR_NAME}
 subjects:
 - kind: ServiceAccount
   name: ${SA_NAME}
@@ -1501,6 +1586,7 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
 
       kubectl apply -f ${manifestsTargetDir}/namespace.yaml
       kubectl apply -f ${manifestsTargetDir}/serviceAccount.yaml
+      kubectl apply -f ${manifestsTargetDir}/clusterRole.yaml
       kubectl apply -f ${manifestsTargetDir}/clusterRoleBinding.yaml
       kubectl apply -f ${manifestsTargetDir}/clusterExtension.yaml
       "
@@ -1522,7 +1608,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
 
   # Install the operator
   if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-    for manifest in namespace serviceAccount clusterRoleBinding clusterExtension; do
+    for manifest in namespace serviceAccount clusterRole clusterRoleBinding clusterExtension; do
       invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
     done
   else
