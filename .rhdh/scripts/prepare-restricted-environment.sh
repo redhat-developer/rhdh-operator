@@ -16,7 +16,7 @@ IS_HOSTED_CONTROL_PLANE=""
 
 NAMESPACE_OPERATOR="rhdh-operator"
 INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
-FILTERED_VERSIONS=(*)
+FILTERED_VERSIONS=("*")
 OLM_VERSION="auto"
 RESOLVED_OLM_VERSION=""
 CATALOG_PULL_SECRET=""
