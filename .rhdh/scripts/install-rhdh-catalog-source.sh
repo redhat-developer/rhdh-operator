@@ -745,6 +745,11 @@ while [[ "$#" -gt 0 ]]; do
       shift 1
       ;;
     '--olm-version')
+      if [[ $# -lt 2 ]]; then
+        errorf "--olm-version requires a value: v0, v1, or auto."
+        usage
+        exit 1
+      fi
       if [[ "$2" != "v0" && "$2" != "v1" && "$2" != "auto" ]]; then
         errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
         usage
@@ -962,7 +967,10 @@ metadata:
   namespace: ${NAMESPACE_SUBSCRIPTION}
 " > "$TMPDIR"/ServiceAccount.yml && invoke_cluster_cli apply -f "$TMPDIR"/ServiceAccount.yml
 
-  # ClusterRoleBinding granting cluster-admin to the installer SA
+  # ClusterRoleBinding: cluster-admin is used because deriving the minimal RBAC for
+  # each operator version is fragile and OLM v1 does not yet provide tooling to
+  # auto-discover required permissions. This script is intended for CI/testing only.
+  warnf "Granting cluster-admin to SA '${SA_NAME}' — acceptable for testing; scope down for production use"
   CRB_NAME="${OPERATOR_NAME_TO_INSTALL}-installer-binding"
   echo "apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
