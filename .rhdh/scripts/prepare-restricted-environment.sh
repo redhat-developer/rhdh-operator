@@ -551,7 +551,7 @@ function buildRegistryUrl() {
     if [[ "${input}" == "internal" ]]; then
       echo "image-registry.openshift-image-registry.svc:5000"
     else
-      echo "$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')"
+      oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}'
     fi
   else
     echo "${TO_REGISTRY}"
@@ -1150,6 +1150,7 @@ EOF
           if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
             debugf "Converting CatalogSource to ClusterCatalog: ${manifest}"
             catalogImage=$("$YQ" '.spec.image' "${manifest}")
+            # shellcheck disable=SC2001
             catalogImage=$(echo "$catalogImage" | sed 's|default-route-openshift-image-registry\.apps\.[^/]*|image-registry.openshift-image-registry.svc:5000|')
             cat <<EOF | invoke_cluster_cli apply -f -
 apiVersion: catalogd.operatorframework.io/v1
