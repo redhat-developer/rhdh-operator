@@ -141,7 +141,7 @@ data:
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - disabled: false
+      - enabled: true
         package: "path-or-url-to-example-plugin"
         dependencies:
           - ref: example-dep
