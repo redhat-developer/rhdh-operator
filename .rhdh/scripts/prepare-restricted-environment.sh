@@ -116,7 +116,8 @@ Options:
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --olm-version v0|v1|auto               : Force OLM version for catalog/operator resources (default: auto-detect).
-                                            'auto' detects OLM v1 by checking for the ClusterExtension CRD on the cluster.
+                                            'auto' detects OLM v1 by checking for the ClusterExtension CRD and
+                                            a running catalogd deployment on the cluster.
                                             When v1 is detected or forced, generates ClusterCatalog + ClusterExtension
                                             instead of CatalogSource + Subscription.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
@@ -273,6 +274,11 @@ while [[ "$#" -gt 0 ]]; do
     shift 1
     ;;
   '--olm-version')
+    if [[ $# -lt 2 ]]; then
+      errorf "--olm-version requires a value (v0, v1, or auto)."
+      usage
+      exit 1
+    fi
     if [[ "$2" != "v0" && "$2" != "v1" && "$2" != "auto" ]]; then
       errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
       usage
