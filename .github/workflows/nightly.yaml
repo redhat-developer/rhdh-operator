@@ -16,7 +16,6 @@ jobs:
           - main
           - release-1.10
           - release-1.9
-          - release-1.8
     name: 'Nightly Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
