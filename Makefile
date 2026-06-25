@@ -204,7 +204,7 @@ gosec: addgosec ## run the gosec scanner for non-test files in this repo
 	$(GOSEC) -no-fail -fmt $(GOSEC_FMT) -out $(GOSEC_OUTPUT_FILE)  ./...
 
 .PHONY: lint
-lint: golangci-lint ## Run golangci-lint linter & yamllint
+lint: golangci-lint vet ## Run golangci-lint linter & yamllint & go vet
 	$(GOLANGCI_LINT) run --timeout 15m
 
 .PHONY: lint-fix
