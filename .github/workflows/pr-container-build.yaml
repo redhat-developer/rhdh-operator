@@ -11,7 +11,11 @@ permissions:
 
 concurrency:
   group: build-images-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  # Must be false: the issue_comment trigger fires on ALL comments (not just /build-images),
+  # but the /build-images filter is only at the job level. With cancel-in-progress: true,
+  # any unrelated comment (e.g. from SonarQube, Renovate) on the same PR would cancel a
+  # running build, then skip the job because the comment doesn't match /build-images.
+  cancel-in-progress: false
 
 env:
   REGISTRY: ${{ vars.REGISTRY }}
