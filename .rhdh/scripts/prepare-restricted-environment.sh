@@ -343,8 +343,18 @@ function invoke_cluster_cli() {
   fi
 }
 
-function detect_olm_v1() {
+function detect_olm_v1_crd() {
   invoke_cluster_cli get crd clusterextensions.olm.operatorframework.io &>/dev/null
+}
+
+function detect_olm_v1_catalogd() {
+  local ns
+  ns=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+  if [[ -z "${ns}" ]]; then
+    ns="openshift-catalogd"
+  fi
+  invoke_cluster_cli get namespace "${ns}" &>/dev/null
 }
 
 function resolve_olm_version() {
@@ -362,17 +372,26 @@ function resolve_olm_version() {
     RESOLVED_OLM_VERSION="v0"
     infof "Using OLM v0 (forced via --olm-version)"
   elif [[ "${OLM_VERSION}" == "v1" ]]; then
-    if ! detect_olm_v1; then
+    if ! detect_olm_v1_crd; then
       errorf "OLM v1 requested but ClusterExtension CRD not found on this cluster"
+      exit 1
+    fi
+    if ! detect_olm_v1_catalogd; then
+      errorf "OLM v1 requested but catalogd is not installed or its namespace is missing"
       exit 1
     fi
     RESOLVED_OLM_VERSION="v1"
     infof "Using OLM v1 (forced via --olm-version)"
   else
     # auto-detect
-    if detect_olm_v1; then
-      RESOLVED_OLM_VERSION="v1"
-      infof "Auto-detected OLM v1 (ClusterExtension CRD found)"
+    if detect_olm_v1_crd; then
+      if detect_olm_v1_catalogd; then
+        RESOLVED_OLM_VERSION="v1"
+        infof "Auto-detected OLM v1 (ClusterExtension CRD and catalogd found)"
+      else
+        RESOLVED_OLM_VERSION="v0"
+        warnf "ClusterExtension CRD found but catalogd is not ready; falling back to OLM v0"
+      fi
     else
       RESOLVED_OLM_VERSION="v0"
       infof "Auto-detected OLM v0 (ClusterExtension CRD not found)"
