@@ -805,7 +805,7 @@ fi
 
 OPERATOR_GROUP_NAME="${OPERATOR_NAME_TO_INSTALL}-operator-group"
 
-if [ -n "$TO_INSTALL" ] && [[ "${RESOLVED_OLM_VERSION}" == "v0" ]]; then
+if [[ -n "$TO_INSTALL" ]] && [[ "${RESOLVED_OLM_VERSION}" == "v0" ]]; then
   # OLM allows a single OperatorGroup per namespace.
   # Err out early if there are existing OperatorGroups in the Operator namespace.
   existing_ogs=$(invoke_cluster_cli get operatorgroup -n "${NAMESPACE_SUBSCRIPTION}" --no-headers -o custom-columns=":metadata.name" || true)
@@ -875,7 +875,7 @@ debugf "newIIBImage=${newIIBImage}"
 # If a CatalogSource is specified ($UPSTREAM_IIB_OVERRIDE), we may want to install a different operator.
 # See https://issues.redhat.com/browse/RHIDP-6408
 OPERATOR_NAME_IN_CS="rhdh"
-if [ -n "$UPSTREAM_IIB_OVERRIDE" ]; then
+if [[ -n "$UPSTREAM_IIB_OVERRIDE" ]]; then
   OPERATOR_NAME_IN_CS="${OPERATOR_NAME_TO_INSTALL}"
 fi
 
@@ -945,7 +945,7 @@ spec:
       ref: ${newIIBImage}
 " > "$TMPDIR"/ClusterCatalog.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterCatalog.yml
 
-  if [ -z "${TO_INSTALL}" ]; then
+  if [[ -z "${TO_INSTALL}" ]]; then
     echo
     echo "Done. ClusterCatalog '${CATALOGSOURCE_NAME}' created."
     echo "To install the operator, create a ClusterExtension, ServiceAccount, and ClusterRoleBinding."
@@ -1079,7 +1079,7 @@ spec:
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 "
 
-  if [ -z "${TO_INSTALL}" ]; then
+  if [[ -z "${TO_INSTALL}" ]]; then
     echo
     echo -n "Done. "
     if [[ "${IS_OPENSHIFT}" = "true" ]]; then
