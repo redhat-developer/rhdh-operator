@@ -147,7 +147,7 @@ Examples:
   # It will automatically replace all references to the internal RH registries with quay.io
   $0 \\
     --ci-index true \\
-    --filter-versions '1.4,1.5'
+    --filter-versions '1.9,1.10'
 
   # WORKFLOW with oc-mirror v2 for fully disconnected environments:
   # (on connected host): Export images to disk
@@ -987,6 +987,12 @@ function push_image_from_archive() {
 check_tool "yq"
 check_tool "umoci"
 check_tool "skopeo"
+if [[ "${USE_OC_MIRROR}" != "true" ]]; then
+  if ! command -v opm &>/dev/null; then
+    errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
+    exit 1
+  fi
+fi
 if [[ -n "$TO_REGISTRY" ]]; then
   check_tool "podman"
 fi
