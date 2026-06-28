@@ -898,7 +898,9 @@ function process_bundles_from_dir() {
         # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
         related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
         if [[ -n "$related_images" ]]; then
-          all_related_images+=("$related_images")
+          while IFS= read -r img; do
+            [[ -n "$img" ]] && all_related_images+=("$img")
+          done <<<"$related_images"
         fi
         for relatedImage in "${all_related_images[@]}"; do
           imgDir="${FROM_DIR}/images/"
@@ -1184,7 +1186,7 @@ EOF
             # shellcheck disable=SC2001
             catalogImage=$(echo "$catalogImage" | sed 's|default-route-openshift-image-registry\.apps\.[^/]*|image-registry.openshift-image-registry.svc:5000|')
             cat <<EOF | invoke_cluster_cli apply -f -
-apiVersion: catalogd.operatorframework.io/v1
+apiVersion: olm.operatorframework.io/v1
 kind: ClusterCatalog
 metadata:
   name: rhdh-catalog
@@ -1281,7 +1283,7 @@ else
 
   if should_generate_v1_manifests; then
     cat <<EOF >"${manifestsTargetDir}/clusterCatalog.yaml"
-apiVersion: catalogd.operatorframework.io/v1
+apiVersion: olm.operatorframework.io/v1
 kind: ClusterCatalog
 metadata:
   name: rhdh-catalog
