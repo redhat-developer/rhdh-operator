@@ -131,7 +131,7 @@ jobs:
           export CONTAINER_TOOL=podman
           export VERSION="${{ env.BASE_VERSION }}"
           export REGISTRY_WITH_ORG="${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}"
-          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME :-operator }}"
+          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
           export IMAGE_TAG_BASE="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}"
 
           : "${PLATFORM:?PLATFORM must be set}"
@@ -231,7 +231,7 @@ jobs:
         run: |
           set -euo pipefail
           export REGISTRY_WITH_ORG="${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}"
-          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME :-operator }}"
+          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
 
           : "${BASE_VERSION:?BASE_VERSION must be set}"
           : "${SHORT_SHA:?SHORT_SHA must be set}"
@@ -269,7 +269,7 @@ jobs:
         if: env.HAS_QUAY_OAUTH == 'true'
         run: |
           set -euo pipefail
-          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME :-operator }}"
+          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
           export NAMESPACE="${{ vars.REGISTRY_ORG }}"
 
           : "${BASE_VERSION:?BASE_VERSION must be set}"
