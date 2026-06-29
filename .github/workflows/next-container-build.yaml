@@ -70,7 +70,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Skip remaining steps if no relevant changes detected
       - name: Prepare
+        if: needs.changes.outputs.any_changed == 'true'
         env:
           MATRIX_OS: ${{ matrix.os }}
         run: |
@@ -105,12 +107,13 @@ jobs:
           echo "LATEST_NEXT=${LATEST_NEXT}" >> "$GITHUB_ENV"
 
       - name: Setup Go
+        if: needs.changes.outputs.any_changed == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: 'go.mod'
 
       - name: Login to registry (${{ env.REGISTRY }})
-        if: steps.changed-files.outputs.any_changed == 'true'
+        if: needs.changes.outputs.any_changed == 'true'
         uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -118,6 +121,7 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Build and push per-arch operator, bundle, and catalog images
+        if: needs.changes.outputs.any_changed == 'true'
         run: |
           set -euo pipefail
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
@@ -152,12 +156,14 @@ jobs:
           GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
 
       - name: Upload build marker
+        if: needs.changes.outputs.any_changed == 'true'
         run: |
           set -euo pipefail
           mkdir -p /tmp/build-markers
           echo "${{ env.PLATFORM_ARCH }}" > /tmp/build-markers/${{ env.PLATFORM_ARCH }}
 
       - name: Upload build marker artifact
+        if: needs.changes.outputs.any_changed == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: build-marker-${{ env.PLATFORM_PAIR }}
