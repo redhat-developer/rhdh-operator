@@ -358,9 +358,9 @@ function detect_olm_v1_catalogd() {
   ns=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
     -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
   if [[ -z "${ns}" ]]; then
-    ns="openshift-catalogd"
+    return 1
   fi
-  invoke_cluster_cli get namespace "${ns}" &>/dev/null
+  invoke_cluster_cli rollout status deployment -n "${ns}" -l 'app.kubernetes.io/name=catalogd' --timeout=5s &>/dev/null
 }
 
 function resolve_olm_version() {
@@ -1618,6 +1618,7 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
       echo "To install the operator via OLM v1, apply the following manifests:
 
       kubectl apply -f ${manifestsTargetDir}/namespace.yaml
+      kubectl apply -f ${manifestsTargetDir}/clusterCatalog.yaml
       kubectl apply -f ${manifestsTargetDir}/serviceAccount.yaml
       kubectl apply -f ${manifestsTargetDir}/clusterRole.yaml
       kubectl apply -f ${manifestsTargetDir}/clusterRoleBinding.yaml
@@ -1641,7 +1642,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
 
   # Install the operator
   if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-    for manifest in namespace serviceAccount clusterRole clusterRoleBinding clusterExtension; do
+    for manifest in namespace clusterCatalog serviceAccount clusterRole clusterRoleBinding clusterExtension; do
       invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
     done
   else
