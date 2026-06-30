@@ -294,7 +294,9 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 			if plugin.Integrity != "" {
 				existingPlugin.Integrity = plugin.Integrity
 			}
-			existingPlugin.Enabled = plugin.Enabled
+			if plugin.Enabled != nil {
+				existingPlugin.Enabled = plugin.Enabled
+			}
 			existingPlugin.Disabled = plugin.Disabled
 			pluginMap[plugin.Package] = existingPlugin
 		} else {
