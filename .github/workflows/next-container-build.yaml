@@ -179,7 +179,7 @@ jobs:
     needs:
       - changes
       - build
-    if: needs.changes.outputs.any_changed == 'true'
+    if: always() && needs.changes.outputs.any_changed == 'true' && needs.build.result == 'success'
     permissions:
       contents: read
       packages: write
@@ -281,7 +281,7 @@ jobs:
               for tag in "${BASE_VERSION}-${arch}" "${BASE_VERSION}-${SHORT_SHA}-${arch}" "${LATEST_NEXT}-${arch}"; do
                 echo "Deleting per-arch tag: ${image}:${tag}"
                 curl -s -o /dev/null -w "%{http_code}" -X DELETE \
-                  -H "Authorization: Bearer ${{ secrets.QUAY_OAUTH_TOKEN }}" \
+                  -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
                   "https://quay.io/api/v1/repository/${NAMESPACE}/${image}/tag/${tag}" \
                   || true
               done
@@ -290,3 +290,4 @@ jobs:
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
           OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
+          QUAY_OAUTH_TOKEN: ${{ secrets.QUAY_OAUTH_TOKEN }}
