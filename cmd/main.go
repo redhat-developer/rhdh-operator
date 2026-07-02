@@ -204,6 +204,10 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 	}
 
+	// Strip useless managedFields from all cached objects to reduce memory usage.
+	// With many resources, managedFields can consume 70%+ of the informer cache heap.
+	mgrOpts.Cache.DefaultTransform = cache.TransformStripManagedFields()
+
 	// Configure cache to only watch labeled Secrets and ConfigMaps if flag is enabled
 	if enableCacheLabelFilter {
 		setupLog.Info("Enabling cache label filter for Secrets and ConfigMaps")
@@ -217,14 +221,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		mgrOpts.Cache = cache.Options{
-			ByObject: map[client.Object]cache.ByObject{
-				&corev1.Secret{}: {
-					Label: labelSelector,
-				},
-				&corev1.ConfigMap{}: {
-					Label: labelSelector,
-				},
+		mgrOpts.Cache.ByObject = map[client.Object]cache.ByObject{
+			&corev1.Secret{}: {
+				Label: labelSelector,
+			},
+			&corev1.ConfigMap{}: {
+				Label: labelSelector,
 			},
 		}
 	}
