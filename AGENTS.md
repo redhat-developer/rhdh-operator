@@ -6,8 +6,8 @@ Manages `Backstage` CRs and reconciles them into Deployments, ConfigMaps, and re
 ## Build & Test Commands
 
 - Build: `make build`
-- Test (unit): `make test`
-- Integration test (requires running cluster): `make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true`
+- Test (unit and integration tests not requiring real cluster): `make test`
+- Integration test (on running cluster and controller): `make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true`
 - Lint: `make lint` (golangci-lint + yamllint)
 - Lint fix: `make lint-fix`
 - Format: `make fmt` (goimports)
@@ -23,6 +23,8 @@ Manages `Backstage` CRs and reconciles them into Deployments, ConfigMaps, and re
      See best_practices.md for patterns already captured from PR reviews. -->
 
 ## Architecture
+
+- Design and configuration overview: `docs/design.md`
 
 <!-- TODO (maintainers): Document non-obvious architectural decisions or unexpected code locations.
      Examples: "reconciler logic is split across pkg/ and internal/", "CRD validation happens in the webhook not the controller", invariants that must hold across the reconcile loop. -->
