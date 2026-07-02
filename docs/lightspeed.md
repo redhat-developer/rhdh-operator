@@ -68,9 +68,9 @@ includes:
   - dynamic-plugins.default.yaml
 plugins:
   - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed:bs_1.49.4__2.2.1
-    disabled: false
+    enabled: true
   - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.49.4__2.2.1
-    disabled: false
+    enabled: true
 ```
 
 For more information about configuring dynamic plugins, please refer to the [Configuration documentation](configuration.md).

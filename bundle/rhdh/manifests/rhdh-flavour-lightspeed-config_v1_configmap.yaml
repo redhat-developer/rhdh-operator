@@ -321,10 +321,10 @@ data:
         plugins:
           # Lightspeed Plugins
           - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed:{{inherit}}
-            disabled: false
+            enabled: true
 
           - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed-backend:{{inherit}}
-            disabled: false
+            enabled: true
   metadata.yaml: |
     # Lightspeed (AI) flavour metadata
     # This flavour is enabled by default and provides AI/Lightspeed functionality

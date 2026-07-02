@@ -719,7 +719,7 @@ data:
       - dynamic-plugins.default.yaml
     plugins:
       - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
-        disabled: false
+        enabled: true
         pluginConfig:
           catalog:
             providers:

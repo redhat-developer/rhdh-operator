@@ -9,15 +9,15 @@ data:
       dynamic-plugins.yaml: |
         plugins:
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
-            disabled: false
+            enabled: true
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
-            disabled: false
+            enabled: true
             dependencies:
               - ref: sonataflow
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
-            disabled: false
+            enabled: true
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
-            disabled: false
+            enabled: true
   metadata.yaml: |
     # Orchestrator flavour metadata
     # This flavour is disabled by default due to heavy infrastructure dependencies

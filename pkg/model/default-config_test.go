@@ -74,7 +74,7 @@ func TestMergeDynamicPluginsFunction(t *testing.T) {
 					}
 				}
 				require.NotNil(t, pluginB, "plugin-b should exist")
-				assert.False(t, pluginB.Disabled, "plugin-b should be enabled (overridden)")
+				assert.False(t, pluginB.IsDisabled(), "plugin-b should be enabled (overridden)")
 				assert.Equal(t, "sha512-overlay", pluginB.Integrity, "plugin-b integrity should be from overlay")
 
 				// Includes should be merged

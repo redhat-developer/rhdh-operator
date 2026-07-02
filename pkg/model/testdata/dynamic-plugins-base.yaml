@@ -8,7 +8,7 @@ data:
       - dynamic-plugins.default.yaml
     plugins:
       - package: "plugin-a"
-        disabled: false
+        enabled: true
       - package: "plugin-b"
-        disabled: true
+        enabled: false
         integrity: "sha512-base"

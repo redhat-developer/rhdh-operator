@@ -53,9 +53,20 @@ type DynaPluginsConfig struct {
 type DynaPlugin struct {
 	Package      string                 `yaml:"package,omitempty"`
 	Integrity    string                 `yaml:"integrity,omitempty"`
+	Enabled      *bool                  `yaml:"enabled,omitempty"`
 	Disabled     bool                   `yaml:"disabled"`
 	PluginConfig map[string]interface{} `yaml:"pluginConfig,omitempty"`
 	Dependencies []PluginDependency     `yaml:"dependencies,omitempty"`
+}
+
+// IsDisabled resolves the effective disabled state from the Enabled and
+// Disabled fields. Enabled takes precedence when both are set. When neither
+// is set the plugin is considered enabled (not disabled), preserving previous behaviour.
+func (p DynaPlugin) IsDisabled() bool {
+	if p.Enabled != nil {
+		return !*p.Enabled
+	}
+	return p.Disabled
 }
 
 type PluginDependency struct {
@@ -185,7 +196,7 @@ func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
 	result := make([]PluginDependency, 0)
 
 	for _, pp := range ps {
-		if pp.Disabled {
+		if pp.IsDisabled() {
 			continue
 		}
 
@@ -282,6 +293,9 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 			}
 			if plugin.Integrity != "" {
 				existingPlugin.Integrity = plugin.Integrity
+			}
+			if plugin.Enabled != nil {
+				existingPlugin.Enabled = plugin.Enabled
 			}
 			existingPlugin.Disabled = plugin.Disabled
 			pluginMap[plugin.Package] = existingPlugin
