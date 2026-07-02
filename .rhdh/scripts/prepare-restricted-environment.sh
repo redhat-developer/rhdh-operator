@@ -17,7 +17,6 @@ IS_HOSTED_CONTROL_PLANE=""
 NAMESPACE_OPERATOR="rhdh-operator"
 INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
 FILTERED_VERSIONS=(*)
-CATALOG_PULL_SECRET=""
 
 MAX_PARALLEL="${MAX_PARALLEL:-10}"
 if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
@@ -532,7 +531,7 @@ function buildRegistryUrl() {
     if [[ "${input}" == "internal" ]]; then
       echo "image-registry.openshift-image-registry.svc:5000"
     else
-      echo "$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')"
+      oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}'
     fi
   else
     echo "${TO_REGISTRY}"
