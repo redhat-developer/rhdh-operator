@@ -1561,7 +1561,7 @@ spec:
     catalog:
       packageName: rhdh
       channels:
-      - name: fast
+      - fast
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: rhdh-catalog
