@@ -545,11 +545,27 @@ function buildRegistryUrl() {
   fi
 }
 
+CACHED_REGISTRY_URL=""
+CACHED_REGISTRY_URL_INTERNAL=""
+
+function cache_registry_urls() {
+  if [[ -n "$TO_REGISTRY" ]]; then
+    CACHED_REGISTRY_URL=$(buildRegistryUrl)
+    CACHED_REGISTRY_URL_INTERNAL=$(buildRegistryUrl "internal")
+  fi
+}
+
 function buildCatalogImageUrl() {
   if [[ -n "$TO_REGISTRY" ]]; then
     tag=${INDEX_IMAGE##*:}
     [[ "$INDEX_IMAGE" == "$tag" ]] && tag="latest"
-    echo "$(buildRegistryUrl "${1:-external}")/${2:-rhdh/index}:${tag}"
+    local reg_url
+    if [[ "${1:-external}" == "internal" ]]; then
+      reg_url="${CACHED_REGISTRY_URL_INTERNAL}"
+    else
+      reg_url="${CACHED_REGISTRY_URL}"
+    fi
+    echo "${reg_url}/${2:-rhdh/index}:${tag}"
   else
     echo ""
   fi
@@ -599,7 +615,7 @@ function render_index() {
       >"${local_index_file}"
   fi
 
-  debugf "Got $(cat "${local_index_file}" | wc -l) lines of JSON from the index!"
+  debugf "Got $(wc -l < "${local_index_file}") lines of JSON from the index!"
 
   if [ ! -s "${local_index_file}" ]; then
     errorf "[ERROR] 'opm render $INDEX_IMAGE' returned an empty output, which likely means that this index Image does not contain the rhdh operator."
@@ -621,6 +637,18 @@ function extract_last_two_elements() {
   fi
 }
 
+function _last_two() {
+  local -n __lt_result=$1
+  local __lt_input="$2"
+  if [[ "$__lt_input" == */*/* ]]; then
+    local __lt_last="${__lt_input##*/}"
+    local __lt_rest="${__lt_input%/*}"
+    __lt_result="${__lt_rest##*/}/${__lt_last}"
+  else
+    __lt_result="$__lt_input"
+  fi
+}
+
 function mirror_extra_images() {
   if [[ ${#EXTRA_IMAGES[@]} -eq 0 ]]; then
     return
@@ -629,13 +657,13 @@ function mirror_extra_images() {
 
   if [[ -n "$TO_REGISTRY" ]] && [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
     for img in "${EXTRA_IMAGES[@]}"; do
-      local lastTwo
+      local lastTwo=""
       if [[ "$img" == *"@sha256:"* ]]; then
-        lastTwo=$(extract_last_two_elements "${img%@*}")
+        _last_two lastTwo "${img%@*}"
       elif [[ "$img" == *":"* ]]; then
-        lastTwo=$(extract_last_two_elements "${img%:*}")
+        _last_two lastTwo "${img%:*}"
       else
-        lastTwo=$(extract_last_two_elements "${img}")
+        _last_two lastTwo "${img}"
       fi
       local projectNameForOcpReg=${lastTwo%%/*}
       oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
@@ -644,21 +672,21 @@ function mirror_extra_images() {
 
   local pids=()
   for img in "${EXTRA_IMAGES[@]}"; do
-    local imgDir imgTag lastTwo targetImg
+    local imgDir imgTag lastTwo="" targetImg
     if [[ "$img" == *"@sha256:"* ]]; then
       local imgDigest="${img##*@sha256:}"
       imgDir="./extraImages/${img%@*}/sha256_$imgDigest"
-      lastTwo=$(extract_last_two_elements "${img%@*}")
-      targetImg="$(buildRegistryUrl)/${lastTwo}:$imgDigest"
+      _last_two lastTwo "${img%@*}"
+      targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$imgDigest"
     elif [[ "$img" == *":"* ]]; then
       imgTag="${img##*:}"
       imgDir="./extraImages/${img%:*}/tag_$imgTag"
-      lastTwo=$(extract_last_two_elements "${img%:*}")
-      targetImg="$(buildRegistryUrl)/${lastTwo}:$imgTag"
+      _last_two lastTwo "${img%:*}"
+      targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$imgTag"
     else
       imgDir="./extraImages/${img}/tag_latest"
-      lastTwo=$(extract_last_two_elements "${img}")
-      targetImg="$(buildRegistryUrl)/${lastTwo}:latest"
+      _last_two lastTwo "${img}"
+      targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:latest"
     fi
 
     if [[ -n "$TO_REGISTRY" ]]; then
@@ -700,16 +728,16 @@ function mirror_extra_images_from_dir() {
       local relative_path=${sha256_dir#"$BASE_DIR/"}
       local parent_path
       parent_path=$(dirname "$relative_path")
-      local lastTwo
-      lastTwo=$(extract_last_two_elements "${parent_path}")
+      local lastTwo=""
+      _last_two lastTwo "${parent_path}"
       ns_set+=("${lastTwo%%/*}")
     done
     for tag_dir in "${tag_dirs[@]}"; do
       local relative_path=${tag_dir#"$BASE_DIR/"}
       local parent_path
       parent_path=$(dirname "$relative_path")
-      local lastTwo
-      lastTwo=$(extract_last_two_elements "${parent_path}")
+      local lastTwo=""
+      _last_two lastTwo "${parent_path}"
       ns_set+=("${lastTwo%%/*}")
     done
     local unique_ns
@@ -728,12 +756,12 @@ function mirror_extra_images_from_dir() {
     local sha256_hash=${sha256_dir##*/sha256_}
     local parent_path
     parent_path=$(dirname "$relative_path")
-    local lastTwo
-    lastTwo=$(extract_last_two_elements "${parent_path}")
+    local lastTwo=""
+    _last_two lastTwo "${parent_path}"
     local extraImg="${lastTwo}:${sha256_hash}"
     if [[ -n "$TO_REGISTRY" ]]; then
       local targetImg
-      targetImg="$(buildRegistryUrl)/${extraImg%@*}"
+      targetImg="${CACHED_REGISTRY_URL}/${extraImg%@*}"
       push_image_from_archive "$sha256_dir" "$targetImg" &
       pids+=($!)
     fi
@@ -744,12 +772,12 @@ function mirror_extra_images_from_dir() {
     local tag_hash=${tag_dir##*/tag_}
     local parent_path
     parent_path=$(dirname "$relative_path")
-    local lastTwo
-    lastTwo=$(extract_last_two_elements "${parent_path}")
+    local lastTwo=""
+    _last_two lastTwo "${parent_path}"
     local extraImg="${lastTwo}:${tag_hash}"
     if [[ -n "$TO_REGISTRY" ]]; then
       local targetImg
-      targetImg="$(buildRegistryUrl)/${extraImg}"
+      targetImg="${CACHED_REGISTRY_URL}/${extraImg}"
       push_image_from_archive "$tag_dir" "$targetImg" &
       pids+=($!)
     fi
@@ -821,24 +849,24 @@ function process_single_bundle() {
 
       for relatedImage in "${all_related_images[@]}"; do
         local imgDir="./images/"
-        local lastTwo targetImg internalTargetImg
+        local lastTwo="" targetImg internalTargetImg
         if [[ "$relatedImage" == *"@sha256:"* ]]; then
           local relatedImageDigest="${relatedImage##*@sha256:}"
           imgDir+="${relatedImage%@*}/sha256_$relatedImageDigest"
-          lastTwo=$(extract_last_two_elements "${relatedImage%@*}")
-          targetImg="$(buildRegistryUrl)/${lastTwo}:$relatedImageDigest"
-          internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:$relatedImageDigest"
+          _last_two lastTwo "${relatedImage%@*}"
+          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$relatedImageDigest"
+          internalTargetImg="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:$relatedImageDigest"
         elif [[ "$relatedImage" == *":"* ]]; then
           local relatedImageTag="${relatedImage##*:}"
           imgDir+="${relatedImage%:*}/tag_$relatedImageTag"
-          lastTwo=$(extract_last_two_elements "${relatedImage%:*}")
-          targetImg="$(buildRegistryUrl)/${lastTwo}:$relatedImageTag"
-          internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:$relatedImageTag"
+          _last_two lastTwo "${relatedImage%:*}"
+          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$relatedImageTag"
+          internalTargetImg="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:$relatedImageTag"
         else
           imgDir+="${relatedImage}/tag_latest"
-          lastTwo=$(extract_last_two_elements "${relatedImage}")
-          targetImg="$(buildRegistryUrl)/${lastTwo}:latest"
-          internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:latest"
+          _last_two lastTwo "${relatedImage}"
+          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:latest"
+          internalTargetImg="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:latest"
         fi
 
         if [[ -n "$TO_REGISTRY" ]]; then
@@ -865,10 +893,10 @@ function process_single_bundle() {
   if [[ -n "$TO_REGISTRY" ]]; then
     umoci repack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked"
 
-    local newBundleImage
-    newBundleImage="$(buildRegistryUrl)/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
-    local newBundleImageInternal
-    newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+    local bundleLastTwo=""
+    _last_two bundleLastTwo "${bundleImg%@*}"
+    local newBundleImage="${CACHED_REGISTRY_URL}/${bundleLastTwo}:${digest}"
+    local newBundleImageInternal="${CACHED_REGISTRY_URL_INTERNAL}/${bundleLastTwo}:${digest}"
     debugf "bundle #${bundle_id}: pushing ${newBundleImage}" >&2
     sem_acquire
     skopeo copy --remove-signatures --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}" || { sem_release; return 1; }
@@ -975,21 +1003,24 @@ function process_single_bundle_from_dir() {
 
       for relatedImage in "${all_related_images[@]}"; do
         local imgDir="${FROM_DIR}/images/"
-        local targetImg targetImgInternal
+        local lastTwo="" targetImg targetImgInternal
         if [[ "$relatedImage" == *"@sha256:"* ]]; then
           local relatedImageDigest="${relatedImage##*@sha256:}"
           imgDir+="${relatedImage%@*}/sha256_$relatedImageDigest"
-          targetImg="$(buildRegistryUrl)/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
-          targetImgInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${relatedImage%@*}"):$relatedImageDigest"
+          _last_two lastTwo "${relatedImage%@*}"
+          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$relatedImageDigest"
+          targetImgInternal="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:$relatedImageDigest"
         elif [[ "$relatedImage" == *":"* ]]; then
           local relatedImageTag="${relatedImage##*:}"
           imgDir+="${relatedImage%:*}/tag_$relatedImageTag"
-          targetImg="$(buildRegistryUrl)/$(extract_last_two_elements "${relatedImage%:*}"):$relatedImageTag"
-          targetImgInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${relatedImage%:*}"):$relatedImageTag"
+          _last_two lastTwo "${relatedImage%:*}"
+          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$relatedImageTag"
+          targetImgInternal="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:$relatedImageTag"
         else
           imgDir+="${relatedImage}/tag_latest"
-          targetImg="$(buildRegistryUrl)/$(extract_last_two_elements "${relatedImage}"):latest"
-          targetImgInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${relatedImage}"):latest"
+          _last_two lastTwo "${relatedImage}"
+          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:latest"
+          targetImgInternal="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:latest"
         fi
         if [ ! -d "$imgDir" ]; then
           warnf "Skipping related image $relatedImage not found mirrored in dir: $FROM_DIR/images" >&2
@@ -1013,10 +1044,10 @@ function process_single_bundle_from_dir() {
   if [[ -n "$TO_REGISTRY" ]]; then
     umoci repack --image "${TMPDIR}/bundles/${digest}/src:latest" "${TMPDIR}/bundles/${digest}/unpacked"
 
-    local newBundleImage
-    newBundleImage="$(buildRegistryUrl)/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
-    local newBundleImageInternal
-    newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+    local bundleLastTwo=""
+    _last_two bundleLastTwo "${bundleImg%@*}"
+    local newBundleImage="${CACHED_REGISTRY_URL}/${bundleLastTwo}:${digest}"
+    local newBundleImageInternal="${CACHED_REGISTRY_URL_INTERNAL}/${bundleLastTwo}:${digest}"
     debugf "bundle #${bundle_id}: pushing ${newBundleImage}" >&2
     sem_acquire
     skopeo copy --preserve-digests --remove-signatures --dest-tls-verify=false "oci:${TMPDIR}/bundles/${digest}/src:latest" "docker://${newBundleImage}" || { sem_release; return 1; }
@@ -1087,10 +1118,14 @@ function process_bundles_from_dir() {
 function mirror_image_to_registry() {
   sem_acquire
   local rc=0
-  local src_image
-  src_image=$(replaceInternalRegIfNeeded "$1")
-  local dest_image
-  dest_image=$2
+  local src_image="$1"
+  if [[ "${IS_CI_INDEX_IMAGE}" == "true" ]]; then
+    for reg in registry.stage.redhat.io registry.redhat.io; do
+      src_image="${src_image/$reg\/rhdh/quay.io\/rhdh}"
+    done
+    src_image="${src_image/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
+  fi
+  local dest_image=$2
 
   echo "Mirroring $src_image to $dest_image..."
   skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image" || rc=$?
@@ -1101,10 +1136,14 @@ function mirror_image_to_registry() {
 function mirror_image_to_archive() {
   sem_acquire
   local rc=0
-  local src_image
-  src_image=$(replaceInternalRegIfNeeded "$1")
-  local archive_path
-  archive_path="$2"
+  local src_image="$1"
+  if [[ "${IS_CI_INDEX_IMAGE}" == "true" ]]; then
+    for reg in registry.stage.redhat.io registry.redhat.io; do
+      src_image="${src_image/$reg\/rhdh/quay.io\/rhdh}"
+    done
+    src_image="${src_image/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
+  fi
+  local archive_path="$2"
 
   debugf "Saving $src_image to $archive_path..."
   skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path" || rc=$?
@@ -1138,7 +1177,7 @@ detect_ocp_and_set_env_var
 if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
   ocp_prepare_internal_registry
 fi
-
+cache_registry_urls
 
 manifestsTargetDir="${TMPDIR}"
 if [[ -n "${FROM_DIR}" ]]; then
@@ -1203,7 +1242,7 @@ EOF
       mirror_image_to_archive "registry.redhat.io/ubi9/ubi:latest" "${TO_DIR}/rhdh-catalog"
     fi
     if [[ -n "$TO_REGISTRY" ]]; then
-      registryUrl=$(buildRegistryUrl)
+      registryUrl="${CACHED_REGISTRY_URL}"
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
         registryUrl+="/oc-mirror"
       fi
@@ -1233,7 +1272,7 @@ EOF
       exit 1
     fi
     if [[ -n "${TO_REGISTRY}" ]]; then
-      registryUrl=$(buildRegistryUrl)
+      registryUrl="${CACHED_REGISTRY_URL}"
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
         registryUrl+="/oc-mirror"
       fi
@@ -1411,7 +1450,7 @@ EOF
 
   if [[ -n "${TO_REGISTRY}" ]]; then
     # IDMS will only work on regular OCP clusters. It doesn't work on ROSA or clusters with hosted control planes like on IBM Cloud.
-    registry_url_internal=$(buildRegistryUrl)
+    registry_url_internal="${CACHED_REGISTRY_URL}"
     cat <<EOF >"${manifestsTargetDir}/imageDigestMirrorSet.yaml"
   apiVersion: config.openshift.io/v1
   kind: ImageDigestMirrorSet
