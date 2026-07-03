@@ -1154,12 +1154,31 @@ function mirror_image_to_archive() {
 }
 
 function push_image_from_archive() {
-  sem_acquire
-  local rc=0
   local archive_path=$1
   local dest_image=$2
+
+  local lock_key="${dest_image//\//__}"
+  lock_key="${lock_key//:/_}"
+  if ! mkdir "$TMPDIR/.push_locks/$lock_key" 2>/dev/null; then
+    debugf "Skipping duplicate push: $dest_image (already handled)"
+    return 0
+  fi
+
+  sem_acquire
+  local rc=0
+  local max_retries=3
+  local retry_delay=5
   echo "Pushing $archive_path to $dest_image..."
-  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image" || rc=$?
+  for ((attempt=1; attempt<=max_retries; attempt++)); do
+    rc=0
+    skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image" || rc=$?
+    if [[ $rc -eq 0 ]]; then break; fi
+    if ((attempt < max_retries)); then
+      warnf "Push failed (attempt $attempt/$max_retries), retrying in ${retry_delay}s... [$dest_image]"
+      sleep "$retry_delay"
+      retry_delay=$((retry_delay * 2))
+    fi
+  done
   sem_release
   return $rc
 }
@@ -1180,6 +1199,7 @@ if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
   ocp_prepare_internal_registry
 fi
 cache_registry_urls
+mkdir -p "$TMPDIR/.push_locks"
 
 manifestsTargetDir="${TMPDIR}"
 if [[ -n "${FROM_DIR}" ]]; then
