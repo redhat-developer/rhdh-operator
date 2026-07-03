@@ -155,7 +155,9 @@ Options:
                                             --to-registry together.
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
-  --max-parallel <N>                     : Maximum number of parallel image operations (default: 10, env: MAX_PARALLEL)
+  --max-parallel <N>                     : Maximum number of parallel image operations (default: 10, env: MAX_PARALLEL).
+                                            Lower this value if you are running low on disk space, as fewer concurrent
+                                            downloads will reduce peak disk usage.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
 
 Examples:
