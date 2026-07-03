@@ -59,20 +59,25 @@ function errorf() {
   logf "ERROR" "\033[0;31m" "$1"
 }
 
-function throttle_parallel() {
-  local -n __tp_pids=$1
-  while true; do
-    local running=0
-    for pid in ${__tp_pids[@]+"${__tp_pids[@]}"}; do
-      if kill -0 "$pid" 2>/dev/null; then
-        running=$((running + 1))
-      fi
-    done
-    if [[ $running -lt $MAX_PARALLEL ]]; then
-      break
-    fi
-    sleep 0.2
+SEM_FD=""
+
+function sem_init() {
+  local fifo
+  fifo=$(mktemp -u)
+  mkfifo "$fifo"
+  exec {SEM_FD}<>"$fifo"
+  rm -f "$fifo"
+  for ((i = 0; i < MAX_PARALLEL; i++)); do
+    printf '\n' >&"${SEM_FD}"
   done
+}
+
+function sem_acquire() {
+  IFS= read -r -u "${SEM_FD}"
+}
+
+function sem_release() {
+  printf '\n' >&"${SEM_FD}"
 }
 
 function wait_for_pids() {
@@ -429,16 +434,18 @@ fi
 if [[ -n "${TO_DIR}" ]]; then
   mkdir -p "${TO_DIR}"
   TMPDIR="${TO_DIR}"
-  trap "jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null" EXIT
-  trap "exit 1" INT TERM
+  trap '{ jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null; } || true' EXIT
+  trap 'exit 1' INT TERM
 else
   TMPDIR=$(mktemp -d)
   # shellcheck disable=SC2064
-  trap "rm -fr $TMPDIR || true; jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null" EXIT
-  trap "exit 1" INT TERM
+  trap "rm -fr \"$TMPDIR\" || true; { jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null; } || true" EXIT
+  trap 'exit 1' INT TERM
 fi
 pushd "${TMPDIR}" >/dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
+
+sem_init
 
 if (( INSTALL_YQ )); then
   YQ=$HOME/.local/bin/yq_mf
@@ -655,13 +662,11 @@ function mirror_extra_images() {
     fi
 
     if [[ -n "$TO_REGISTRY" ]]; then
-      throttle_parallel pids
       mirror_image_to_registry "$img" "$targetImg" &
       pids+=($!)
     else
       if [ ! -d "$imgDir" ]; then
         mkdir -p "${imgDir}"
-        throttle_parallel pids
         mirror_image_to_archive "$img" "$imgDir" &
         pids+=($!)
       fi
@@ -729,7 +734,6 @@ function mirror_extra_images_from_dir() {
     if [[ -n "$TO_REGISTRY" ]]; then
       local targetImg
       targetImg="$(buildRegistryUrl)/${extraImg%@*}"
-      throttle_parallel pids
       push_image_from_archive "$sha256_dir" "$targetImg" &
       pids+=($!)
     fi
@@ -745,8 +749,7 @@ function mirror_extra_images_from_dir() {
     local extraImg="${lastTwo}:${tag_hash}"
     if [[ -n "$TO_REGISTRY" ]]; then
       local targetImg
-      targetImg="$(buildRegistryUrl)/${extraImg%:*}"
-      throttle_parallel pids
+      targetImg="$(buildRegistryUrl)/${extraImg}"
       push_image_from_archive "$tag_dir" "$targetImg" &
       pids+=($!)
     fi
@@ -780,10 +783,13 @@ function process_single_bundle() {
   local bundle_dir="bundles/${digest}"
   mkdir -p "${bundle_dir}"
 
+  sem_acquire
   if ! skopeo copy --remove-signatures "docker://$bundleImg" "oci:./${bundle_dir}/src:latest" 2>"${bundle_dir}/copy.err"; then
+    sem_release
     debugf "bundle #${bundle_id}: skopeo copy failed, skipping (see ${bundle_dir}/copy.err)" >&2
     return 0
   fi
+  sem_release
   debugf "bundle #${bundle_id}: pulled ${bundleImg}" >&2
 
   umoci unpack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked" --rootless
@@ -837,13 +843,11 @@ function process_single_bundle() {
 
         if [[ -n "$TO_REGISTRY" ]]; then
           echo "s#${relatedImage}#${internalTargetImg}#g" >> "$csv_sed_file"
-          throttle_parallel inner_pids
           mirror_image_to_registry "$relatedImage" "$targetImg" &
           inner_pids+=($!)
         else
           if [ ! -d "$imgDir" ]; then
             mkdir -p "${imgDir}"
-            throttle_parallel inner_pids
             mirror_image_to_archive "$relatedImage" "$imgDir" &
             inner_pids+=($!)
           fi
@@ -866,7 +870,9 @@ function process_single_bundle() {
     local newBundleImageInternal
     newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
     debugf "bundle #${bundle_id}: pushing ${newBundleImage}" >&2
-    skopeo copy --remove-signatures --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}"
+    sem_acquire
+    skopeo copy --remove-signatures --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}" || { sem_release; return 1; }
+    sem_release
 
     echo "s#${originalBundleImg}#${newBundleImageInternal}#g" > "${sed_commands_dir}/${digest}.sed"
   fi
@@ -893,8 +899,6 @@ function process_bundles() {
     bundleImg=$(replaceInternalRegIfNeeded "$bundleImg")
     local digest="${bundleImg##*@sha256:}"
     debugf "bundle #${bundle_count}/${total_bundles}: $originalBundleImg => $bundleImg"
-
-    throttle_parallel pids
 
     process_single_bundle "$bundleImg" "$originalBundleImg" "$digest" "$sed_commands_dir" "$bundle_count" &
     pids+=($!)
@@ -993,7 +997,6 @@ function process_single_bundle_from_dir() {
         fi
         if [[ -n "$TO_REGISTRY" ]]; then
           echo "s#${relatedImage}#${targetImgInternal}#g" >> "$csv_sed_file"
-          throttle_parallel inner_pids
           push_image_from_archive "$imgDir" "$targetImg" &
           inner_pids+=($!)
         fi
@@ -1015,7 +1018,9 @@ function process_single_bundle_from_dir() {
     local newBundleImageInternal
     newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
     debugf "bundle #${bundle_id}: pushing ${newBundleImage}" >&2
-    skopeo copy --preserve-digests --remove-signatures --dest-tls-verify=false "oci:${TMPDIR}/bundles/${digest}/src:latest" "docker://${newBundleImage}"
+    sem_acquire
+    skopeo copy --preserve-digests --remove-signatures --dest-tls-verify=false "oci:${TMPDIR}/bundles/${digest}/src:latest" "docker://${newBundleImage}" || { sem_release; return 1; }
+    sem_release
 
     echo "s#${bundleImg}#${newBundleImageInternal}#g" > "${sed_commands_dir}/${digest}.sed"
   fi
@@ -1050,8 +1055,6 @@ function process_bundles_from_dir() {
     local digest="${bundleImg##*@sha256:}"
     debugf "bundle #${bundle_count}/${total_bundles}: $bundleImg"
 
-    throttle_parallel pids
-
     process_single_bundle_from_dir "$bundleImg" "$digest" "$sed_commands_dir" "$bundle_count" &
     pids+=($!)
   done
@@ -1082,30 +1085,42 @@ function process_bundles_from_dir() {
 }
 
 function mirror_image_to_registry() {
+  sem_acquire
+  local rc=0
   local src_image
   src_image=$(replaceInternalRegIfNeeded "$1")
   local dest_image
   dest_image=$2
-  
+
   echo "Mirroring $src_image to $dest_image..."
-  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image"
+  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image" || rc=$?
+  sem_release
+  return $rc
 }
 
 function mirror_image_to_archive() {
+  sem_acquire
+  local rc=0
   local src_image
   src_image=$(replaceInternalRegIfNeeded "$1")
   local archive_path
   archive_path="$2"
 
   debugf "Saving $src_image to $archive_path..."
-  skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
+  skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path" || rc=$?
+  sem_release
+  return $rc
 }
 
 function push_image_from_archive() {
+  sem_acquire
+  local rc=0
   local archive_path=$1
   local dest_image=$2
   echo "Pushing $archive_path to $dest_image..."
-  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image"
+  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image" || rc=$?
+  sem_release
+  return $rc
 }
 
 check_tool "yq"
