@@ -369,14 +369,6 @@ function detect_olm_v1_catalogd() {
 function resolve_olm_version() {
   set -euo pipefail
 
-  if [[ "${IS_OPENSHIFT}" != "true" ]]; then
-    if [[ "${OLM_VERSION}" == "v1" ]]; then
-      warnf "OLM v1 is not supported on Kubernetes clusters; falling back to v0"
-    fi
-    RESOLVED_OLM_VERSION="v0"
-    return
-  fi
-
   if [[ "${OLM_VERSION}" == "v0" ]]; then
     RESOLVED_OLM_VERSION="v0"
     infof "Using OLM v0 (forced via --olm-version)"
