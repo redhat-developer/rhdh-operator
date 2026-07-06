@@ -62,9 +62,35 @@ make uninstall
 You can run your controller standalone (this will run in the foreground, so switch to a new terminal if you want to leave it running)
 This way you can see controllers log just in your terminal window which is quite convenient for debugging.
 
+#### Local Dynamic Plugins Setup (rhdh profile)
+
+For the `rhdh` profile, default dynamic plugins configuration is provided by the catalog-index image (not stored in the repository). In production, this configuration is extracted at runtime.
+
+For local development and testing, we download the configuration once and reuse it to avoid repeated image pulls on every `make run` or `make test` invocation.
+
+```sh
+make local-dynamic-plugins
+```
+
+This command extracts `dynamic-plugins.default.yaml` from the catalog-index image and creates `config/profile/rhdh/local-test/dynamic-plugins.yaml`. The `local-test` directory is git-ignored, allowing you to customize dynamic-plugins for local testing.
+
+**This only needs to be run once.** Re-run it when you want to refresh with newer catalog-index data.
+
+**Requirements:**
+- `skopeo` must be installed (`brew install skopeo` on macOS, `dnf install skopeo` on Fedora/RHEL)
+
+**Optional:** Specify a different catalog-index image:
+```sh
+IMAGE=quay.io/rhdh/plugin-catalog-index:1.10 make local-dynamic-plugins
+```
+
+#### Running the controller
+
 ```sh
 make [PROFILE=<configuration-profile>] [install] run
 ```
+
+**Note:** For the `rhdh` profile, `make run`, `make test`, and `make integration-test` require the `local-test` directory to exist. If it doesn't, the command will fail with instructions to run `make local-dynamic-plugins` first.
 
 You can use it for manual and automated ([such as](../integration_tests/README.md) `USE_EXISTING_CLUSTER=true make integration-test`) tests efficiently, but, note, RBAC is not working with this kind of deployment.
 

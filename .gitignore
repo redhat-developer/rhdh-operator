@@ -9,6 +9,7 @@ bundle_tmp*
 testbin/*
 Dockerfile.cross
 __debug_bin*
+tmp/*
 
 # Test binary, built with `go test -c`
 *.test
@@ -48,3 +49,6 @@ rhdh-disconnected-install.Dockerfile
 
 # from mirror-plugins.sh script
 rhdh-plugin-mirroring-summary.txt
+
+# local-test directories are user-specific local configs for testing
+**/local-test/

@@ -261,6 +261,13 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
 	}
 
+	// Resolve references ({{inherit}}, ref://, etc.) in secondPluginsConfig using firstPluginsConfig as base
+	resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins)
+	if err != nil {
+		return "", err
+	}
+	secondPluginsConfig.Plugins = resolvedPlugins
+
 	// Merge Plugins by package field
 	pluginMap := make(map[string]DynaPlugin)
 	for _, plugin := range firstPluginsConfig.Plugins {
