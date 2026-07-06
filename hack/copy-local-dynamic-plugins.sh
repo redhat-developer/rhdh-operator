@@ -36,19 +36,19 @@ if [[ "${PROFILE}" == "rhdh" ]]; then
     DYNAMIC_PLUGINS_FILE="${LOCAL_TEST_DIR}/dynamic-plugins.yaml"
 
     if [[ ! -d "${LOCAL_TEST_DIR}" ]]; then
-        echo "Error: local-test directory not found at ${LOCAL_TEST_DIR}"
-        echo ""
-        echo "Run 'make local-dynamic-plugins' to generate it first."
-        echo ""
-        echo "This extracts dynamic-plugins.default.yaml from the catalog-index image"
-        echo "and creates a local configuration for testing."
+        echo "Error: local-test directory not found at ${LOCAL_TEST_DIR}" >&2
+        echo "" >&2
+        echo "Run 'make local-dynamic-plugins' to generate it first." >&2
+        echo "" >&2
+        echo "This extracts dynamic-plugins.default.yaml from the catalog-index image" >&2
+        echo "and creates a local configuration for testing." >&2
         exit 1
     fi
 
     if [[ ! -f "${DYNAMIC_PLUGINS_FILE}" ]]; then
-        echo "Error: dynamic-plugins.yaml not found at ${DYNAMIC_PLUGINS_FILE}"
-        echo ""
-        echo "Run 'make local-dynamic-plugins' to regenerate the local-test directory."
+        echo "Error: dynamic-plugins.yaml not found at ${DYNAMIC_PLUGINS_FILE}" >&2
+        echo "" >&2
+        echo "Run 'make local-dynamic-plugins' to regenerate the local-test directory." >&2
         exit 1
     fi
 

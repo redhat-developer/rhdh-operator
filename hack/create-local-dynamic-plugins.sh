@@ -20,17 +20,17 @@ OUTPUT_FILE="${OUTPUT_DIR}/dynamic-plugins.yaml"
 
 # Verify we're in project root
 if [[ ! -f "go.mod" ]] || [[ ! -d "config/profile/rhdh" ]]; then
-  echo "Error: This script must be run from the project root directory"
-  echo "Usage: ./hack/create-local-dynamic-plugins.sh"
+  echo "Error: This script must be run from the project root directory" >&2
+  echo "Usage: ./hack/create-local-dynamic-plugins.sh" >&2
   exit 1
 fi
 
 # Verify skopeo is available
 if ! command -v skopeo &> /dev/null; then
-  echo "Error: skopeo command not found"
-  echo "Please install skopeo to use this script"
-  echo "  macOS: brew install skopeo"
-  echo "  Fedora/RHEL: dnf install skopeo"
+  echo "Error: skopeo command not found" >&2
+  echo "Please install skopeo to use this script" >&2
+  echo "  macOS: brew install skopeo" >&2
+  echo "  Fedora/RHEL: dnf install skopeo" >&2
   exit 1
 fi
 
@@ -67,8 +67,8 @@ done
 
 # Check if dynamic-plugins.default.yaml was extracted
 if [[ ! -f "dynamic-plugins.default.yaml" ]]; then
-  echo "Error: dynamic-plugins.default.yaml not found in image"
-  echo "Trying alternative extraction..."
+  echo "Error: dynamic-plugins.default.yaml not found in image" >&2
+  echo "Trying alternative extraction..." >&2
 
   # Alternative: extract all layers and search
   mkdir -p rootfs
@@ -80,7 +80,7 @@ if [[ ! -f "dynamic-plugins.default.yaml" ]]; then
   if [[ -f "rootfs/dynamic-plugins.default.yaml" ]]; then
     cp rootfs/dynamic-plugins.default.yaml ./
   else
-    echo "Error: Could not find dynamic-plugins.default.yaml in any layer"
+    echo "Error: Could not find dynamic-plugins.default.yaml in any layer" >&2
     exit 1
   fi
 fi
