@@ -814,6 +814,40 @@ fi
 
 OPERATOR_GROUP_NAME="${OPERATOR_NAME_TO_INSTALL}-operator-group"
 
+# Detect leftover resources from a previous run using the other OLM version
+if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+  NAMESPACE_CATALOGSOURCE_CHECK="olm"
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    NAMESPACE_CATALOGSOURCE_CHECK="openshift-marketplace"
+  fi
+  stale_v0=""
+  if invoke_cluster_cli get catalogsource "${CATALOGSOURCE_NAME}" -n "${NAMESPACE_CATALOGSOURCE_CHECK}" &>/dev/null; then
+    stale_v0="${stale_v0}  - CatalogSource/${CATALOGSOURCE_NAME} in ${NAMESPACE_CATALOGSOURCE_CHECK}\n"
+  fi
+  if invoke_cluster_cli get subscription "${OPERATOR_NAME_TO_INSTALL}" -n "${NAMESPACE_SUBSCRIPTION}" &>/dev/null; then
+    stale_v0="${stale_v0}  - Subscription/${OPERATOR_NAME_TO_INSTALL} in ${NAMESPACE_SUBSCRIPTION}\n"
+  fi
+  if invoke_cluster_cli get operatorgroup "${OPERATOR_GROUP_NAME}" -n "${NAMESPACE_SUBSCRIPTION}" &>/dev/null; then
+    stale_v0="${stale_v0}  - OperatorGroup/${OPERATOR_GROUP_NAME} in ${NAMESPACE_SUBSCRIPTION}\n"
+  fi
+  if [[ -n "$stale_v0" ]]; then
+    errorf "Found leftover OLM v0 resources from a previous installation:\n${stale_v0}Please remove them before installing with OLM v1."
+    exit 1
+  fi
+elif [[ "${RESOLVED_OLM_VERSION}" == "v0" ]]; then
+  stale_v1=""
+  if invoke_cluster_cli get clustercatalog "${CATALOGSOURCE_NAME}" &>/dev/null; then
+    stale_v1="${stale_v1}  - ClusterCatalog/${CATALOGSOURCE_NAME}\n"
+  fi
+  if invoke_cluster_cli get clusterextension "${OPERATOR_NAME_TO_INSTALL}" &>/dev/null; then
+    stale_v1="${stale_v1}  - ClusterExtension/${OPERATOR_NAME_TO_INSTALL}\n"
+  fi
+  if [[ -n "$stale_v1" ]]; then
+    errorf "Found leftover OLM v1 resources from a previous installation:\n${stale_v1}Please remove them before installing with OLM v0."
+    exit 1
+  fi
+fi
+
 if [[ -n "$TO_INSTALL" ]] && [[ "${RESOLVED_OLM_VERSION}" == "v0" ]]; then
   # OLM allows a single OperatorGroup per namespace.
   # Err out early if there are existing OperatorGroups in the Operator namespace.
