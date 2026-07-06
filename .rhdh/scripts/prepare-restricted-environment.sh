@@ -1179,16 +1179,31 @@ EOF
         fi
       done
       
-      # Process CatalogSource resources
-      # oc-mirror v2 generates files with pattern: cs-*.yaml
-      for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
-        if [[ -f "${manifest}" ]]; then
-          if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-            debugf "Converting CatalogSource to ClusterCatalog: ${manifest}"
-            catalogImage=$("$YQ" '.spec.image' "${manifest}")
-            # shellcheck disable=SC2001
-            catalogImage=$(echo "$catalogImage" | sed 's|default-route-openshift-image-registry\.apps\.[^/]*|image-registry.openshift-image-registry.svc:5000|')
-            cat <<EOF | invoke_cluster_cli apply -f -
+      if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+        # oc-mirror v2 generates native ClusterCatalog manifests with pattern: cc-*.yaml
+        local foundClusterCatalog=false
+        for manifest in "${clusterResourcesDir}"/cc-*.yaml; do
+          if [[ -f "${manifest}" ]]; then
+            debugf "Processing native ClusterCatalog: ${manifest}"
+            "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
+            "$YQ" -i '.spec.source.image.ref |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
+            if [[ -n "${CATALOG_PULL_SECRET}" ]]; then
+              "$YQ" -i ".spec.source.image.pullSecret = \"${CATALOG_PULL_SECRET}\"" "${manifest}"
+            fi
+            invoke_cluster_cli apply -f "${manifest}"
+            foundClusterCatalog=true
+            foundResources=true
+          fi
+        done
+        # Fall back to converting CatalogSource if no native ClusterCatalog was found
+        if [[ "${foundClusterCatalog}" != "true" ]]; then
+          for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
+            if [[ -f "${manifest}" ]]; then
+              debugf "Converting CatalogSource to ClusterCatalog (no native cc-*.yaml found): ${manifest}"
+              catalogImage=$("$YQ" '.spec.image' "${manifest}")
+              # shellcheck disable=SC2001
+              catalogImage=$(echo "$catalogImage" | sed 's|default-route-openshift-image-registry\.apps\.[^/]*|image-registry.openshift-image-registry.svc:5000|')
+              cat <<EOF | invoke_cluster_cli apply -f -
 apiVersion: olm.operatorframework.io/v1
 kind: ClusterCatalog
 metadata:
@@ -1200,17 +1215,25 @@ spec:
       ref: ${catalogImage}
       pullSecret: ${CATALOG_PULL_SECRET}
 EOF
-          else
+              foundResources=true
+            fi
+          done
+        fi
+      else
+        # OLM v0: process CatalogSource resources
+        # oc-mirror v2 generates files with pattern: cs-*.yaml
+        for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
+          if [[ -f "${manifest}" ]]; then
             debugf "Processing CatalogSource: ${manifest}"
             "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
             "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
             "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
             "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
             invoke_cluster_cli apply -f "${manifest}"
+            foundResources=true
           fi
-          foundResources=true
-        fi
-      done
+        done
+      fi
       
       if [[ "${foundResources}" != "true" ]]; then
         warnf "No cluster resources found in ${clusterResourcesDir}. This may indicate that oc-mirror v2 did not generate them."
