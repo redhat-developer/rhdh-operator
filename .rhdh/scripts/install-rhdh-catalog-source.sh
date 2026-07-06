@@ -155,6 +155,10 @@ function resolve_olm_version() {
       infof "Auto-detected OLM v0 (ClusterExtension CRD not found)"
     fi
   fi
+
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" && "${INSTALL_PLAN_APPROVAL}" != "Automatic" ]]; then
+    warnf "--install-plan-approval is only relevant with OLM v0 and will be ignored with OLM v1"
+  fi
 }
 
 function render_iib() {
