@@ -439,10 +439,18 @@ function prepare_olm_v1_secrets() {
   done
 }
 
+# Generate v1 manifests when:
+#   - OLM v1 was resolved (detected or forced), OR
+#   - we're exporting to disk (no registry) with auto-detect, so we generate both v0 and v1
+#     for the user to choose from in their disconnected environment
 function should_generate_v1_manifests() {
   [[ "${RESOLVED_OLM_VERSION}" == "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }
 }
 
+# Generate v0 manifests when:
+#   - OLM v0 was resolved (detected or forced), OR
+#   - we're exporting to disk (no registry) with auto-detect, so we generate both v0 and v1
+#     for the user to choose from in their disconnected environment
 function should_generate_v0_manifests() {
   [[ "${RESOLVED_OLM_VERSION}" != "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }
 }
