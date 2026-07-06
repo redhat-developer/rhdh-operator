@@ -55,8 +55,8 @@ function errorf() {
 function usage() {
   echo "
 This script streamlines testing IIB images by configuring an OpenShift or Kubernetes cluster to enable it to use the specified IIB image
-as a catalog source. On OLM v0, a CatalogSource is created in 'openshift-marketplace' (OpenShift) or 'olm' (Kubernetes). On OLM v1
-(OpenShift only), a ClusterCatalog and ClusterExtension are created instead. By default, the OLM version is auto-detected based on the
+as a catalog source. On OLM v0, a CatalogSource is created in 'openshift-marketplace' (OpenShift) or 'olm' (Kubernetes). On OLM v1,
+a ClusterCatalog and ClusterExtension are created instead. By default, the OLM version is auto-detected based on the
 presence of the ClusterExtension CRD. The catalog/resource name is 'operatorName-channelName', eg., rhdh-fast
 
 If IIB installation fails, see https://docs.engineering.redhat.com/display/CFC/Test and
