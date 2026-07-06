@@ -19,7 +19,7 @@ OUTPUT_DIR="config/profile/rhdh/local-test"
 OUTPUT_FILE="${OUTPUT_DIR}/dynamic-plugins.yaml"
 
 # Verify we're in project root
-if [ ! -f "go.mod" ] || [ ! -d "config/profile/rhdh" ]; then
+if [[ ! -f "go.mod" ]] || [[ ! -d "config/profile/rhdh" ]]; then
   echo "Error: This script must be run from the project root directory"
   echo "Usage: ./hack/create-local-dynamic-plugins.sh"
   exit 1
@@ -66,7 +66,7 @@ for layer in image/*; do
 done
 
 # Check if dynamic-plugins.default.yaml was extracted
-if [ ! -f "dynamic-plugins.default.yaml" ]; then
+if [[ ! -f "dynamic-plugins.default.yaml" ]]; then
   echo "Error: dynamic-plugins.default.yaml not found in image"
   echo "Trying alternative extraction..."
 
@@ -77,7 +77,7 @@ if [ ! -f "dynamic-plugins.default.yaml" ]; then
     tar -xf "$layer" -C rootfs 2>/dev/null || true
   done
 
-  if [ -f "rootfs/dynamic-plugins.default.yaml" ]; then
+  if [[ -f "rootfs/dynamic-plugins.default.yaml" ]]; then
     cp rootfs/dynamic-plugins.default.yaml ./
   else
     echo "Error: Could not find dynamic-plugins.default.yaml in any layer"

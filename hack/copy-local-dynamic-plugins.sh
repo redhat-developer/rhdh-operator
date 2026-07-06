@@ -25,17 +25,17 @@ cp -r "${DEFAULT_CONFIG_SRC}"/* "${DEFAULT_CONFIG_TARGET}/"
 # Step 2: Copy plugin-deps if it exists
 mkdir -p "${PLUGIN_DEPS_TARGET}"
 rm -fr "${PLUGIN_DEPS_TARGET:?}"/*
-if [ -d "${PLUGIN_DEPS_SRC}" ]; then
+if [[ -d "${PLUGIN_DEPS_SRC}" ]]; then
     cp -r "${PLUGIN_DEPS_SRC}"/* "${PLUGIN_DEPS_TARGET}/" 2>/dev/null || :
 fi
 
 # Step 3: For rhdh profile only, overlay dynamic-plugins.yaml from local-test
 # (replaces the one copied from default-config)
-if [ "${PROFILE}" = "rhdh" ]; then
+if [[ "${PROFILE}" == "rhdh" ]]; then
     LOCAL_TEST_DIR="config/profile/${PROFILE}/local-test"
     DYNAMIC_PLUGINS_FILE="${LOCAL_TEST_DIR}/dynamic-plugins.yaml"
 
-    if [ ! -d "${LOCAL_TEST_DIR}" ]; then
+    if [[ ! -d "${LOCAL_TEST_DIR}" ]]; then
         echo "Error: local-test directory not found at ${LOCAL_TEST_DIR}"
         echo ""
         echo "Run 'make local-dynamic-plugins' to generate it first."
@@ -45,7 +45,7 @@ if [ "${PROFILE}" = "rhdh" ]; then
         exit 1
     fi
 
-    if [ ! -f "${DYNAMIC_PLUGINS_FILE}" ]; then
+    if [[ ! -f "${DYNAMIC_PLUGINS_FILE}" ]]; then
         echo "Error: dynamic-plugins.yaml not found at ${DYNAMIC_PLUGINS_FILE}"
         echo ""
         echo "Run 'make local-dynamic-plugins' to regenerate the local-test directory."

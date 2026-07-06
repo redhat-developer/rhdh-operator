@@ -141,7 +141,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 // TODO
 // extract pluginConfigs
 // merge with app-config (deep merge)
-func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
 
 	// Only proceed if there's a ConfigMap to mount or dynamic plugins config in spec
 	if p.ConfigMap == nil && (backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "") {
