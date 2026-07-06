@@ -1617,15 +1617,19 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
     "
   fi
   if [[ -n "${TO_REGISTRY}" ]]; then
+    local cli_hint="kubectl"
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      cli_hint="oc"
+    fi
     if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
       echo "To install the operator via OLM v1, apply the following manifests:
 
-      kubectl apply -f ${manifestsTargetDir}/namespace.yaml
-      kubectl apply -f ${manifestsTargetDir}/clusterCatalog.yaml
-      kubectl apply -f ${manifestsTargetDir}/serviceAccount.yaml
-      kubectl apply -f ${manifestsTargetDir}/clusterRole.yaml
-      kubectl apply -f ${manifestsTargetDir}/clusterRoleBinding.yaml
-      kubectl apply -f ${manifestsTargetDir}/clusterExtension.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/namespace.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterCatalog.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/serviceAccount.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterRole.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterRoleBinding.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterExtension.yaml
       "
     elif [[ "${IS_OPENSHIFT}" = "true" ]]; then
       echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
