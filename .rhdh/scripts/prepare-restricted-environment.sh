@@ -437,6 +437,16 @@ function prepare_olm_v1_secrets() {
       --docker-password="$(oc whoami -t)" \
       --docker-email="admin@internal-registry.example.com" >&2
   done
+
+  # Grant image-puller to catalogd service accounts so they can pull from the internal registry
+  local catalogd_sa
+  catalogd_sa=$(invoke_cluster_cli get deployment -n "${NAMESPACE_CATALOGD}" -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
+  if [[ -z "${catalogd_sa}" ]]; then
+    catalogd_sa="catalogd-controller-manager"
+  fi
+  invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:default" -n "${NAMESPACE_CATALOGD}" >&2 || true
+  invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:${catalogd_sa}" -n "${NAMESPACE_CATALOGD}" >&2 || true
 }
 
 # Generate v1 manifests when:
