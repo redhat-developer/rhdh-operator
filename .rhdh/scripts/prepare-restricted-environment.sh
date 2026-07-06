@@ -279,11 +279,14 @@ while [[ "$#" -gt 0 ]]; do
       usage
       exit 1
     fi
-    if [[ "$2" != "v0" && "$2" != "v1" && "$2" != "auto" ]]; then
-      errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
-      usage
-      exit 1
-    fi
+    case "$2" in
+      v0|v1|auto) ;;
+      *)
+        errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
+        usage
+        exit 1
+        ;;
+    esac
     OLM_VERSION="$2"
     shift 1
     ;;
