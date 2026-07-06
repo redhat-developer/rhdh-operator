@@ -48,7 +48,7 @@ mkdir -p "${OUTPUT_DIR}"
 
 # Create temporary directory
 TEMP_DIR=$(mktemp -d)
-trap "rm -rf ${TEMP_DIR}" EXIT
+trap 'rm -rf ${TEMP_DIR}' EXIT
 
 echo "Extracting dynamic-plugins.default.yaml from image using skopeo..."
 cd "${TEMP_DIR}"
@@ -57,7 +57,8 @@ cd "${TEMP_DIR}"
 skopeo copy --override-arch amd64 --override-os linux "docker://${IMAGE}" "dir:./image"
 
 # Find and extract the layer containing dynamic-plugins.default.yaml
-for layer in $(ls image/*.tar 2>/dev/null || ls image/* 2>/dev/null | grep -v manifest.json | grep -v version); do
+for layer in image/*; do
+  [[ "$layer" == */manifest.json || "$layer" == */version ]] && continue
   if tar -tf "$layer" 2>/dev/null | grep -q "dynamic-plugins.default.yaml"; then
     tar -xf "$layer" dynamic-plugins.default.yaml 2>/dev/null || true
     break
@@ -71,7 +72,8 @@ if [ ! -f "dynamic-plugins.default.yaml" ]; then
 
   # Alternative: extract all layers and search
   mkdir -p rootfs
-  for layer in $(ls image/*.tar 2>/dev/null || ls image/* 2>/dev/null | grep -v manifest.json | grep -v version); do
+  for layer in image/*; do
+    [[ "$layer" == */manifest.json || "$layer" == */version ]] && continue
     tar -xf "$layer" -C rootfs 2>/dev/null || true
   done
 
