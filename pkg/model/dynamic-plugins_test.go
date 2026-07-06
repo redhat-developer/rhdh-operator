@@ -496,6 +496,129 @@ includes:
 	assert.Contains(t, string(marshalledE), "disabled", "The string should contain 'disabled:'")
 }
 
+func TestIsDisabled(t *testing.T) {
+	true_ := true
+	false_ := false
+
+	tests := []struct {
+		name     string
+		plugin   DynaPlugin
+		expected bool
+	}{
+		{"neither set defaults to enabled", DynaPlugin{Package: "p"}, false},
+		{"disabled: true", DynaPlugin{Package: "p", Disabled: true}, true},
+		{"disabled: false", DynaPlugin{Package: "p", Disabled: false}, false},
+		{"enabled: true", DynaPlugin{Package: "p", Enabled: &true_}, false},
+		{"enabled: false", DynaPlugin{Package: "p", Enabled: &false_}, true},
+		{"enabled takes precedence over disabled", DynaPlugin{Package: "p", Enabled: &true_, Disabled: true}, false},
+		{"enabled: false takes precedence over disabled: false", DynaPlugin{Package: "p", Enabled: &false_, Disabled: false}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.plugin.IsDisabled())
+		})
+	}
+}
+
+func TestMergePluginsEnabledDisabledBackwardCompat(t *testing.T) {
+	// Base has enabled: true, overlay disables with legacy disabled: true
+	t.Run("legacy disabled overlay overrides enabled base", func(t *testing.T) {
+		base := `
+plugins:
+  - package: "plugin-a"
+    enabled: true
+`
+		overlay := `
+plugins:
+  - package: "plugin-a"
+    disabled: true
+`
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(merged), &config)
+		assert.NoError(t, err)
+
+		plugin := findPluginByPackage(config.Plugins, "plugin-a")
+		assert.NotNil(t, plugin)
+		assert.True(t, plugin.IsDisabled(), "legacy disabled: true should override enabled: true")
+	})
+
+	// Base has disabled: true, overlay enables with enabled: true
+	t.Run("enabled overlay overrides disabled base", func(t *testing.T) {
+		base := `
+plugins:
+  - package: "plugin-a"
+    disabled: true
+`
+		overlay := `
+plugins:
+  - package: "plugin-a"
+    enabled: true
+`
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(merged), &config)
+		assert.NoError(t, err)
+
+		plugin := findPluginByPackage(config.Plugins, "plugin-a")
+		assert.NotNil(t, plugin)
+		assert.False(t, plugin.IsDisabled(), "enabled: true should override disabled: true")
+	})
+
+	// Overlay omits both fields — base state preserved
+	t.Run("overlay without activation fields preserves base", func(t *testing.T) {
+		base := `
+plugins:
+  - package: "plugin-a"
+    disabled: true
+    integrity: "sha256-abc"
+`
+		overlay := `
+plugins:
+  - package: "plugin-a"
+    integrity: "sha256-overridden"
+`
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(merged), &config)
+		assert.NoError(t, err)
+
+		plugin := findPluginByPackage(config.Plugins, "plugin-a")
+		assert.NotNil(t, plugin)
+		assert.True(t, plugin.IsDisabled(), "base disabled: true should be preserved when overlay omits both fields")
+		assert.Equal(t, "sha256-overridden", plugin.Integrity)
+	})
+
+	// Pure legacy config still works
+	t.Run("legacy disabled-only config works", func(t *testing.T) {
+		base := `
+plugins:
+  - package: "plugin-a"
+    disabled: false
+  - package: "plugin-b"
+    disabled: true
+`
+		merged, err := MergePluginsData(base, "")
+		assert.NoError(t, err)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(merged), &config)
+		assert.NoError(t, err)
+
+		pluginA := findPluginByPackage(config.Plugins, "plugin-a")
+		assert.False(t, pluginA.IsDisabled())
+		pluginB := findPluginByPackage(config.Plugins, "plugin-b")
+		assert.True(t, pluginB.IsDisabled())
+	})
+}
+
 func TestRemoveDefaultInclude(t *testing.T) {
 	modelData := `
 includes:
