@@ -1181,7 +1181,7 @@ EOF
       
       if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
         # oc-mirror v2 generates native ClusterCatalog manifests with pattern: cc-*.yaml
-        local foundClusterCatalog=false
+        foundClusterCatalog=false
         for manifest in "${clusterResourcesDir}"/cc-*.yaml; do
           if [[ -f "${manifest}" ]]; then
             debugf "Processing native ClusterCatalog: ${manifest}"
@@ -1640,7 +1640,7 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
     "
   fi
   if [[ -n "${TO_REGISTRY}" ]]; then
-    local cli_hint="kubectl"
+    cli_hint="kubectl"
     if [[ "${IS_OPENSHIFT}" = "true" ]]; then
       cli_hint="oc"
     fi
