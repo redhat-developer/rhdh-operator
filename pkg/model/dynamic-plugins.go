@@ -296,8 +296,11 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 			}
 			if plugin.Enabled != nil {
 				existingPlugin.Enabled = plugin.Enabled
+				existingPlugin.Disabled = false
+			} else if plugin.Disabled {
+				existingPlugin.Disabled = true
+				existingPlugin.Enabled = nil
 			}
-			existingPlugin.Disabled = plugin.Disabled
 			pluginMap[plugin.Package] = existingPlugin
 		} else {
 			pluginMap[plugin.Package] = plugin
