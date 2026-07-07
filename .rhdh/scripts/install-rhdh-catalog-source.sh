@@ -966,10 +966,12 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   debugf "Using operator-controller namespace: ${NAMESPACE_OLM_CONTROLLER}"
 
   # Grant image-puller access to OLM v1 controller SAs so they can pull images from the internal registry
-  oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:catalogd-controller-manager" -n rhdh ||
-    warnf "Failed to grant image-puller to catalogd SA; catalog image pulls from internal registry may fail"
-  oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_OLM_CONTROLLER}:operator-controller-controller-manager" -n rhdh ||
-    warnf "Failed to grant image-puller to operator-controller SA; operator image pulls from internal registry may fail"
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:catalogd-controller-manager" -n rhdh ||
+      warnf "Failed to grant image-puller to catalogd SA; catalog image pulls from internal registry may fail"
+    oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_OLM_CONTROLLER}:operator-controller-controller-manager" -n rhdh ||
+      warnf "Failed to grant image-puller to operator-controller SA; operator image pulls from internal registry may fail"
+  fi
 
   # Delete existing ClusterCatalog to force re-index
   invoke_cluster_cli delete clustercatalog "${CATALOGSOURCE_NAME}" --ignore-not-found
@@ -1026,8 +1028,10 @@ subjects:
 " > "$TMPDIR"/ClusterRoleBinding.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterRoleBinding.yml
 
   # Grant installer SA image-puller access so it can pull operator images from the internal registry
-  oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME}" -n rhdh ||
-    warnf "Failed to grant image-puller to installer SA '${SA_NAME}'; operator image pulls from internal registry may fail"
+  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME}" -n rhdh ||
+      warnf "Failed to grant image-puller to installer SA '${SA_NAME}'; operator image pulls from internal registry may fail"
+  fi
 
   # Create ClusterExtension
   echo "apiVersion: olm.operatorframework.io/v1
