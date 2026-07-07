@@ -1294,13 +1294,14 @@ else
         exit 1
       fi
       debugf "Falling back to a standard K8s cluster"
-      # OLM v1 on Kubernetes is not supported (resolve_olm_version forces v0 for non-OpenShift)
-      if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
-        errorf "
+      if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]]; then
+        if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
+          errorf "
     OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
     Check that you are correctly logged into the cluster and that OLM is installed.
     See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
-        exit 1
+          exit 1
+        fi
       fi
     fi
 
