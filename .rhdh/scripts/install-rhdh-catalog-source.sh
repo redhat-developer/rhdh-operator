@@ -15,6 +15,7 @@ OLM_CHANNEL="fast"
 UPSTREAM_IIB_OVERRIDE=""
 INSTALL_PLAN_APPROVAL="Automatic"
 OLM_VERSION="auto"
+RESOLVED_OLM_VERSION=""
 MAX_PARALLEL="${MAX_PARALLEL:-10}"
 if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
   echo "[ERROR] MAX_PARALLEL must be a positive integer, got: '$MAX_PARALLEL'" >&2
