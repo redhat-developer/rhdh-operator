@@ -7,7 +7,7 @@ set -euo pipefail
 
 selected_instance=""
 
-captureRHDHNamespace() {
+capture_rhdh_namespace() {
   default="rhdh"
   if [[ "$use_default" == true ]]; then
     rhdh_workspace="$default"
@@ -22,7 +22,7 @@ captureRHDHNamespace() {
   RHDH_NAMESPACE=$rhdh_workspace
 }
 
-captureArgoCDNamespace() {
+capture_argocd_namespace() {
   default="openshift-gitops-operator"
   if [[ "$use_default" == true ]]; then
     argocd_namespace="$default"
@@ -38,7 +38,7 @@ captureArgoCDNamespace() {
   ARGOCD_NAMESPACE=$argocd_namespace
 }
 
-captureArgoCDURL() {
+capture_argocd_url() {
   argocd_instances=$(oc get argocd -n "$ARGOCD_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
   if [ -z "$argocd_instances" ]; then
@@ -65,7 +65,7 @@ captureArgoCDURL() {
 
 }
 
-captureArgoCDCreds() {
+capture_argocd_creds() {
   if [ -n "$selected_instance" ]; then
     admin_password=$(oc get secret -n "$ARGOCD_NAMESPACE" "${selected_instance}"-cluster -ojsonpath='{.data.admin\.password}' | base64 -d)
     ARGOCD_USERNAME="admin"
@@ -73,7 +73,7 @@ captureArgoCDCreds() {
   fi
 }
 
-captureGitToken() {
+capture_git_token() {
    if [ -z "${GITHUB_TOKEN:-}" ]; then
     read -rs -p "Enter GitHub access token: " value
     echo ""
@@ -83,12 +83,12 @@ captureGitToken() {
   fi
 }
 
-captureK8sURL() {
+capture_k8s_url() {
   url="$(oc whoami --show-server)"
   K8S_CLUSTER_URL=$url
 }
 
-generateK8sToken() {
+generate_k8s_token() {
   sa_namespace="rhdh"
   sa_name="rhdh"
   if [[ "$use_default" == false ]]; then
@@ -133,14 +133,14 @@ EOF
   K8S_CLUSTER_TOKEN=$(oc -n "$sa_namespace" get secret/"${sa_name}" -o jsonpath='{.data.token}' | base64 -d )
 }
 
-checkPrerequisite() {
+check_prerequisite() {
   if ! command -v oc &> /dev/null; then
     echo "oc is required for this script to run. Exiting."
     exit 1
   fi
 }
 
-createBackstageSecret() {
+create_backstage_secret() {
   if 2>/dev/null 1>&2 oc get secret backstage-backend-auth-secret -n "$RHDH_NAMESPACE"; then
     oc delete secret backstage-backend-auth-secret -n "$RHDH_NAMESPACE"
   fi
@@ -211,15 +211,15 @@ main() {
       echo "Not using default values."
   fi
 
-  checkPrerequisite
-  captureK8sURL
-  generateK8sToken
-  captureRHDHNamespace
-  captureArgoCDNamespace
-  captureArgoCDURL
-  captureArgoCDCreds
-  captureGitToken
-  createBackstageSecret
+  check_prerequisite
+  capture_k8s_url
+  generate_k8s_token
+  capture_rhdh_namespace
+  capture_argocd_namespace
+  capture_argocd_url
+  capture_argocd_creds
+  capture_git_token
+  create_backstage_secret
 
   echo "Setup completed successfully!"
 }
