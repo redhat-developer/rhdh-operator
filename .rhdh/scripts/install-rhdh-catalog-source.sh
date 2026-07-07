@@ -839,6 +839,12 @@ elif [[ "${RESOLVED_OLM_VERSION}" == "v0" ]]; then
   if invoke_cluster_cli get clusterextension "${OPERATOR_NAME_TO_INSTALL}" &>/dev/null; then
     stale_v1="${stale_v1}  - ClusterExtension/${OPERATOR_NAME_TO_INSTALL}\n"
   fi
+  if invoke_cluster_cli get serviceaccount "${OPERATOR_NAME_TO_INSTALL}-installer" -n "${NAMESPACE_SUBSCRIPTION}" &>/dev/null; then
+    stale_v1="${stale_v1}  - ServiceAccount/${OPERATOR_NAME_TO_INSTALL}-installer in ${NAMESPACE_SUBSCRIPTION}\n"
+  fi
+  if invoke_cluster_cli get clusterrolebinding "${OPERATOR_NAME_TO_INSTALL}-installer-binding" &>/dev/null; then
+    stale_v1="${stale_v1}  - ClusterRoleBinding/${OPERATOR_NAME_TO_INSTALL}-installer-binding\n"
+  fi
   if [[ -n "$stale_v1" ]]; then
     errorf "Found leftover OLM v1 resources from a previous installation:\n${stale_v1}Please remove them before installing with OLM v0."
     exit 1
