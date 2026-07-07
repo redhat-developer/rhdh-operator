@@ -3,9 +3,13 @@
 # Setup Script for RHDH Authentication For Orchestrator CICD
 #
 
-function captureRHDHNamespace {
+set -euo pipefail
+
+selected_instance=""
+
+captureRHDHNamespace() {
   default="rhdh"
-  if [ "$use_default" == true ]; then
+  if [[ "$use_default" == true ]]; then
     rhdh_workspace="$default"
   else
     read -rp "Enter RHDH Instance namespace (default: $default): " value
@@ -18,9 +22,9 @@ function captureRHDHNamespace {
   RHDH_NAMESPACE=$rhdh_workspace
 }
 
-function captureArgoCDNamespace {
+captureArgoCDNamespace() {
   default="openshift-gitops-operator"
-  if [ "$use_default" == true ]; then
+  if [[ "$use_default" == true ]]; then
     argocd_namespace="$default"
   else
     read -rp "Enter ArgoCD installation namespace (default: $default): " value
@@ -34,13 +38,13 @@ function captureArgoCDNamespace {
   ARGOCD_NAMESPACE=$argocd_namespace
 }
 
-function captureArgoCDURL {
+captureArgoCDURL() {
   argocd_instances=$(oc get argocd -n "$ARGOCD_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
   if [ -z "$argocd_instances" ]; then
       echo "No ArgoCD instances found in namespace $ARGOCD_NAMESPACE. Continuing without ArgoCD support"
   else
-    if [ "$use_default" == true ]; then
+    if [[ "$use_default" == true ]]; then
           selected_instance=$(echo "$argocd_instances" | awk 'NR==1')
           echo "Select an ArgoCD instance: $selected_instance"
     else
@@ -56,12 +60,12 @@ function captureArgoCDURL {
     fi
     argocd_route=$(oc get route -n "$ARGOCD_NAMESPACE" -l app.kubernetes.io/managed-by="$selected_instance" -ojsonpath='{.items[0].status.ingress[0].host}')
     echo "Found Route at $argocd_route"
-    ARGOCD_URL=https://$argocd_route
+    ARGOCD_URL="https://${argocd_route}"
   fi
 
 }
 
-function captureArgoCDCreds {
+captureArgoCDCreds() {
   if [ -n "$selected_instance" ]; then
     admin_password=$(oc get secret -n "$ARGOCD_NAMESPACE" "${selected_instance}"-cluster -ojsonpath='{.data.admin\.password}' | base64 -d)
     ARGOCD_USERNAME="admin"
@@ -69,8 +73,8 @@ function captureArgoCDCreds {
   fi
 }
 
-function captureGitToken {
-   if [ -z "$GITHUB_TOKEN" ]; then
+captureGitToken() {
+   if [ -z "${GITHUB_TOKEN:-}" ]; then
     read -rs -p "Enter GitHub access token: " value
     echo ""
     GITHUB_TOKEN=$value
@@ -79,15 +83,15 @@ function captureGitToken {
   fi
 }
 
-function captureK8sURL {
+captureK8sURL() {
   url="$(oc whoami --show-server)"
   K8S_CLUSTER_URL=$url
 }
 
-function  generateK8sToken {
+generateK8sToken() {
   sa_namespace="rhdh"
   sa_name="rhdh"
-  if [ "$use_default" == false ]; then
+  if [[ "$use_default" == false ]]; then
     read -rp "Which namespace should be used or created to check the SA holding the persistent token? (default: $sa_namespace): " selected_namespace
     if [ -n "$selected_namespace" ]; then
       sa_namespace="$selected_namespace"
@@ -129,42 +133,44 @@ EOF
   K8S_CLUSTER_TOKEN=$(oc -n "$sa_namespace" get secret/"${sa_name}" -o jsonpath='{.data.token}' | base64 -d )
 }
 
-
-function checkPrerequisite {
+checkPrerequisite() {
   if ! command -v oc &> /dev/null; then
     echo "oc is required for this script to run. Exiting."
     exit 1
   fi
 }
 
-function createBackstageSecret {
+createBackstageSecret() {
   if 2>/dev/null 1>&2 oc get secret backstage-backend-auth-secret -n "$RHDH_NAMESPACE"; then
     oc delete secret backstage-backend-auth-secret -n "$RHDH_NAMESPACE"
   fi
   declare -A secretKeys
-  if [ -n "$K8S_CLUSTER_URL" ]; then
+  if [ -n "${K8S_CLUSTER_URL:-}" ]; then
     secretKeys[K8S_CLUSTER_URL]=$K8S_CLUSTER_URL
   fi
-  if [ -n "$K8S_CLUSTER_TOKEN" ]; then
+  if [ -n "${K8S_CLUSTER_TOKEN:-}" ]; then
     secretKeys[K8S_CLUSTER_TOKEN]=$K8S_CLUSTER_TOKEN
   fi
-  if [ -n "$ARGOCD_USERNAME" ]; then
+  if [ -n "${ARGOCD_USERNAME:-}" ]; then
     secretKeys[ARGOCD_USERNAME]=$ARGOCD_USERNAME
   fi
-  if [ -n "$ARGOCD_URL" ]; then
+  if [ -n "${ARGOCD_URL:-}" ]; then
     secretKeys[ARGOCD_URL]=$ARGOCD_URL
   fi
-  if [ -n "$ARGOCD_PASSWORD" ]; then
+  if [ -n "${ARGOCD_PASSWORD:-}" ]; then
     secretKeys[ARGOCD_PASSWORD]=$ARGOCD_PASSWORD
   fi
-  if [ -n "$GITHUB_TOKEN" ]; then
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
     secretKeys[GITHUB_TOKEN]=$GITHUB_TOKEN
   fi
-  cmd="oc create secret generic backstage-backend-auth-secret -n $RHDH_NAMESPACE"
+  local -a cmd=(
+    oc create secret generic backstage-backend-auth-secret
+    -n "$RHDH_NAMESPACE"
+  )
   for key in "${!secretKeys[@]}"; do
-    cmd="${cmd} --from-literal=${key}=${secretKeys[$key]}"
+    cmd+=(--from-literal="${key}=${secretKeys[$key]}")
   done
-  eval "$cmd"
+  "${cmd[@]}"
 }
 
 # Function to display usage instructions
@@ -196,7 +202,7 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-function main {
+main() {
 
   # Check if using default values or not
   if $use_default; then
