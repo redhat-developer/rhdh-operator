@@ -14,7 +14,6 @@ jobs:
       fail-fast: false
       matrix:
         branch:
-          - main
           - release-1.10
 
     concurrency:
