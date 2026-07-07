@@ -949,7 +949,11 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   NAMESPACE_CATALOGD=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
     -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
   if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
-    NAMESPACE_CATALOGD="openshift-catalogd"
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      NAMESPACE_CATALOGD="openshift-catalogd"
+    else
+      NAMESPACE_CATALOGD="olmv1-system"
+    fi
   fi
   debugf "Using catalogd namespace: ${NAMESPACE_CATALOGD}"
 
@@ -962,7 +966,11 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   NAMESPACE_OLM_CONTROLLER=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=operator-controller' \
     -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
   if [[ -z "${NAMESPACE_OLM_CONTROLLER}" ]]; then
-    NAMESPACE_OLM_CONTROLLER="openshift-operator-controller"
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      NAMESPACE_OLM_CONTROLLER="openshift-operator-controller"
+    else
+      NAMESPACE_OLM_CONTROLLER="olmv1-system"
+    fi
   fi
   debugf "Using operator-controller namespace: ${NAMESPACE_OLM_CONTROLLER}"
 
