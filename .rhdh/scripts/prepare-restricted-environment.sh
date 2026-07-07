@@ -20,6 +20,7 @@ FILTERED_VERSIONS=("*")
 OLM_VERSION="auto"
 RESOLVED_OLM_VERSION=""
 CATALOG_PULL_SECRET=""
+NAMESPACE_CATALOGD=""
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
@@ -357,13 +358,12 @@ function detect_olm_v1_crd() {
 }
 
 function detect_olm_v1_catalogd() {
-  local ns
-  ns=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
+  NAMESPACE_CATALOGD=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
     -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
-  if [[ -z "${ns}" ]]; then
+  if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
     return 1
   fi
-  invoke_cluster_cli rollout status deployment -n "${ns}" -l 'app.kubernetes.io/name=catalogd' --timeout=5s &>/dev/null
+  invoke_cluster_cli rollout status deployment -n "${NAMESPACE_CATALOGD}" -l 'app.kubernetes.io/name=catalogd' --timeout=5s &>/dev/null
 }
 
 function resolve_olm_version() {
@@ -403,8 +403,6 @@ function prepare_olm_v1_secrets() {
     return
   fi
 
-  NAMESPACE_CATALOGD=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
-    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
   if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
     NAMESPACE_CATALOGD="openshift-catalogd"
   fi
