@@ -1594,6 +1594,7 @@ spec:
   install:
     preflight:
       crdUpgradeSafety:
+        # Disabled due to known blocker RHIDP-8656
         enforcement: None
 EOF
 fi
