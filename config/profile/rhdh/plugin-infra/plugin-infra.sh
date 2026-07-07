@@ -37,7 +37,7 @@ apply_manifest() {
   local script_dir
   script_dir="$(dirname "$(realpath "$0")")"
 
-  if [ -f "${script_dir}/${file}" ]; then
+  if [[ -f "${script_dir}/${file}" ]]; then
     echo "Using local file: ${file}"
     kubectl "$action" -f "${script_dir}/${file}"
   else

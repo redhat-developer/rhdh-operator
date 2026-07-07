@@ -13,7 +13,7 @@ capture_rhdh_namespace() {
     rhdh_workspace="$default"
   else
     read -rp "Enter RHDH Instance namespace (default: $default): " value
-    if [ -z "$value" ]; then
+    if [[ -z "$value" ]]; then
         rhdh_workspace="$default"
     else
         rhdh_workspace="$value"
@@ -29,7 +29,7 @@ capture_argocd_namespace() {
   else
     read -rp "Enter ArgoCD installation namespace (default: $default): " value
 
-    if [ -z "$value" ]; then
+    if [[ -z "$value" ]]; then
         argocd_namespace="$default"
     else
         argocd_namespace="$value"
@@ -41,7 +41,7 @@ capture_argocd_namespace() {
 capture_argocd_url() {
   argocd_instances=$(oc get argocd -n "$ARGOCD_NAMESPACE" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
-  if [ -z "$argocd_instances" ]; then
+  if [[ -z "$argocd_instances" ]]; then
       echo "No ArgoCD instances found in namespace $ARGOCD_NAMESPACE. Continuing without ArgoCD support"
   else
     if [[ "$use_default" == true ]]; then
@@ -50,7 +50,7 @@ capture_argocd_url() {
     else
       echo "Select an ArgoCD instance:"
       select instance in $argocd_instances; do
-          if [ -n "$instance" ]; then
+          if [[ -n "$instance" ]]; then
               selected_instance="$instance"
               break
           else
@@ -66,7 +66,7 @@ capture_argocd_url() {
 }
 
 capture_argocd_creds() {
-  if [ -n "$selected_instance" ]; then
+  if [[ -n "$selected_instance" ]]; then
     admin_password=$(oc get secret -n "$ARGOCD_NAMESPACE" "${selected_instance}"-cluster -ojsonpath='{.data.admin\.password}' | base64 -d)
     ARGOCD_USERNAME="admin"
     ARGOCD_PASSWORD=$admin_password
@@ -74,7 +74,7 @@ capture_argocd_creds() {
 }
 
 capture_git_token() {
-   if [ -z "${GITHUB_TOKEN:-}" ]; then
+  if [[ -z "${GITHUB_TOKEN:-}" ]]; then
     read -rs -p "Enter GitHub access token: " value
     echo ""
     GITHUB_TOKEN=$value
@@ -93,12 +93,12 @@ generate_k8s_token() {
   sa_name="rhdh"
   if [[ "$use_default" == false ]]; then
     read -rp "Which namespace should be used or created to check the SA holding the persistent token? (default: $sa_namespace): " selected_namespace
-    if [ -n "$selected_namespace" ]; then
+    if [[ -n "$selected_namespace" ]]; then
       sa_namespace="$selected_namespace"
     fi
 
     read -rp "What is the name of the SA? (default: $sa_name): " selected_name
-    if [ -n "$selected_name" ]; then
+    if [[ -n "$selected_name" ]]; then
       sa_name="$selected_name"
     fi
   fi
@@ -145,22 +145,22 @@ create_backstage_secret() {
     oc delete secret backstage-backend-auth-secret -n "$RHDH_NAMESPACE"
   fi
   declare -A secretKeys
-  if [ -n "${K8S_CLUSTER_URL:-}" ]; then
+  if [[ -n "${K8S_CLUSTER_URL:-}" ]]; then
     secretKeys[K8S_CLUSTER_URL]=$K8S_CLUSTER_URL
   fi
-  if [ -n "${K8S_CLUSTER_TOKEN:-}" ]; then
+  if [[ -n "${K8S_CLUSTER_TOKEN:-}" ]]; then
     secretKeys[K8S_CLUSTER_TOKEN]=$K8S_CLUSTER_TOKEN
   fi
-  if [ -n "${ARGOCD_USERNAME:-}" ]; then
+  if [[ -n "${ARGOCD_USERNAME:-}" ]]; then
     secretKeys[ARGOCD_USERNAME]=$ARGOCD_USERNAME
   fi
-  if [ -n "${ARGOCD_URL:-}" ]; then
+  if [[ -n "${ARGOCD_URL:-}" ]]; then
     secretKeys[ARGOCD_URL]=$ARGOCD_URL
   fi
-  if [ -n "${ARGOCD_PASSWORD:-}" ]; then
+  if [[ -n "${ARGOCD_PASSWORD:-}" ]]; then
     secretKeys[ARGOCD_PASSWORD]=$ARGOCD_PASSWORD
   fi
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     secretKeys[GITHUB_TOKEN]=$GITHUB_TOKEN
   fi
   local -a cmd=(
