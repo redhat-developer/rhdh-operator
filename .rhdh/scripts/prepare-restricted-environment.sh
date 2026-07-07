@@ -1591,11 +1591,6 @@ spec:
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: rhdh-catalog
-  install:
-    preflight:
-      crdUpgradeSafety:
-        # Workaround for upstream OLM v1 bug OCPBUGS-60693, fixed in OCP 4.22
-        enforcement: None
 EOF
 fi
 
