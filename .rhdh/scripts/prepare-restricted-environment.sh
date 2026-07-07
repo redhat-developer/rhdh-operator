@@ -367,8 +367,6 @@ function detect_olm_v1_catalogd() {
 }
 
 function resolve_olm_version() {
-  set -euo pipefail
-
   if [[ "${OLM_VERSION}" == "v0" ]]; then
     RESOLVED_OLM_VERSION="v0"
     infof "Using OLM v0 (forced via --olm-version)"
@@ -401,8 +399,6 @@ function resolve_olm_version() {
 }
 
 function prepare_olm_v1_secrets() {
-  set -euo pipefail
-
   if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]]; then
     return
   fi
