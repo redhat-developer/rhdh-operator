@@ -688,10 +688,11 @@ else
     exit 1
   fi
   debugf "Falling back to a standard K8s cluster"
-  # Check that OLM is installed
-  if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &> /dev/null; then
+  # Check that OLM is installed (v0 or v1)
+  if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &> /dev/null && \
+     ! invoke_cluster_cli get crd clusterextensions.olm.operatorframework.io &> /dev/null; then
     errorf "
-OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
+OLM not installed (neither CatalogSource nor ClusterExtension CRD found) or you don't have enough permissions.
 Check that you are correctly logged into the cluster and that OLM is installed.
 See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
     exit 1
