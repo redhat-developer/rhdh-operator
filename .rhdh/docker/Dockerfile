@@ -38,7 +38,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Install openssl for FIPS support
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
 # https://registry.access.redhat.com/ubi9-minimal
-FROM registry.access.redhat.com/ubi9-minimal:9.8-1782797275@sha256:463cae32c6f6f5594b11a5c22de275016bd8545ce58a6373388e8b24f13fc15c AS runtime
+FROM registry.access.redhat.com/ubi9-minimal:1782797355@sha256:463cae32c6f6f5594b11a5c22de275016bd8545ce58a6373388e8b24f13fc15c AS runtime
 # Downstream uncomment
 RUN cat /cachi2/cachi2.env
 #/ Downstream uncomment
