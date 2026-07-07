@@ -1594,7 +1594,7 @@ spec:
   install:
     preflight:
       crdUpgradeSafety:
-        # Disabled due to known blocker RHIDP-8656
+        # Workaround for upstream OLM v1 bug OCPBUGS-60693, fixed in OCP 4.22
         enforcement: None
 EOF
 fi
