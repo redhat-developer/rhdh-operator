@@ -1305,11 +1305,6 @@ else
       NAMESPACE_CATALOGSOURCE="olm"
     fi
     my_operator_index="$(buildCatalogImageUrl "internal")"
-    if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
-      CATALOG_PULL_SECRET="internal-reg-auth-for-rhdh"
-    else
-      CATALOG_PULL_SECRET="reg-pull-secret"
-    fi
   fi
 
   if should_generate_v1_manifests; then
