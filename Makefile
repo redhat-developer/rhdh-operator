@@ -327,15 +327,18 @@ bundle-build: ## Build the bundle image.
 bundle-push: ## Push bundle image to registry
 	$(MAKE) image-push IMG=$(BUNDLE_IMG)
 
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
-# bundle-push is needed because 'opm index add' always pulls from the remote registry and never uses the local image.
-# See https://github.com/operator-framework/operator-registry/issues/885
+# Build an FBC (File-Based Catalog) image using opm.
+# Produces a catalog with the operators.operatorframework.io.index.configs.v1 label required by OLM v1.
+# FBC catalogs are also backward-compatible with OLM v0 on OCP 4.17+.
 .PHONY: catalog-build
-catalog-build: bundle-push opm ## Generate operator-catalog dockerfile using the operator-bundle image built and published above; then build catalog image
-	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT) --generate -d ./index.Dockerfile
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f index.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) .
+catalog-build: bundle-push opm ## Build an FBC catalog image from the operator-bundle image
+	rm -rf catalog-fbc && mkdir -p catalog-fbc
+	$(OPM) init $(BUNDLE_METADATA_PACKAGE_NAME) --default-channel=$(DEFAULT_CHANNEL) --output yaml > catalog-fbc/catalog.yaml
+	$(OPM) render $(BUNDLE_IMGS) --output yaml >> catalog-fbc/catalog.yaml
+	@printf -- '---\nschema: olm.channel\npackage: $(BUNDLE_METADATA_PACKAGE_NAME)\nname: $(DEFAULT_CHANNEL)\nentries:\n  - name: $(PROFILE_SHORT)-operator.v$(VERSION)\n' >> catalog-fbc/catalog.yaml
+	$(OPM) validate catalog-fbc
+	@printf 'FROM scratch\nADD catalog.yaml /configs/catalog.yaml\nLABEL operators.operatorframework.io.index.configs.v1=/configs/\n' > catalog-fbc/catalog.Dockerfile
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f catalog-fbc/catalog.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) catalog-fbc/
 
 # Push the catalog image.
 .PHONY: catalog-push
