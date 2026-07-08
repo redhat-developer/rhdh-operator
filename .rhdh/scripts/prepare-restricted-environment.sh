@@ -19,7 +19,6 @@ INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
 FILTERED_VERSIONS=("*")
 OLM_VERSION="auto"
 RESOLVED_OLM_VERSION=""
-CATALOG_PULL_SECRET=""
 NAMESPACE_CATALOGD=""
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
@@ -438,24 +437,22 @@ json.dump(data, sys.stdout)
   infof "Merged internal registry credentials into global pull secret (openshift-config/pull-secret)"
 
   # Also create namespace-scoped secrets for the operator SA to pull images
-  for ns in "${NAMESPACE_OPERATOR}"; do
-    if invoke_cluster_cli -n "${ns}" get secret internal-reg-ext-auth-for-rhdh &>/dev/null; then
-      invoke_cluster_cli -n "${ns}" delete secret internal-reg-ext-auth-for-rhdh >&2
-    fi
-    invoke_cluster_cli -n "${ns}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
-      --docker-server="$(buildRegistryUrl)" \
-      --docker-username=kubeadmin \
-      --docker-password="${token}" \
-      --docker-email="admin@internal-registry-ext.example.com" >&2
-    if invoke_cluster_cli -n "${ns}" get secret internal-reg-auth-for-rhdh &>/dev/null; then
-      invoke_cluster_cli -n "${ns}" delete secret internal-reg-auth-for-rhdh >&2
-    fi
-    invoke_cluster_cli -n "${ns}" create secret docker-registry internal-reg-auth-for-rhdh \
-      --docker-server="${internal_registry_url}" \
-      --docker-username=kubeadmin \
-      --docker-password="${token}" \
-      --docker-email="admin@internal-registry.example.com" >&2
-  done
+  if invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" get secret internal-reg-ext-auth-for-rhdh &>/dev/null; then
+    invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" delete secret internal-reg-ext-auth-for-rhdh >&2
+  fi
+  invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
+    --docker-server="$(buildRegistryUrl)" \
+    --docker-username=kubeadmin \
+    --docker-password="${token}" \
+    --docker-email="admin@internal-registry-ext.example.com" >&2
+  if invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" get secret internal-reg-auth-for-rhdh &>/dev/null; then
+    invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" delete secret internal-reg-auth-for-rhdh >&2
+  fi
+  invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" create secret docker-registry internal-reg-auth-for-rhdh \
+    --docker-server="${internal_registry_url}" \
+    --docker-username=kubeadmin \
+    --docker-password="${token}" \
+    --docker-email="admin@internal-registry.example.com" >&2
 
   # Grant image-puller to catalogd service accounts so they can pull from the internal registry
   local catalogd_sa
@@ -1042,11 +1039,6 @@ fi
 
 if [[ -n "${TO_REGISTRY}" ]]; then
   resolve_olm_version
-  if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
-    CATALOG_PULL_SECRET="internal-reg-auth-for-rhdh"
-  else
-    CATALOG_PULL_SECRET="reg-pull-secret"
-  fi
   if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" && "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
     prepare_olm_v1_secrets
   fi
@@ -1287,8 +1279,6 @@ else
   NAMESPACE_CATALOGSOURCE='$NAMESPACE_CATALOGSOURCE'
   # shellcheck disable=SC2016
   my_operator_index='$CATALOG_IMAGE'
-  # shellcheck disable=SC2016
-  CATALOG_PULL_SECRET='$CATALOG_PULL_SECRET'
   if [[ -n "${TO_REGISTRY}" ]]; then
       # It assumes that the user is also connected to a cluster
     detect_ocp_and_set_env_var
@@ -1326,11 +1316,6 @@ else
       NAMESPACE_CATALOGSOURCE="olm"
     fi
     my_operator_index="$(buildCatalogImageUrl "internal")"
-    if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
-      CATALOG_PULL_SECRET="internal-reg-auth-for-rhdh"
-    else
-      CATALOG_PULL_SECRET="reg-pull-secret"
-    fi
   fi
 
   if should_generate_v1_manifests; then
