@@ -330,6 +330,7 @@ bundle-push: ## Push bundle image to registry
 # Build an FBC (File-Based Catalog) image using opm.
 # Produces a catalog with the operators.operatorframework.io.index.configs.v1 label required by OLM v1.
 # FBC catalogs are also backward-compatible with OLM v0 on OCP 4.17+.
+# NOTE: currently supports a single BUNDLE_IMG. Multi-bundle catalogs need additional channel entries.
 .PHONY: catalog-build
 catalog-build: bundle-push opm ## Build an FBC catalog image from the operator-bundle image
 	rm -rf catalog-fbc && mkdir -p catalog-fbc
