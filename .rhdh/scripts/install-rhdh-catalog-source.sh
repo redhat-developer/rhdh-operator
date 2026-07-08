@@ -1069,10 +1069,6 @@ spec:
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: ${CATALOGSOURCE_NAME}
-  install:
-    preflight:
-      crdUpgradeSafety:
-        enforcement: None
 " > "$TMPDIR"/ClusterExtension.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterExtension.yml
 
   # Post-install output
