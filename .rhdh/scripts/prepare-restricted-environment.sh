@@ -454,15 +454,38 @@ json.dump(data, sys.stdout)
     --docker-password="${token}" \
     --docker-email="admin@internal-registry.example.com" >&2
 
-  # Grant image-puller to catalogd service accounts so they can pull from the internal registry
+  # Grant image-puller in the image source namespace so OLM v1 components can pull mirrored images.
+  # Images are mirrored under rhdh/ paths (e.g. rhdh/index, rhdh/rhdh-operator-bundle), so the
+  # OCP namespace where they're stored is derived from the catalog image path.
+  local catalog_image_url
+  catalog_image_url="$(buildCatalogImageUrl "internal")"
+  local registry_url
+  registry_url="$(buildRegistryUrl "internal")"
+  local image_path="${catalog_image_url#"${registry_url}"/}"
+  local image_namespace="${image_path%%/*}"
+  debugf "Granting image-puller in namespace '${image_namespace}' to OLM v1 service accounts"
+
   local catalogd_sa
   catalogd_sa=$(invoke_cluster_cli get deployment -n "${NAMESPACE_CATALOGD}" -l 'app.kubernetes.io/name=catalogd' \
     -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
   if [[ -z "${catalogd_sa}" ]]; then
     catalogd_sa="catalogd-controller-manager"
   fi
-  invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:default" -n "${NAMESPACE_CATALOGD}" >&2 || true
-  invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:${catalogd_sa}" -n "${NAMESPACE_CATALOGD}" >&2 || true
+  invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:${catalogd_sa}" -n "${image_namespace}" >&2 || true
+
+  local oc_ns
+  oc_ns=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=operator-controller' \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+  if [[ -z "${oc_ns}" ]]; then
+    oc_ns="openshift-operator-controller"
+  fi
+  local oc_sa
+  oc_sa=$(invoke_cluster_cli get deployment -n "${oc_ns}" -l 'app.kubernetes.io/name=operator-controller' \
+    -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
+  if [[ -z "${oc_sa}" ]]; then
+    oc_sa="operator-controller-controller-manager"
+  fi
+  invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${oc_ns}:${oc_sa}" -n "${image_namespace}" >&2 || true
 }
 
 # Generate v1 manifests when:
