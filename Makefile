@@ -335,7 +335,12 @@ bundle-push: ## Push bundle image to registry
 catalog-build: bundle-push opm ## Build an FBC catalog image from the operator-bundle image
 	rm -rf catalog-fbc && mkdir -p catalog-fbc
 	$(OPM) init $(BUNDLE_METADATA_PACKAGE_NAME) --default-channel=$(DEFAULT_CHANNEL) --output yaml > catalog-fbc/catalog.yaml
-	$(OPM) render $(BUNDLE_IMGS) --output yaml >> catalog-fbc/catalog.yaml
+	@if [ -f /etc/containers/registries.conf ] && grep -q '^\[registries' /etc/containers/registries.conf 2>/dev/null; then \
+		printf 'unqualified-search-registries = ["docker.io"]\n' > catalog-fbc/registries.conf; \
+		CONTAINERS_REGISTRIES_CONF=catalog-fbc/registries.conf $(OPM) render $(BUNDLE_IMGS) --output yaml >> catalog-fbc/catalog.yaml; \
+	else \
+		$(OPM) render $(BUNDLE_IMGS) --output yaml >> catalog-fbc/catalog.yaml; \
+	fi
 	@printf -- '---\nschema: olm.channel\npackage: $(BUNDLE_METADATA_PACKAGE_NAME)\nname: $(DEFAULT_CHANNEL)\nentries:\n  - name: $(PROFILE_SHORT)-operator.v$(VERSION)\n' >> catalog-fbc/catalog.yaml
 	$(OPM) validate catalog-fbc
 	@printf 'FROM scratch\nADD catalog.yaml /configs/catalog.yaml\nLABEL operators.operatorframework.io.index.configs.v1=/configs/\n' > catalog-fbc/catalog.Dockerfile
