@@ -92,6 +92,9 @@ jobs:
         run: |
           # install skopeo, podman
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
+          # opm render uses Go containers/image which requires registries.conf v2 format.
+          # Ubuntu's podman package ships v1 format, so overwrite it.
+          printf 'unqualified-search-registries = ["docker.io"]\n' | sudo tee /etc/containers/registries.conf > /dev/null
 
           export CONTAINER_TOOL=podman
           latestNext="next"
