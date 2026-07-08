@@ -336,8 +336,8 @@ catalog-build: bundle-push opm ## Build an FBC catalog image from the operator-b
 	rm -rf catalog-fbc && mkdir -p catalog-fbc
 	$(OPM) init $(BUNDLE_METADATA_PACKAGE_NAME) --default-channel=$(DEFAULT_CHANNEL) --output yaml > catalog-fbc/catalog.yaml
 	@if [ -f /etc/containers/registries.conf ] && grep -q '^\[registries' /etc/containers/registries.conf 2>/dev/null; then \
-		printf 'unqualified-search-registries = ["docker.io"]\n' > catalog-fbc/registries.conf; \
-		CONTAINERS_REGISTRIES_CONF=catalog-fbc/registries.conf $(OPM) render $(BUNDLE_IMGS) --output yaml >> catalog-fbc/catalog.yaml; \
+		printf 'unqualified-search-registries = ["docker.io"]\n' > /tmp/opm-registries.conf; \
+		CONTAINERS_REGISTRIES_CONF=/tmp/opm-registries.conf $(OPM) render $(BUNDLE_IMGS) --output yaml >> catalog-fbc/catalog.yaml; \
 	else \
 		$(OPM) render $(BUNDLE_IMGS) --output yaml >> catalog-fbc/catalog.yaml; \
 	fi
