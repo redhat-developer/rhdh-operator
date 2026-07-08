@@ -434,9 +434,9 @@ deploy-olmv1: ## Deploy the operator with OLM v1 (ClusterCatalog + ClusterExtens
 
 .PHONY: undeploy-olmv1
 undeploy-olmv1: ## Un-deploy the operator with OLM v1
-	-$(KUBECTL) delete clusterextension $(PROFILE_SHORT)-operator
-	-$(KUBECTL) delete clusterrolebinding $(PROFILE_SHORT)-operator-installer-binding
-	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete serviceaccount $(PROFILE_SHORT)-operator-installer
+	-$(KUBECTL) delete clusterextension $(PROFILE_SHORT)-operator --ignore-not-found
+	-$(KUBECTL) delete clusterrolebinding $(PROFILE_SHORT)-operator-installer-binding --ignore-not-found
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete serviceaccount $(PROFILE_SHORT)-operator-installer --ignore-not-found
 
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in the default namespace for catalogsource
