@@ -32,7 +32,7 @@ go.work
 .scripts/
 .DS_Store
 database/
-index.Dockerfile
+catalog-fbc/
 gosec.sarif
 
 # from prepare-restricted-environment script
