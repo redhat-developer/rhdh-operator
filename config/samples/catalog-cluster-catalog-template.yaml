@@ -1,0 +1,9 @@
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterCatalog
+metadata:
+  name: {{PROFILE_SHORT}}-operator
+spec:
+  source:
+    type: Image
+    image:
+      ref: {{CATALOG_IMG}}
