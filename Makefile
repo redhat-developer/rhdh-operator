@@ -425,6 +425,19 @@ undeploy-olm: ## Un-deploy the operator with OLM
 	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete operatorgroup $(PROFILE_SHORT)-operator-group
 	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete clusterserviceversion $(PROFILE_SHORT)-operator.v$(VERSION)
 
+.PHONY: deploy-olmv1
+deploy-olmv1: ## Deploy the operator with OLM v1 (ClusterCatalog + ClusterExtension)
+	sed "s/{{BUNDLE_METADATA_PACKAGE_NAME}}/$(subst /,\/,$(BUNDLE_METADATA_PACKAGE_NAME))/g" config/samples/catalog-cluster-extension-template.yaml | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		sed "s/{{OPERATOR_NAMESPACE}}/$(subst /,\/,$(OPERATOR_NAMESPACE))/g" | \
+		$(KUBECTL) apply -f -
+
+.PHONY: undeploy-olmv1
+undeploy-olmv1: ## Un-deploy the operator with OLM v1
+	-$(KUBECTL) delete clusterextension $(PROFILE_SHORT)-operator
+	-$(KUBECTL) delete clusterrolebinding $(PROFILE_SHORT)-operator-installer-binding
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete serviceaccount $(PROFILE_SHORT)-operator-installer
+
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in the default namespace for catalogsource
 	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OLM_NAMESPACE)
@@ -441,9 +454,19 @@ catalog-update-openshift: ## Update catalog source in the default namespace for 
 		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
 		$(KUBECTL) apply -n $(OPENSHIFT_OLM_NAMESPACE) -f -
 
+.PHONY: catalog-update-olmv1
+catalog-update-olmv1: ## Update ClusterCatalog for OLM v1
+	-$(KUBECTL) delete clustercatalog $(PROFILE_SHORT)-operator --ignore-not-found
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-cluster-catalog-template.yaml | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		$(KUBECTL) apply -f -
+
 # Deploy on Openshift cluster using OLM (by default installed on Openshift)
 .PHONY: deploy-openshift
 deploy-openshift: release-build release-push catalog-update-openshift create-operator-namespace deploy-olm-openshift ## Deploy the operator on openshift cluster
+
+.PHONY: deploy-openshift-olmv1
+deploy-openshift-olmv1: release-build release-push catalog-update-olmv1 create-operator-namespace deploy-olmv1 ## Deploy the operator on openshift cluster with OLM v1
 
 .PHONY: install-olm
 install-olm: operator-sdk ## Install the Operator Lifecycle Manager.
