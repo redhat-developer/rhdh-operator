@@ -413,22 +413,47 @@ function prepare_olm_v1_secrets() {
     exit 1
   fi
 
-  for ns in "${NAMESPACE_CATALOGD}" "${NAMESPACE_OPERATOR}"; do
+  # OLM v1 catalogd and operator-controller authenticate via the global pull secret
+  # (openshift-config/pull-secret), not per-resource pullSecret fields.
+  # Merge internal registry credentials into the global pull secret.
+  local internal_registry_url="image-registry.openshift-image-registry.svc:5000"
+  local token
+  token=$(oc whoami -t)
+  local internal_auth
+  internal_auth=$(echo -n "kubeadmin:${token}" | base64 -w0)
+
+  local existing_pull_secret
+  existing_pull_secret=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
+
+  local merged
+  merged=$(echo "${existing_pull_secret}" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+data['auths']['${internal_registry_url}'] = {'auth': '${internal_auth}'}
+data['auths']['$(buildRegistryUrl)'] = {'auth': '${internal_auth}'}
+json.dump(data, sys.stdout)
+")
+
+  echo "${merged}" | oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/dev/stdin >&2
+  infof "Merged internal registry credentials into global pull secret (openshift-config/pull-secret)"
+
+  # Also create namespace-scoped secrets for the operator SA to pull images
+  for ns in "${NAMESPACE_OPERATOR}"; do
     if invoke_cluster_cli -n "${ns}" get secret internal-reg-ext-auth-for-rhdh &>/dev/null; then
       invoke_cluster_cli -n "${ns}" delete secret internal-reg-ext-auth-for-rhdh >&2
     fi
     invoke_cluster_cli -n "${ns}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
       --docker-server="$(buildRegistryUrl)" \
       --docker-username=kubeadmin \
-      --docker-password="$(oc whoami -t)" \
+      --docker-password="${token}" \
       --docker-email="admin@internal-registry-ext.example.com" >&2
     if invoke_cluster_cli -n "${ns}" get secret internal-reg-auth-for-rhdh &>/dev/null; then
       invoke_cluster_cli -n "${ns}" delete secret internal-reg-auth-for-rhdh >&2
     fi
     invoke_cluster_cli -n "${ns}" create secret docker-registry internal-reg-auth-for-rhdh \
-      --docker-server="image-registry.openshift-image-registry.svc:5000" \
+      --docker-server="${internal_registry_url}" \
       --docker-username=kubeadmin \
-      --docker-password="$(oc whoami -t)" \
+      --docker-password="${token}" \
       --docker-email="admin@internal-registry.example.com" >&2
   done
 
@@ -1191,9 +1216,6 @@ EOF
             debugf "Processing native ClusterCatalog: ${manifest}"
             "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
             "$YQ" -i '.spec.source.image.ref |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
-            if [[ -n "${CATALOG_PULL_SECRET}" ]]; then
-              "$YQ" -i ".spec.source.image.pullSecret = \"${CATALOG_PULL_SECRET}\"" "${manifest}"
-            fi
             invoke_cluster_cli apply -f "${manifest}"
             foundClusterCatalog=true
             foundResources=true
@@ -1217,7 +1239,6 @@ spec:
     type: Image
     image:
       ref: ${catalogImage}
-      pullSecret: ${CATALOG_PULL_SECRET}
 EOF
               foundResources=true
             fi
@@ -1323,7 +1344,6 @@ spec:
     type: Image
     image:
       ref: ${my_operator_index}
-      pullSecret: ${CATALOG_PULL_SECRET}
 EOF
   fi
 
