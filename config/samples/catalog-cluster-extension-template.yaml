@@ -4,6 +4,7 @@ metadata:
   name: {{PROFILE_SHORT}}-operator-installer
   namespace: {{OPERATOR_NAMESPACE}}
 ---
+# OLM v1 requires cluster-admin for installer SAs that manage cluster-scoped resources.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
