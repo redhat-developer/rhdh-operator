@@ -468,6 +468,14 @@ deploy-openshift: release-build release-push catalog-update-openshift create-ope
 .PHONY: deploy-openshift-olmv1
 deploy-openshift-olmv1: release-build release-push catalog-update-olmv1 create-operator-namespace deploy-olmv1 ## Deploy the operator on openshift cluster with OLM v1
 
+.PHONY: deploy-openshift-auto
+deploy-openshift-auto: release-build release-push create-operator-namespace ## Deploy the operator, auto-detecting OLM v0 or v1
+	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
+		$(MAKE) catalog-update-olmv1 deploy-olmv1; \
+	else \
+		$(MAKE) catalog-update-openshift deploy-olm-openshift; \
+	fi
+
 .PHONY: install-olm
 install-olm: operator-sdk ## Install the Operator Lifecycle Manager.
 	$(OPSDK) olm install
