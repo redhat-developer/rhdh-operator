@@ -27,6 +27,7 @@ import (
 
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
+const OperatorDPProcessingEnvVar = "OPERATOR_DP_PROCESSING"
 
 type DynamicPluginsFactory struct{}
 
@@ -68,6 +69,10 @@ func init() {
 
 func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
+}
+
+func IsOperatorDPProcessing() bool {
+	return utils.BoolEnvVar(OperatorDPProcessingEnvVar, false)
 }
 
 func (p *DynamicPlugins) Object() runtime.Object {
@@ -262,11 +267,13 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 	}
 
 	// Resolve references ({{inherit}}, ref://, etc.) in secondPluginsConfig using firstPluginsConfig as base
-	resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins)
-	if err != nil {
-		return "", err
+	if IsOperatorDPProcessing() {
+		resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins)
+		if err != nil {
+			return "", err
+		}
+		secondPluginsConfig.Plugins = resolvedPlugins
 	}
-	secondPluginsConfig.Plugins = resolvedPlugins
 
 	// Merge Plugins by package field
 	pluginMap := make(map[string]DynaPlugin)

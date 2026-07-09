@@ -42,6 +42,7 @@ ifeq ($(PROFILE), rhdh)
 	DEFAULT_CHANNEL ?= fast
 	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
+	CATALOG_INDEX_IMAGE ?= quay.io/rhdh/plugin-catalog-index:$(IMAGE_TAG_VERSION)
 else
 	# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
     # This variable is used to construct full image tags for bundle and catalog images.
@@ -166,7 +167,7 @@ fmt: goimports ## Format the code using goimports
 .PHONY: test
 test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
+	OPERATOR_DP_PROCESSING=true LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
@@ -231,12 +232,12 @@ build: manifests generate fmt vet ## Build manager binary.
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	@./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+	OPERATOR_DP_PROCESSING=true go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
 .PHONY: local-dynamic-plugins
 local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-index image for local testing
 	@echo "Generating local-test dynamic-plugins.yaml from catalog-index image..."
-	@./hack/create-local-dynamic-plugins.sh
+	@IMAGE=$(CATALOG_INDEX_IMAGE) ./hack/create-local-dynamic-plugins.sh
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)

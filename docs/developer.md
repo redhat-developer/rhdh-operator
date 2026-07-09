@@ -72,17 +72,12 @@ For local development and testing, we download the configuration once and reuse 
 make local-dynamic-plugins
 ```
 
-This command extracts `dynamic-plugins.default.yaml` from the catalog-index image and creates `config/profile/rhdh/local-test/dynamic-plugins.yaml`. The `local-test` directory is git-ignored, allowing you to customize dynamic-plugins for local testing.
+This command extracts `dynamic-plugins.default.yaml` from the catalog-index image and creates `config/profile/rhdh/local-test/dynamic-plugins.yaml`.
 
 **This only needs to be run once.** Re-run it when you want to refresh with newer catalog-index data.
 
 **Requirements:**
 - `skopeo` must be installed (`brew install skopeo` on macOS, `dnf install skopeo` on Fedora/RHEL)
-
-**Optional:** Specify a different catalog-index image:
-```sh
-IMAGE=quay.io/rhdh/plugin-catalog-index:1.10 make local-dynamic-plugins
-```
 
 #### Running the controller
 
