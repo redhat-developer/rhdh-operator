@@ -2796,7 +2796,7 @@ spec:
         - --metrics-bind-address=:8443
         command:
         - /manager
-        image: quay.io/rhdh-community/operator:0.11.0
+        image: quay.io/rhdh-community/operator:0.11.1
         livenessProbe:
           httpGet:
             path: /healthz
