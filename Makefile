@@ -234,10 +234,11 @@ run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	@./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
 	OPERATOR_DP_PROCESSING=true go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
+# TODO @IMAGE=$(CATALOG_INDEX_IMAGE) ./hack/create-local-dynamic-plugins.sh - when catalog become stable
 .PHONY: local-dynamic-plugins
 local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-index image for local testing
 	@echo "Generating local-test dynamic-plugins.yaml from catalog-index image..."
-	@IMAGE=$(CATALOG_INDEX_IMAGE) ./hack/create-local-dynamic-plugins.sh
+	./hack/create-local-dynamic-plugins.sh
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
