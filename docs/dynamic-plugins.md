@@ -84,6 +84,20 @@ The extraction directory can be configured via the `CATALOG_ENTITIES_EXTRACT_DIR
 
 More details in [Catalog Entities Extraction](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#catalog-entities-extraction).
 
+## Plugin URL References
+
+The operator supports special URL reference syntax in plugin package URLs, allowing users to reference versions or plugins from the default configuration.
+
+**Operator behavior:**
+- The operator resolves all references during ConfigMap merge (before passing to the init container)
+- If a reference cannot be resolved, the operator returns an error and the Backstage CR will not reconcile
+
+### Inherit Reference (`:{{inherit}}`)
+
+Allows inheriting version (tag or digest) from default plugins. Useful when overriding plugin settings without hardcoding versions.
+
+For syntax details and examples, see [OCI Package Version Inheritance](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#oci-package-version-inheritance).
+
 ## Dynamic plugins dependency management
 
 ### Overview

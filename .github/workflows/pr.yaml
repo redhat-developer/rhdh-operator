@@ -56,7 +56,9 @@ jobs:
 
       - name: Test
         if: steps.changed-files.outputs.any_changed == 'true'
-        run: make test
+        run: |
+          make local-dynamic-plugins
+          make test
 
       - name: Upload coverage to Codecov
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -83,6 +85,7 @@ jobs:
           # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
           # but the `make test` command tries to use it.
           make manifests generate fmt vet install
+          make local-dynamic-plugins
           make run &
 
       - name: Generic Integration test

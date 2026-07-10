@@ -27,6 +27,7 @@ import (
 
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
+const OperatorDPProcessingEnvVar = "OPERATOR_DP_PROCESSING"
 
 type DynamicPluginsFactory struct{}
 
@@ -68,6 +69,10 @@ func init() {
 
 func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
+}
+
+func IsOperatorDPProcessing() bool {
+	return utils.BoolEnvVar(OperatorDPProcessingEnvVar, false)
 }
 
 func (p *DynamicPlugins) Object() runtime.Object {
@@ -141,7 +146,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 // TODO
 // extract pluginConfigs
 // merge with app-config (deep merge)
-func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
 
 	// Only proceed if there's a ConfigMap to mount or dynamic plugins config in spec
 	if p.ConfigMap == nil && (backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "") {
@@ -259,6 +264,15 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 
 	if err := yaml.Unmarshal([]byte(secondData), &secondPluginsConfig); err != nil {
 		return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
+	}
+
+	// Resolve references ({{inherit}}, ref://, etc.) in secondPluginsConfig using firstPluginsConfig as base
+	if IsOperatorDPProcessing() {
+		resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins)
+		if err != nil {
+			return "", err
+		}
+		secondPluginsConfig.Plugins = resolvedPlugins
 	}
 
 	// Merge Plugins by package field
