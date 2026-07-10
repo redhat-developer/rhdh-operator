@@ -6,4 +6,4 @@ data:
   "dynamic-plugins.yaml": |
     plugins:
       - package: "plugin-flavor1"
-        disabled: false
+        enabled: true

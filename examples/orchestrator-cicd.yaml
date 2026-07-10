@@ -8,34 +8,34 @@ data:
       - dynamic-plugins.default.yaml
     plugins:
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
-        disabled: false
+        enabled: true
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
-        disabled: false
+        enabled: true
         dependencies:
           - ref: sonataflow
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
-        disabled: false
+        enabled: true
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
-        disabled: false
+        enabled: true
     # TODO These should be changed to the OCI references
       - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
-        disabled: false
+        enabled: true
         dependencies:
           - ref: argocd
       - package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
-        disabled: false
+        enabled: true
         dependencies:
           - ref: tekton
       - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd-backend-dynamic
-        disabled: false
+        enabled: true
       - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-argocd-dynamic
-        disabled: false
+        enabled: true
       - package: ./dynamic-plugins/dist/backstage-plugin-scaffolder-backend-module-github-dynamic
-        disabled: false
+        enabled: true
       - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes
-        disabled: false
+        enabled: true
       - package: ./dynamic-plugins/dist/backstage-plugin-kubernetes-backend-dynamic
-        disabled: false
+        enabled: true
         pluginConfig:
           kubernetes:
             customResources:

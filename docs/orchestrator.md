@@ -81,15 +81,15 @@ To enable the orchestrator plugin, you should refer the dynamic plugins ConfigMa
       - dynamic-plugins.default.yaml
     plugins:
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
-        disabled: false
+        enabled: true
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
-        disabled: false
+        enabled: true
         dependencies:
           - ref: sonataflow
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
-        disabled: false
+        enabled: true
       - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
-        disabled: false
+        enabled: true
 ```
 
 Starting from version 1.10, RHDH contains a predefined Orchestrator flavour with configured plugins. Users can enable it by configuring:
