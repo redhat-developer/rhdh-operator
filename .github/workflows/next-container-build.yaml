@@ -50,9 +50,86 @@ jobs:
             .rhdh/**
             tests/**
 
+  # The bundle image is FROM scratch and contains only YAML manifests/metadata -- no
+  # compiled binaries -- so its content is identical regardless of build architecture
+  # (confirmed against the currently-published quay.io/rhdh-community/operator-bundle:next:
+  # ~40KB, empty base image annotations). It's built and pushed exactly once here, rather
+  # than per-arch in the build matrix, so the two matrix legs' catalog-build step can both
+  # safely pull this same already-published, stable tag instead of racing each other to
+  # push/pull a shared tag themselves (opm index add always pulls the bundle from the
+  # registry, never the local image -- see the Makefile's own comment on bundle-push).
+  bundle:
+    name: Build and push operator-bundle
+    needs: changes
+    if: needs.changes.outputs.any_changed == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Prepare
+        run: |
+          set -euo pipefail
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
+          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
+          echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_ENV"
+
+          BRANCH_REF="${{ github.ref_name }}"
+          if [[ "${BRANCH_REF}" == "main" ]]; then
+            LATEST_NEXT="next"
+          else
+            LATEST_NEXT="latest"
+          fi
+          echo "LATEST_NEXT=${LATEST_NEXT}" >> "$GITHUB_ENV"
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Login to registry (${{ env.REGISTRY }})
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Build and push operator-bundle
+        run: |
+          set -euo pipefail
+          sudo apt-get -y update; sudo apt-get -y install podman
+
+          export CONTAINER_TOOL=podman
+          export VERSION="${{ env.BASE_VERSION }}"
+          export REGISTRY_WITH_ORG="${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}"
+          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
+          export IMAGE_TAG_BASE="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}"
+
+          : "${SHORT_SHA:?SHORT_SHA must be set}"
+          : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+
+          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" make bundle bundle-build bundle-push
+
+          for tag in "${VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
+            podman tag "${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}" "${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${tag}"
+            podman push -q "${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${tag}"
+          done
+        env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
+          GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+
   build:
     name: Build (${{ matrix.os }})
-    needs: changes
+    needs:
+      - changes
+      - bundle
     if: needs.changes.outputs.any_changed == 'true'
     strategy:
       fail-fast: false
@@ -120,7 +197,7 @@ jobs:
           username: ${{ vars.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - name: Build and push per-arch operator, bundle, and catalog images
+      - name: Build and push per-arch operator and catalog images
         if: needs.changes.outputs.any_changed == 'true'
         run: |
           set -euo pipefail
@@ -131,16 +208,24 @@ jobs:
           export REGISTRY_WITH_ORG="${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}"
           export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
           export IMAGE_TAG_BASE="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}"
+          # Point catalog-build's bundle reference at the already-published, stable bundle
+          # tag from the dedicated `bundle` job instead of rebuilding/pushing it again here.
+          export BUNDLE_IMGS="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}"
 
           : "${PLATFORM:?PLATFORM must be set}"
           : "${SHORT_SHA:?SHORT_SHA must be set}"
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
 
-          # Build all 3 images for this architecture
-          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" PLATFORM="${PLATFORM}" make release-build
+          # Build the operator image, then the catalog image. catalog-build's only other
+          # prerequisite (besides the bundle-push we're skipping) is `opm`, which downloads
+          # the opm CLI if needed -- that still runs normally. `-o bundle-push` tells make to
+          # treat that phony prerequisite as already satisfied, so `opm index add` runs
+          # directly against BUNDLE_IMGS above (a safe concurrent *read* of an already-stable
+          # tag) instead of each matrix leg re-pushing its own bundle to a shared tag first.
+          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" PLATFORM="${PLATFORM}" BUNDLE_IMGS="${BUNDLE_IMGS}" make -o bundle-push image-build catalog-build
 
           # Push per-arch tagged images
-          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-bundle" "${OPERATOR_IMAGE_NAME}-catalog"; do
+          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
             podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${{ env.PLATFORM_ARCH }}"
             podman push -q "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${{ env.PLATFORM_ARCH }}"
 
@@ -235,7 +320,10 @@ jobs:
           : "${SHORT_SHA:?SHORT_SHA must be set}"
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
 
-          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-bundle" "${OPERATOR_IMAGE_NAME}-catalog"; do
+          # operator-bundle is not included here: it's architecture-invariant (see the
+          # `bundle` job) and was already published as a single, final image there --
+          # no per-arch tags exist for it to merge.
+          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
             echo "=== Creating manifest list for ${image} ==="
 
             # Create manifest list for version tag
@@ -274,7 +362,7 @@ jobs:
           : "${SHORT_SHA:?SHORT_SHA must be set}"
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
 
-          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-bundle" "${OPERATOR_IMAGE_NAME}-catalog"; do
+          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
             for arch in amd64 arm64; do
               for tag in "${BASE_VERSION}-${arch}" "${BASE_VERSION}-${SHORT_SHA}-${arch}" "${LATEST_NEXT}-${arch}"; do
                 echo "Deleting per-arch tag: ${image}:${tag}"
