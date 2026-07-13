@@ -1243,9 +1243,7 @@ EOF
           for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
             if [[ -f "${manifest}" ]]; then
               debugf "Converting CatalogSource to ClusterCatalog (no native cc-*.yaml found): ${manifest}"
-              catalogImage=$("$YQ" '.spec.image' "${manifest}")
-              # shellcheck disable=SC2001
-              catalogImage=$(echo "$catalogImage" | sed 's|default-route-openshift-image-registry\.apps\.[^/]*|image-registry.openshift-image-registry.svc:5000|')
+              catalogImage=$("$YQ" '.spec.image | sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}")
               cat <<EOF | invoke_cluster_cli apply -f -
 apiVersion: olm.operatorframework.io/v1
 kind: ClusterCatalog
