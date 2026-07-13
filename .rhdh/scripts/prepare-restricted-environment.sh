@@ -740,6 +740,10 @@ function mirror_extra_images() {
       fi
       mirror_image_to_registry "$img" "$targetImg"
     else
+      if [ -d "$imgDir" ] && ! is_complete_image_archive "$imgDir"; then
+        warnf "Removing incomplete image archive at ${imgDir} (previous download was interrupted)"
+        rm -rf "$imgDir"
+      fi
       if [ ! -d "$imgDir" ]; then
         mkdir -p "${imgDir}"
         mirror_image_to_archive "$img" "$imgDir"
@@ -873,6 +877,10 @@ function process_bundles() {
               debugf "replacing $relatedImage in file '${file}' => $internalTargetImg"
               sed -i 's#'"$relatedImage"'#'"$internalTargetImg"'#g' "$file"
             else
+              if [ -d "$imgDir" ] && ! is_complete_image_archive "$imgDir"; then
+                warnf "Removing incomplete image archive at ${imgDir} (previous download was interrupted)"
+                rm -rf "$imgDir"
+              fi
               if [ ! -d "$imgDir" ]; then
                 mkdir -p "${imgDir}"
                 mirror_image_to_archive "$relatedImage" "$imgDir"
@@ -1033,9 +1041,18 @@ function mirror_image_to_archive() {
   skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
 }
 
+function is_complete_image_archive() {
+  local archive_path=$1
+  [[ -f "${archive_path}/manifest.json" ]]
+}
+
 function push_image_from_archive() {
   local archive_path=$1
   local dest_image=$2
+  if ! is_complete_image_archive "${archive_path}"; then
+    errorf "Incomplete image archive at ${archive_path} (missing manifest.json). This usually means a previous export was interrupted. Re-run with --to-dir to re-download."
+    exit 1
+  fi
   echo "Pushing $archive_path to $dest_image..."
   skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image"
 }
