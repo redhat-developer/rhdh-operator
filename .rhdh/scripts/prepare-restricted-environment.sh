@@ -424,14 +424,15 @@ function prepare_olm_v1_secrets() {
   local existing_pull_secret
   existing_pull_secret=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
 
+  local external_registry_url
+  external_registry_url="$(buildRegistryUrl)"
+
   local merged
-  merged=$(echo "${existing_pull_secret}" | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-data['auths']['${internal_registry_url}'] = {'auth': '${internal_auth}'}
-data['auths']['$(buildRegistryUrl)'] = {'auth': '${internal_auth}'}
-json.dump(data, sys.stdout)
-")
+  merged=$(echo "${existing_pull_secret}" | jq \
+    --arg url1 "${internal_registry_url}" \
+    --arg url2 "${external_registry_url}" \
+    --arg auth "${internal_auth}" \
+    '.auths[$url1] = {auth: $auth} | .auths[$url2] = {auth: $auth}')
 
   echo "${merged}" | oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/dev/stdin >&2
   infof "Merged internal registry credentials into global pull secret (openshift-config/pull-secret)"
