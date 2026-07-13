@@ -1043,9 +1043,15 @@ function push_image_from_archive() {
 check_tool "yq"
 check_tool "umoci"
 check_tool "skopeo"
+OPM_MIN_VERSION="1.47"
 if [[ "${USE_OC_MIRROR}" != "true" ]]; then
   if ! command -v opm &>/dev/null; then
-    errorf "Please install opm v1.47+. See https://github.com/operator-framework/operator-registry/releases"
+    errorf "Please install opm v${OPM_MIN_VERSION}+. See https://github.com/operator-framework/operator-registry/releases"
+    exit 1
+  fi
+  opm_version=$(opm version 2>/dev/null | grep -oP 'OpmVersion:"v\K[0-9]+\.[0-9]+' || echo "0.0")
+  if [[ "$(printf '%s\n' "${OPM_MIN_VERSION}" "${opm_version}" | sort -V | head -1)" != "${OPM_MIN_VERSION}" ]]; then
+    errorf "opm v${OPM_MIN_VERSION}+ required, found v${opm_version}. See https://github.com/operator-framework/operator-registry/releases"
     exit 1
   fi
 fi
