@@ -1663,6 +1663,12 @@ if [[ "$INSTALL_OPERATOR" != "true" ]]; then
   echo
   echo "Done. "
   if [[ -n "${TO_DIR}" ]]; then
+    olm_hint=""
+    if should_generate_v1_manifests; then
+      olm_hint="
+  # If your target cluster uses OLM v1, add:  --olm-version v1
+  # If it uses OLM v0 (legacy), add:          --olm-version v0"
+    fi
     echo "
 ${TO_DIR} should now contain all the images and resources needed to install the Red Hat Developer Hub operator. Next steps:
 
@@ -1670,10 +1676,10 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
 2. In your disconnected environment, run the 'install.sh' script (located in your export dir) with the '--from-dir' and '--to-registry' options, like so:
 
 # Make sure you are connected to the mirror registry and the target cluster
-/path/to/export-dir/install.sh \
-  --from-dir /path/to/export-dir \
-  --to-registry \$mirror_registry_url \
-  --install-operator <true|false>
+/path/to/export-dir/install.sh \\
+  --from-dir /path/to/export-dir \\
+  --to-registry \$mirror_registry_url \\
+  --install-operator <true|false>${olm_hint}
     "
   fi
   if [[ -n "${TO_REGISTRY}" ]]; then
