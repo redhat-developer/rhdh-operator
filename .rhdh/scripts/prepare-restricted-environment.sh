@@ -1550,6 +1550,9 @@ rules:
   verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 # Operator runtime: core resources
 - apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
   resources: ["configmaps", "persistentvolumeclaims", "secrets", "services"]
   verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 - apiGroups: [""]
@@ -1614,6 +1617,12 @@ rules:
 - apiGroups: ["olm.operatorframework.io"]
   resources: ["clusterextensions/finalizers"]
   verbs: ["update"]
+- apiGroups: ["olm.operatorframework.io"]
+  resources: ["clusterobjectsets/finalizers"]
+  verbs: ["update"]
+# Metrics
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
 EOF
 
   cat <<EOF >"${manifestsTargetDir}/clusterRoleBinding.yaml"
