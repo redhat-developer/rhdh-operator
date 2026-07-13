@@ -1072,6 +1072,8 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   resolve_olm_version
   if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" && "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
     prepare_olm_v1_secrets
+  elif [[ "${RESOLVED_OLM_VERSION}" == "v1" && "${TO_REGISTRY}" != "OCP_INTERNAL" ]]; then
+    debugf "Skipping OLM v1 pull secret setup for external registry '${TO_REGISTRY}'; ensure your registry credentials are configured"
   fi
 else
   if [[ "${OLM_VERSION}" != "auto" ]]; then
