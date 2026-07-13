@@ -1702,9 +1702,9 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
     else
       echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following commands:
 
-      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/namespace.yaml
-      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/operatorGroup.yaml
-      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/subscription.yaml
+      ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/namespace.yaml
+      ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/operatorGroup.yaml
+      ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/subscription.yaml
       "
     fi
   fi
