@@ -404,6 +404,7 @@ function prepare_olm_v1_secrets() {
 
   if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
     NAMESPACE_CATALOGD="openshift-catalogd"
+    warnf "catalogd namespace was not detected; falling back to default '${NAMESPACE_CATALOGD}'"
   fi
   debugf "Using catalogd namespace: ${NAMESPACE_CATALOGD}"
 
