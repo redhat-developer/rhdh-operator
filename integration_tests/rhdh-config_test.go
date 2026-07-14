@@ -58,8 +58,6 @@ var _ = When("create default rhdh", func() {
 			// with lightspeed
 			//g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(2))
 
-			///////////////////// DP
-
 			if !model.IsOperatorDPProcessing() {
 
 				_, initCont := model.DynamicPluginsInitContainer(deploy.PodSpec().InitContainers)
