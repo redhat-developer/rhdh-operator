@@ -175,7 +175,7 @@ test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
 POLL_PROGRESS_INTERVAL := 600s

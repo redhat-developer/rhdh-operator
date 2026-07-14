@@ -120,8 +120,6 @@ var _ = When("create default rhdh", func() {
 				g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
 			}
 
-			///////////////////////////////////////////
-
 			// no default lightspeed
 			//g.Expect(deploy.PodSpec().Volumes).To(HaveLen(8))
 			//g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
