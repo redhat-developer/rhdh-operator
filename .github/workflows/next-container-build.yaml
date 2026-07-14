@@ -1,13 +1,14 @@
-# for main branch, use next tags; for 1.y branches, use :latest tags
+# for main branch, use next tags; for x.y branches, use :latest tags
 name: Build and push operator, bundle, and catalog images
 
 on:
   push:
     branches: 
       - main
-      - rhdh-1.[0-9]+
-      - 1.[0-9]+.x
-      - release-1.[0-9]+
+      - rhdh-[0-9]+.[0-9]+
+      - "[0-9]+.[0-9]+.x"
+      - release-[0-9]+.[0-9]+
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
