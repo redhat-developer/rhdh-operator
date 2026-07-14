@@ -7,6 +7,9 @@ PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec 
 # to use other config - add a directory with config,
 # use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
 PROFILE ?= rhdh
+
+# Enable operator dynamic plugins processing (default: true)
+OPERATOR_DP_PROCESSING ?= true
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
@@ -167,7 +170,7 @@ fmt: goimports ## Format the code using goimports
 .PHONY: test
 test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	OPERATOR_DP_PROCESSING=true LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
@@ -232,7 +235,7 @@ build: manifests generate fmt vet ## Build manager binary.
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	@./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	OPERATOR_DP_PROCESSING=true go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
 # TODO @IMAGE=$(CATALOG_INDEX_IMAGE) ./hack/create-local-dynamic-plugins.sh - when catalog become stable
 .PHONY: local-dynamic-plugins

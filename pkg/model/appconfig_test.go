@@ -4,9 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	"golang.org/x/exp/maps"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 
@@ -170,4 +172,71 @@ func TestMultiEntryAppConfigNotAllowed(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "multiple entries")
 	assert.Contains(t, err.Error(), multiEntryCmName)
+}
+
+func TestAddPluginsAppConfig(t *testing.T) {
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
+	t.Run("no pluginConfig - no ConfigMap", func(t *testing.T) {
+		model := &BackstageModel{RuntimeObjects: []RuntimeObject{}}
+		dp := &DynamicPlugins{
+			enabledPlugins:   []DynaPlugin{{Package: "plugin-a"}},
+			enabledPluginsCM: &corev1.ConfigMap{},
+		}
+		model.RuntimeObjects = append(model.RuntimeObjects, dp)
+
+		appConfig := &AppConfig{
+			model:      model,
+			ConfigMaps: &multiobject.MultiObject{Items: []client.Object{}},
+		}
+
+		err := appConfig.addPluginsAppConfig("test-ns")
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(appConfig.ConfigMaps.Items))
+	})
+
+	t.Run("with pluginConfig - deep merged with yaml types", func(t *testing.T) {
+		// Simulate yaml.v2 unmarshaling which produces map[interface{}]interface{}
+		model := &BackstageModel{RuntimeObjects: []RuntimeObject{}}
+		dp := &DynamicPlugins{
+			enabledPlugins: []DynaPlugin{
+				{
+					Package: "plugin-a",
+					PluginConfig: map[string]interface{}{
+						"dynamicPlugins": map[interface{}]interface{}{
+							"frontend": map[interface{}]interface{}{
+								"plugin-a": "config-a",
+							},
+						},
+					},
+				},
+				{
+					Package: "plugin-b",
+					PluginConfig: map[string]interface{}{
+						"dynamicPlugins": map[interface{}]interface{}{
+							"frontend": map[interface{}]interface{}{
+								"plugin-b": "config-b",
+							},
+						},
+					},
+				},
+			},
+			enabledPluginsCM: &corev1.ConfigMap{},
+		}
+		model.RuntimeObjects = append(model.RuntimeObjects, dp)
+
+		appConfig := &AppConfig{
+			model:      model,
+			ConfigMaps: &multiobject.MultiObject{Items: []client.Object{}},
+		}
+
+		err := appConfig.addPluginsAppConfig("test-ns")
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(appConfig.ConfigMaps.Items))
+
+		cm := appConfig.ConfigMaps.Items[0].(*corev1.ConfigMap)
+		// Both plugins should be present (deep merged, not overwritten)
+		assert.Contains(t, cm.Data[PluginsAppConfigFile], "plugin-a")
+		assert.Contains(t, cm.Data[PluginsAppConfigFile], "plugin-b")
+	})
 }

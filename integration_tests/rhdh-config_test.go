@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
-
 	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
@@ -59,62 +58,69 @@ var _ = When("create default rhdh", func() {
 			// with lightspeed
 			//g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(2))
 
-			_, initCont := model.DynamicPluginsInitContainer(deploy.PodSpec().InitContainers)
+			///////////////////// DP
 
-			initContainerExpectedVolumeMounts := []corev1.VolumeMount{
-				{
-					Name:      "dynamic-plugins-root",
-					MountPath: "/dynamic-plugins-root",
-					SubPath:   "",
-				},
-				{
-					Name:      model.DefaultMultiObjectName("files", backstageName, "dynamic-plugins-npmrc"),
-					MountPath: "/opt/app-root/src/.npmrc.dynamic-plugins",
-					SubPath:   "",
-				},
-				// TODO - configure this when have defined dynamic plugins OCI registry
-				{
-					Name:      "dynamic-plugins-registry-auth",
-					MountPath: "/opt/app-root/src/.config/containers",
-					SubPath:   "",
-				},
-				{
-					Name:      "npmcacache",
-					MountPath: "/opt/app-root/src/.npm/_cacache",
-					SubPath:   "",
-				},
-				{
-					Name:      utils.GenerateVolumeNameFromCmOrSecret(model.DynamicPluginsDefaultName(backstageName)),
-					MountPath: "/opt/app-root/src/dynamic-plugins.yaml",
-					SubPath:   "dynamic-plugins.yaml",
-				},
-				{
-					Name:      "extensions-catalog",
-					MountPath: "/extensions",
-				},
-				{
-					Name:      "temp",
-					MountPath: "/tmp",
-					SubPath:   "",
-				},
-			}
+			if !model.IsOperatorDPProcessing() {
 
-			g.Expect(initCont.VolumeMounts).To(HaveLen(len(initContainerExpectedVolumeMounts)))
+				_, initCont := model.DynamicPluginsInitContainer(deploy.PodSpec().InitContainers)
 
-			for _, evm := range initContainerExpectedVolumeMounts {
-				found := false
-				for _, vm := range initCont.VolumeMounts {
-					if vm.Name == evm.Name {
-						found = true
-						g.Expect(vm.MountPath).To(Equal(evm.MountPath))
-						g.Expect(vm.SubPath).To(Equal(evm.SubPath))
-					}
+				initContainerExpectedVolumeMounts := []corev1.VolumeMount{
+					{
+						Name:      "dynamic-plugins-root",
+						MountPath: "/dynamic-plugins-root",
+						SubPath:   "",
+					},
+					{
+						Name:      model.DefaultMultiObjectName("files", backstageName, "dynamic-plugins-npmrc"),
+						MountPath: "/opt/app-root/src/.npmrc.dynamic-plugins",
+						SubPath:   "",
+					},
+					// TODO - configure this when have defined dynamic plugins OCI registry
+					{
+						Name:      "dynamic-plugins-registry-auth",
+						MountPath: "/opt/app-root/src/.config/containers",
+						SubPath:   "",
+					},
+					{
+						Name:      "npmcacache",
+						MountPath: "/opt/app-root/src/.npm/_cacache",
+						SubPath:   "",
+					},
+					{
+						Name:      utils.GenerateVolumeNameFromCmOrSecret(model.DynamicPluginsDefaultName(backstageName)),
+						MountPath: "/opt/app-root/src/dynamic-plugins.yaml",
+						SubPath:   "dynamic-plugins.yaml",
+					},
+					{
+						Name:      "extensions-catalog",
+						MountPath: "/extensions",
+					},
+					{
+						Name:      "temp",
+						MountPath: "/tmp",
+						SubPath:   "",
+					},
 				}
-				g.Expect(found).To(BeTrue())
+
+				g.Expect(initCont.VolumeMounts).To(HaveLen(len(initContainerExpectedVolumeMounts)))
+
+				for _, evm := range initContainerExpectedVolumeMounts {
+					found := false
+					for _, vm := range initCont.VolumeMounts {
+						if vm.Name == evm.Name {
+							found = true
+							g.Expect(vm.MountPath).To(Equal(evm.MountPath))
+							g.Expect(vm.SubPath).To(Equal(evm.SubPath))
+						}
+					}
+					g.Expect(found).To(BeTrue())
+				}
+
+				g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
+				g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
 			}
 
-			g.Expect(initCont.Env[0].Name).To(Equal("NPM_CONFIG_USERCONFIG"))
-			g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
+			///////////////////////////////////////////
 
 			// no default lightspeed
 			//g.Expect(deploy.PodSpec().Volumes).To(HaveLen(8))
@@ -124,13 +130,6 @@ var _ = When("create default rhdh", func() {
 			// TODO restore it
 			//g.Expect(deploy.PodSpec().Volumes).To(HaveLen(13))
 			//g.Expect(deploy.PodSpec().Containers).To(HaveLen(7))
-
-			mainCont := backstageContainer(*deploy.PodSpec())
-			g.Expect(mainCont.Args).To(HaveLen(4))
-			g.Expect(mainCont.Args[0]).To(Equal("--config"))
-			g.Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
-			g.Expect(mainCont.Args[2]).To(Equal("--config"))
-			g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 
 			mainContainerExpectedVolumeMounts := []corev1.VolumeMount{
 				{
@@ -150,6 +149,26 @@ var _ = When("create default rhdh", func() {
 					Name:      "temp",
 					MountPath: "/tmp",
 				},
+			}
+
+			mainCont := backstageContainer(*deploy.PodSpec())
+			g.Expect(mainCont.Args[0]).To(Equal("--config"))
+			// additional from deployment manifest exists but not working if OperatorDPProcessing
+			g.Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
+
+			if model.IsOperatorDPProcessing() {
+				// additional from deployment manifest is not used
+				g.Expect(mainCont.Args).To(HaveLen(6))
+				g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/app-config.plugins.yaml"))
+				g.Expect(mainCont.Args[5]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
+				mainContainerExpectedVolumeMounts = append(mainContainerExpectedVolumeMounts, corev1.VolumeMount{
+					Name:      model.DefaultMultiObjectName("appconfig", backstageName, "plugins-appconfig"),
+					MountPath: "/opt/app-root/src/app-config.plugins.yaml",
+					SubPath:   "app-config.plugins.yaml",
+				})
+			} else {
+				g.Expect(mainCont.Args).To(HaveLen(4))
+				g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 			}
 
 			g.Expect(mainCont.VolumeMounts).To(HaveLen(len(mainContainerExpectedVolumeMounts)))

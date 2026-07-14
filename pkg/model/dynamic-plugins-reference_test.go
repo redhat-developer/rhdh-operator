@@ -201,6 +201,8 @@ func TestResolveReferences(t *testing.T) {
 }
 
 func TestMergePluginsDataWithInherit(t *testing.T) {
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
 	// Default config with versioned plugins
 	defaultData := `
 plugins:
@@ -232,6 +234,8 @@ plugins:
 }
 
 func TestMergePluginsDataWithInheritError(t *testing.T) {
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
 	defaultData := `
 plugins:
   - package: "oci://quay.io/rhdh/plugin-a@sha256:abc123"
