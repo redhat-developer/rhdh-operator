@@ -36,4 +36,5 @@ spec:
   install:
     preflight:
       crdUpgradeSafety:
+        # Disable CRD upgrade safety checks for development; set to Strict for production.
         enforcement: None
