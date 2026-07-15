@@ -452,7 +452,7 @@ catalog-update: ## Update catalog source in the default namespace for catalogsou
 		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
 		$(KUBECTL) apply -n $(OLM_NAMESPACE) -f -
 
-.PHONY: catalog-update
+.PHONY: catalog-update-openshift
 catalog-update-openshift: ## Update catalog source in the default namespace for catalogsource
 	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OPENSHIFT_OLM_NAMESPACE)
 	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | \
