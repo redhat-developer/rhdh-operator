@@ -213,9 +213,21 @@ function process_bundle() {
   local bundle_dir="bundles/${digest}"
   mkdir -p "${bundle_dir}"
 
-  # Failed copies are faster than successful inspects.
-  if ! skopeo copy "docker://$bundleImg" "oci:./${bundle_dir}/src:latest" 2>"${bundle_dir}/copy.err"; then
-    debugf "bundle #${bundle_id}: skopeo copy failed, skipping (see ${bundle_dir}/copy.err)" >&2
+  local max_retries="${SKOPEO_RETRIES:-3}"
+  local retry_delay="${SKOPEO_RETRY_DELAY:-5}"
+
+  local pull_attempt
+  local pull_ok=false
+  for pull_attempt in $(seq 1 "$max_retries"); do
+    if skopeo copy "docker://$bundleImg" "oci:./${bundle_dir}/src:latest" 2>"${bundle_dir}/copy.err"; then
+      pull_ok=true
+      break
+    fi
+    debugf "bundle #${bundle_id}: pull attempt ${pull_attempt}/${max_retries} failed, retrying in ${retry_delay}s..." >&2
+    sleep "$retry_delay"
+  done
+  if [[ "$pull_ok" != "true" ]]; then
+    debugf "bundle #${bundle_id}: skopeo copy failed after ${max_retries} attempts, skipping (see ${bundle_dir}/copy.err)" >&2
     return 0
   fi
   debugf "bundle #${bundle_id}: pulled ${bundleImg}" >&2
@@ -235,7 +247,20 @@ function process_bundle() {
   umoci repack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked"
 
   local newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
-  skopeo copy --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}"
+  local push_attempt
+  local push_ok=false
+  for push_attempt in $(seq 1 "$max_retries"); do
+    if skopeo copy --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}" 2>"${bundle_dir}/push.err"; then
+      push_ok=true
+      break
+    fi
+    debugf "bundle #${bundle_id}: push attempt ${push_attempt}/${max_retries} failed, retrying in ${retry_delay}s..." >&2
+    sleep "$retry_delay"
+  done
+  if [[ "$push_ok" != "true" ]]; then
+    errorf "bundle #${bundle_id}: push to registry failed after ${max_retries} attempts (see ${bundle_dir}/push.err)" >&2
+    return 1
+  fi
   debugf "bundle #${bundle_id}: pushed to ${newBundleImage}" >&2
 
   local newBundleImageAsInt="${internal_registry_url}/rhdh/rhdh-operator-bundle:${digest}"

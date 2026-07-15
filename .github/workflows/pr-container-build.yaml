@@ -11,7 +11,11 @@ permissions:
 
 concurrency:
   group: build-images-${{ github.event.issue.number }}
-  cancel-in-progress: true
+  # Must be false: the issue_comment trigger fires on ALL comments (not just /build-images),
+  # but the /build-images filter is only at the job level. With cancel-in-progress: true,
+  # any unrelated comment (e.g. from SonarQube, Renovate) on the same PR would cancel a
+  # running build, then skip the job because the comment doesn't match /build-images.
+  cancel-in-progress: false
 
 env:
   REGISTRY: ${{ vars.REGISTRY }}
@@ -49,19 +53,7 @@ jobs:
               pull_number: context.issue.number
             });
             
-            // Extract the exact SHA the maintainer authorized from the comment
-            const commentBody = context.payload.comment.body.trim();
-            const match = commentBody.match(/^\/build-images\s+([a-f0-9]{7,40})/);
-            
-            if (!match) {
-              core.setFailed("❌ Security Gate: You must provide a specific commit SHA to build. Example: /build-images abc1234");
-              return;
-            }
-            
-            const authorizedSha = match[1];
-
-            // 4. Output the frozen, trusted data
-            core.setOutput('sha', authorizedSha);
+            core.setOutput('sha', pr.data.head.sha);
             core.setOutput('repo', pr.data.head.repo.full_name);
             core.setOutput('number', context.issue.number);
 
@@ -90,7 +82,7 @@ jobs:
           echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
 
       - name: Login to registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}

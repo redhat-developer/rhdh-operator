@@ -390,13 +390,14 @@ fi
 pushd "${TMPDIR}" >/dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
-if [[ $INSTALL_YQ ]]; then
+if (( INSTALL_YQ )); then
   YQ=$HOME/.local/bin/yq_mf
   YQ_BINARY=yq_linux_amd64
+  mkdir -p "$HOME/.local/bin"
   curl -sSLo- https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_BINARY}.tar.gz | tar xz && mv -f ${YQ_BINARY} "${YQ}"
   debugf "mikefarah yq $YQ_VERSION installed to $YQ"
 else
-  YQ=$(which yq)
+  YQ=$(command -v yq)
 fi
 
 

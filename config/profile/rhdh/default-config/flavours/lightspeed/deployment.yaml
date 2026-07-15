@@ -9,7 +9,7 @@ spec:
           command:
             - "sh"
             - "-c"
-            - "echo 'Copying RAG data...'; cp -r /rag/. /data/ && chmod -R 777 /data/vector_db && echo 'Copy complete.'"
+            - "echo 'Copying RAG data...'; cp -r --no-preserve=mode,ownership /rag/. /data/ && mkdir -p /data/vector_db/notebooks && chmod -R a+rwX /data/embeddings_model /data/vector_db && echo 'Copy complete.'"
           resources:
             requests:
               memory: 150Mi
@@ -24,7 +24,7 @@ spec:
       containers:
         # Lightspeed Core Backend
         - name: lightspeed-core
-          image: quay.io/lightspeed-core/lightspeed-stack:0.5.1
+          image: quay.io/lightspeed-core/lightspeed-stack:0.5.2
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

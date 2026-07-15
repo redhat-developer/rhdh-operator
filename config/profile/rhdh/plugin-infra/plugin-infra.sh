@@ -3,7 +3,7 @@
 # Plugin Infrastructure Setup Script for RHDH with Orchestrator
 #
 
-set -e
+set -euo pipefail
 
 action="apply" # Default action
 branch="main"  # Default branch
@@ -37,7 +37,7 @@ apply_manifest() {
   local script_dir
   script_dir="$(dirname "$(realpath "$0")")"
 
-  if [ -f "${script_dir}/${file}" ]; then
+  if [[ -f "${script_dir}/${file}" ]]; then
     echo "Using local file: ${file}"
     kubectl "$action" -f "${script_dir}/${file}"
   else
@@ -47,24 +47,24 @@ apply_manifest() {
 }
 
 # Execution
-if [ "$action" == "apply" ]; then
+if [[ "$action" == "apply" ]]; then
   apply_manifest "serverless.yaml"
   echo "Waiting for CRDs to be established..."
   kubectl wait --for=condition=Established crd --all --timeout=60s
   apply_manifest "knative.yaml"
   apply_manifest "serverless-logic.yaml"
-  if [ "$cicd" == true ]; then
+  if [[ "$cicd" == true ]]; then
     echo "CICD enabled. Executing CICD-specific logic..."
     apply_manifest "argocd.yaml"
     kubectl wait --for=condition=Established crd --all --timeout=60s
     apply_manifest "argocd-cr.yaml"
     apply_manifest "pipeline.yaml"
   fi
-elif [ "$action" == "delete" ]; then
+elif [[ "$action" == "delete" ]]; then
   apply_manifest "serverless-logic.yaml"
   apply_manifest "knative.yaml"
   apply_manifest "serverless.yaml"
-  if [ "$cicd" == true ]; then
+  if [[ "$cicd" == true ]]; then
     apply_manifest "argocd.yaml"
     apply_manifest "argocd-cr.yaml"
     apply_manifest "pipeline.yaml"

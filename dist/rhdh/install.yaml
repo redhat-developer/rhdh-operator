@@ -3292,7 +3292,7 @@ data:
               command:
                 - "sh"
                 - "-c"
-                - "echo 'Copying RAG data...'; cp -r /rag/. /data/ && chmod -R 777 /data/vector_db && echo 'Copy complete.'"
+                - "echo 'Copying RAG data...'; cp -r --no-preserve=mode,ownership /rag/. /data/ && mkdir -p /data/vector_db/notebooks && chmod -R a+rwX /data/embeddings_model /data/vector_db && echo 'Copy complete.'"
               resources:
                 requests:
                   memory: 150Mi
@@ -3307,7 +3307,7 @@ data:
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:0.5.1
+              image: quay.io/lightspeed-core/lightspeed-stack:0.5.2
               imagePullPolicy: Always
               ports:
                 - containerPort: 8080
@@ -3343,14 +3343,15 @@ data:
         plugins:
           # Lightspeed Plugins
           - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed:{{inherit}}
-            disabled: false
+            enabled: true
 
           - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed-backend:{{inherit}}
-            disabled: false
+            enabled: true
   metadata.yaml: |
     # Lightspeed (AI) flavour metadata
     # This flavour is enabled by default and provides AI/Lightspeed functionality
-    enabledByDefault: true
+    # FIXME: temporarily disabled due to DPDY issues; to re-enable in https://redhat.atlassian.net/browse/RHIDP-15458
+    enabledByDefault: false
 kind: ConfigMap
 metadata:
   name: rhdh-flavour-lightspeed-config
@@ -3367,15 +3368,15 @@ data:
       dynamic-plugins.yaml: |
         plugins:
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
-            disabled: false
+            enabled: true
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
-            disabled: false
+            enabled: true
             dependencies:
               - ref: sonataflow
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
-            disabled: false
+            enabled: true
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
-            disabled: false
+            enabled: true
   metadata.yaml: |
     # Orchestrator flavour metadata
     # This flavour is disabled by default due to heavy infrastructure dependencies
@@ -3718,8 +3719,9 @@ data:
           image: registry.access.redhat.com/ubi9-minimal
           workingDir: $(workspaces.workflow-source.path)
           script: |
-            ROOT=/workspace/workflow
-            TARGET=flat
+            #!/usr/bin/env sh
+            set -eu
+
             mkdir -p flat
 
             if [ -d "workflow/$(params.workflowId)" ]; then
@@ -3730,7 +3732,7 @@ data:
               cp workflow/LICENSE flat/$(params.workflowId)
             fi
 
-            if [ "$(params.convertToFlat)" == "false" ]; then
+            if [ "$(params.convertToFlat)" = "false" ]; then
               rm -rf workflow/src/main/resources
               mv workflow/src flat/$(params.workflowId)/
             fi
@@ -3756,6 +3758,9 @@ data:
           image: registry.access.redhat.com/ubi9-minimal
           workingDir: $(workspaces.workflow-source.path)/flat/$(params.workflowId)
           script: |
+            #!/usr/bin/env sh
+            set -eu
+
             microdnf install -y tar gzip
             KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.38.0/kn-workflow-linux-amd64.tar.gz"
             curl -L "$KN_CLI_URL" | tar -xz --no-same-owner && chmod +x kn-workflow-linux-amd64 && mv kn-workflow-linux-amd64 kn-workflow
@@ -3781,10 +3786,13 @@ data:
           image: registry.access.redhat.com/ubi9-minimal
           workingDir: $(workspaces.workflow-gitops.path)/workflow-gitops
           script: |
-            cp $(workspaces.workflow-source.path)/flat/$(params.workflowId)/manifests/* kustomize/base
+            #!/usr/bin/env sh
+            set -eu
+
+            cp "$(workspaces.workflow-source.path)/flat/$(params.workflowId)/manifests/"* kustomize/base
             microdnf install -y findutils && microdnf clean all
-            cd kustomize
-            ./updater.sh $(params.workflowId) $(params.imageTag)
+            cd kustomize || exit
+            ./updater.sh "$(params.workflowId)" "$(params.imageTag)"
     ---
     apiVersion: tekton.dev/v1
     kind: Pipeline
