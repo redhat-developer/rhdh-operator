@@ -477,6 +477,14 @@ deploy-openshift-auto: release-build release-push create-operator-namespace ## D
 		$(MAKE) catalog-update-openshift deploy-olm-openshift; \
 	fi
 
+.PHONY: undeploy-openshift-auto
+undeploy-openshift-auto: ## Un-deploy the operator, auto-detecting OLM v0 or v1
+	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
+		$(MAKE) undeploy-olmv1; \
+	else \
+		$(MAKE) undeploy-olm; \
+	fi
+
 .PHONY: install-olm
 install-olm: operator-sdk ## Install the Operator Lifecycle Manager.
 	$(OPSDK) olm install
