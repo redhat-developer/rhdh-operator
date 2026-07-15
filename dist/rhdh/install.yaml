@@ -3343,14 +3343,15 @@ data:
         plugins:
           # Lightspeed Plugins
           - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed:{{inherit}}
-            disabled: false
+            enabled: true
 
           - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed-backend:{{inherit}}
-            disabled: false
+            enabled: true
   metadata.yaml: |
     # Lightspeed (AI) flavour metadata
     # This flavour is enabled by default and provides AI/Lightspeed functionality
-    enabledByDefault: true
+    # FIXME: temporarily disabled due to DPDY issues; to re-enable in https://redhat.atlassian.net/browse/RHIDP-15458
+    enabledByDefault: false
 kind: ConfigMap
 metadata:
   name: rhdh-flavour-lightspeed-config
@@ -3367,15 +3368,15 @@ data:
       dynamic-plugins.yaml: |
         plugins:
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
-            disabled: false
+            enabled: true
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
-            disabled: false
+            enabled: true
             dependencies:
               - ref: sonataflow
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
-            disabled: false
+            enabled: true
           - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
-            disabled: false
+            enabled: true
   metadata.yaml: |
     # Orchestrator flavour metadata
     # This flavour is disabled by default due to heavy infrastructure dependencies

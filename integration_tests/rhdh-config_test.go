@@ -276,11 +276,8 @@ var _ = When("create default rhdh", func() {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			// no default flavour
-			// g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
-
-			// with default lightspeed flavour
-			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(2))
+			// FIXME: restore to Equal(2) when lightspeed is re-enabled (RHIDP-15458)
+			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
 
 			initCont := deploy.PodSpec().InitContainers[0]
 			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
@@ -298,6 +295,9 @@ var _ = When("create default rhdh", func() {
 	})
 
 	It("creates rhdh with default Lightspeed flavour", func() {
+
+		// FIXME: re-enable when lightspeed is re-enabled (RHIDP-15458)
+		Skip("Temporarily skipped: lightspeed disabled by default due to DPDY issues")
 
 		if !isProfile("rhdh") {
 			Skip("Skipped for non rhdh config")

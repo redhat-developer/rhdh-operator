@@ -27,6 +27,7 @@ import (
 
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
+const OperatorDPProcessingEnvVar = "OPERATOR_DP_PROCESSING"
 
 type DynamicPluginsFactory struct{}
 
@@ -53,9 +54,20 @@ type DynaPluginsConfig struct {
 type DynaPlugin struct {
 	Package      string                 `yaml:"package,omitempty"`
 	Integrity    string                 `yaml:"integrity,omitempty"`
+	Enabled      *bool                  `yaml:"enabled,omitempty"`
 	Disabled     bool                   `yaml:"disabled"`
 	PluginConfig map[string]interface{} `yaml:"pluginConfig,omitempty"`
 	Dependencies []PluginDependency     `yaml:"dependencies,omitempty"`
+}
+
+// IsDisabled resolves the effective disabled state from the Enabled and
+// Disabled fields. Enabled takes precedence when both are set. When neither
+// is set the plugin is considered enabled (not disabled), preserving previous behaviour.
+func (p DynaPlugin) IsDisabled() bool {
+	if p.Enabled != nil {
+		return !*p.Enabled
+	}
+	return p.Disabled
 }
 
 type PluginDependency struct {
@@ -68,6 +80,10 @@ func init() {
 
 func DynamicPluginsDefaultName(backstageName string) string {
 	return utils.GenerateRuntimeObjectName(backstageName, "backstage-dynamic-plugins")
+}
+
+func IsOperatorDPProcessing() bool {
+	return utils.BoolEnvVar(OperatorDPProcessingEnvVar, false)
 }
 
 func (p *DynamicPlugins) Object() runtime.Object {
@@ -141,7 +157,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 // TODO
 // extract pluginConfigs
 // merge with app-config (deep merge)
-func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
+func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
 
 	// Only proceed if there's a ConfigMap to mount or dynamic plugins config in spec
 	if p.ConfigMap == nil && (backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "") {
@@ -185,7 +201,7 @@ func (p *DynamicPlugins) Dependencies() ([]PluginDependency, error) {
 	result := make([]PluginDependency, 0)
 
 	for _, pp := range ps {
-		if pp.Disabled {
+		if pp.IsDisabled() {
 			continue
 		}
 
@@ -261,6 +277,15 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
 	}
 
+	// Resolve references ({{inherit}}, ref://, etc.) in secondPluginsConfig using firstPluginsConfig as base
+	if IsOperatorDPProcessing() {
+		resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins)
+		if err != nil {
+			return "", err
+		}
+		secondPluginsConfig.Plugins = resolvedPlugins
+	}
+
 	// Merge Plugins by package field
 	pluginMap := make(map[string]DynaPlugin)
 	for _, plugin := range firstPluginsConfig.Plugins {
@@ -283,7 +308,13 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 			if plugin.Integrity != "" {
 				existingPlugin.Integrity = plugin.Integrity
 			}
-			existingPlugin.Disabled = plugin.Disabled
+			if plugin.Enabled != nil {
+				existingPlugin.Enabled = plugin.Enabled
+				existingPlugin.Disabled = false
+			} else if plugin.Disabled {
+				existingPlugin.Disabled = true
+				existingPlugin.Enabled = nil
+			}
 			pluginMap[plugin.Package] = existingPlugin
 		} else {
 			pluginMap[plugin.Package] = plugin
