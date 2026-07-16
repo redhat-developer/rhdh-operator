@@ -1676,6 +1676,11 @@ spec:
 EOF
 fi
 
+cli_hint="kubectl"
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  cli_hint="oc"
+fi
+
 if [[ "$INSTALL_OPERATOR" != "true" ]]; then
   echo
   echo "Done. "
@@ -1700,10 +1705,6 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
     "
   fi
   if [[ -n "${TO_REGISTRY}" ]]; then
-    cli_hint="kubectl"
-    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-      cli_hint="oc"
-    fi
     if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
       echo "To install the operator via OLM v1, apply the following manifests:
 
@@ -1744,17 +1745,12 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   invoke_cluster_cli -n ${NAMESPACE_OPERATOR} patch serviceaccount default \
     -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
 
-  CLI_TOOL="kubectl"
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    CLI_TOOL="oc"
-  fi
-
   if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
     OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}' 2>/dev/null || true)
     CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
 
     CR_EXAMPLE="
-  cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
+  cat <<EOF | ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f -
   apiVersion: rhdh.redhat.com/v1alpha5
   kind: Backstage
   metadata:
@@ -1781,7 +1777,7 @@ To create an RHDH instance:
 Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
 pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
 
-${CLI_TOOL} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
+${cli_hint} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
 
 More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
   "
@@ -1809,7 +1805,7 @@ More details about image pull secrets in https://kubernetes.io/docs/tasks/config
     fi
 
     CR_EXAMPLE="
-  cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
+  cat <<EOF | ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f -
   apiVersion: rhdh.redhat.com/v1alpha5
   kind: Backstage
   metadata:
@@ -1833,7 +1829,7 @@ More details about image pull secrets in https://kubernetes.io/docs/tasks/config
 Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
 be able to pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
 
-${CLI_TOOL} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
+${cli_hint} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
 
 More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
   "
