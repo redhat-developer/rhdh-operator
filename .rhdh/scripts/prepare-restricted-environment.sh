@@ -1745,11 +1745,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
   invoke_cluster_cli -n ${NAMESPACE_OPERATOR} patch serviceaccount default \
     -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
 
-  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-    OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}' 2>/dev/null || true)
-    CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
-
-    CR_EXAMPLE="
+  CR_EXAMPLE="
   cat <<EOF | ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f -
   apiVersion: rhdh.redhat.com/v1alpha5
   kind: Backstage
@@ -1767,6 +1763,10 @@ if [[ -n "${TO_REGISTRY}" ]]; then
     database:
       enableLocalDb: true
   EOF"
+
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}' 2>/dev/null || true)
+    CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
 
     echo "
 Done. ClusterExtension 'rhdh-operator' created via OLM v1.
@@ -1804,30 +1804,11 @@ More details about image pull secrets in https://kubernetes.io/docs/tasks/config
   To install on Kubernetes: "
     fi
 
-    CR_EXAMPLE="
-  cat <<EOF | ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f -
-  apiVersion: rhdh.redhat.com/v1alpha5
-  kind: Backstage
-  metadata:
-    name: developer-hub
-  spec:
-    application:
-      appConfig:
-        mountPath: /opt/app-root/src
-      extraFiles:
-        mountPath: /opt/app-root/src
-      replicas: 1
-      route:
-        enabled: true
-    database:
-      enableLocalDb: true
-  EOF"
-
     echo "run this to create an RHDH instance:
   ${CR_EXAMPLE}
 
 Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
-be able to pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
+pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
 
 ${cli_hint} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
 
