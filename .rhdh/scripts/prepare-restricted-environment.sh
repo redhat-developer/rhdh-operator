@@ -19,7 +19,6 @@ INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.21"
 FILTERED_VERSIONS=("*")
 OLM_VERSION="auto"
 RESOLVED_OLM_VERSION=""
-NAMESPACE_CATALOGD=""
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
