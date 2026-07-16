@@ -116,8 +116,8 @@ Options:
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
   --olm-version v0|v1|auto               : Force OLM version for catalog/operator resources (default: auto-detect).
-                                            'auto' detects OLM v1 by checking for the ClusterExtension CRD and
-                                            a running catalogd deployment on the cluster.
+                                            'auto' detects OLM v1 by checking for the ClusterExtension and
+                                            ClusterCatalog CRDs on the cluster.
                                             When v1 is detected or forced, generates ClusterCatalog + ClusterExtension
                                             instead of CatalogSource + Subscription.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
@@ -356,13 +356,8 @@ function detect_olm_v1_crd() {
   invoke_cluster_cli get crd clusterextensions.olm.operatorframework.io &>/dev/null
 }
 
-function detect_olm_v1_catalogd() {
-  NAMESPACE_CATALOGD=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
-    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
-  if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
-    return 1
-  fi
-  invoke_cluster_cli rollout status deployment -n "${NAMESPACE_CATALOGD}" -l 'app.kubernetes.io/name=catalogd' --timeout=5s &>/dev/null
+function detect_olm_v1_clustercatalog_crd() {
+  invoke_cluster_cli get crd clustercatalogs.olm.operatorframework.io &>/dev/null
 }
 
 function resolve_olm_version() {
@@ -374,25 +369,20 @@ function resolve_olm_version() {
       errorf "OLM v1 requested but ClusterExtension CRD not found on this cluster"
       exit 1
     fi
-    if ! detect_olm_v1_catalogd; then
-      errorf "OLM v1 requested but catalogd is not installed or its namespace is missing"
+    if ! detect_olm_v1_clustercatalog_crd; then
+      errorf "OLM v1 requested but ClusterCatalog CRD not found on this cluster"
       exit 1
     fi
     RESOLVED_OLM_VERSION="v1"
     infof "Using OLM v1 (forced via --olm-version)"
   else
-    # auto-detect
-    if detect_olm_v1_crd; then
-      if detect_olm_v1_catalogd; then
-        RESOLVED_OLM_VERSION="v1"
-        infof "Auto-detected OLM v1 (ClusterExtension CRD and catalogd found)"
-      else
-        RESOLVED_OLM_VERSION="v0"
-        warnf "ClusterExtension CRD found but catalogd is not ready; falling back to OLM v0"
-      fi
+    # auto-detect: both ClusterExtension and ClusterCatalog CRDs must be present
+    if detect_olm_v1_crd && detect_olm_v1_clustercatalog_crd; then
+      RESOLVED_OLM_VERSION="v1"
+      infof "Auto-detected OLM v1 (ClusterExtension and ClusterCatalog CRDs found)"
     else
       RESOLVED_OLM_VERSION="v0"
-      infof "Auto-detected OLM v0 (ClusterExtension CRD not found)"
+      infof "Auto-detected OLM v0 (OLM v1 CRDs not found)"
     fi
   fi
 }
@@ -402,6 +392,8 @@ function prepare_olm_v1_secrets() {
     return
   fi
 
+  NAMESPACE_CATALOGD=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
   if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
     NAMESPACE_CATALOGD="openshift-catalogd"
     warnf "catalogd namespace was not detected; falling back to default '${NAMESPACE_CATALOGD}'"
