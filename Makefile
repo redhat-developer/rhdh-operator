@@ -467,23 +467,23 @@ catalog-update-olmv1: ## Update ClusterCatalog for OLM v1
 		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
 		$(KUBECTL) apply -f -
 
-# Deploy on Openshift cluster using OLM (by default installed on Openshift)
-.PHONY: deploy-openshift
-deploy-openshift: release-build release-push catalog-update-openshift create-operator-namespace deploy-olm-openshift ## Deploy the operator on openshift cluster
+# Deploy on Openshift cluster using OLM
+.PHONY: deploy-openshift-olmv0
+deploy-openshift-olmv0: release-build release-push catalog-update-openshift create-operator-namespace deploy-olm-openshift ## Deploy the operator on OpenShift with OLM v0
 
 .PHONY: deploy-openshift-olmv1
-deploy-openshift-olmv1: release-build release-push catalog-update-olmv1 create-operator-namespace deploy-olmv1 ## Deploy the operator on openshift cluster with OLM v1
+deploy-openshift-olmv1: release-build release-push catalog-update-olmv1 create-operator-namespace deploy-olmv1 ## Deploy the operator on OpenShift with OLM v1
 
-.PHONY: deploy-openshift-auto
-deploy-openshift-auto: release-build release-push create-operator-namespace ## Deploy the operator, auto-detecting OLM v0 or v1
+.PHONY: deploy-openshift
+deploy-openshift: release-build release-push create-operator-namespace ## Deploy the operator on OpenShift, auto-detecting OLM version
 	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
 		$(MAKE) catalog-update-olmv1 deploy-olmv1; \
 	else \
 		$(MAKE) catalog-update-openshift deploy-olm-openshift; \
 	fi
 
-.PHONY: undeploy-openshift-auto
-undeploy-openshift-auto: ## Un-deploy the operator, auto-detecting OLM v0 or v1
+.PHONY: undeploy-openshift
+undeploy-openshift: ## Un-deploy the operator from OpenShift, auto-detecting OLM version
 	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
 		$(MAKE) undeploy-olmv1; \
 	else \
