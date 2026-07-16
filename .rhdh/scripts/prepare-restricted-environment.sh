@@ -1768,26 +1768,10 @@ if [[ -n "${TO_REGISTRY}" ]]; then
     OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}' 2>/dev/null || true)
     CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
 
-    echo "
+    echo -n "
 Done. ClusterExtension 'rhdh-operator' created via OLM v1.
 
-To create an RHDH instance:
-  ${CR_EXAMPLE}
-
-Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
-pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
-
-${cli_hint} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
-
-More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-  "
-
-    if [[ -n "${CLUSTER_ROUTER_BASE}" ]]; then
-      echo "
-  Once deployed, Developer Hub will be available at
-  https://backstage-developer-hub-${NAMESPACE_OPERATOR}.${CLUSTER_ROUTER_BASE}
-  "
-    fi
+To create an RHDH instance:"
   else
     if [[ "${IS_OPENSHIFT}" = "true" ]]; then
       OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
@@ -1803,8 +1787,10 @@ More details about image pull secrets in https://kubernetes.io/docs/tasks/config
 
   To install on Kubernetes: "
     fi
+    echo -n "run this to create an RHDH instance:"
+  fi
 
-    echo "run this to create an RHDH instance:
+  echo "
   ${CR_EXAMPLE}
 
 Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
@@ -1815,11 +1801,10 @@ ${cli_hint} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSec
 More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
   "
 
-    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-      echo "
+  if [[ -n "${CLUSTER_ROUTER_BASE}" ]]; then
+    echo "
   Once deployed, Developer Hub will be available at
   https://backstage-developer-hub-${NAMESPACE_OPERATOR}.${CLUSTER_ROUTER_BASE}
   "
-    fi
   fi
 fi
