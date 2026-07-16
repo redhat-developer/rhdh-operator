@@ -408,6 +408,7 @@ function prepare_olm_v1_secrets() {
   # OLM v1 catalogd and operator-controller authenticate via the global pull secret
   # (openshift-config/pull-secret), not per-resource pullSecret fields.
   # Merge internal registry credentials into the global pull secret.
+  # Note: the oc commands below are OCP-specific (no kubectl equivalent).
   local internal_registry_url="image-registry.openshift-image-registry.svc:5000"
   local token
   token=$(oc whoami -t)
