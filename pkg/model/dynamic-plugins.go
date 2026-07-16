@@ -3,9 +3,10 @@ package model
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v2"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -36,12 +37,10 @@ func (f DynamicPluginsFactory) newBackstageObject() RuntimeObject {
 }
 
 type DynamicPlugins struct {
-	ConfigMap *corev1.ConfigMap
-	model     *BackstageModel
-	//EffectivePlugins      *corev1.ConfigMap
-	//EffectiveAppConfig    *corev1.ConfigMap
-	//EffectiveDependencies []PluginDependency
-	//dynaPlugins           []DynaPlugin
+	ConfigMap        *corev1.ConfigMap
+	model            *BackstageModel
+	enabledPlugins   []DynaPlugin
+	enabledPluginsCM *corev1.ConfigMap
 }
 
 type DynaPluginsConfig struct {
@@ -58,16 +57,6 @@ type DynaPlugin struct {
 	Disabled     bool                   `yaml:"disabled"`
 	PluginConfig map[string]interface{} `yaml:"pluginConfig,omitempty"`
 	Dependencies []PluginDependency     `yaml:"dependencies,omitempty"`
-}
-
-// IsDisabled resolves the effective disabled state from the Enabled and
-// Disabled fields. Enabled takes precedence when both are set. When neither
-// is set the plugin is considered enabled (not disabled), preserving previous behaviour.
-func (p DynaPlugin) IsDisabled() bool {
-	if p.Enabled != nil {
-		return !*p.Enabled
-	}
-	return p.Disabled
 }
 
 type PluginDependency struct {
@@ -87,6 +76,14 @@ func IsOperatorDPProcessing() bool {
 }
 
 func (p *DynamicPlugins) Object() runtime.Object {
+
+	if IsOperatorDPProcessing() {
+		if p.enabledPluginsCM == nil {
+			return nil
+		}
+		return p.enabledPluginsCM
+	}
+
 	if p.ConfigMap == nil {
 		return nil
 	}
@@ -116,17 +113,6 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 			return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
 		}
 
-		//// resolve references
-		// TODO
-		//plugins, err := GetPluginsData(specPlugins)
-		//if err != nil {
-		//	return err
-		//}
-		//for _, plugin := range plugins {
-		//	if plugin.Package
-		//
-		//}
-
 		if p.ConfigMap != nil {
 			// Merge user's config with default config
 			//mergedData, err := p.mergeWith(specPlugins.Data[DynamicPluginsFile])
@@ -146,6 +132,37 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		}
 	}
 
+	if IsOperatorDPProcessing() && p.ConfigMap != nil {
+
+		p.enabledPlugins = make([]DynaPlugin, 0)
+		pluginsData, err := GetPluginsData(p.ConfigMap)
+		if err != nil {
+			return err
+		}
+
+		packages := []string{}
+		for _, plugin := range pluginsData {
+			if !plugin.IsDisabled() {
+				p.enabledPlugins = append(p.enabledPlugins, plugin)
+				packages = append(packages, plugin.Package)
+			}
+		}
+
+		p.enabledPluginsCM = &corev1.ConfigMap{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1.SchemeGroupVersion.String(),
+				Kind:       "ConfigMap",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      DynamicPluginsDefaultName(backstage.Name),
+				Namespace: backstage.Namespace,
+			},
+			Data: map[string]string{"packages.txt": strings.Join(packages, "\n")},
+		}
+		setMetaInfo(p.enabledPluginsCM, backstage, scheme)
+
+	}
+
 	p.setMetaInfo(backstage, scheme)
 	// Always add wrapper to model (unconditional)
 	model.setRuntimeObject(p)
@@ -154,10 +171,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 }
 
 // ConfigMap name must be the same as (deployment.yaml).spec.template.spec.volumes.name.dynamic-plugins-conf.ConfigMap.name
-// TODO
-// extract pluginConfigs
-// merge with app-config (deep merge)
-func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
+func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 
 	// Only proceed if there's a ConfigMap to mount or dynamic plugins config in spec
 	if p.ConfigMap == nil && (backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "") {
@@ -175,6 +189,15 @@ func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, _ *runtime.S
 		return fmt.Errorf("failed to find initContainer named %s", dynamicPluginInitContainerName)
 	}
 
+	if p.enabledPluginsCM != nil {
+
+		if err := deployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
+			p.enabledPluginsCM.Name, initContainer.WorkingDir, "packages.txt", true, utils.SortedKeys(p.enabledPluginsCM.Data)); err != nil {
+			return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)
+		}
+		return nil
+	}
+
 	if err := deployment.mountFilesFrom(containersFilter{names: []string{dynamicPluginInitContainerName}}, ConfigMapObjectKind,
 		p.ConfigMap.Name, initContainer.WorkingDir, DynamicPluginsFile, true, utils.SortedKeys(p.ConfigMap.Data)); err != nil {
 		return fmt.Errorf("failed to mount dynamic plugins configMap: %w", err)
@@ -188,6 +211,16 @@ func (p *DynamicPlugins) setMetaInfo(backstage api.Backstage, scheme *runtime.Sc
 		p.ConfigMap.SetName(DynamicPluginsDefaultName(backstage.Name))
 		setMetaInfo(p.ConfigMap, backstage, scheme)
 	}
+}
+
+// IsDisabled resolves the effective disabled state from the Enabled and
+// Disabled fields. Enabled takes precedence when both are set. When neither
+// is set the plugin is considered enabled (not disabled), preserving previous behaviour.
+func (p DynaPlugin) IsDisabled() bool {
+	if p.Enabled != nil {
+		return !*p.Enabled
+	}
+	return p.Disabled
 }
 
 // Dependencies returns a list of plugin dependencies
