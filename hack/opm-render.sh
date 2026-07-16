@@ -8,7 +8,7 @@ set -euo pipefail
 
 if [[ -f /etc/containers/registries.conf ]] && grep -q '^\[registries' /etc/containers/registries.conf 2>/dev/null; then
 	printf 'unqualified-search-registries = ["docker.io"]\n' > /tmp/opm-registries.conf
-	CONTAINERS_REGISTRIES_CONF=/tmp/opm-registries.conf "${OPM}" render "${BUNDLE_IMGS}" --output yaml >> "${OUTPUT_FILE}"
-else
-	"${OPM}" render "${BUNDLE_IMGS}" --output yaml >> "${OUTPUT_FILE}"
+	export CONTAINERS_REGISTRIES_CONF=/tmp/opm-registries.conf
 fi
+
+"${OPM}" render "${BUNDLE_IMGS}" --output yaml >> "${OUTPUT_FILE}"
