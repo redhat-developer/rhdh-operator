@@ -197,12 +197,6 @@ make undeploy-olm
 [IMAGE_TAG_BASE=<your-registry>/backstage-operator] make deploy-openshift
 ```
 
-* To explicitly target OLM v0 or v1
-```sh
-[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make deploy-openshift-olmv0
-[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make deploy-openshift-olmv1
-```
-
 * To undeploy the operator from OpenShift (auto-detects OLM version)
 ```sh
 make undeploy-openshift

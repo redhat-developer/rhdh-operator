@@ -470,13 +470,7 @@ catalog-update-olmv1: ## Update ClusterCatalog for OLM v1
 		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
 		$(KUBECTL) apply -f -
 
-# Deploy on Openshift cluster using OLM
-.PHONY: deploy-openshift-olmv0
-deploy-openshift-olmv0: release-build release-push catalog-update-openshift create-operator-namespace deploy-olm-openshift ## Deploy the operator on OpenShift with OLM v0
-
-.PHONY: deploy-openshift-olmv1
-deploy-openshift-olmv1: release-build release-push catalog-update-olmv1 create-operator-namespace deploy-olmv1 ## Deploy the operator on OpenShift with OLM v1
-
+# Deploy on Openshift cluster using OLM (auto-detects v0 or v1)
 .PHONY: deploy-openshift
 deploy-openshift: release-build release-push create-operator-namespace ## Deploy the operator on OpenShift, auto-detecting OLM version
 	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
