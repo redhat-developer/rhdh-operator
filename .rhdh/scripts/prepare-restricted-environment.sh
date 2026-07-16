@@ -482,20 +482,28 @@ function prepare_olm_v1_secrets() {
   invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${oc_ns}:${oc_sa}" -n "${image_namespace}" >&2 || true
 }
 
-# Generate v1 manifests when:
-#   - OLM v1 was resolved (detected or forced), OR
-#   - we're exporting to disk (no registry) with auto-detect, so we generate both v0 and v1
-#     for the user to choose from in their disconnected environment
 function should_generate_v1_manifests() {
-  [[ "${RESOLVED_OLM_VERSION}" == "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }
+  # OLM v1 was resolved (detected or forced)
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    return 0
+  fi
+  # Export-only mode with auto-detect: generate both v0 and v1 templates
+  if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
+    return 0
+  fi
+  return 1
 }
 
-# Generate v0 manifests when:
-#   - OLM v0 was resolved (detected or forced), OR
-#   - we're exporting to disk (no registry) with auto-detect, so we generate both v0 and v1
-#     for the user to choose from in their disconnected environment
 function should_generate_v0_manifests() {
-  [[ "${RESOLVED_OLM_VERSION}" != "v1" ]] || { [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; }
+  # OLM v0 was resolved (detected or forced)
+  if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]]; then
+    return 0
+  fi
+  # Export-only mode with auto-detect: generate both v0 and v1 templates
+  if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
+    return 0
+  fi
+  return 1
 }
 
 ##########################################################################################
