@@ -206,7 +206,7 @@ func TestWithDynamicPluginsDeps(t *testing.T) {
 
 	yamlData := `"dynamic-plugins.yaml": |
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     disabled: false
     dependencies:
       - ref: "dependency-1"
@@ -384,25 +384,25 @@ func TestMergeDynamicPlugins(t *testing.T) {
 	// Sample model ConfigMap
 	modelData := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     integrity: "sha256-abc123"
     disabled: false
     pluginConfig:
       key1: "value1"
     dependencies:
       - ref: "dependency-1"
-  - package: "plugin-b"
+  - package: "./plugin-b"
     integrity: "sha256-def456"
     disabled: true
     pluginConfig:
       key2: "value2"
     dependencies:
       - ref: "dependency-2"
-  - package: "plugin-c"
+  - package: "./plugin-c"
     integrity: "sha256-ghi789"
     pluginConfig:
       key3: "value3"
-  - package: "plugin-d"
+  - package: "./plugin-d"
     disabled: true
     integrity: "sha256-ddd"
     pluginConfig:
@@ -425,14 +425,14 @@ includes:
 	// Sample spec data
 	specData := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     integrity: "sha256-overridden"
     pluginConfig:
       key1: "overridden"
     dependencies:
       - ref: "dependency-3"
-  - package: "plugin-d"
-  - package: "plugin-e"
+  - package: "./plugin-d"
+  - package: "./plugin-e"
 includes:
   - "include-2"
 
@@ -454,9 +454,7 @@ includes:
 	assert.Equal(t, 5, len(mergedConfig.Plugins))
 
 	// Validate plugin-a (overridden by specData)
-	//pluginA := mergedConfig.Plugins[0]
-	//assert.Equal(t, "plugin-a", pluginA.Package)
-	pluginA := findPluginByPackage(mergedConfig.Plugins, "plugin-a")
+	pluginA := findPluginByPackage(mergedConfig.Plugins, "./plugin-a")
 	assert.NotNil(t, pluginA)
 	assert.Equal(t, "sha256-overridden", pluginA.Integrity)
 	assert.False(t, pluginA.IsDisabled())
@@ -465,29 +463,25 @@ includes:
 	assert.Equal(t, "dependency-3", pluginA.Dependencies[0].Ref)
 
 	// Validate plugin-b (disabled, from modelDp)
-	pluginB := findPluginByPackage(mergedConfig.Plugins, "plugin-b")
+	pluginB := findPluginByPackage(mergedConfig.Plugins, "./plugin-b")
 	assert.NotNil(t, pluginB)
 	assert.True(t, pluginB.IsDisabled())
 
 	// Validate plugin-c (from modelDp, as plugin-b is disabled)
-	//pluginC := mergedConfig.Plugins[1]
-	pluginC := findPluginByPackage(mergedConfig.Plugins, "plugin-c")
+	pluginC := findPluginByPackage(mergedConfig.Plugins, "./plugin-c")
 	assert.NotNil(t, pluginC)
-	//assert.Equal(t, "plugin-c", pluginC.Package)
 	assert.Equal(t, "sha256-ghi789", pluginC.Integrity)
 	assert.Equal(t, "value3", pluginC.PluginConfig["key3"])
 
-	//pluginD := mergedConfig.Plugins[2]
-	pluginD := findPluginByPackage(mergedConfig.Plugins, "plugin-d")
+	pluginD := findPluginByPackage(mergedConfig.Plugins, "./plugin-d")
 	assert.NotNil(t, pluginD)
-	//assert.Equal(t, "plugin-d", pluginD.Package)
 	assert.Equal(t, "sha256-ddd", pluginD.Integrity)
 
 	// Validate merged includes
 	assert.ElementsMatch(t, []string{"include-1", "include-2"}, mergedConfig.Includes)
 
 	// Marshal the merged configuration into YAML
-	marshalledE, err := yaml.Marshal(findPluginByPackage(mergedConfig.Plugins, "plugin-e"))
+	marshalledE, err := yaml.Marshal(findPluginByPackage(mergedConfig.Plugins, "./plugin-e"))
 
 	assert.NoError(t, err)
 	// Validate that the marshalled string omits empty fields
@@ -526,12 +520,12 @@ func TestMergePluginsEnabledDisabledBackwardCompat(t *testing.T) {
 	t.Run("legacy disabled overlay overrides enabled base", func(t *testing.T) {
 		base := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     enabled: true
 `
 		overlay := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     disabled: true
 `
 		merged, err := MergePluginsData(base, overlay)
@@ -541,7 +535,7 @@ plugins:
 		err = yaml.Unmarshal([]byte(merged), &config)
 		assert.NoError(t, err)
 
-		plugin := findPluginByPackage(config.Plugins, "plugin-a")
+		plugin := findPluginByPackage(config.Plugins, "./plugin-a")
 		assert.NotNil(t, plugin)
 		assert.True(t, plugin.IsDisabled(), "legacy disabled: true should override enabled: true")
 	})
@@ -550,12 +544,12 @@ plugins:
 	t.Run("enabled overlay overrides disabled base", func(t *testing.T) {
 		base := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     disabled: true
 `
 		overlay := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     enabled: true
 `
 		merged, err := MergePluginsData(base, overlay)
@@ -565,7 +559,7 @@ plugins:
 		err = yaml.Unmarshal([]byte(merged), &config)
 		assert.NoError(t, err)
 
-		plugin := findPluginByPackage(config.Plugins, "plugin-a")
+		plugin := findPluginByPackage(config.Plugins, "./plugin-a")
 		assert.NotNil(t, plugin)
 		assert.False(t, plugin.IsDisabled(), "enabled: true should override disabled: true")
 	})
@@ -574,13 +568,13 @@ plugins:
 	t.Run("overlay without activation fields preserves base", func(t *testing.T) {
 		base := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     disabled: true
     integrity: "sha256-abc"
 `
 		overlay := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     integrity: "sha256-overridden"
 `
 		merged, err := MergePluginsData(base, overlay)
@@ -590,7 +584,7 @@ plugins:
 		err = yaml.Unmarshal([]byte(merged), &config)
 		assert.NoError(t, err)
 
-		plugin := findPluginByPackage(config.Plugins, "plugin-a")
+		plugin := findPluginByPackage(config.Plugins, "./plugin-a")
 		assert.NotNil(t, plugin)
 		assert.True(t, plugin.IsDisabled(), "base disabled: true should be preserved when overlay omits both fields")
 		assert.Equal(t, "sha256-overridden", plugin.Integrity)
@@ -600,9 +594,9 @@ plugins:
 	t.Run("legacy disabled-only config works", func(t *testing.T) {
 		base := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     disabled: false
-  - package: "plugin-b"
+  - package: "./plugin-b"
     disabled: true
 `
 		merged, err := MergePluginsData(base, "")
@@ -612,9 +606,9 @@ plugins:
 		err = yaml.Unmarshal([]byte(merged), &config)
 		assert.NoError(t, err)
 
-		pluginA := findPluginByPackage(config.Plugins, "plugin-a")
+		pluginA := findPluginByPackage(config.Plugins, "./plugin-a")
 		assert.False(t, pluginA.IsDisabled())
-		pluginB := findPluginByPackage(config.Plugins, "plugin-b")
+		pluginB := findPluginByPackage(config.Plugins, "./plugin-b")
 		assert.True(t, pluginB.IsDisabled())
 	})
 }
@@ -637,7 +631,7 @@ includes:
 
 	specData := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
 includes: []
 `
 	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
@@ -656,7 +650,7 @@ func TestClearDeps(t *testing.T) {
 	// Sample model (default) ConfigMap
 	modelData := `
 plugins:
- - package: "plugin-a"
+ - package: "./plugin-a"
    disabled: true
    pluginConfig:
      key1: "value1"
@@ -678,7 +672,7 @@ plugins:
 	// Sample spec data, remove default deps and override plugin-a to be enabled
 	specData := `
 plugins:
- - package: "plugin-a"
+ - package: "./plugin-a"
    pluginConfig:
      key1: "overridden"
    dependencies: []
