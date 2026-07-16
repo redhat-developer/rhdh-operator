@@ -1,8 +1,9 @@
 #!/bin/bash
-# Copy default-config and plugin-deps to LOCALBIN for 'make run'
+# Copy default-config and plugin-deps to LOCALBIN for 'make run' and 'make test'
 #
-# For all profiles: copies default-config and plugin-deps
-# For 'rhdh' profile only: overlays dynamic-plugins.yaml from local-test
+# Dynamic plugins source depends on OPERATOR_DP_PROCESSING:
+#   - true:  uses local-test/dynamic-plugins.yaml (rhdh profile only)
+#   - false: uses default-config/dynamic-plugins.yaml
 #
 # Usage: ./hack/copy-local-dynamic-plugins.sh <PROFILE> <LOCALBIN>
 
@@ -16,8 +17,7 @@ PLUGIN_DEPS_SRC="config/profile/${PROFILE}/plugin-deps"
 DEFAULT_CONFIG_TARGET="${LOCALBIN}/default-config"
 PLUGIN_DEPS_TARGET="${LOCALBIN}/plugin-deps"
 
-# Step 1: Copy default-config for all profiles
-# This includes dynamic-plugins.yaml from default-config
+# Step 1: Copy default-config
 mkdir -p "${DEFAULT_CONFIG_TARGET}"
 rm -fr "${DEFAULT_CONFIG_TARGET:?}"/*
 cp -r "${DEFAULT_CONFIG_SRC}"/* "${DEFAULT_CONFIG_TARGET}/"
@@ -29,9 +29,8 @@ if [[ -d "${PLUGIN_DEPS_SRC}" ]]; then
     cp -r "${PLUGIN_DEPS_SRC}"/* "${PLUGIN_DEPS_TARGET}/" 2>/dev/null || :
 fi
 
-# Step 3: For rhdh profile only, overlay dynamic-plugins.yaml from local-test
-# (replaces the one copied from default-config)
-if [[ "${PROFILE}" == "rhdh" ]]; then
+# Step 3: For OPERATOR_DP_PROCESSING=true and rhdh profile, overlay dynamic-plugins.yaml from local-test
+if [[ "${OPERATOR_DP_PROCESSING:-false}" == "true" && "${PROFILE}" == "rhdh" ]]; then
     LOCAL_TEST_DIR="config/profile/${PROFILE}/local-test"
     DYNAMIC_PLUGINS_FILE="${LOCAL_TEST_DIR}/dynamic-plugins.yaml"
 
@@ -53,4 +52,7 @@ if [[ "${PROFILE}" == "rhdh" ]]; then
     fi
 
     cp "${DYNAMIC_PLUGINS_FILE}" "${DEFAULT_CONFIG_TARGET}/"
+    echo "Using local-test dynamic-plugins.yaml (OPERATOR_DP_PROCESSING=true)"
+else
+    echo "Using default-config dynamic-plugins.yaml (OPERATOR_DP_PROCESSING=${OPERATOR_DP_PROCESSING:-false})"
 fi
