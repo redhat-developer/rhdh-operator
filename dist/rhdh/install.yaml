@@ -3307,7 +3307,7 @@ data:
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:0.5.2
+              image: quay.io/lightspeed-core/lightspeed-stack:0.5.3
               imagePullPolicy: Always
               ports:
                 - containerPort: 8080
