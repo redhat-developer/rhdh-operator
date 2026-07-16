@@ -15,7 +15,7 @@ IS_OPENSHIFT=""
 IS_HOSTED_CONTROL_PLANE=""
 
 NAMESPACE_OPERATOR="rhdh-operator"
-INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
+INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.21"
 FILTERED_VERSIONS=("*")
 OLM_VERSION="auto"
 RESOLVED_OLM_VERSION=""
