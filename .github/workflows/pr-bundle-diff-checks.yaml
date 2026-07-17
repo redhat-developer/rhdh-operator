@@ -57,13 +57,14 @@ jobs:
         continue-on-error: true
         env:
           RHDH_BOT_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           git config user.name "rhdh-bot"
           git config user.email "rhdh-bot@redhat.com"
           git remote set-url origin "https://x-access-token:${RHDH_BOT_TOKEN}@github.com/${{ github.repository }}.git"
           git add bundle/ config/ dist/
           git commit -m "chore: regenerate bundle manifests"
-          if git push origin HEAD:${{ github.head_ref }}; then
+          if git push origin "HEAD:${HEAD_REF}"; then
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           else
             echo "pushed=false" >> "$GITHUB_OUTPUT"
