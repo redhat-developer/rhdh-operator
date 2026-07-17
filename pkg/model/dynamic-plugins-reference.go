@@ -170,16 +170,18 @@ func (p *DynaPlugin) Name() string {
 			url = url[:idx]
 		}
 
-		// Remove tag (:tag)
-		if idx := strings.LastIndex(url, ":"); idx != -1 {
-			url = url[:idx]
+		// Extract the last path component (the image name, possibly with tag)
+		imageName := url
+		if idx := strings.LastIndex(url, "/"); idx != -1 {
+			imageName = url[idx+1:]
 		}
 
-		// Extract the last path component (the image name)
-		if idx := strings.LastIndex(url, "/"); idx != -1 {
-			return url[idx+1:]
+		// Remove tag (:tag) from image name only (not port from registry)
+		if idx := strings.LastIndex(imageName, ":"); idx != -1 {
+			imageName = imageName[:idx]
 		}
-		return url
+
+		return imageName
 	}
 
 	// Handle HTTP(S) URLs

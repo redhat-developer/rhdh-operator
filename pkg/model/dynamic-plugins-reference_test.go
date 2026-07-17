@@ -255,6 +255,16 @@ func TestName(t *testing.T) {
 			expected: "backstage-plugin-bar",
 		},
 		{
+			name:     "OCI with registry port and no tag",
+			package_: "oci://localhost:5000/path/my-plugin",
+			expected: "my-plugin",
+		},
+		{
+			name:     "OCI with registry port and tag",
+			package_: "oci://localhost:5000/path/my-plugin:v1.0.0",
+			expected: "my-plugin",
+		},
+		{
 			name:     "HTTPS with version and tgz",
 			package_: "https://example.com/plugins/backstage-plugin-foo-1.0.0.tgz",
 			expected: "backstage-plugin-foo",
