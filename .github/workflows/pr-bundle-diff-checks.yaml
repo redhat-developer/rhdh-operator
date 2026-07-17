@@ -67,7 +67,7 @@ jobs:
             echo "pushed=true" >> "$GITHUB_OUTPUT"
           else
             echo "pushed=false" >> "$GITHUB_OUTPUT"
-            git reset --hard HEAD~1
+            git reset --mixed HEAD~1
           fi
 
       - name: Fail if bundle manifests are out of sync
