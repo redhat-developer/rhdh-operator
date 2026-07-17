@@ -192,9 +192,14 @@ make undeploy-olm
 [IMAGE_TAG_BASE=<your-registry>/backstage-operator] make deploy-k8s-olm
 ```
 
-* To build and deploy the operator to Openshift with OLM
+* To build and deploy the operator to OpenShift (auto-detects OLM v0 or v1)
 ```sh
-[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make deploy-openshift 
+[IMAGE_TAG_BASE=<your-registry>/backstage-operator] make deploy-openshift
+```
+
+* To undeploy the operator from OpenShift (auto-detects OLM version)
+```sh
+make undeploy-openshift
 ```
 
 
