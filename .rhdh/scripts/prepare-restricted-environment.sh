@@ -15,8 +15,10 @@ IS_OPENSHIFT=""
 IS_HOSTED_CONTROL_PLANE=""
 
 NAMESPACE_OPERATOR="rhdh-operator"
-INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.18"
-FILTERED_VERSIONS=(*)
+INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.21"
+FILTERED_VERSIONS=("*")
+OLM_VERSION="auto"
+RESOLVED_OLM_VERSION=""
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
@@ -112,6 +114,11 @@ Options:
                                             --to-registry together.
   --oc-mirror-path <path>                : Path to the oc-mirror binary (default: 'oc-mirror').
   --oc-mirror-flags <string>             : Additional flags to pass to all oc-mirror commands.
+  --olm-version v0|v1|auto               : Force OLM version for catalog/operator resources (default: auto-detect).
+                                            'auto' detects OLM v1 by checking for the ClusterExtension and
+                                            ClusterCatalog CRDs on the cluster.
+                                            When v1 is detected or forced, generates ClusterCatalog + ClusterExtension
+                                            instead of CatalogSource + Subscription.
   --install-yq                           : Install yq $YQ_VERSION from https://github.com/mikefarah/yq (not the jq python wrapper)
 
 Examples:
@@ -139,7 +146,7 @@ Examples:
   # It will automatically replace all references to the internal RH registries with quay.io
   $0 \\
     --ci-index true \\
-    --filter-versions '1.4,1.5'
+    --filter-versions '1.9,1.10'
 
   # WORKFLOW with oc-mirror v2 for fully disconnected environments:
   # (on connected host): Export images to disk
@@ -265,7 +272,24 @@ while [[ "$#" -gt 0 ]]; do
     OC_MIRROR_FLAGS="$2"
     shift 1
     ;;
-  '--install-yq') 
+  '--olm-version')
+    if [[ $# -lt 2 ]]; then
+      errorf "--olm-version requires a value (v0, v1, or auto)."
+      usage
+      exit 1
+    fi
+    case "$2" in
+      v0|v1|auto) ;;
+      *)
+        errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
+        usage
+        exit 1
+        ;;
+    esac
+    OLM_VERSION="$2"
+    shift 1
+    ;;
+  '--install-yq')
     INSTALL_YQ=1 ;;
   '-h' | '--help')
     usage
@@ -325,6 +349,161 @@ function invoke_cluster_cli() {
   else
     kubectl "$command" "$@"
   fi
+}
+
+function detect_olm_v1_crd() {
+  invoke_cluster_cli get crd clusterextensions.olm.operatorframework.io &>/dev/null
+}
+
+function detect_olm_v1_clustercatalog_crd() {
+  invoke_cluster_cli get crd clustercatalogs.olm.operatorframework.io &>/dev/null
+}
+
+function resolve_olm_version() {
+  if [[ "${OLM_VERSION}" == "v0" ]]; then
+    RESOLVED_OLM_VERSION="v0"
+    infof "Using OLM v0 (forced via --olm-version)"
+  elif [[ "${OLM_VERSION}" == "v1" ]]; then
+    if ! detect_olm_v1_crd; then
+      errorf "OLM v1 requested but ClusterExtension CRD not found on this cluster"
+      exit 1
+    fi
+    if ! detect_olm_v1_clustercatalog_crd; then
+      errorf "OLM v1 requested but ClusterCatalog CRD not found on this cluster"
+      exit 1
+    fi
+    RESOLVED_OLM_VERSION="v1"
+    infof "Using OLM v1 (forced via --olm-version)"
+  else
+    # auto-detect: both ClusterExtension and ClusterCatalog CRDs must be present
+    if detect_olm_v1_crd && detect_olm_v1_clustercatalog_crd; then
+      RESOLVED_OLM_VERSION="v1"
+      infof "Auto-detected OLM v1 (ClusterExtension and ClusterCatalog CRDs found)"
+    else
+      RESOLVED_OLM_VERSION="v0"
+      infof "Auto-detected OLM v0 (OLM v1 CRDs not found)"
+    fi
+  fi
+}
+
+function prepare_olm_v1_secrets() {
+  if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]]; then
+    return
+  fi
+
+  NAMESPACE_CATALOGD=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+  if [[ -z "${NAMESPACE_CATALOGD}" ]]; then
+    NAMESPACE_CATALOGD="openshift-catalogd"
+    warnf "catalogd namespace was not detected; falling back to default '${NAMESPACE_CATALOGD}'"
+  fi
+  debugf "Using catalogd namespace: ${NAMESPACE_CATALOGD}"
+
+  if ! invoke_cluster_cli get namespace "${NAMESPACE_CATALOGD}" &>/dev/null; then
+    errorf "Catalogd namespace '${NAMESPACE_CATALOGD}' not found. Is OLM v1 installed correctly?"
+    exit 1
+  fi
+
+  # OLM v1 catalogd and operator-controller authenticate via the global pull secret
+  # (openshift-config/pull-secret), not per-resource pullSecret fields.
+  # Merge internal registry credentials into the global pull secret.
+  # Note: the oc commands below are OCP-specific (no kubectl equivalent).
+  local internal_registry_url="image-registry.openshift-image-registry.svc:5000"
+  local token
+  token=$(oc whoami -t)
+  local internal_auth
+  internal_auth=$(echo -n "kubeadmin:${token}" | base64 -w0)
+
+  local existing_pull_secret
+  existing_pull_secret=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
+
+  local external_registry_url
+  external_registry_url="$(buildRegistryUrl)"
+
+  local merged
+  merged=$(echo "${existing_pull_secret}" | jq \
+    --arg url1 "${internal_registry_url}" \
+    --arg url2 "${external_registry_url}" \
+    --arg auth "${internal_auth}" \
+    '.auths[$url1] = {auth: $auth} | .auths[$url2] = {auth: $auth}')
+
+  echo "${merged}" | oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/dev/stdin >&2
+  infof "Merged internal registry credentials into global pull secret (openshift-config/pull-secret)"
+
+  # Also create namespace-scoped secrets for the operator SA to pull images
+  if invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" get secret internal-reg-ext-auth-for-rhdh &>/dev/null; then
+    invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" delete secret internal-reg-ext-auth-for-rhdh >&2
+  fi
+  invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
+    --docker-server="$(buildRegistryUrl)" \
+    --docker-username=kubeadmin \
+    --docker-password="${token}" \
+    --docker-email="admin@internal-registry-ext.example.com" >&2
+  if invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" get secret internal-reg-auth-for-rhdh &>/dev/null; then
+    invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" delete secret internal-reg-auth-for-rhdh >&2
+  fi
+  invoke_cluster_cli -n "${NAMESPACE_OPERATOR}" create secret docker-registry internal-reg-auth-for-rhdh \
+    --docker-server="${internal_registry_url}" \
+    --docker-username=kubeadmin \
+    --docker-password="${token}" \
+    --docker-email="admin@internal-registry.example.com" >&2
+
+  # Grant image-puller in the image source namespace so OLM v1 components can pull mirrored images.
+  # Images are mirrored under rhdh/ paths (e.g. rhdh/index, rhdh/rhdh-operator-bundle), so the
+  # OCP namespace where they're stored is derived from the catalog image path.
+  local catalog_image_url
+  catalog_image_url="$(buildCatalogImageUrl "internal")"
+  local registry_url
+  registry_url="$(buildRegistryUrl "internal")"
+  local image_path="${catalog_image_url#"${registry_url}"/}"
+  local image_namespace="${image_path%%/*}"
+  debugf "Granting image-puller in namespace '${image_namespace}' to OLM v1 service accounts"
+
+  local catalogd_sa
+  catalogd_sa=$(invoke_cluster_cli get deployment -n "${NAMESPACE_CATALOGD}" -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
+  if [[ -z "${catalogd_sa}" ]]; then
+    catalogd_sa="catalogd-controller-manager"
+  fi
+  invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:${catalogd_sa}" -n "${image_namespace}" >&2 || true
+
+  local oc_ns
+  oc_ns=$(invoke_cluster_cli get deployment -A -l 'app.kubernetes.io/name=operator-controller' \
+    -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+  if [[ -z "${oc_ns}" ]]; then
+    oc_ns="openshift-operator-controller"
+  fi
+  local oc_sa
+  oc_sa=$(invoke_cluster_cli get deployment -n "${oc_ns}" -l 'app.kubernetes.io/name=operator-controller' \
+    -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
+  if [[ -z "${oc_sa}" ]]; then
+    oc_sa="operator-controller-controller-manager"
+  fi
+  invoke_cluster_cli policy add-role-to-user system:image-puller "system:serviceaccount:${oc_ns}:${oc_sa}" -n "${image_namespace}" >&2 || true
+}
+
+function should_generate_v1_manifests() {
+  # OLM v1 was resolved (detected or forced)
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    return 0
+  fi
+  # Export-only mode with auto-detect: generate both v0 and v1 templates
+  if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+function should_generate_v0_manifests() {
+  # OLM v0 was resolved (detected or forced)
+  if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]]; then
+    return 0
+  fi
+  # Export-only mode with auto-detect: generate both v0 and v1 templates
+  if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
+    return 0
+  fi
+  return 1
 }
 
 ##########################################################################################
@@ -452,7 +631,7 @@ function buildRegistryUrl() {
     if [[ "${input}" == "internal" ]]; then
       echo "image-registry.openshift-image-registry.svc:5000"
     else
-      echo "$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')"
+      oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}'
     fi
   else
     echo "${TO_REGISTRY}"
@@ -562,6 +741,10 @@ function mirror_extra_images() {
       fi
       mirror_image_to_registry "$img" "$targetImg"
     else
+      if [ -d "$imgDir" ] && ! is_complete_image_archive "$imgDir"; then
+        warnf "Removing incomplete image archive at ${imgDir} (previous download was interrupted)"
+        rm -rf "$imgDir"
+      fi
       if [ ! -d "$imgDir" ]; then
         mkdir -p "${imgDir}"
         mirror_image_to_archive "$img" "$imgDir"
@@ -695,6 +878,10 @@ function process_bundles() {
               debugf "replacing $relatedImage in file '${file}' => $internalTargetImg"
               sed -i 's#'"$relatedImage"'#'"$internalTargetImg"'#g' "$file"
             else
+              if [ -d "$imgDir" ] && ! is_complete_image_archive "$imgDir"; then
+                warnf "Removing incomplete image archive at ${imgDir} (previous download was interrupted)"
+                rm -rf "$imgDir"
+              fi
               if [ ! -d "$imgDir" ]; then
                 mkdir -p "${imgDir}"
                 mirror_image_to_archive "$relatedImage" "$imgDir"
@@ -774,7 +961,9 @@ function process_bundles_from_dir() {
         # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
         related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
         if [[ -n "$related_images" ]]; then
-          all_related_images+=("$related_images")
+          while IFS= read -r img; do
+            [[ -n "$img" ]] && all_related_images+=("$img")
+          done <<<"$related_images"
         fi
         for relatedImage in "${all_related_images[@]}"; do
           imgDir="${FROM_DIR}/images/"
@@ -853,9 +1042,18 @@ function mirror_image_to_archive() {
   skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
 }
 
+function is_complete_image_archive() {
+  local archive_path=$1
+  [[ -f "${archive_path}/manifest.json" ]]
+}
+
 function push_image_from_archive() {
   local archive_path=$1
   local dest_image=$2
+  if ! is_complete_image_archive "${archive_path}"; then
+    errorf "Incomplete image archive at ${archive_path} (missing manifest.json). This usually means a previous export was interrupted. Re-run with --to-dir to re-download."
+    exit 1
+  fi
   echo "Pushing $archive_path to $dest_image..."
   skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image"
 }
@@ -863,6 +1061,9 @@ function push_image_from_archive() {
 check_tool "yq"
 check_tool "umoci"
 check_tool "skopeo"
+if [[ "${USE_OC_MIRROR}" != "true" ]]; then
+  check_tool "opm"
+fi
 if [[ -n "$TO_REGISTRY" ]]; then
   check_tool "podman"
 fi
@@ -876,6 +1077,20 @@ if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
   ocp_prepare_internal_registry
 fi
 
+if [[ -n "${TO_REGISTRY}" ]]; then
+  resolve_olm_version
+  if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" && "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    prepare_olm_v1_secrets
+  elif [[ "${RESOLVED_OLM_VERSION}" == "v1" && "${TO_REGISTRY}" != "OCP_INTERNAL" ]]; then
+    debugf "Skipping OLM v1 pull secret setup for external registry '${TO_REGISTRY}'; ensure your registry credentials are configured"
+  fi
+else
+  if [[ "${OLM_VERSION}" != "auto" ]]; then
+    RESOLVED_OLM_VERSION="${OLM_VERSION}"
+  else
+    RESOLVED_OLM_VERSION="v0"
+  fi
+fi
 
 manifestsTargetDir="${TMPDIR}"
 if [[ -n "${FROM_DIR}" ]]; then
@@ -1027,20 +1242,55 @@ EOF
         fi
       done
       
-      # Process CatalogSource resources
-      # oc-mirror v2 generates files with pattern: cs-*.yaml
-      for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
-        if [[ -f "${manifest}" ]]; then
-          debugf "Processing CatalogSource: ${manifest}"
-          # Replace some metadata and add the default list of secrets
-          "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
-          "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
-          "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
-          "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
-          invoke_cluster_cli apply -f "${manifest}"
-          foundResources=true
+      if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+        # oc-mirror v2 generates native ClusterCatalog manifests with pattern: cc-*.yaml
+        foundClusterCatalog=false
+        for manifest in "${clusterResourcesDir}"/cc-*.yaml; do
+          if [[ -f "${manifest}" ]]; then
+            debugf "Processing native ClusterCatalog: ${manifest}"
+            "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
+            "$YQ" -i '.spec.source.image.ref |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
+            invoke_cluster_cli apply -f "${manifest}"
+            foundClusterCatalog=true
+            foundResources=true
+          fi
+        done
+        # Fall back to converting CatalogSource if no native ClusterCatalog was found
+        if [[ "${foundClusterCatalog}" != "true" ]]; then
+          for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
+            if [[ -f "${manifest}" ]]; then
+              debugf "Converting CatalogSource to ClusterCatalog (no native cc-*.yaml found): ${manifest}"
+              catalogImage=$("$YQ" '.spec.image | sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}")
+              cat <<EOF | invoke_cluster_cli apply -f -
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterCatalog
+metadata:
+  name: rhdh-catalog
+spec:
+  source:
+    type: Image
+    image:
+      ref: ${catalogImage}
+EOF
+              foundResources=true
+            fi
+          done
         fi
-      done
+      else
+        # OLM v0: process CatalogSource resources
+        # oc-mirror v2 generates files with pattern: cs-*.yaml
+        for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
+          if [[ -f "${manifest}" ]]; then
+            debugf "Processing CatalogSource: ${manifest}"
+            "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
+            "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
+            "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
+            "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
+            invoke_cluster_cli apply -f "${manifest}"
+            foundResources=true
+          fi
+        done
+      fi
       
       if [[ "${foundResources}" != "true" ]]; then
         warnf "No cluster resources found in ${clusterResourcesDir}. This may indicate that oc-mirror v2 did not generate them."
@@ -1089,13 +1339,14 @@ else
         exit 1
       fi
       debugf "Falling back to a standard K8s cluster"
-      # Check that OLM is installed
-      if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
-        errorf "
+      if [[ "${RESOLVED_OLM_VERSION}" != "v1" ]]; then
+        if ! invoke_cluster_cli get crd catalogsources.operators.coreos.com &>/dev/null; then
+          errorf "
     OLM not installed (CatalogSource CRD not found) or you don't have enough permissions.
     Check that you are correctly logged into the cluster and that OLM is installed.
     See https://olm.operatorframework.io/docs/getting-started/#installing-olm-in-your-cluster to install OLM."
-        exit 1
+          exit 1
+        fi
       fi
     fi
 
@@ -1107,7 +1358,22 @@ else
     my_operator_index="$(buildCatalogImageUrl "internal")"
   fi
 
-  cat <<EOF >"${manifestsTargetDir}/catalogSource.yaml"
+  if should_generate_v1_manifests; then
+    cat <<EOF >"${manifestsTargetDir}/clusterCatalog.yaml"
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterCatalog
+metadata:
+  name: rhdh-catalog
+spec:
+  source:
+    type: Image
+    image:
+      ref: ${my_operator_index}
+EOF
+  fi
+
+  if should_generate_v0_manifests; then
+    cat <<EOF >"${manifestsTargetDir}/catalogSource.yaml"
   apiVersion: operators.coreos.com/v1alpha1
   kind: CatalogSource
   metadata:
@@ -1124,6 +1390,7 @@ else
     publisher: "Red Hat"
     displayName: "Red Hat Developer Hub (Airgapped)"
 EOF
+  fi
 
   if [[ -n "${TO_REGISTRY}" ]]; then
     # IDMS will only work on regular OCP clusters. It doesn't work on ROSA or clusters with hosted control planes like on IBM Cloud.
@@ -1206,7 +1473,11 @@ EOF
       invoke_cluster_cli apply -f "${manifestsTargetDir}/imageDigestMirrorSet.yaml"
     fi
     debugf "Adding the internal cluster creds as pull secrets to be able to pull images from this internal registry by default"
-    invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
+    if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/clusterCatalog.yaml"
+    else
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/catalogSource.yaml"
+    fi
   fi
 fi
 
@@ -1225,7 +1496,165 @@ metadata:
   name: ${NAMESPACE_OPERATOR}
 EOF
 
-cat <<EOF >"${manifestsTargetDir}/operatorGroup.yaml"
+if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
+  # Export-only mode with auto-detection: generate both v0 and v1 manifest templates
+  # so the user has them available when importing on the target cluster.
+  # During import (--from-dir + --to-registry), manifests are regenerated with real values.
+  infof "Generating both OLM v0 and v1 manifest templates for export."
+fi
+
+if should_generate_v1_manifests; then
+  # shellcheck disable=SC2016
+  SA_NAME='${SA_NAME}'
+  # shellcheck disable=SC2016
+  CRB_NAME='${CRB_NAME}'
+  # shellcheck disable=SC2016
+  CR_NAME='${CR_NAME}'
+  if [[ -n "${TO_REGISTRY}" ]]; then
+    SA_NAME="rhdh-operator-installer"
+    CRB_NAME="rhdh-operator-installer-binding"
+    CR_NAME="rhdh-operator-installer-role"
+  fi
+
+  cat <<EOF >"${manifestsTargetDir}/serviceAccount.yaml"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${SA_NAME}
+  namespace: ${NAMESPACE_OPERATOR}
+EOF
+
+  cat <<EOF >"${manifestsTargetDir}/clusterRole.yaml"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${CR_NAME}
+rules:
+# Bundle resource management: CRDs, RBAC, core resources
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Operator runtime: core resources
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps", "persistentvolumeclaims", "secrets", "services"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: [""]
+  resources: ["persistentvolumes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+# Operator runtime: workloads
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "delete", "patch", "update"]
+# Operator runtime: OpenShift
+- apiGroups: ["config.openshift.io"]
+  resources: ["ingresses"]
+  verbs: ["get"]
+- apiGroups: ["route.openshift.io"]
+  resources: ["routes", "routes/custom-host"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Operator runtime: monitoring
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Operator runtime: RHDH CRDs
+- apiGroups: ["rhdh.redhat.com"]
+  resources: ["backstages"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["rhdh.redhat.com"]
+  resources: ["backstages/finalizers"]
+  verbs: ["update"]
+- apiGroups: ["rhdh.redhat.com"]
+  resources: ["backstages/status"]
+  verbs: ["get", "patch", "update"]
+# Operator runtime: plugin integrations
+- apiGroups: ["sonataflow.org"]
+  resources: ["sonataflowplatforms", "sonataflows"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["tekton.dev"]
+  resources: ["tasks", "pipelines"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["argoproj.io"]
+  resources: ["appprojects"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Operator runtime: auth
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+# Operator runtime: leader election
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# OLM v1 lifecycle
+- apiGroups: ["olm.operatorframework.io"]
+  resources: ["clusterextensions/finalizers"]
+  verbs: ["update"]
+- apiGroups: ["olm.operatorframework.io"]
+  resources: ["clusterobjectsets/finalizers"]
+  verbs: ["update"]
+# Metrics
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+EOF
+
+  cat <<EOF >"${manifestsTargetDir}/clusterRoleBinding.yaml"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${CRB_NAME}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ${CR_NAME}
+subjects:
+- kind: ServiceAccount
+  name: ${SA_NAME}
+  namespace: ${NAMESPACE_OPERATOR}
+EOF
+
+  cat <<EOF >"${manifestsTargetDir}/clusterExtension.yaml"
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterExtension
+metadata:
+  name: rhdh-operator
+spec:
+  namespace: ${NAMESPACE_OPERATOR}
+  serviceAccount:
+    name: ${SA_NAME}
+  source:
+    sourceType: Catalog
+    catalog:
+      packageName: rhdh
+      channels:
+      - fast
+      selector:
+        matchLabels:
+          olm.operatorframework.io/metadata.name: rhdh-catalog
+EOF
+fi
+
+if should_generate_v0_manifests; then
+  cat <<EOF >"${manifestsTargetDir}/operatorGroup.yaml"
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -1233,7 +1662,7 @@ metadata:
   namespace: ${NAMESPACE_OPERATOR}
 EOF
 
-cat <<EOF >"${manifestsTargetDir}/subscription.yaml"
+  cat <<EOF >"${manifestsTargetDir}/subscription.yaml"
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -1246,11 +1675,23 @@ spec:
   source: rhdh-catalog
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 EOF
+fi
+
+cli_hint="kubectl"
+if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  cli_hint="oc"
+fi
 
 if [[ "$INSTALL_OPERATOR" != "true" ]]; then
   echo
   echo "Done. "
   if [[ -n "${TO_DIR}" ]]; then
+    olm_hint=""
+    if should_generate_v1_manifests; then
+      olm_hint="
+  # If your target cluster uses OLM v1, add:  --olm-version v1
+  # If it uses OLM v0 (legacy), add:          --olm-version v0"
+    fi
     echo "
 ${TO_DIR} should now contain all the images and resources needed to install the Red Hat Developer Hub operator. Next steps:
 
@@ -1258,21 +1699,31 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
 2. In your disconnected environment, run the 'install.sh' script (located in your export dir) with the '--from-dir' and '--to-registry' options, like so:
 
 # Make sure you are connected to the mirror registry and the target cluster
-/path/to/export-dir/install.sh \
-  --from-dir /path/to/export-dir \
-  --to-registry \$mirror_registry_url \
-  --install-operator <true|false>
+/path/to/export-dir/install.sh \\
+  --from-dir /path/to/export-dir \\
+  --to-registry \$mirror_registry_url \\
+  --install-operator <true|false>${olm_hint}
     "
   fi
   if [[ -n "${TO_REGISTRY}" ]]; then
-    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+    if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+      echo "To install the operator via OLM v1, apply the following manifests:
+
+      ${cli_hint} apply -f ${manifestsTargetDir}/namespace.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterCatalog.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/serviceAccount.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterRole.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterRoleBinding.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterExtension.yaml
+      "
+    elif [[ "${IS_OPENSHIFT}" = "true" ]]; then
       echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
     else
       echo "To install the operator, you will need to create an OperatorGroup and a Subscription. You can do so with the following commands:
 
-      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/namespace.yaml
-      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/operatorGroup.yaml
-      kubectl -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/subscription.yaml
+      ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/namespace.yaml
+      ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/operatorGroup.yaml
+      ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f ${manifestsTargetDir}/subscription.yaml
       "
     fi
   fi
@@ -1282,34 +1733,21 @@ fi
 if [[ -n "${TO_REGISTRY}" ]]; then
 
   # Install the operator
-  for manifest in namespace operatorGroup subscription; do
-    invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
-  done
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    for manifest in namespace clusterCatalog serviceAccount clusterRole clusterRoleBinding clusterExtension; do
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
+    done
+  else
+    for manifest in namespace operatorGroup subscription; do
+      invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
+    done
+  fi
 
   invoke_cluster_cli -n ${NAMESPACE_OPERATOR} patch serviceaccount default \
     -p '{"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}'
 
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
-    CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
-    echo -n "
-
-  To install, go to:
-  https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_OPERATOR}?catalogType=OperatorBackedService
-
-  Or "
-  else
-    echo -n "
-
-  To install on Kubernetes: "
-  fi
-
-  CLI_TOOL="kubectl"
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    CLI_TOOL="oc"
-  fi
   CR_EXAMPLE="
-  cat <<EOF | ${CLI_TOOL} -n ${NAMESPACE_OPERATOR} apply -f -
+  cat <<EOF | ${cli_hint} -n ${NAMESPACE_OPERATOR} apply -f -
   apiVersion: rhdh.redhat.com/v1alpha5
   kind: Backstage
   metadata:
@@ -1327,18 +1765,44 @@ if [[ -n "${TO_REGISTRY}" ]]; then
       enableLocalDb: true
   EOF"
 
-  echo "run this to create an RHDH instance:
+  if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
+    OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}' 2>/dev/null || true)
+    CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
+
+    echo -n "
+Done. ClusterExtension 'rhdh-operator' created via OLM v1.
+
+To create an RHDH instance:"
+  else
+    if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+      OCP_CONSOLE_ROUTE_HOST=$(invoke_cluster_cli get route console -n openshift-console -o=jsonpath='{.spec.host}')
+      CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}')
+      echo -n "
+
+  To install, go to:
+  https://${OCP_CONSOLE_ROUTE_HOST}/catalog/ns/${NAMESPACE_OPERATOR}?catalogType=OperatorBackedService
+
+  Or "
+    else
+      echo -n "
+
+  To install on Kubernetes: "
+    fi
+    echo -n "run this to create an RHDH instance:"
+  fi
+
+  echo "
   ${CR_EXAMPLE}
 
 Note that if you are creating the CR above in a different namespace, you will probably need to add the right pull secrets to be able to
-be able to pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
+pull the images from your mirror registry. You can do so by patching the default service account in your namespace, like so:
 
-${CLI_TOOL} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
+${cli_hint} -n \$YOUR_NAMESPACE patch serviceaccount default -p '{\"imagePullSecrets\": [{\"name\": \"\$YOUR_PULL_SECRET_NAME\"}]}'
 
 More details about image pull secrets in https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
   "
 
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
+  if [[ -n "${CLUSTER_ROUTER_BASE}" ]]; then
     echo "
   Once deployed, Developer Hub will be available at
   https://backstage-developer-hub-${NAMESPACE_OPERATOR}.${CLUSTER_ROUTER_BASE}
