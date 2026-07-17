@@ -79,7 +79,7 @@ jobs:
   bundle:
     name: Build and push operator-bundle
     needs: changes
-    if: needs.changes.outputs.any_changed == 'true'
+    if: needs.changes.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -136,7 +136,7 @@ jobs:
     needs:
       - changes
       - bundle
-    if: needs.changes.outputs.any_changed == 'true'
+    if: needs.changes.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -238,7 +238,7 @@ jobs:
     needs:
       - changes
       - build
-    if: always() && needs.changes.outputs.any_changed == 'true' && needs.build.result == 'success'
+    if: always() && (needs.changes.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch') && needs.build.result == 'success'
     permissions:
       contents: read
       packages: write
