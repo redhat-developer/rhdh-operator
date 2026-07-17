@@ -128,7 +128,7 @@ plugins:
   - package: "oci://any-registry/path/backstage-plugin-catalog:{{inherit}}"
 ```
 
-Note: this behavior is similar to `ref://` and slightly different from what is described in [OCI Package Version Inheritance](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#oci-package-version-inheritance).
+**Since v0.11.0:** Both `ref://` and `:{{inherit}}` use name-based matching (plugin name only, registry/path ignored). This behavior is slightly different from what is described in [OCI Package Version Inheritance](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#oci-package-version-inheritance) which documents the RHDH init-container behavior (full URL matching).
 
 ## Dynamic plugins dependency management
 

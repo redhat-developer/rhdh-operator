@@ -265,6 +265,16 @@ func TestName(t *testing.T) {
 			expected: "my-plugin",
 		},
 		{
+			name:     "OCI registry-only URL returns empty",
+			package_: "oci://localhost:5000",
+			expected: "",
+		},
+		{
+			name:     "OCI registry with trailing slash returns empty",
+			package_: "oci://localhost:5000/",
+			expected: "",
+		},
+		{
 			name:     "HTTPS with version and tgz",
 			package_: "https://example.com/plugins/backstage-plugin-foo-1.0.0.tgz",
 			expected: "backstage-plugin-foo",

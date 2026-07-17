@@ -170,10 +170,16 @@ func (p *DynaPlugin) Name() string {
 			url = url[:idx]
 		}
 
+		// Require a path component (must have "/") - registry-only URLs are invalid
+		idx := strings.LastIndex(url, "/")
+		if idx == -1 {
+			return ""
+		}
+
 		// Extract the last path component (the image name, possibly with tag)
-		imageName := url
-		if idx := strings.LastIndex(url, "/"); idx != -1 {
-			imageName = url[idx+1:]
+		imageName := url[idx+1:]
+		if imageName == "" {
+			return ""
 		}
 
 		// Remove tag (:tag) from image name only (not port from registry)
