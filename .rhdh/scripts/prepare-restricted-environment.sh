@@ -20,12 +20,6 @@ FILTERED_VERSIONS=("*")
 OLM_VERSION="auto"
 RESOLVED_OLM_VERSION=""
 
-MAX_PARALLEL="${MAX_PARALLEL:-10}"
-if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
-  echo "[ERROR] MAX_PARALLEL must be a positive integer, got: '$MAX_PARALLEL'" >&2
-  exit 1
-fi
-
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
 YQ_VERSION=v4.45.1
@@ -59,43 +53,6 @@ function debugf() {
 
 function errorf() {
   logf "ERROR" "\033[0;31m" "$1"
-}
-
-SEM_FD=""
-
-function sem_init() {
-  local fifo
-  fifo=$(mktemp -u)
-  mkfifo "$fifo"
-  exec {SEM_FD}<>"$fifo"
-  rm -f "$fifo"
-  for ((i = 0; i < MAX_PARALLEL; i++)); do
-    printf '\n' >&"${SEM_FD}"
-  done
-}
-
-function sem_acquire() {
-  IFS= read -r -u "${SEM_FD}"
-}
-
-function sem_release() {
-  printf '\n' >&"${SEM_FD}"
-}
-
-function wait_for_pids() {
-  local -n __wfp_pids=$1
-  local context="${2:-background job}"
-  local failed=0
-  for pid in ${__wfp_pids[@]+"${__wfp_pids[@]}"}; do
-    if ! wait "$pid"; then
-      failed=$((failed + 1))
-    fi
-  done
-  __wfp_pids=()
-  if [[ $failed -gt 0 ]]; then
-    errorf "${failed} ${context}(s) failed"
-    return 1
-  fi
 }
 
 function check_tool() {
@@ -604,18 +561,13 @@ fi
 if [[ -n "${TO_DIR}" ]]; then
   mkdir -p "${TO_DIR}"
   TMPDIR="${TO_DIR}"
-  trap '{ jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null; } || true' EXIT
-  trap 'exit 1' INT TERM
 else
   TMPDIR=$(mktemp -d)
   # shellcheck disable=SC2064
-  trap "rm -fr \"$TMPDIR\" || true; { jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null; } || true" EXIT
-  trap 'exit 1' INT TERM
+  trap "rm -fr $TMPDIR || true" EXIT
 fi
 pushd "${TMPDIR}" >/dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
-
-sem_init
 
 if (( INSTALL_YQ )); then
   YQ=$HOME/.local/bin/yq_mf
@@ -637,66 +589,37 @@ function ocp_prepare_internal_registry() {
   # https://access.redhat.com/solutions/6022011
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"disableRedirect":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
-
-  skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2 &
-  local skopeo_login_pid=$!
-  podman login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2 &
-  local podman_login_pid=$!
-
-  local ns_pids=()
+  skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
+  podman login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
   for ns in rhdh-operator openshift4 rhdh rhel9 oc-mirror; do
-    (
-      if ! oc get namespace "$ns" &>/dev/null; then
-        oc create namespace "$ns" >&2
-      fi
-      oc adm policy add-cluster-role-to-user system:image-signer "system:serviceaccount:${ns}:default" >&2 || true
-    ) &
-    ns_pids+=($!)
+    # To be able to push images under this scope in the internal image registry
+    if ! oc get namespace "$ns" &>/dev/null; then
+      oc create namespace "$ns" >&2
+    fi
+    oc adm policy add-cluster-role-to-user system:image-signer system:serviceaccount:${ns}:default >&2 || true
   done
-  wait_for_pids ns_pids "namespace setup"
-
-  if ! wait "$skopeo_login_pid"; then
-    errorf "skopeo login failed"
-    return 1
-  fi
-  if ! wait "$podman_login_pid"; then
-    errorf "podman login failed"
-    return 1
-  fi
-
-  local secret_pids=()
   for ns in rhdh-operator openshift-marketplace; do
-    (
-      if oc -n "${ns}" get secret internal-reg-ext-auth-for-rhdh &>/dev/null; then
-        oc -n "${ns}" delete secret internal-reg-ext-auth-for-rhdh >&2
-      fi
-      oc -n "${ns}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
-        --docker-server="${my_registry}" \
-        --docker-username=kubeadmin \
-        --docker-password="$(oc whoami -t)" \
-        --docker-email="admin@internal-registry-ext.example.com" >&2
-      if oc -n "${ns}" get secret internal-reg-auth-for-rhdh &>/dev/null; then
-        oc -n "${ns}" delete secret internal-reg-auth-for-rhdh >&2
-      fi
-      oc -n "${ns}" create secret docker-registry internal-reg-auth-for-rhdh \
-        --docker-server="${internal_registry_url}" \
-        --docker-username=kubeadmin \
-        --docker-password="$(oc whoami -t)" \
-        --docker-email="admin@internal-registry.example.com" >&2
-      oc adm policy add-cluster-role-to-user system:image-signer "system:serviceaccount:${ns}:default" >&2 || true
-    ) &
-    secret_pids+=($!)
+    if oc -n ${ns} get secret internal-reg-ext-auth-for-rhdh &>/dev/null; then
+      oc -n ${ns} delete secret internal-reg-ext-auth-for-rhdh >&2
+    fi
+    oc -n ${ns} create secret docker-registry internal-reg-ext-auth-for-rhdh \
+      --docker-server="${my_registry}" \
+      --docker-username=kubeadmin \
+      --docker-password="$(oc whoami -t)" \
+      --docker-email="admin@internal-registry-ext.example.com" >&2
+    if oc -n ${ns} get secret internal-reg-auth-for-rhdh &>/dev/null; then
+      oc -n ${ns} delete secret internal-reg-auth-for-rhdh >&2
+    fi
+    oc -n ${ns} create secret docker-registry internal-reg-auth-for-rhdh \
+      --docker-server="${internal_registry_url}" \
+      --docker-username=kubeadmin \
+      --docker-password="$(oc whoami -t)" \
+      --docker-email="admin@internal-registry.example.com" >&2
+    oc adm policy add-cluster-role-to-user system:image-signer system:serviceaccount:${ns}:default >&2 || true
   done
-  wait_for_pids secret_pids "secret setup"
-
-  local policy_pids=()
-  oc policy add-role-to-user system:image-puller system:serviceaccount:openshift-marketplace:default -n openshift-marketplace >&2 &
-  policy_pids+=($!)
-  oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:default -n rhdh-operator >&2 &
-  policy_pids+=($!)
-  oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:rhdh-operator -n rhdh-operator >&2 &
-  policy_pids+=($!)
-  wait_for_pids policy_pids "policy setup"
+  oc policy add-role-to-user system:image-puller system:serviceaccount:openshift-marketplace:default -n openshift-marketplace >&2 || true
+  oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:default -n rhdh-operator >&2 || true
+  oc policy add-role-to-user system:image-puller system:serviceaccount:rhdh-operator:rhdh-operator -n rhdh-operator >&2 || true
 }
 
 function buildRegistryUrl() {
@@ -715,27 +638,11 @@ function buildRegistryUrl() {
   fi
 }
 
-CACHED_REGISTRY_URL=""
-CACHED_REGISTRY_URL_INTERNAL=""
-
-function cache_registry_urls() {
-  if [[ -n "$TO_REGISTRY" ]]; then
-    CACHED_REGISTRY_URL=$(buildRegistryUrl)
-    CACHED_REGISTRY_URL_INTERNAL=$(buildRegistryUrl "internal")
-  fi
-}
-
 function buildCatalogImageUrl() {
   if [[ -n "$TO_REGISTRY" ]]; then
     tag=${INDEX_IMAGE##*:}
     [[ "$INDEX_IMAGE" == "$tag" ]] && tag="latest"
-    local reg_url
-    if [[ "${1:-external}" == "internal" ]]; then
-      reg_url="${CACHED_REGISTRY_URL_INTERNAL}"
-    else
-      reg_url="${CACHED_REGISTRY_URL}"
-    fi
-    echo "${reg_url}/${2:-rhdh/index}:${tag}"
+    echo "$(buildRegistryUrl "${1:-external}")/${2:-rhdh/index}:${tag}"
   else
     echo ""
   fi
@@ -785,7 +692,7 @@ function render_index() {
       >"${local_index_file}"
   fi
 
-  debugf "Got $(wc -l < "${local_index_file}") lines of JSON from the index!"
+  debugf "Got $(cat "${local_index_file}" | wc -l) lines of JSON from the index!"
 
   if [ ! -s "${local_index_file}" ]; then
     errorf "[ERROR] 'opm render $INDEX_IMAGE' returned an empty output, which likely means that this index Image does not contain the rhdh operator."
@@ -807,61 +714,32 @@ function extract_last_two_elements() {
   fi
 }
 
-function _last_two() {
-  local -n __lt_result=$1
-  local __lt_input="$2"
-  if [[ "$__lt_input" == */*/* ]]; then
-    local __lt_last="${__lt_input##*/}"
-    local __lt_rest="${__lt_input%/*}"
-    __lt_result="${__lt_rest##*/}/${__lt_last}"
-  else
-    __lt_result="$__lt_input"
-  fi
-}
-
 function mirror_extra_images() {
-  if [[ ${#EXTRA_IMAGES[@]} -eq 0 ]]; then
-    return
-  fi
-  debugf "Extra images (${#EXTRA_IMAGES[@]}, max ${MAX_PARALLEL} parallel): ${EXTRA_IMAGES[*]}"
-
-  if [[ -n "$TO_REGISTRY" ]] && [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
-    for img in "${EXTRA_IMAGES[@]}"; do
-      local lastTwo=""
-      if [[ "$img" == *"@sha256:"* ]]; then
-        _last_two lastTwo "${img%@*}"
-      elif [[ "$img" == *":"* ]]; then
-        _last_two lastTwo "${img%:*}"
-      else
-        _last_two lastTwo "${img}"
-      fi
-      local projectNameForOcpReg=${lastTwo%%/*}
-      oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
-    done
-  fi
-
-  local pids=()
+  debugf "Extra images: " "${EXTRA_IMAGES[@]}"
   for img in "${EXTRA_IMAGES[@]}"; do
-    local imgDir imgTag lastTwo="" targetImg
     if [[ "$img" == *"@sha256:"* ]]; then
-      local imgDigest="${img##*@sha256:}"
+      imgDigest="${img##*@sha256:}"
       imgDir="./extraImages/${img%@*}/sha256_$imgDigest"
-      _last_two lastTwo "${img%@*}"
-      targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$imgDigest"
+      lastTwo=$(extract_last_two_elements "${img%@*}")
+      targetImg="$(buildRegistryUrl)/${lastTwo}:$imgDigest"
     elif [[ "$img" == *":"* ]]; then
-      imgTag="${img##*:}"
       imgDir="./extraImages/${img%:*}/tag_$imgTag"
-      _last_two lastTwo "${img%:*}"
-      targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$imgTag"
+      imgTag="${img##*:}"
+      lastTwo=$(extract_last_two_elements "${img%:*}")
+      targetImg="$(buildRegistryUrl)/${lastTwo}:$imgTag"
     else
       imgDir="./extraImages/${img}/tag_latest"
-      _last_two lastTwo "${img}"
-      targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:latest"
+      lastTwo=$(extract_last_two_elements "${img}")
+      targetImg="$(buildRegistryUrl)/${lastTwo}:latest"
     fi
 
     if [[ -n "$TO_REGISTRY" ]]; then
-      mirror_image_to_registry "$img" "$targetImg" &
-      pids+=($!)
+      if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
+        # Create the corresponding project if it doesn't exist
+        projectNameForOcpReg=${lastTwo%%/*}
+        oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
+      fi
+      mirror_image_to_registry "$img" "$targetImg"
     else
       if [ -d "$imgDir" ] && ! is_complete_image_archive "$imgDir"; then
         warnf "Removing incomplete image archive at ${imgDir} (previous download was interrupted)"
@@ -869,95 +747,57 @@ function mirror_extra_images() {
       fi
       if [ ! -d "$imgDir" ]; then
         mkdir -p "${imgDir}"
-        mirror_image_to_archive "$img" "$imgDir" &
-        pids+=($!)
+        mirror_image_to_archive "$img" "$imgDir"
       fi
     fi
   done
-  wait_for_pids pids "extra image"
   debugf "... done."
 }
 
 function mirror_extra_images_from_dir() {
-  local BASE_DIR="${FROM_DIR}/extraImages"
+  BASE_DIR="${FROM_DIR}/extraImages"
   debugf "Extra images from ${BASE_DIR}..."
-  if [ ! -d "${BASE_DIR}" ]; then
-    return
-  fi
-
-  local sha256_dirs=()
-  mapfile -t sha256_dirs < <(find "$BASE_DIR" -type d -name "sha256_*" 2>/dev/null)
-  local tag_dirs=()
-  mapfile -t tag_dirs < <(find "$BASE_DIR" -type d -name "tag_*" 2>/dev/null)
-
-  if [[ ${#sha256_dirs[@]} -eq 0 ]] && [[ ${#tag_dirs[@]} -eq 0 ]]; then
-    return
-  fi
-
-  infof "Pushing ${#sha256_dirs[@]} digest + ${#tag_dirs[@]} tag extra images from dir (max ${MAX_PARALLEL} parallel)..."
-
-  if [[ -n "$TO_REGISTRY" ]] && [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
-    local ns_set=()
-    for sha256_dir in "${sha256_dirs[@]}"; do
-      local relative_path=${sha256_dir#"$BASE_DIR/"}
-      local parent_path
+  if [ -d "${BASE_DIR}" ]; then
+    # Iterate over all directories named "sha256_*"
+    find "$BASE_DIR" -type d -name "sha256_*" | while read -r sha256_dir; do
+      relative_path=${sha256_dir#"$BASE_DIR/"}
+      sha256_hash=${sha256_dir##*/sha256_}
       parent_path=$(dirname "$relative_path")
-      local lastTwo=""
-      _last_two lastTwo "${parent_path}"
-      ns_set+=("${lastTwo%%/*}")
-    done
-    for tag_dir in "${tag_dirs[@]}"; do
-      local relative_path=${tag_dir#"$BASE_DIR/"}
-      local parent_path
-      parent_path=$(dirname "$relative_path")
-      local lastTwo=""
-      _last_two lastTwo "${parent_path}"
-      ns_set+=("${lastTwo%%/*}")
-    done
-    local unique_ns
-    unique_ns=$(printf '%s\n' "${ns_set[@]}" | sort -u)
-    while IFS= read -r ns; do
-      if [[ -n "$ns" ]] && ! oc get namespace "$ns" &>/dev/null; then
-        oc create namespace "$ns"
+      debugf "parent_path: $parent_path"
+      lastTwo=$(extract_last_two_elements "${parent_path}")
+      extraImg="${lastTwo}:${sha256_hash}"
+      debugf "Extra-image: $extraImg"
+      if [[ -n "$TO_REGISTRY" ]]; then
+        if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
+          # Create the corresponding project if it doesn't exist
+          projectNameForOcpReg=${lastTwo%%/*}
+          oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
+        fi
+        targetImg="$(buildRegistryUrl)/${extraImg%@*}"
+        push_image_from_archive "$sha256_dir" "$targetImg"
       fi
-    done <<<"$unique_ns"
+    done
+
+    # Iterate over all directories named "tag_*"
+    find "$BASE_DIR" -type d -name "tag_*" | while read -r tag_dir; do
+      relative_path=${tag_dir#"$BASE_DIR/"}
+      tag_hash=${tag_dir##*/tag_}
+      parent_path=$(dirname "$relative_path")
+      debugf "parent_path: $parent_path"
+      lastTwo=$(extract_last_two_elements "${parent_path}")
+      extraImg="${lastTwo}:${tag_hash}"
+      debugf "Extra-image: $extraImg"
+      if [[ -n "$TO_REGISTRY" ]]; then
+        if [[ "${IS_OPENSHIFT}" = "true" && "${TO_REGISTRY}" = "OCP_INTERNAL" ]]; then
+          # Create the corresponding project if it doesn't exist
+          projectNameForOcpReg=${lastTwo%%/*}
+          oc get namespace "${projectNameForOcpReg}" &>/dev/null || oc create namespace "${projectNameForOcpReg}"
+        fi
+        targetImg="$(buildRegistryUrl)/${extraImg%:*}"
+        push_image_from_archive "$tag_dir" "$targetImg"
+      fi
+    done
   fi
-
-  local pids=()
-
-  for sha256_dir in "${sha256_dirs[@]}"; do
-    local relative_path=${sha256_dir#"$BASE_DIR/"}
-    local sha256_hash=${sha256_dir##*/sha256_}
-    local parent_path
-    parent_path=$(dirname "$relative_path")
-    local lastTwo=""
-    _last_two lastTwo "${parent_path}"
-    local extraImg="${lastTwo}:${sha256_hash}"
-    if [[ -n "$TO_REGISTRY" ]]; then
-      local targetImg
-      targetImg="${CACHED_REGISTRY_URL}/${extraImg%@*}"
-      push_image_from_archive "$sha256_dir" "$targetImg" &
-      pids+=($!)
-    fi
-  done
-
-  for tag_dir in "${tag_dirs[@]}"; do
-    local relative_path=${tag_dir#"$BASE_DIR/"}
-    local tag_hash=${tag_dir##*/tag_}
-    local parent_path
-    parent_path=$(dirname "$relative_path")
-    local lastTwo=""
-    _last_two lastTwo "${parent_path}"
-    local extraImg="${lastTwo}:${tag_hash}"
-    if [[ -n "$TO_REGISTRY" ]]; then
-      local targetImg
-      targetImg="${CACHED_REGISTRY_URL}/${extraImg}"
-      push_image_from_archive "$tag_dir" "$targetImg" &
-      pids+=($!)
-    fi
-  done
-
-  wait_for_pids pids "extra image from dir"
 }
 
 function replaceInternalRegIfNeeded() {
@@ -973,75 +813,65 @@ function replaceInternalRegIfNeeded() {
   echo "$img"
 }
 
-function process_single_bundle() {
-  set -euo pipefail
+function process_bundles() {
 
-  local bundleImg="$1"
-  local originalBundleImg="$2"
-  local digest="$3"
-  local sed_commands_dir="$4"
-  local bundle_id="$5"
-
-  local bundle_dir="bundles/${digest}"
-  mkdir -p "${bundle_dir}"
-
-  sem_acquire
-  if ! skopeo copy --remove-signatures "docker://$bundleImg" "oci:./${bundle_dir}/src:latest" 2>"${bundle_dir}/copy.err"; then
-    sem_release
-    debugf "bundle #${bundle_id}: skopeo copy failed, skipping (see ${bundle_dir}/copy.err)" >&2
-    return 0
-  fi
-  sem_release
-  debugf "bundle #${bundle_id}: pulled ${bundleImg}" >&2
-
-  umoci unpack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked" --rootless
-
-  for file in "./${bundle_dir}/unpacked/rootfs/manifests"/*; do
-    if [[ "$file" == *.clusterserviceversion.yaml || "$file" == *.csv.yaml ]]; then
-      "$YQ" eval '
-        (.spec.install.spec.deployments[] | select(.name == "rhdh-operator").spec.template.spec) +=
-          {"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}
-      ' -i "$file"
-
-      local all_related_images=()
-      local images
-      mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
-      if ((${#images[@]})); then
-        all_related_images+=("${images[@]}")
+  for bundleImg in $(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq); do
+    debugf "bundleImg=$bundleImg"
+    originalBundleImg="$bundleImg"
+    bundleImg=$(replaceInternalRegIfNeeded "$bundleImg")
+    digest="${bundleImg##*@sha256:}"
+    if skopeo inspect "docker://$bundleImg" &>/dev/null; then
+      mkdir -p "bundles/$digest"
+      debugf "\t copying and unpacking image $bundleImg locally..."
+      if [ ! -d "./bundles/${digest}/src" ]; then
+        skopeo copy --remove-signatures "docker://$bundleImg" "oci:./bundles/${digest}/src:latest"
       fi
-      local related_images
-      related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
-      if [[ -n "$related_images" ]]; then
-        while IFS= read -r img; do
-          [[ -n "$img" ]] && all_related_images+=("$img")
-        done <<<"$related_images"
+      if [ ! -d "./bundles/${digest}/unpacked" ]; then
+        umoci unpack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked" --rootless
       fi
 
-      local csv_sed_file="${sed_commands_dir}/${digest}_csv.sed"
-      : > "$csv_sed_file"
-      local inner_pids=()
+      debugf "\t inspecting related images referenced in bundle image $bundleImg..."
+      for file in "./bundles/${digest}/unpacked/rootfs/manifests"/*; do
+        if [[ "$file" == *.clusterserviceversion.yaml || "$file" == *.csv.yaml ]]; then
+          debugf "\t Adding imagePullSecrets to the CSV file so we can pull from private registries"
+          "$YQ" eval '
+            (.spec.install.spec.deployments[] | select(.name == "rhdh-operator").spec.template.spec) +=
+              {"imagePullSecrets": [{"name": "internal-reg-auth-for-rhdh"},{"name": "internal-reg-ext-auth-for-rhdh"},{"name": "reg-pull-secret"}]}
+          ' -i "$file"
 
-      for relatedImage in "${all_related_images[@]}"; do
-        local imgDir="./images/"
-        local lastTwo="" targetImg internalTargetImg
-        if [[ "$relatedImage" == *"@sha256:"* ]]; then
-          local relatedImageDigest="${relatedImage##*@sha256:}"
-          imgDir+="${relatedImage%@*}/sha256_$relatedImageDigest"
-          _last_two lastTwo "${relatedImage%@*}"
-          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$relatedImageDigest"
-          internalTargetImg="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:$relatedImageDigest"
-        elif [[ "$relatedImage" == *":"* ]]; then
-          local relatedImageTag="${relatedImage##*:}"
-          imgDir+="${relatedImage%:*}/tag_$relatedImageTag"
-          _last_two lastTwo "${relatedImage%:*}"
-          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$relatedImageTag"
-          internalTargetImg="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:$relatedImageTag"
-        else
-          imgDir+="${relatedImage}/tag_latest"
-          _last_two lastTwo "${relatedImage}"
-          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:latest"
-          internalTargetImg="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:latest"
-        fi
+          all_related_images=()
+          debugf "\t finding related images in $file to mirror..."
+          mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
+          if ((${#images[@]})); then
+            all_related_images+=("${images[@]}")
+          fi
+          # TODO(rm3l): we should use spec.relatedImages instead, but it seems to be incomplete in some bundles
+          related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
+          if [[ -n "$related_images" ]]; then
+            while IFS= read -r img; do
+              [[ -n "$img" ]] && all_related_images+=("$img")
+            done <<<"$related_images"
+          fi
+          for relatedImage in "${all_related_images[@]}"; do
+            imgDir="./images/"
+            if [[ "$relatedImage" == *"@sha256:"* ]]; then
+              relatedImageDigest="${relatedImage##*@sha256:}"
+              imgDir+="${relatedImage%@*}/sha256_$relatedImageDigest"
+              lastTwo=$(extract_last_two_elements "${relatedImage%@*}")
+              targetImg="$(buildRegistryUrl)/${lastTwo}:$relatedImageDigest"
+              internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:$relatedImageDigest"
+            elif [[ "$relatedImage" == *":"* ]]; then
+              relatedImageTag="${relatedImage##*:}"
+              imgDir+="${relatedImage%:*}/tag_$relatedImageTag"
+              lastTwo=$(extract_last_two_elements "${relatedImage%:*}")
+              targetImg="$(buildRegistryUrl)/${lastTwo}:$relatedImageTag"
+              internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:$relatedImageTag"
+            else
+              imgDir+="${relatedImage}/tag_latest"
+              lastTwo=$(extract_last_two_elements "${relatedImage}")
+              targetImg="$(buildRegistryUrl)/${lastTwo}:latest"
+              internalTargetImg="$(buildRegistryUrl "internal")/${lastTwo}:latest"
+            fi
 
             if [[ -n "$TO_REGISTRY" ]]; then
               mirror_image_to_registry "$relatedImage" "$targetImg"
@@ -1061,68 +891,21 @@ function process_single_bundle() {
         fi
       done
 
-      wait_for_pids inner_pids "related image mirror"
+      if [[ -n "$TO_REGISTRY" ]]; then
+        # repack the image with the changes
+        debugf "\t Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
+        umoci repack --image "./bundles/${digest}/src:latest" "./bundles/${digest}/unpacked"
 
-      if [[ -s "$csv_sed_file" ]]; then
-        sed -i -f "$csv_sed_file" "$file"
+        # Push the bundle to the mirror registry
+        newBundleImage="$(buildRegistryUrl)/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+        newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+        debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
+        skopeo copy --remove-signatures --dest-tls-verify=false "oci:./bundles/${digest}/src:latest" "docker://${newBundleImage}"
+
+        sed -i "s#${originalBundleImg}#${newBundleImageInternal}#g" "./rhdh/rhdh/render.yaml"
       fi
     fi
   done
-
-  if [[ -n "$TO_REGISTRY" ]]; then
-    umoci repack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked"
-
-    local bundleLastTwo=""
-    _last_two bundleLastTwo "${bundleImg%@*}"
-    local newBundleImage="${CACHED_REGISTRY_URL}/${bundleLastTwo}:${digest}"
-    local newBundleImageInternal="${CACHED_REGISTRY_URL_INTERNAL}/${bundleLastTwo}:${digest}"
-    debugf "bundle #${bundle_id}: pushing ${newBundleImage}" >&2
-    sem_acquire
-    skopeo copy --remove-signatures --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}" || { sem_release; return 1; }
-    sem_release
-
-    echo "s#${originalBundleImg}#${newBundleImageInternal}#g" > "${sed_commands_dir}/${digest}.sed"
-  fi
-}
-
-function process_bundles() {
-
-  local bundle_images
-  bundle_images=$(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
-
-  local total_bundles
-  total_bundles=$(echo "$bundle_images" | wc -l | tr -d ' ')
-  infof "Processing ${total_bundles} bundles (max ${MAX_PARALLEL} parallel)..."
-
-  local sed_commands_dir="${TMPDIR}/sed_commands_bundles"
-  mkdir -p "$sed_commands_dir"
-
-  local bundle_count=0
-  local pids=()
-
-  for bundleImg in $bundle_images; do
-    bundle_count=$((bundle_count + 1))
-    local originalBundleImg="$bundleImg"
-    bundleImg=$(replaceInternalRegIfNeeded "$bundleImg")
-    local digest="${bundleImg##*@sha256:}"
-    debugf "bundle #${bundle_count}/${total_bundles}: $originalBundleImg => $bundleImg"
-
-    process_single_bundle "$bundleImg" "$originalBundleImg" "$digest" "$sed_commands_dir" "$bundle_count" &
-    pids+=($!)
-  done
-
-  wait_for_pids pids "bundle"
-
-  local sed_files
-  sed_files=$(find "$sed_commands_dir" -maxdepth 1 -name '*.sed' ! -name '*_csv.sed' 2>/dev/null || true)
-  if [[ -n "$sed_files" ]]; then
-    local combined_sed="${TMPDIR}/combined_bundle_sed.txt"
-    find "$sed_commands_dir" -maxdepth 1 -name '*.sed' ! -name '*_csv.sed' -exec cat {} + > "$combined_sed"
-    local replacement_count
-    replacement_count=$(wc -l < "$combined_sed" | tr -d ' ')
-    infof "Applying ${replacement_count} image ref replacements to render.yaml..."
-    sed -i -f "$combined_sed" "./rhdh/rhdh/render.yaml"
-  fi
 
   if [ ! -f "rhdh/rhdh.Dockerfile" ]; then
     debugf "\t Regenerating Dockerfile so the index can be rebuilt..."
@@ -1141,101 +924,6 @@ function process_bundles() {
   fi
 }
 
-function process_single_bundle_from_dir() {
-  set -euo pipefail
-
-  local bundleImg="$1"
-  local digest="$2"
-  local sed_commands_dir="$3"
-  local bundle_id="$4"
-
-  if [ ! -d "${FROM_DIR}/bundles/${digest}/src" ]; then
-    warnf "missing src image for bundle digest: ${FROM_DIR}/bundles/${digest}/src" >&2
-    return 0
-  fi
-  if [ ! -d "${FROM_DIR}/bundles/${digest}/unpacked" ]; then
-    warnf "missing unpacked image for bundle digest: ${FROM_DIR}/bundles/${digest}/unpacked" >&2
-    return 0
-  fi
-
-  debugf "bundle #${bundle_id}: handling from ${FROM_DIR}/bundles/${digest}..." >&2
-
-  for file in "${TMPDIR}/bundles/${digest}/unpacked/rootfs/manifests"/*; do
-    if [[ "$file" == *.clusterserviceversion.yaml || "$file" == *.csv.yaml ]]; then
-      local all_related_images=()
-      local images
-      mapfile -t images < <(grep -E 'image: ' "$file" | awk -F ': ' '{print $2}' | uniq)
-      if ((${#images[@]})); then
-        all_related_images+=("${images[@]}")
-      fi
-      local related_images
-      related_images=$("$YQ" '.spec.install.spec.deployments[].spec.template.spec.containers[].env[] | select(.name | test("^RELATED_IMAGE_")).value' "$file" || true)
-      if [[ -n "$related_images" ]]; then
-        while IFS= read -r img; do
-          [[ -n "$img" ]] && all_related_images+=("$img")
-        done <<<"$related_images"
-      fi
-
-      local csv_sed_file="${sed_commands_dir}/${digest}_csv.sed"
-      : > "$csv_sed_file"
-      local inner_pids=()
-
-      for relatedImage in "${all_related_images[@]}"; do
-        local imgDir="${FROM_DIR}/images/"
-        local lastTwo="" targetImg targetImgInternal
-        if [[ "$relatedImage" == *"@sha256:"* ]]; then
-          local relatedImageDigest="${relatedImage##*@sha256:}"
-          imgDir+="${relatedImage%@*}/sha256_$relatedImageDigest"
-          _last_two lastTwo "${relatedImage%@*}"
-          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$relatedImageDigest"
-          targetImgInternal="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:$relatedImageDigest"
-        elif [[ "$relatedImage" == *":"* ]]; then
-          local relatedImageTag="${relatedImage##*:}"
-          imgDir+="${relatedImage%:*}/tag_$relatedImageTag"
-          _last_two lastTwo "${relatedImage%:*}"
-          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:$relatedImageTag"
-          targetImgInternal="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:$relatedImageTag"
-        else
-          imgDir+="${relatedImage}/tag_latest"
-          _last_two lastTwo "${relatedImage}"
-          targetImg="${CACHED_REGISTRY_URL}/${lastTwo}:latest"
-          targetImgInternal="${CACHED_REGISTRY_URL_INTERNAL}/${lastTwo}:latest"
-        fi
-        if [ ! -d "$imgDir" ]; then
-          warnf "Skipping related image $relatedImage not found mirrored in dir: $FROM_DIR/images" >&2
-          continue
-        fi
-        if [[ -n "$TO_REGISTRY" ]]; then
-          echo "s#${relatedImage}#${targetImgInternal}#g" >> "$csv_sed_file"
-          push_image_from_archive "$imgDir" "$targetImg" &
-          inner_pids+=($!)
-        fi
-      done
-
-      wait_for_pids inner_pids "related image push"
-
-      if [[ -s "$csv_sed_file" ]]; then
-        sed -i -f "$csv_sed_file" "$file"
-      fi
-    fi
-  done
-
-  if [[ -n "$TO_REGISTRY" ]]; then
-    umoci repack --image "${TMPDIR}/bundles/${digest}/src:latest" "${TMPDIR}/bundles/${digest}/unpacked"
-
-    local bundleLastTwo=""
-    _last_two bundleLastTwo "${bundleImg%@*}"
-    local newBundleImage="${CACHED_REGISTRY_URL}/${bundleLastTwo}:${digest}"
-    local newBundleImageInternal="${CACHED_REGISTRY_URL_INTERNAL}/${bundleLastTwo}:${digest}"
-    debugf "bundle #${bundle_id}: pushing ${newBundleImage}" >&2
-    sem_acquire
-    skopeo copy --preserve-digests --remove-signatures --dest-tls-verify=false "oci:${TMPDIR}/bundles/${digest}/src:latest" "docker://${newBundleImage}" || { sem_release; return 1; }
-    sem_release
-
-    echo "s#${bundleImg}#${newBundleImageInternal}#g" > "${sed_commands_dir}/${digest}.sed"
-  fi
-}
-
 function process_bundles_from_dir() {
 
   if [ ! -f "${FROM_DIR}/rhdh/rhdh.Dockerfile" ]; then
@@ -1247,12 +935,19 @@ function process_bundles_from_dir() {
     cp -r "${FROM_DIR}/${d}" "${TMPDIR}/${d}"
   done
 
-  local bundle_images
-  bundle_images=$(grep -E '^image: .*operator-bundle' "${FROM_DIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
+  for bundleImg in $(grep -E '^image: .*operator-bundle' "${FROM_DIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq); do
+    debugf "bundleImg=$bundleImg"
+    digest="${bundleImg##*@sha256:}"
+    if [ ! -d "${FROM_DIR}/bundles/${digest}/src" ]; then
+      warnf "missing src image for bundle digest: ${FROM_DIR}/bundles/${digest}/src"
+      continue
+    fi
+    if [ ! -d "${FROM_DIR}/bundles/${digest}/unpacked" ]; then
+      warnf "missing unpacked image for bundle digest: ${FROM_DIR}/bundles/${digest}/unpacked"
+      continue
+    fi
 
-  local total_bundles
-  total_bundles=$(echo "$bundle_images" | wc -l | tr -d ' ')
-  infof "Processing ${total_bundles} bundles from dir (max ${MAX_PARALLEL} parallel)..."
+    debugf "Handling bundle image from ${FROM_DIR}/bundles/${digest}..."
 
     debugf "\t inspecting related images referenced in bundle image $bundleImg..."
     for file in "${TMPDIR}/bundles/${digest}/unpacked/rootfs/manifests"/*; do
@@ -1300,30 +995,20 @@ function process_bundles_from_dir() {
       fi
     done
 
-  local bundle_count=0
-  local pids=()
+    if [[ -n "$TO_REGISTRY" ]]; then
+      # repack the image with the changes
+      debugf "\t Repacking image ./bundles/${digest}/src => ./bundles/${digest}/unpacked..."
+      umoci repack --image "${TMPDIR}/bundles/${digest}/src:latest" "${TMPDIR}/bundles/${digest}/unpacked"
 
-  for bundleImg in $bundle_images; do
-    bundle_count=$((bundle_count + 1))
-    local digest="${bundleImg##*@sha256:}"
-    debugf "bundle #${bundle_count}/${total_bundles}: $bundleImg"
+      # Push the bundle to the mirror registry
+      newBundleImage="$(buildRegistryUrl)/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+      newBundleImageInternal="$(buildRegistryUrl "internal")/$(extract_last_two_elements "${bundleImg%@*}"):${digest}"
+      debugf "\t Pushing updated bundle image: ./bundles/${digest}/src => ${newBundleImage}..."
+      skopeo copy --preserve-digests --remove-signatures --dest-tls-verify=false "oci:${TMPDIR}/bundles/${digest}/src:latest" "docker://${newBundleImage}"
 
-    process_single_bundle_from_dir "$bundleImg" "$digest" "$sed_commands_dir" "$bundle_count" &
-    pids+=($!)
+      sed -i "s#${bundleImg}#${newBundleImageInternal}#g" "${TMPDIR}/rhdh/rhdh/render.yaml"
+    fi
   done
-
-  wait_for_pids pids "bundle from dir"
-
-  local sed_files
-  sed_files=$(find "$sed_commands_dir" -maxdepth 1 -name '*.sed' ! -name '*_csv.sed' 2>/dev/null || true)
-  if [[ -n "$sed_files" ]]; then
-    local combined_sed="${TMPDIR}/combined_bundle_from_dir_sed.txt"
-    find "$sed_commands_dir" -maxdepth 1 -name '*.sed' ! -name '*_csv.sed' -exec cat {} + > "$combined_sed"
-    local replacement_count
-    replacement_count=$(wc -l < "$combined_sed" | tr -d ' ')
-    infof "Applying ${replacement_count} image ref replacements to render.yaml..."
-    sed -i -f "$combined_sed" "${TMPDIR}/rhdh/rhdh/render.yaml"
-  fi
 
   if [[ -n "$TO_REGISTRY" ]]; then
     pushd "${TMPDIR}/rhdh"
@@ -1338,39 +1023,23 @@ function process_bundles_from_dir() {
 }
 
 function mirror_image_to_registry() {
-  sem_acquire
-  local rc=0
-  local src_image="$1"
-  if [[ "${IS_CI_INDEX_IMAGE}" == "true" ]]; then
-    for reg in registry.stage.redhat.io registry.redhat.io; do
-      src_image="${src_image/$reg\/rhdh/quay.io\/rhdh}"
-    done
-    src_image="${src_image/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
-  fi
-  local dest_image=$2
-
+  local src_image
+  src_image=$(replaceInternalRegIfNeeded "$1")
+  local dest_image
+  dest_image=$2
+  
   echo "Mirroring $src_image to $dest_image..."
-  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image" || rc=$?
-  sem_release
-  return $rc
+  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false docker://"$src_image" docker://"$dest_image"
 }
 
 function mirror_image_to_archive() {
-  sem_acquire
-  local rc=0
-  local src_image="$1"
-  if [[ "${IS_CI_INDEX_IMAGE}" == "true" ]]; then
-    for reg in registry.stage.redhat.io registry.redhat.io; do
-      src_image="${src_image/$reg\/rhdh/quay.io\/rhdh}"
-    done
-    src_image="${src_image/registry-proxy.engineering.redhat.com\/rh-osbs\/rhdh-/quay.io\/rhdh\/}"
-  fi
-  local archive_path="$2"
+  local src_image
+  src_image=$(replaceInternalRegIfNeeded "$1")
+  local archive_path
+  archive_path="$2"
 
   debugf "Saving $src_image to $archive_path..."
-  skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path" || rc=$?
-  sem_release
-  return $rc
+  skopeo copy --preserve-digests --remove-signatures --all --preserve-digests --dest-tls-verify=false docker://"$src_image" dir:"$archive_path"
 }
 
 function is_complete_image_archive() {
@@ -1386,18 +1055,7 @@ function push_image_from_archive() {
     exit 1
   fi
   echo "Pushing $archive_path to $dest_image..."
-  for ((attempt=1; attempt<=max_retries; attempt++)); do
-    rc=0
-    skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image" || rc=$?
-    if [[ $rc -eq 0 ]]; then break; fi
-    if ((attempt < max_retries)); then
-      warnf "Push failed (attempt $attempt/$max_retries), retrying in ${retry_delay}s... [$dest_image]"
-      sleep "$retry_delay"
-      retry_delay=$((retry_delay * 2))
-    fi
-  done
-  sem_release
-  return $rc
+  skopeo copy --preserve-digests --remove-signatures --all --dest-tls-verify=false dir:"$archive_path" docker://"$dest_image"
 }
 
 check_tool "yq"
@@ -1497,7 +1155,7 @@ EOF
       mirror_image_to_archive "registry.redhat.io/ubi9/ubi:latest" "${TO_DIR}/rhdh-catalog"
     fi
     if [[ -n "$TO_REGISTRY" ]]; then
-      registryUrl="${CACHED_REGISTRY_URL}"
+      registryUrl=$(buildRegistryUrl)
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
         registryUrl+="/oc-mirror"
       fi
@@ -1527,7 +1185,7 @@ EOF
       exit 1
     fi
     if [[ -n "${TO_REGISTRY}" ]]; then
-      registryUrl="${CACHED_REGISTRY_URL}"
+      registryUrl=$(buildRegistryUrl)
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
         registryUrl+="/oc-mirror"
       fi
@@ -1643,34 +1301,13 @@ EOF
   fi
 else
   if [[ -z "${FROM_DIR}" ]]; then
-    mirror_extra_images &
-    extra_mirror_pid=$!
-
     render_index
     process_bundles
-
-    if ! wait "$extra_mirror_pid"; then
-      errorf "mirror_extra_images failed"
-      exit 1
-    fi
   else
-    mirror_extra_images_from_dir &
-    extra_from_dir_pid=$!
-
-    mirror_extra_images &
-    extra_mirror_pid=$!
-
     process_bundles_from_dir
-
-    if ! wait "$extra_from_dir_pid"; then
-      errorf "mirror_extra_images_from_dir failed"
-      exit 1
-    fi
-    if ! wait "$extra_mirror_pid"; then
-      errorf "mirror_extra_images failed"
-      exit 1
-    fi
+    mirror_extra_images_from_dir
   fi
+  mirror_extra_images
 
   # create OLM resources
   manifestsTargetDir="${TMPDIR}"
@@ -1757,7 +1394,7 @@ EOF
 
   if [[ -n "${TO_REGISTRY}" ]]; then
     # IDMS will only work on regular OCP clusters. It doesn't work on ROSA or clusters with hosted control planes like on IBM Cloud.
-    registry_url_internal="${CACHED_REGISTRY_URL}"
+    registry_url_internal=$(buildRegistryUrl)
     cat <<EOF >"${manifestsTargetDir}/imageDigestMirrorSet.yaml"
   apiVersion: config.openshift.io/v1
   kind: ImageDigestMirrorSet
