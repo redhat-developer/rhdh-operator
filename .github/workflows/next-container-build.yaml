@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       any_changed: ${{ steps.changed-files.outputs.any_changed }}
+      short_sha: ${{ steps.meta.outputs.short_sha }}
+      base_version: ${{ steps.meta.outputs.base_version }}
+      latest_next: ${{ steps.meta.outputs.latest_next }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,6 +53,21 @@ jobs:
             .rhdh/**
             tests/**
 
+      - name: Compute image metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            LATEST_NEXT="next"
+          else
+            LATEST_NEXT="latest"
+          fi
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "base_version=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "latest_next=${LATEST_NEXT}" >> "$GITHUB_OUTPUT"
+
   # The bundle image is FROM scratch and contains only YAML manifests/metadata -- no
   # compiled binaries -- so its content is identical regardless of build architecture
   # (confirmed against the currently-published quay.io/rhdh-community/operator-bundle:next:
@@ -66,30 +84,18 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
+      BASE_VERSION: ${{ needs.changes.outputs.base_version }}
+      LATEST_NEXT: ${{ needs.changes.outputs.latest_next }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
-      - name: Prepare
-        run: |
-          set -euo pipefail
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
-          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
-          echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_ENV"
-
-          BRANCH_REF="${{ github.ref_name }}"
-          if [[ "${BRANCH_REF}" == "main" ]]; then
-            LATEST_NEXT="next"
-          else
-            LATEST_NEXT="latest"
-          fi
-          echo "LATEST_NEXT=${LATEST_NEXT}" >> "$GITHUB_ENV"
-
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: 'go.mod'
 
@@ -106,13 +112,13 @@ jobs:
           sudo apt-get -y update; sudo apt-get -y install podman
 
           export CONTAINER_TOOL=podman
-          export VERSION="${{ env.BASE_VERSION }}"
-          export REGISTRY_WITH_ORG="${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}"
-          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
+          export VERSION="${BASE_VERSION}"
+          export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
           export IMAGE_TAG_BASE="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}"
 
           : "${SHORT_SHA:?SHORT_SHA must be set}"
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
 
           CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" make bundle bundle-build bundle-push
 
@@ -122,7 +128,7 @@ jobs:
           done
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
-          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
           GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
 
   build:
@@ -141,24 +147,21 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
+      BASE_VERSION: ${{ needs.changes.outputs.base_version }}
+      LATEST_NEXT: ${{ needs.changes.outputs.latest_next }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
-      # Skip remaining steps if no relevant changes detected
       - name: Prepare
-        if: needs.changes.outputs.any_changed == 'true'
         env:
           MATRIX_OS: ${{ matrix.os }}
         run: |
           set -euo pipefail
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
-          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
-          echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_ENV"
-
           case "${MATRIX_OS}" in
             ubuntu-24.04)
               platform="linux/amd64"
@@ -175,22 +178,12 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
           echo "PLATFORM_ARCH=${platform#*/}" >> "$GITHUB_ENV"
 
-          BRANCH_REF="${{ github.ref_name }}"
-          if [[ "${BRANCH_REF}" == "main" ]]; then
-            LATEST_NEXT="next"
-          else
-            LATEST_NEXT="latest"
-          fi
-          echo "LATEST_NEXT=${LATEST_NEXT}" >> "$GITHUB_ENV"
-
       - name: Setup Go
-        if: needs.changes.outputs.any_changed == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: 'go.mod'
 
       - name: Login to registry (${{ env.REGISTRY }})
-        if: needs.changes.outputs.any_changed == 'true'
         uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -198,15 +191,13 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Build and push per-arch operator and catalog images
-        if: needs.changes.outputs.any_changed == 'true'
         run: |
           set -euo pipefail
-          sudo apt-get -y update; sudo apt-get -y install skopeo podman
+          sudo apt-get -y update; sudo apt-get -y install podman
 
           export CONTAINER_TOOL=podman
-          export VERSION="${{ env.BASE_VERSION }}"
-          export REGISTRY_WITH_ORG="${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}"
-          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
+          export VERSION="${BASE_VERSION}"
+          export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
           export IMAGE_TAG_BASE="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}"
           # Point catalog-build's bundle reference at the already-published, stable bundle
           # tag from the dedicated `bundle` job instead of rebuilding/pushing it again here.
@@ -215,6 +206,7 @@ jobs:
           : "${PLATFORM:?PLATFORM must be set}"
           : "${SHORT_SHA:?SHORT_SHA must be set}"
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
 
           # Build the operator image, then the catalog image. catalog-build's only other
           # prerequisite (besides the bundle-push we're skipping) is `opm`, which downloads
@@ -226,35 +218,19 @@ jobs:
 
           # Push per-arch tagged images
           for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
-            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${{ env.PLATFORM_ARCH }}"
-            podman push -q "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${{ env.PLATFORM_ARCH }}"
+            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${PLATFORM_ARCH}"
+            podman push -q "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${PLATFORM_ARCH}"
 
-            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${SHORT_SHA}-${{ env.PLATFORM_ARCH }}"
-            podman push -q "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${SHORT_SHA}-${{ env.PLATFORM_ARCH }}"
+            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${SHORT_SHA}-${PLATFORM_ARCH}"
+            podman push -q "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${SHORT_SHA}-${PLATFORM_ARCH}"
 
-            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-${{ env.PLATFORM_ARCH }}"
-            podman push -q "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-${{ env.PLATFORM_ARCH }}"
+            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-${PLATFORM_ARCH}"
+            podman push -q "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-${PLATFORM_ARCH}"
           done
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
-          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
           GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
-
-      - name: Upload build marker
-        if: needs.changes.outputs.any_changed == 'true'
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/build-markers
-          echo "${{ env.PLATFORM_ARCH }}" > /tmp/build-markers/${{ env.PLATFORM_ARCH }}
-
-      - name: Upload build marker artifact
-        if: needs.changes.outputs.any_changed == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: build-marker-${{ env.PLATFORM_PAIR }}
-          path: /tmp/build-markers/*
-          if-no-files-found: error
-          retention-days: 1
 
   merge:
     name: Create multi-arch manifests
@@ -268,40 +244,12 @@ jobs:
       packages: write
     env:
       HAS_QUAY_OAUTH: ${{ secrets.QUAY_OAUTH_TOKEN != '' }}
+      SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
+      BASE_VERSION: ${{ needs.changes.outputs.base_version }}
+      LATEST_NEXT: ${{ needs.changes.outputs.latest_next }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 0
-
-      - name: Download build markers
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          path: /tmp/build-markers
-          pattern: build-marker-*
-          merge-multiple: true
-
-      - name: Prepare
-        run: |
-          set -euo pipefail
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
-          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
-          echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_ENV"
-
-          BRANCH_REF="${{ github.ref_name }}"
-          if [[ "${BRANCH_REF}" == "main" ]]; then
-            LATEST_NEXT="next"
-          else
-            LATEST_NEXT="latest"
-          fi
-          echo "LATEST_NEXT=${LATEST_NEXT}" >> "$GITHUB_ENV"
-
-          echo "Build markers found:"
-          ls -la /tmp/build-markers/ || echo "No markers found"
-
       - name: Login to registry (${{ env.REGISTRY }})
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}
@@ -313,12 +261,12 @@ jobs:
       - name: Create manifest lists and push
         run: |
           set -euo pipefail
-          export REGISTRY_WITH_ORG="${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}"
-          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
+          export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
 
           : "${BASE_VERSION:?BASE_VERSION must be set}"
           : "${SHORT_SHA:?SHORT_SHA must be set}"
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
 
           # operator-bundle is not included here: it's architecture-invariant (see the
           # `bundle` job) and was already published as a single, final image there --
@@ -349,31 +297,32 @@ jobs:
           done
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
-          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
 
       - name: Cleanup per-arch tags
         if: env.HAS_QUAY_OAUTH == 'true'
         run: |
           set -euo pipefail
-          export OPERATOR_IMAGE_NAME="${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}"
-          export NAMESPACE="${{ vars.REGISTRY_ORG }}"
+          export NAMESPACE="${REGISTRY_ORG}"
 
           : "${BASE_VERSION:?BASE_VERSION must be set}"
           : "${SHORT_SHA:?SHORT_SHA must be set}"
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
 
           for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
             for arch in amd64 arm64; do
               for tag in "${BASE_VERSION}-${arch}" "${BASE_VERSION}-${SHORT_SHA}-${arch}" "${LATEST_NEXT}-${arch}"; do
                 echo "Deleting per-arch tag: ${image}:${tag}"
-                curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+                status=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE \
                   -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
                   "https://quay.io/api/v1/repository/${NAMESPACE}/${image}/tag/${tag}" \
-                  || true
+                  || true)
+                echo "  -> HTTP ${status} for ${image}:${tag}"
               done
             done
           done
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
-          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
           QUAY_OAUTH_TOKEN: ${{ secrets.QUAY_OAUTH_TOKEN }}
