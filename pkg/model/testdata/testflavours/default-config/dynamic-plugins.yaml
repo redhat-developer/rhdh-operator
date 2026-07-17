@@ -8,4 +8,4 @@ data:
       - dynamic-plugins.default.yaml
     plugins:
       - package: "plugin-base"
-        disabled: false
+        enabled: true

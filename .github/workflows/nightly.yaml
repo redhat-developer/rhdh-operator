@@ -56,7 +56,7 @@ jobs:
           rm_cmd: "rmz"
 
       - name: Setup Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: 'go.mod'
 
@@ -65,7 +65,9 @@ jobs:
         run: make lint
 
       - name: Test
-        run: make test
+        run: |
+          make local-dynamic-plugins
+          make test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
@@ -92,6 +94,7 @@ jobs:
           # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
           # but the `make test` command tries to use it.
           make manifests generate fmt vet install
+          make local-dynamic-plugins
           make run &
           MAKE_RUN_BG_PID=$!
           echo "MAKE_RUN_BG_PID=${MAKE_RUN_BG_PID}" | tee -a $GITHUB_ENV

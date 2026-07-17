@@ -7,6 +7,9 @@ PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec 
 # to use other config - add a directory with config,
 # use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
 PROFILE ?= rhdh
+
+# Enable operator dynamic plugins processing (default: true)
+OPERATOR_DP_PROCESSING ?= true
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
@@ -42,6 +45,7 @@ ifeq ($(PROFILE), rhdh)
 	DEFAULT_CHANNEL ?= fast
 	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
+	CATALOG_INDEX_IMAGE ?= quay.io/rhdh/plugin-catalog-index:$(IMAGE_TAG_VERSION)
 else
 	# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
     # This variable is used to construct full image tags for bundle and catalog images.
@@ -165,15 +169,13 @@ fmt: goimports ## Format the code using goimports
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
-	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps 2>/dev/null || :
-	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
+	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
-	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps 2>/dev/null || :
-	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
+	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
 POLL_PROGRESS_INTERVAL := 600s
@@ -232,9 +234,14 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
-	mkdir -p $(LOCALBIN)/default-config/ &&	rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config/
-	mkdir -p $(LOCALBIN)/plugin-deps/ &&	rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps/ 2>/dev/null || :
-	go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+
+# TODO @IMAGE=$(CATALOG_INDEX_IMAGE) ./hack/create-local-dynamic-plugins.sh - when catalog become stable
+.PHONY: local-dynamic-plugins
+local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-index image for local testing
+	@echo "Generating local-test dynamic-plugins.yaml from catalog-index image..."
+	./hack/create-local-dynamic-plugins.sh
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
@@ -295,11 +302,6 @@ BUNDLE_IMGS ?= $(BUNDLE_IMG)
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
 CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG_VERSION)
 
-# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
-
 .PHONY: bundles
 bundles: ## Generate bundle manifests and metadata, then validate generated files for all available profiles.
 	@for profile in $(PROFILES); do \
@@ -332,15 +334,19 @@ bundle-build: ## Build the bundle image.
 bundle-push: ## Push bundle image to registry
 	$(MAKE) image-push IMG=$(BUNDLE_IMG)
 
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
-# bundle-push is needed because 'opm index add' always pulls from the remote registry and never uses the local image.
-# See https://github.com/operator-framework/operator-registry/issues/885
+# Build an FBC (File-Based Catalog) image using opm.
+# Produces a catalog with the operators.operatorframework.io.index.configs.v1 label required by OLM v1.
+# FBC catalogs are also backward-compatible with OLM v0 on OCP 4.17+.
+# NOTE: currently supports a single BUNDLE_IMG. Multi-bundle catalogs need additional channel entries.
 .PHONY: catalog-build
-catalog-build: bundle-push opm ## Generate operator-catalog dockerfile using the operator-bundle image built and published above; then build catalog image
-	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT) --generate -d ./index.Dockerfile
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f index.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) .
+catalog-build: bundle-push opm ## Build an FBC catalog image from the operator-bundle image
+	rm -rf catalog-fbc && mkdir -p catalog-fbc
+	$(OPM) init $(BUNDLE_METADATA_PACKAGE_NAME) --default-channel=$(DEFAULT_CHANNEL) --output yaml > catalog-fbc/catalog.yaml
+	OPM=$(OPM) BUNDLE_IMGS="$(BUNDLE_IMGS)" OUTPUT_FILE=catalog-fbc/catalog.yaml hack/opm-render.sh
+	@printf -- '---\nschema: olm.channel\npackage: $(BUNDLE_METADATA_PACKAGE_NAME)\nname: $(DEFAULT_CHANNEL)\nentries:\n  - name: $(PROFILE_SHORT)-operator.v$(VERSION)\n' >> catalog-fbc/catalog.yaml
+	$(OPM) validate catalog-fbc
+	@printf 'FROM scratch\nADD catalog.yaml /configs/catalog.yaml\nLABEL operators.operatorframework.io.index.configs.v1=/configs/\n' > catalog-fbc/catalog.Dockerfile
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f catalog-fbc/catalog.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) catalog-fbc/
 
 # Push the catalog image.
 .PHONY: catalog-push
@@ -427,6 +433,20 @@ undeploy-olm: ## Un-deploy the operator with OLM
 	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete operatorgroup $(PROFILE_SHORT)-operator-group
 	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete clusterserviceversion $(PROFILE_SHORT)-operator.v$(VERSION)
 
+.PHONY: deploy-olmv1
+deploy-olmv1: ## Deploy the operator with OLM v1 (ClusterCatalog + ClusterExtension)
+	sed "s/{{BUNDLE_METADATA_PACKAGE_NAME}}/$(subst /,\/,$(BUNDLE_METADATA_PACKAGE_NAME))/g" config/samples/catalog-cluster-extension-template.yaml | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		sed "s/{{OPERATOR_NAMESPACE}}/$(subst /,\/,$(OPERATOR_NAMESPACE))/g" | \
+		$(KUBECTL) apply -f -
+
+.PHONY: undeploy-olmv1
+undeploy-olmv1: ## Un-deploy the operator with OLM v1
+	-$(KUBECTL) delete clusterextension $(PROFILE_SHORT)-operator --ignore-not-found
+	-$(KUBECTL) delete clustercatalog $(PROFILE_SHORT)-operator --ignore-not-found
+	-$(KUBECTL) delete clusterrolebinding $(PROFILE_SHORT)-operator-installer-binding --ignore-not-found
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete serviceaccount $(PROFILE_SHORT)-operator-installer --ignore-not-found
+
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in the default namespace for catalogsource
 	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OLM_NAMESPACE)
@@ -435,7 +455,7 @@ catalog-update: ## Update catalog source in the default namespace for catalogsou
 		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
 		$(KUBECTL) apply -n $(OLM_NAMESPACE) -f -
 
-.PHONY: catalog-update
+.PHONY: catalog-update-openshift
 catalog-update-openshift: ## Update catalog source in the default namespace for catalogsource
 	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OPENSHIFT_OLM_NAMESPACE)
 	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | \
@@ -443,9 +463,29 @@ catalog-update-openshift: ## Update catalog source in the default namespace for 
 		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
 		$(KUBECTL) apply -n $(OPENSHIFT_OLM_NAMESPACE) -f -
 
-# Deploy on Openshift cluster using OLM (by default installed on Openshift)
+.PHONY: catalog-update-olmv1
+catalog-update-olmv1: ## Update ClusterCatalog for OLM v1
+	-$(KUBECTL) delete clustercatalog $(PROFILE_SHORT)-operator --ignore-not-found
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-cluster-catalog-template.yaml | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		$(KUBECTL) apply -f -
+
+# Deploy on Openshift cluster using OLM (auto-detects v0 or v1)
 .PHONY: deploy-openshift
-deploy-openshift: release-build release-push catalog-update-openshift create-operator-namespace deploy-olm-openshift ## Deploy the operator on openshift cluster
+deploy-openshift: release-build release-push create-operator-namespace ## Deploy the operator on OpenShift, auto-detecting OLM version
+	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
+		$(MAKE) catalog-update-olmv1 deploy-olmv1; \
+	else \
+		$(MAKE) catalog-update-openshift deploy-olm-openshift; \
+	fi
+
+.PHONY: undeploy-openshift
+undeploy-openshift: ## Un-deploy the operator from OpenShift, auto-detecting OLM version
+	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
+		$(MAKE) undeploy-olmv1; \
+	else \
+		$(MAKE) undeploy-olm; \
+	fi
 
 .PHONY: install-olm
 install-olm: operator-sdk ## Install the Operator Lifecycle Manager.

@@ -286,17 +286,17 @@ To enable the ArgoCD and tekton plugins, update your Dynamic Plugins ConfigMap b
     plugins:
        ......
        - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
-         disabled: false
+         enabled: true
          dependencies:
             - ref: argocd
        - package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
-         disabled: false
+         enabled: true
          dependencies:
             - ref: tekton
        - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd-backend-dynamic
-         disabled: false
+         enabled: true
        - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-argocd-dynamic
-         disabled: false
+         enabled: true
 ```
 
 This should create the ArgoCD AppProject resource and Tekton pipeline called `workflow-deployment`, for RHDH

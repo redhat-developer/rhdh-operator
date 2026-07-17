@@ -285,5 +285,5 @@ organization:
 		// NOTE: it does not work well on envtest, real controller needed
 		g.Expect(fmt.Sprintf("%s%s", newEnv, "\r\n")).To(Equal(out2))
 
-	}, 10*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
+	}, 5*time.Minute, 10*time.Second).Should(Succeed(), controllerMessage())
 }
