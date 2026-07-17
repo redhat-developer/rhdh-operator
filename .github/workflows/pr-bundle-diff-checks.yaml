@@ -52,6 +52,7 @@ jobs:
           fi
 
       - name: Auto-commit and push updated bundle manifests
+        id: autopush
         # Only attempt on same-repo PRs (not forks) for security; best-effort — failure falls through to the next step
         if: steps.check.outputs.changed == 'true' && github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
@@ -60,17 +61,16 @@ jobs:
           git config user.email "rhdh-bot@redhat.com"
           git add bundle/ config/ dist/
           git commit -m "chore: regenerate bundle manifests"
-          git push
-
-      - name: Fail if bundle manifests are out of sync
-        if: steps.check.outputs.changed == 'true'
-        run: |
-          # Re-check in case the auto-commit step already pushed the fix
-          if git diff --quiet -I'^    createdAt: ' bundle config dist; then
-            echo "✅ Bundle manifests were auto-updated and pushed"
-            exit 0
+          if git push; then
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            git reset --hard HEAD~1
           fi
 
+      - name: Fail if bundle manifests are out of sync
+        if: steps.check.outputs.changed == 'true' && steps.autopush.outputs.pushed != 'true'
+        run: |
           echo "::error::Bundle manifests are out of sync with the code"
           echo ""
           echo "❌ The bundle manifests need to be regenerated."
