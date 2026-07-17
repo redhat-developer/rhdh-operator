@@ -19,7 +19,7 @@ data:
       - dynamic-plugins.default.yaml
     plugins:
       - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
-        disabled: true
+        enabled: false
         pluginConfig:
           catalog:
             providers:
@@ -33,15 +33,15 @@ data:
                     timeout: { minutes: 3}
                     initialDelay: { seconds: 15}
       - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-backend-dynamic
-        disabled: true
+        enabled: false
       - package: ./dynamic-plugins/dist/backstage-plugin-techdocs
-        disabled: false
+        enabled: true
       - package: ./dynamic-plugins/dist/backstage-plugin-techdocs-module-addons-contrib
-        disabled: true
+        enabled: false
       
       # Homepage
       - package: ./dynamic-plugins/dist/red-hat-developer-hub-backstage-plugin-dynamic-home-page
-        disabled: false
+        enabled: true
 ---
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
