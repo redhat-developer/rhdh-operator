@@ -29,7 +29,7 @@ metadata:
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.11
-    createdAt: "2026-07-17T09:46:46Z"
+    createdAt: "2026-07-20T13:45:07Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -40,7 +40,7 @@ metadata:
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
-    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/tls-profiles: "true"
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
@@ -150,9 +150,12 @@ spec:
         - apiGroups:
           - config.openshift.io
           resources:
+          - apiservers
           - ingresses
           verbs:
           - get
+          - list
+          - watch
         - apiGroups:
           - monitoring.coreos.com
           resources:

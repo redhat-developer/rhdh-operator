@@ -50,7 +50,8 @@ type BackstageReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
 // +kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
-// +kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get
+// +kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get;list;watch
+// +kubebuilder:rbac:groups="config.openshift.io",resources=apiservers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;update;patch;delete
 

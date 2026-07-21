@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -31,7 +32,9 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
 
+	configv1 "github.com/openshift/api/config/v1"
 	openshift "github.com/openshift/api/route/v1"
+	tlspkg "github.com/openshift/controller-runtime-common/pkg/tls"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -48,6 +51,8 @@ func init() {
 	utilruntime.Must(openshift.Install(scheme))
 
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
+
+	utilruntime.Must(configv1.Install(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -91,8 +96,44 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// Cancel this context when the TLS profile changes so the pod restarts with the new config.
+	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	defer cancel()
+
 	if metricsAddr != "0" && !secureMetrics {
 		setupLog.Info("Metrics are served over plaintext HTTP. This is only intended for local development.")
+	}
+
+	restConfig := ctrl.GetConfigOrDie()
+
+	// Fetch the TLS profile from apiservers.config.openshift.io/cluster.
+	// Fall back to Intermediate on non-OpenShift clusters (or if the fetch fails).
+	tlsSecurityProfileSpec, err := tlspkg.GetTLSProfileSpec(nil)
+	if err != nil {
+		setupLog.Error(err, "unable to get default TLS profile")
+		os.Exit(1)
+	}
+	tlsAdherence := configv1.TLSAdherencePolicyNoOpinion
+
+	k8sClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+	if err != nil {
+		setupLog.Info("unable to create client for TLS profile fetch, using Intermediate fallback", "error", err)
+	} else {
+		if profile, fetchErr := tlspkg.FetchAPIServerTLSProfile(ctx, k8sClient); fetchErr != nil {
+			setupLog.Info("unable to get TLS profile from API server, using Intermediate fallback", "error", fetchErr)
+		} else {
+			tlsSecurityProfileSpec = profile
+		}
+		if adherence, fetchErr := tlspkg.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient); fetchErr != nil {
+			setupLog.Info("unable to get TLS adherence policy from API server", "error", fetchErr)
+		} else {
+			tlsAdherence = adherence
+		}
+	}
+
+	tlsConfig, unsupportedCiphers := tlspkg.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	if len(unsupportedCiphers) > 0 {
+		setupLog.Info("TLS profile contains ciphers unsupported by Go that will be ignored", "ciphers", unsupportedCiphers)
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -106,7 +147,7 @@ func main() {
 		c.NextProtos = []string{"http/1.1"}
 	}
 
-	var tlsOpts []func(*tls.Config)
+	tlsOpts := []func(*tls.Config){tlsConfig}
 	if !enableHTTP2 {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
@@ -231,7 +272,7 @@ func main() {
 		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
+	mgr, err := ctrl.NewManager(restConfig, mgrOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -252,6 +293,26 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
+
+	// Watch for TLS profile changes and restart so the new config is applied.
+	if err := (&tlspkg.SecurityProfileWatcher{
+		Client:                    mgr.GetClient(),
+		InitialTLSProfileSpec:     tlsSecurityProfileSpec,
+		InitialTLSAdherencePolicy: tlsAdherence,
+		OnProfileChange: func(_ context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
+			setupLog.Info("TLS profile changed, shutting down to reload",
+				"old", oldTLSProfileSpec, "new", newTLSProfileSpec)
+			cancel()
+		},
+		OnAdherencePolicyChange: func(_ context.Context, oldTLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
+			setupLog.Info("TLS adherence policy changed, shutting down to reload",
+				"old", oldTLSAdherencePolicy, "new", newTLSAdherencePolicy)
+			cancel()
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create TLS security profile watcher")
+		os.Exit(1)
+	}
 
 	if metricsCertWatcher != nil {
 		setupLog.Info("Adding metrics certificate watcher to manager")
@@ -282,7 +343,7 @@ func main() {
 		"env.LOCALBIN", os.Getenv("LOCALBIN"),
 		"platform", plf.Name,
 	)
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

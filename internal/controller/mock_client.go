@@ -125,6 +125,11 @@ func (m MockClient) Patch(_ context.Context, obj client.Object, patch client.Pat
 	return nil
 }
 
+// Apply was added to client.Writer in controller-runtime v0.23.
+func (m MockClient) Apply(_ context.Context, _ runtime.ApplyConfiguration, _ ...client.ApplyOption) error {
+	panic(implementMe)
+}
+
 func (m MockClient) DeleteAllOf(_ context.Context, _ client.Object, _ ...client.DeleteAllOfOption) error {
 	panic(implementMe)
 }
