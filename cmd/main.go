@@ -295,23 +295,27 @@ func main() {
 	// +kubebuilder:scaffold:builder
 
 	// Watch for TLS profile changes and restart so the new config is applied.
-	if err := (&tlspkg.SecurityProfileWatcher{
-		Client:                    mgr.GetClient(),
-		InitialTLSProfileSpec:     tlsSecurityProfileSpec,
-		InitialTLSAdherencePolicy: tlsAdherence,
-		OnProfileChange: func(_ context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
-			setupLog.Info("TLS profile changed, shutting down to reload",
-				"old", oldTLSProfileSpec, "new", newTLSProfileSpec)
-			cancel()
-		},
-		OnAdherencePolicyChange: func(_ context.Context, oldTLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
-			setupLog.Info("TLS adherence policy changed, shutting down to reload",
-				"old", oldTLSAdherencePolicy, "new", newTLSAdherencePolicy)
-			cancel()
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create TLS security profile watcher")
-		os.Exit(1)
+	if plf.IsOpenshift() {
+		if err := (&tlspkg.SecurityProfileWatcher{
+			Client:                    mgr.GetClient(),
+			InitialTLSProfileSpec:     tlsSecurityProfileSpec,
+			InitialTLSAdherencePolicy: tlsAdherence,
+			OnProfileChange: func(_ context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
+				setupLog.Info("TLS profile changed, shutting down to reload",
+					"old", oldTLSProfileSpec, "new", newTLSProfileSpec)
+				cancel()
+			},
+			OnAdherencePolicyChange: func(_ context.Context, oldTLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
+				setupLog.Info("TLS adherence policy changed, shutting down to reload",
+					"old", oldTLSAdherencePolicy, "new", newTLSAdherencePolicy)
+				cancel()
+			},
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create TLS security profile watcher")
+			os.Exit(1)
+		}
+	} else {
+		setupLog.Info("TLS profile watcher is not supported on non-OpenShift clusters")
 	}
 
 	if metricsCertWatcher != nil {
