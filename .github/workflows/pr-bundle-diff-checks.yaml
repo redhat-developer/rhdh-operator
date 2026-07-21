@@ -16,11 +16,16 @@ jobs:
     name: Validate Bundle Manifests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Checkout PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup Go
@@ -28,20 +33,51 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Verify bundle manifests are up to date
-        run: |
-          make bundles build-installers
+      - name: Regenerate bundle manifests
+        run: make bundles build-installers
 
-          # Check if bundle manifests changed (ignoring createdAt timestamps)
+      - name: Check for changes
+        id: check
+        run: |
           # Since operator-sdk 1.26.0, `make bundle` changes the `createdAt` field from the bundle every time we run it.
           # The `git diff` below checks if only the createdAt field has changed. If it is the only change, it is ignored.
           # Inspired from https://github.com/operator-framework/operator-sdk/issues/6285#issuecomment-1415350333
           if git diff --quiet -I'^    createdAt: ' bundle config dist; then
             echo "✅ Bundle manifests are up to date"
-            exit 0
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Bundle manifests are out of sync"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-          # Bundle is out of sync - provide helpful error message
+      - name: Auto-commit and push updated bundle manifests
+        id: autopush
+        # Only attempt on same-repo PRs (not forks) for security; best-effort — failure falls through to the next step
+        if: steps.check.outputs.changed == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          RHDH_BOT_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ -z "${RHDH_BOT_TOKEN}" || -z "${HEAD_REF}" ]]; then
+            echo "::warning::RHDH_BOT_TOKEN or HEAD_REF is not set, skipping auto-push"
+            exit 0
+          fi
+          git config user.name "rhdh-bot"
+          git config user.email "rhdh-bot@redhat.com"
+          git remote set-url origin "https://x-access-token:${RHDH_BOT_TOKEN}@github.com/${{ github.repository }}.git"
+          git add bundle/ config/ dist/
+          git commit -m "chore: regenerate bundle manifests"
+          if git push origin "HEAD:${HEAD_REF}"; then
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            git reset --mixed HEAD~1
+          fi
+
+      - name: Fail if bundle manifests are out of sync
+        if: steps.check.outputs.changed == 'true' && steps.autopush.outputs.pushed != 'true'
+        run: |
           echo "::error::Bundle manifests are out of sync with the code"
           echo ""
           echo "❌ The bundle manifests need to be regenerated."
