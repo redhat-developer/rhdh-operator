@@ -1272,13 +1272,19 @@ spec:
     image:
       ref: ${catalogImage}
 EOF
+              foundClusterCatalog=true
               foundResources=true
             fi
           done
         fi
+        if [[ "${foundClusterCatalog}" != "true" ]]; then
+          errorf "No ClusterCatalog (cc-*.yaml) or convertible CatalogSource (cs-*.yaml) found in ${clusterResourcesDir}."
+          exit 1
+        fi
       else
         # OLM v0: process CatalogSource resources
         # oc-mirror v2 generates files with pattern: cs-*.yaml
+        foundCatalogSource=false
         for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
           if [[ -f "${manifest}" ]]; then
             debugf "Processing CatalogSource: ${manifest}"
@@ -1287,9 +1293,14 @@ EOF
             "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
             "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
             invoke_cluster_cli apply -f "${manifest}"
+            foundCatalogSource=true
             foundResources=true
           fi
         done
+        if [[ "${foundCatalogSource}" != "true" ]]; then
+          errorf "No CatalogSource (cs-*.yaml) found in ${clusterResourcesDir}."
+          exit 1
+        fi
       fi
       
       if [[ "${foundResources}" != "true" ]]; then
@@ -1707,7 +1718,23 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
   fi
   if [[ -n "${TO_REGISTRY}" ]]; then
     if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-      echo "To install the operator via OLM v1, apply the following manifests:
+      if [[ "${USE_OC_MIRROR}" = "true" ]]; then
+        cluster_resources_hint="${TMPDIR}/working-dir/cluster-resources"
+        if [[ -n "${FROM_DIR}" ]]; then
+          cluster_resources_hint="${FROM_DIR}/working-dir/cluster-resources"
+        fi
+        echo "To install the operator via OLM v1, apply the following manifests:
+
+      # ClusterCatalog from oc-mirror (native cc-*.yaml; already applied if --to-registry was used)
+      ${cli_hint} apply -f ${cluster_resources_hint}/cc-*.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/namespace.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/serviceAccount.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterRole.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterRoleBinding.yaml
+      ${cli_hint} apply -f ${manifestsTargetDir}/clusterExtension.yaml
+      "
+      else
+        echo "To install the operator via OLM v1, apply the following manifests:
 
       ${cli_hint} apply -f ${manifestsTargetDir}/namespace.yaml
       ${cli_hint} apply -f ${manifestsTargetDir}/clusterCatalog.yaml
@@ -1716,6 +1743,7 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
       ${cli_hint} apply -f ${manifestsTargetDir}/clusterRoleBinding.yaml
       ${cli_hint} apply -f ${manifestsTargetDir}/clusterExtension.yaml
       "
+      fi
     elif [[ "${IS_OPENSHIFT}" = "true" ]]; then
       echo "Now log into the OCP web console as an admin, then go to Operators > OperatorHub, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator."
     else
@@ -1734,9 +1762,16 @@ if [[ -n "${TO_REGISTRY}" ]]; then
 
   # Install the operator
   if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-    for manifest in namespace clusterCatalog serviceAccount clusterRole clusterRoleBinding clusterExtension; do
-      invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
-    done
+    if [[ "${USE_OC_MIRROR}" = "true" ]]; then
+      # Catalog already applied from native oc-mirror cc-*.yaml (or cs-* conversion)
+      for manifest in namespace serviceAccount clusterRole clusterRoleBinding clusterExtension; do
+        invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
+      done
+    else
+      for manifest in namespace clusterCatalog serviceAccount clusterRole clusterRoleBinding clusterExtension; do
+        invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
+      done
+    fi
   else
     for manifest in namespace operatorGroup subscription; do
       invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
