@@ -6,73 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBaseURL(t *testing.T) {
-	tests := []struct {
-		name     string
-		package_ string
-		expected string
-	}{
-		{
-			name:     "OCI with digest",
-			package_: "oci://quay.io/rhdh/plugin@sha256:abc123",
-			expected: "oci://quay.io/rhdh/plugin",
-		},
-		{
-			name:     "OCI with tag",
-			package_: "oci://quay.io/rhdh/plugin:v1.0.0",
-			expected: "oci://quay.io/rhdh/plugin",
-		},
-		{
-			name:     "OCI with digest and plugin path",
-			package_: "oci://quay.io/rhdh/plugin@sha256:abc123!my-plugin",
-			expected: "oci://quay.io/rhdh/plugin",
-		},
-		{
-			name:     "OCI with tag and plugin path",
-			package_: "oci://quay.io/rhdh/plugin:v1.0.0!my-plugin",
-			expected: "oci://quay.io/rhdh/plugin",
-		},
-		{
-			name:     "OCI with inherit suffix",
-			package_: "oci://quay.io/rhdh/plugin:{{inherit}}",
-			expected: "oci://quay.io/rhdh/plugin",
-		},
-		{
-			name:     "OCI with inherit suffix and plugin path",
-			package_: "oci://quay.io/rhdh/plugin:{{inherit}}!my-plugin",
-			expected: "oci://quay.io/rhdh/plugin",
-		},
-		{
-			name:     "OCI without tag or digest",
-			package_: "oci://quay.io/rhdh/plugin",
-			expected: "oci://quay.io/rhdh/plugin",
-		},
-		{
-			name:     "Local path",
-			package_: "./dynamic-plugins/dist/my-plugin",
-			expected: "./dynamic-plugins/dist/my-plugin",
-		},
-		{
-			name:     "NPM package",
-			package_: "@backstage/plugin-catalog",
-			expected: "@backstage/plugin-catalog",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			plugin := DynaPlugin{Package: tt.package_}
-			result := plugin.BaseURL()
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestResolveInheritReference(t *testing.T) {
-	baseURLMap := map[string]string{
-		"oci://quay.io/rhdh/plugin-a":         "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a-path",
-		"oci://quay.io/rhdh/plugin-b":         "oci://quay.io/rhdh/plugin-b@sha256:def456",
-		"oci://registry.access.redhat.com/rh": "oci://registry.access.redhat.com/rh@sha256:xyz789!rh-plugin",
+	basePlugins := []DynaPlugin{
+		{Package: "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a-path"},
+		{Package: "oci://quay.io/rhdh/plugin-b@sha256:def456"},
+		{Package: "oci://registry.access.redhat.com/plugin-c@sha256:xyz789!rh-plugin"},
 	}
 
 	tests := []struct {
@@ -102,6 +40,11 @@ func TestResolveInheritReference(t *testing.T) {
 			expected:   "oci://quay.io/rhdh/plugin-b@sha256:def456!my-plugin",
 		},
 		{
+			name:       "inherit with different registry - matches by name",
+			packageURL: "oci://other-registry.io/different/plugin-c:{{inherit}}",
+			expected:   "oci://registry.access.redhat.com/plugin-c@sha256:xyz789!rh-plugin",
+		},
+		{
 			name:        "inherit with no matching base - error",
 			packageURL:  "oci://quay.io/rhdh/unknown:{{inherit}}",
 			expectError: true,
@@ -110,7 +53,7 @@ func TestResolveInheritReference(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := resolveInheritReference(tt.packageURL, baseURLMap)
+			result, err := resolveInheritReference(tt.packageURL, basePlugins)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -181,6 +124,20 @@ func TestResolveReferences(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "unsupported protocol - error",
+			plugins: []DynaPlugin{
+				{Package: "ftp://server.example.com/plugin"},
+			},
+			expectError: true,
+		},
+		{
+			name: "npm package not supported - error",
+			plugins: []DynaPlugin{
+				{Package: "@backstage/plugin-catalog"},
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -231,6 +188,121 @@ plugins:
 	assert.Contains(t, mergedData, "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a")
 	assert.Contains(t, mergedData, "oci://quay.io/rhdh/plugin-b@sha256:def456!custom-path")
 	assert.NotContains(t, mergedData, "{{inherit}}")
+}
+
+func TestResolveRefReference(t *testing.T) {
+	basePlugins := []DynaPlugin{
+		{Package: "oci://quay.io/rhdh/backstage-plugin-foo@sha256:abc123"},
+		{Package: "oci://quay.io/rhdh/backstage-plugin-bar@sha256:def456!plugin-path"},
+	}
+
+	tests := []struct {
+		name        string
+		packageURL  string
+		expected    string
+		expectError bool
+	}{
+		{
+			name:       "ref to OCI plugin",
+			packageURL: "ref://backstage-plugin-foo",
+			expected:   "oci://quay.io/rhdh/backstage-plugin-foo@sha256:abc123",
+		},
+		{
+			name:       "ref to OCI plugin with path",
+			packageURL: "ref://backstage-plugin-bar",
+			expected:   "oci://quay.io/rhdh/backstage-plugin-bar@sha256:def456!plugin-path",
+		},
+		{
+			name:        "ref to non-existent plugin",
+			packageURL:  "ref://unknown-plugin",
+			expectError: true,
+		},
+		{
+			name:        "empty ref",
+			packageURL:  "ref://",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := resolveRefReference(tt.packageURL, basePlugins)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestName(t *testing.T) {
+	tests := []struct {
+		name     string
+		package_ string
+		expected string
+	}{
+		{
+			name:     "OCI with digest",
+			package_: "oci://quay.io/rhdh/backstage-plugin-foo@sha256:abc123",
+			expected: "backstage-plugin-foo",
+		},
+		{
+			name:     "OCI with tag",
+			package_: "oci://quay.io/rhdh/backstage-plugin-bar:v1.0.0",
+			expected: "backstage-plugin-bar",
+		},
+		{
+			name:     "OCI with registry port and no tag",
+			package_: "oci://localhost:5000/path/my-plugin",
+			expected: "my-plugin",
+		},
+		{
+			name:     "OCI with registry port and tag",
+			package_: "oci://localhost:5000/path/my-plugin:v1.0.0",
+			expected: "my-plugin",
+		},
+		{
+			name:     "OCI registry-only URL returns empty",
+			package_: "oci://localhost:5000",
+			expected: "",
+		},
+		{
+			name:     "OCI registry with trailing slash returns empty",
+			package_: "oci://localhost:5000/",
+			expected: "",
+		},
+		{
+			name:     "HTTPS with version and tgz",
+			package_: "https://example.com/plugins/backstage-plugin-foo-1.0.0.tgz",
+			expected: "backstage-plugin-foo",
+		},
+		{
+			name:     "HTTPS with tar.gz",
+			package_: "https://example.com/path/my-plugin-2.3.4.tar.gz",
+			expected: "my-plugin",
+		},
+		{
+			name:     "HTTP URL",
+			package_: "http://registry.example.com/backstage-plugin-bar-0.1.0.tgz",
+			expected: "backstage-plugin-bar",
+		},
+		{
+			name:     "Local path",
+			package_: "./dynamic-plugins/dist/backstage-plugin-techdocs",
+			expected: "backstage-plugin-techdocs",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plugin := DynaPlugin{Package: tt.package_}
+			result := plugin.Name()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
 
 func TestMergePluginsDataWithInheritError(t *testing.T) {

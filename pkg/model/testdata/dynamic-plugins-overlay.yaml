@@ -7,8 +7,8 @@ data:
     includes:
       - dynamic-plugins.custom.yaml
     plugins:
-      - package: "plugin-b"
+      - package: "./plugin-b"
         enabled: true
         integrity: "sha512-overlay"
-      - package: "plugin-c"
+      - package: "./plugin-c"
         enabled: true
