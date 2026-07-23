@@ -13,9 +13,9 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	golang.org/x/exp v0.0.0-20260718201538-764159d718ef
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.36.2
+	k8s.io/api v0.36.3
 	k8s.io/apiextensions-apiserver v0.35.4
-	k8s.io/apimachinery v0.36.2
+	k8s.io/apimachinery v0.36.3
 	k8s.io/client-go v0.35.4
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
