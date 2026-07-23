@@ -514,8 +514,9 @@ function should_generate_v0_manifests() {
 
 # Select the oc-mirror catalog manifest for TARGET_CATALOG.
 # Sets SELECTED_CATALOG_MANIFEST on success (return 0).
-# candidates: existing file paths; match is by basename containing TARGET_CATALOG
-# (oc-mirror names: cs-<repo>-<suffix>.yaml / cc-<repo>-<suffix>.yaml).
+# Match oc-mirror naming only: cc|cs-<targetCatalog>-<suffix>.yaml
+# (not a substring match, to avoid false positives like cc-my-rhdh-catalog-extra-…).
+# Multiple matches are a hard error (leftover catalogs must not silently win).
 function select_target_catalog_manifest() {
   set -euo pipefail
 
@@ -531,28 +532,31 @@ function select_target_catalog_manifest() {
     if [[ -f "${candidate}" ]]; then
       all+=("${candidate}")
       base="${candidate##*/}"
-      if [[ "${base}" == *"${TARGET_CATALOG}"* ]]; then
+      # Canonical: cc-<TARGET_CATALOG>-<suffix>.yaml / cs-<TARGET_CATALOG>-<suffix>.yaml
+      if [[ "${base}" == cc-"${TARGET_CATALOG}"-*.yaml || "${base}" == cs-"${TARGET_CATALOG}"-*.yaml ]]; then
         matched+=("${candidate}")
       fi
     fi
   done
 
   if [[ "${#matched[@]}" -gt 1 ]]; then
-    warnf "Multiple ${kind} manifests matched targetCatalog '${TARGET_CATALOG}'; using ${matched[0]}"
+    errorf "Multiple ${kind} manifests matched targetCatalog '${TARGET_CATALOG}'; refusing to guess which to use:"
     local extra
-    for extra in "${matched[@]:1}"; do
-      warnf "  ignoring: ${extra}"
+    for extra in "${matched[@]}"; do
+      errorf "  ${extra}"
     done
+    errorf "Remove leftover catalogs from the cluster-resources directory or re-run oc-mirror with a clean workspace."
+    exit 1
   fi
 
-  if [[ "${#matched[@]}" -ge 1 ]]; then
+  if [[ "${#matched[@]}" -eq 1 ]]; then
     SELECTED_CATALOG_MANIFEST="${matched[0]}"
     return 0
   fi
 
   if [[ "${#all[@]}" -ge 1 ]]; then
     warnf "Found ${kind} manifests but none matched targetCatalog '${TARGET_CATALOG}': ${all[*]}"
-    warnf "Expected a filename containing '${TARGET_CATALOG}' (for example cc-${TARGET_CATALOG}-v4-21.yaml)."
+    warnf "Expected oc-mirror naming cc-${TARGET_CATALOG}-<suffix>.yaml or cs-${TARGET_CATALOG}-<suffix>.yaml."
   fi
 
   return 1
@@ -1437,7 +1441,7 @@ else
 apiVersion: olm.operatorframework.io/v1
 kind: ClusterCatalog
 metadata:
-  name: rhdh-catalog
+  name: ${TARGET_CATALOG}
 spec:
   source:
     type: Image
@@ -1451,7 +1455,7 @@ EOF
   apiVersion: operators.coreos.com/v1alpha1
   kind: CatalogSource
   metadata:
-    name: rhdh-catalog
+    name: ${TARGET_CATALOG}
     namespace: ${NAMESPACE_CATALOGSOURCE}
   spec:
     sourceType: grpc
@@ -1723,7 +1727,7 @@ spec:
       - fast
       selector:
         matchLabels:
-          olm.operatorframework.io/metadata.name: rhdh-catalog
+          olm.operatorframework.io/metadata.name: ${TARGET_CATALOG}
 EOF
 fi
 
@@ -1746,7 +1750,7 @@ spec:
   channel: fast
   installPlanApproval: Automatic
   name: rhdh
-  source: rhdh-catalog
+  source: ${TARGET_CATALOG}
   sourceNamespace: ${NAMESPACE_CATALOGSOURCE}
 EOF
 fi
@@ -1791,10 +1795,10 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
           cluster_resources_hint="<export-dir>/working-dir/cluster-resources"
         fi
         catalog_hint="# ClusterCatalog: already applied to the cluster when --to-registry was used
-      # (native cc-*.yaml, or converted from cs-*.yaml / catalogSource*.yaml).
+      # (native cc-${TARGET_CATALOG}-*.yaml, or converted from cs-${TARGET_CATALOG}-*.yaml).
       # To re-apply from a durable export (--from-dir / --to-dir), use:
-      #   ${cli_hint} apply -f ${cluster_resources_hint}/cc-*.yaml
-      #   # or, if no cc-* exists, convert from cs-*.yaml / catalogSource*.yaml
+      #   ${cli_hint} apply -f ${cluster_resources_hint}/cc-${TARGET_CATALOG}-*.yaml
+      #   # or, if no cc-* exists, convert from cs-${TARGET_CATALOG}-*.yaml
       # Ephemeral TMPDIR workspace files are removed when this script exits."
         echo "To install the operator via OLM v1, apply the following manifests:
 
