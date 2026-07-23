@@ -16,9 +16,15 @@ IS_HOSTED_CONTROL_PLANE=""
 
 NAMESPACE_OPERATOR="rhdh-operator"
 INDEX_IMAGE="registry.redhat.io/redhat/redhat-operator-index:v4.21"
+# Must match ImageSetConfiguration targetCatalog; oc-mirror names files
+# cs-<targetCatalog>-<suffix>.yaml / cc-<targetCatalog>-<suffix>.yaml
+TARGET_CATALOG="rhdh-catalog"
 FILTERED_VERSIONS=("*")
 OLM_VERSION="auto"
 RESOLVED_OLM_VERSION=""
+# Set when oc-mirror path successfully applies a catalog (cc-* or cs-* conversion).
+# Used so install skips synthetic clusterCatalog.yaml only after a real apply.
+OC_MIRROR_CATALOG_APPLIED="false"
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
@@ -503,6 +509,52 @@ function should_generate_v0_manifests() {
   if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
     return 0
   fi
+  return 1
+}
+
+# Select the oc-mirror catalog manifest for TARGET_CATALOG.
+# Sets SELECTED_CATALOG_MANIFEST on success (return 0).
+# candidates: existing file paths; match is by basename containing TARGET_CATALOG
+# (oc-mirror names: cs-<repo>-<suffix>.yaml / cc-<repo>-<suffix>.yaml).
+function select_target_catalog_manifest() {
+  set -euo pipefail
+
+  local kind=$1
+  shift
+  local all=()
+  local matched=()
+  local candidate base
+
+  SELECTED_CATALOG_MANIFEST=""
+
+  for candidate in "$@"; do
+    if [[ -f "${candidate}" ]]; then
+      all+=("${candidate}")
+      base="${candidate##*/}"
+      if [[ "${base}" == *"${TARGET_CATALOG}"* ]]; then
+        matched+=("${candidate}")
+      fi
+    fi
+  done
+
+  if [[ "${#matched[@]}" -gt 1 ]]; then
+    warnf "Multiple ${kind} manifests matched targetCatalog '${TARGET_CATALOG}'; using ${matched[0]}"
+    local extra
+    for extra in "${matched[@]:1}"; do
+      warnf "  ignoring: ${extra}"
+    done
+  fi
+
+  if [[ "${#matched[@]}" -ge 1 ]]; then
+    SELECTED_CATALOG_MANIFEST="${matched[0]}"
+    return 0
+  fi
+
+  if [[ "${#all[@]}" -ge 1 ]]; then
+    warnf "Found ${kind} manifests but none matched targetCatalog '${TARGET_CATALOG}': ${all[*]}"
+    warnf "Expected a filename containing '${TARGET_CATALOG}' (for example cc-${TARGET_CATALOG}-v4-21.yaml)."
+  fi
+
   return 1
 }
 
@@ -1112,7 +1164,7 @@ mirror:
   operators:
   - catalog: ${INDEX_IMAGE}
     full: false
-    targetCatalog: rhdh-catalog
+    targetCatalog: ${TARGET_CATALOG}
     packages:
       - name: rhdh
 EOF
@@ -1152,7 +1204,7 @@ EOF
         cp -f "${TMPDIR}/imageset-config.yaml" "${TO_DIR}/imageset-config.yaml"
       fi
       # targetCatalog needs to exist in the target registry. Copying a fake image..
-      mirror_image_to_archive "registry.redhat.io/ubi9/ubi:latest" "${TO_DIR}/rhdh-catalog"
+      mirror_image_to_archive "registry.redhat.io/ubi9/ubi:latest" "${TO_DIR}/${TARGET_CATALOG}"
     fi
     if [[ -n "$TO_REGISTRY" ]]; then
       registryUrl=$(buildRegistryUrl)
@@ -1160,9 +1212,9 @@ EOF
         registryUrl+="/oc-mirror"
       fi
       # targetCatalog needs to exist in the target registry. Copying a fake image..
-      catalog_reg_path="rhdh-catalog"
+      catalog_reg_path="${TARGET_CATALOG}"
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
-        catalog_reg_path="oc-mirror/rhdh-catalog"
+        catalog_reg_path="oc-mirror/${TARGET_CATALOG}"
       fi
       my_operator_index="$(buildCatalogImageUrl external "${catalog_reg_path}")"
       mirror_image_to_registry "registry.redhat.io/ubi9/ubi:latest" "${my_operator_index}-tmp"
@@ -1192,12 +1244,12 @@ EOF
 
       # Rendering index, so as to manually build and push the targetCatalog (defined in the imageset).
       # The target catalog needs to exist in the target registry.
-      catalog_reg_path="rhdh-catalog"
+      catalog_reg_path="${TARGET_CATALOG}"
       if [[ "${TO_REGISTRY}" == "OCP_INTERNAL" ]]; then
-        catalog_reg_path="oc-mirror/rhdh-catalog"
+        catalog_reg_path="oc-mirror/${TARGET_CATALOG}"
       fi
       my_operator_index="$(buildCatalogImageUrl external "${catalog_reg_path}")"
-      push_image_from_archive "${FROM_DIR}/rhdh-catalog" "${my_operator_index}-tmp"
+      push_image_from_archive "${FROM_DIR}/${TARGET_CATALOG}" "${my_operator_index}-tmp"
 
       "${OC_MIRROR_PATH}" \
         --config="${FROM_DIR}/imageset-config.yaml" \
@@ -1221,11 +1273,13 @@ EOF
     
     if [ -d "${clusterResourcesDir}" ]; then
       debugf "Processing cluster resources from: ${clusterResourcesDir}"
-      
+
       # Apply ImageDigestMirrorSet and ImageTagMirrorSet resources
-      foundResources=false
+      # Tracked separately from catalog resources: missing mirrors is a warning
+      # (especially on HCP), but a missing catalog is a hard error below.
+      foundMirrors=false
       # oc-mirror v2 generates files with patterns: idms-*.yaml, itms-*.yaml
-      
+
       for manifest in "${clusterResourcesDir}"/idms-*.yaml "${clusterResourcesDir}"/imageDigestMirrorSet*.yaml \
                       "${clusterResourcesDir}"/itms-*.yaml "${clusterResourcesDir}"/imageTagMirrorSet*.yaml; do
         if [[ -f "${manifest}" ]]; then
@@ -1238,76 +1292,85 @@ EOF
               warnf "Please work with your cluster administrator to configure image mirroring."
             fi
           fi
-          foundResources=true
+          foundMirrors=true
         fi
       done
-      
+
+      if [[ "${foundMirrors}" != "true" ]]; then
+        warnf "No IDMS/ITMS found in ${clusterResourcesDir}. Image pulls may fail unless mirrors are configured elsewhere (for example on Hosted Control Plane clusters)."
+      fi
+
+      # oc-mirror emits one cs-*/cc-* pair per mirrored catalog image, named
+      # cs-<repo>-<suffix>.yaml / cc-<repo>-<suffix>.yaml. This ImageSet uses a
+      # single targetCatalog (${TARGET_CATALOG}); select that pair by filename
+      # and OLM version (cc for v1, cs for v0) — do not apply an unrelated catalog.
       if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-        # oc-mirror v2 generates native ClusterCatalog manifests with pattern: cc-*.yaml
+        # Prefer native ClusterCatalog (cc-*.yaml); fall back to converting cs-*.yaml
         foundClusterCatalog=false
-        for manifest in "${clusterResourcesDir}"/cc-*.yaml; do
-          if [[ -f "${manifest}" ]]; then
-            debugf "Processing native ClusterCatalog: ${manifest}"
-            "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
-            "$YQ" -i '.spec.source.image.ref |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
-            invoke_cluster_cli apply -f "${manifest}"
-            foundClusterCatalog=true
-            foundResources=true
-          fi
-        done
-        # Fall back to converting CatalogSource if no native ClusterCatalog was found
+        if select_target_catalog_manifest "ClusterCatalog (cc-*.yaml)" \
+            "${clusterResourcesDir}"/cc-*.yaml; then
+          manifest="${SELECTED_CATALOG_MANIFEST}"
+          debugf "Processing native ClusterCatalog for targetCatalog '${TARGET_CATALOG}': ${manifest}"
+          "$YQ" -i ".metadata.name = \"${TARGET_CATALOG}\"" "${manifest}"
+          "$YQ" -i '.spec.source.image.ref |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
+          invoke_cluster_cli apply -f "${manifest}"
+          foundClusterCatalog=true
+          OC_MIRROR_CATALOG_APPLIED="true"
+        fi
+
         if [[ "${foundClusterCatalog}" != "true" ]]; then
-          for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
-            if [[ -f "${manifest}" ]]; then
-              debugf "Converting CatalogSource to ClusterCatalog (no native cc-*.yaml found): ${manifest}"
-              catalogImage=$("$YQ" '.spec.image | sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}")
-              cat <<EOF | invoke_cluster_cli apply -f -
+          if select_target_catalog_manifest "CatalogSource (cs-*.yaml / catalogSource*.yaml)" \
+              "${clusterResourcesDir}"/cs-*.yaml \
+              "${clusterResourcesDir}"/catalogSource*.yaml; then
+            manifest="${SELECTED_CATALOG_MANIFEST}"
+            debugf "Converting CatalogSource to ClusterCatalog for targetCatalog '${TARGET_CATALOG}' (no matching cc-*.yaml): ${manifest}"
+            catalogImage=$("$YQ" '.spec.image | sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}")
+            cat <<EOF | invoke_cluster_cli apply -f -
 apiVersion: olm.operatorframework.io/v1
 kind: ClusterCatalog
 metadata:
-  name: rhdh-catalog
+  name: ${TARGET_CATALOG}
 spec:
   source:
     type: Image
     image:
       ref: ${catalogImage}
 EOF
-              foundClusterCatalog=true
-              foundResources=true
-            fi
-          done
+            foundClusterCatalog=true
+            OC_MIRROR_CATALOG_APPLIED="true"
+          fi
         fi
         if [[ "${foundClusterCatalog}" != "true" ]]; then
-          errorf "No ClusterCatalog (cc-*.yaml) or convertible CatalogSource (cs-*.yaml) found in ${clusterResourcesDir}."
+          errorf "No ClusterCatalog (cc-*.yaml) or convertible CatalogSource (cs-*.yaml / catalogSource*.yaml) matching targetCatalog '${TARGET_CATALOG}' found in ${clusterResourcesDir}."
           exit 1
         fi
       else
-        # OLM v0: process CatalogSource resources
-        # oc-mirror v2 generates files with pattern: cs-*.yaml
+        # OLM v0: CatalogSource (cs-*.yaml) for targetCatalog
         foundCatalogSource=false
-        for manifest in "${clusterResourcesDir}"/cs-*.yaml "${clusterResourcesDir}"/catalogSource*.yaml; do
-          if [[ -f "${manifest}" ]]; then
-            debugf "Processing CatalogSource: ${manifest}"
-            "$YQ" -i '.metadata.name = "rhdh-catalog"' "${manifest}"
-            "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
-            "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
-            "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
-            invoke_cluster_cli apply -f "${manifest}"
-            foundCatalogSource=true
-            foundResources=true
-          fi
-        done
+        if select_target_catalog_manifest "CatalogSource (cs-*.yaml / catalogSource*.yaml)" \
+            "${clusterResourcesDir}"/cs-*.yaml \
+            "${clusterResourcesDir}"/catalogSource*.yaml; then
+          manifest="${SELECTED_CATALOG_MANIFEST}"
+          debugf "Processing CatalogSource for targetCatalog '${TARGET_CATALOG}': ${manifest}"
+          "$YQ" -i ".metadata.name = \"${TARGET_CATALOG}\"" "${manifest}"
+          "$YQ" -i '.spec.displayName = "Red Hat Developer Hub Catalog (Airgapped)"' "${manifest}"
+          "$YQ" -i '.spec.secrets = (.spec.secrets // []) + ["internal-reg-auth-for-rhdh", "internal-reg-ext-auth-for-rhdh"]' "${manifest}"
+          "$YQ" -i '.spec.image |= sub("default-route-openshift-image-registry\.apps\.[^/]+", "image-registry.openshift-image-registry.svc:5000")' "${manifest}"
+          invoke_cluster_cli apply -f "${manifest}"
+          foundCatalogSource=true
+          OC_MIRROR_CATALOG_APPLIED="true"
+        fi
         if [[ "${foundCatalogSource}" != "true" ]]; then
-          errorf "No CatalogSource (cs-*.yaml) found in ${clusterResourcesDir}."
+          errorf "No CatalogSource (cs-*.yaml / catalogSource*.yaml) matching targetCatalog '${TARGET_CATALOG}' found in ${clusterResourcesDir}."
           exit 1
         fi
       fi
-      
-      if [[ "${foundResources}" != "true" ]]; then
-        warnf "No cluster resources found in ${clusterResourcesDir}. This may indicate that oc-mirror v2 did not generate them."
-      fi
     else
-      warnf "Cluster resources directory not found: ${clusterResourcesDir}. This may indicate that oc-mirror v2 did not generate cluster resources."
+      # Missing cluster-resources used to only warn, then install skipped synthetic
+      # clusterCatalog.yaml under USE_OC_MIRROR and continued with no catalog.
+      errorf "Cluster resources directory not found: ${clusterResourcesDir}."
+      errorf "oc-mirror v2 should generate this after a successful mirror-to-mirror / disk-to-mirror run."
+      exit 1
     fi
   fi
 else
@@ -1719,14 +1782,23 @@ ${TO_DIR} should now contain all the images and resources needed to install the 
   if [[ -n "${TO_REGISTRY}" ]]; then
     if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
       if [[ "${USE_OC_MIRROR}" = "true" ]]; then
-        cluster_resources_hint="${TMPDIR}/working-dir/cluster-resources"
+        # Prefer a durable export path; TMPDIR is removed by the EXIT trap.
         if [[ -n "${FROM_DIR}" ]]; then
           cluster_resources_hint="${FROM_DIR}/working-dir/cluster-resources"
+        elif [[ -n "${TO_DIR}" ]]; then
+          cluster_resources_hint="${TO_DIR}/working-dir/cluster-resources"
+        else
+          cluster_resources_hint="<export-dir>/working-dir/cluster-resources"
         fi
+        catalog_hint="# ClusterCatalog: already applied to the cluster when --to-registry was used
+      # (native cc-*.yaml, or converted from cs-*.yaml / catalogSource*.yaml).
+      # To re-apply from a durable export (--from-dir / --to-dir), use:
+      #   ${cli_hint} apply -f ${cluster_resources_hint}/cc-*.yaml
+      #   # or, if no cc-* exists, convert from cs-*.yaml / catalogSource*.yaml
+      # Ephemeral TMPDIR workspace files are removed when this script exits."
         echo "To install the operator via OLM v1, apply the following manifests:
 
-      # ClusterCatalog from oc-mirror (native cc-*.yaml; already applied if --to-registry was used)
-      ${cli_hint} apply -f ${cluster_resources_hint}/cc-*.yaml
+      ${catalog_hint}
       ${cli_hint} apply -f ${manifestsTargetDir}/namespace.yaml
       ${cli_hint} apply -f ${manifestsTargetDir}/serviceAccount.yaml
       ${cli_hint} apply -f ${manifestsTargetDir}/clusterRole.yaml
@@ -1762,7 +1834,7 @@ if [[ -n "${TO_REGISTRY}" ]]; then
 
   # Install the operator
   if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
-    if [[ "${USE_OC_MIRROR}" = "true" ]]; then
+    if [[ "${OC_MIRROR_CATALOG_APPLIED}" = "true" ]]; then
       # Catalog already applied from native oc-mirror cc-*.yaml (or cs-* conversion)
       for manifest in namespace serviceAccount clusterRole clusterRoleBinding clusterExtension; do
         invoke_cluster_cli apply -f "${manifestsTargetDir}/${manifest}.yaml"
