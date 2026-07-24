@@ -3,7 +3,7 @@ name: Build and push operator, bundle, and catalog images
 
 on:
   push:
-    branches: 
+    branches:
       - main
       - release-[0-9]+.[0-9]+
   workflow_dispatch:
@@ -16,19 +16,20 @@ env:
   REGISTRY: ${{ vars.REGISTRY }}
 
 jobs:
-  next-build:
-    name: Next build
+  changes:
+    name: Check for changes
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      any_changed: ${{ steps.changed-files.outputs.any_changed }}
+      short_sha: ${{ steps.meta.outputs.short_sha }}
+      base_version: ${{ steps.meta.outputs.base_version }}
+      latest_next: ${{ steps.meta.outputs.latest_next }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      # check changes in this commit for regex include and exclude matches
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
@@ -50,73 +51,278 @@ jobs:
             **/*.md
             **/*.adoc
             .rhdh/**
-            tests/** 
+            tests/**
 
-      - name: List all changed files (for troubleshooting)
-        env:
-          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      - name: Compute image metadata
+        id: meta
         run: |
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file was changed"
-          done
-
-      - name: Get the last commit short SHA
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
-        run: |
+          set -euo pipefail
           SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //") # 0.0.1
-          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
+          BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            LATEST_NEXT="next"
+          else
+            LATEST_NEXT="latest"
+          fi
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "base_version=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "latest_next=${LATEST_NEXT}" >> "$GITHUB_OUTPUT"
+
+  # The bundle image is FROM scratch and contains only YAML manifests/metadata -- no
+  # compiled binaries -- so its content is identical regardless of build architecture
+  # (confirmed against the currently-published quay.io/rhdh-community/operator-bundle:next:
+  # ~40KB, empty base image annotations). It's built and pushed exactly once here, rather
+  # than per-arch in the build matrix, so the two matrix legs' catalog-build step can both
+  # safely pull this same already-published, stable tag instead of racing each other to
+  # push/pull a shared tag themselves (opm index add always pulls the bundle from the
+  # registry, never the local image -- see the Makefile's own comment on bundle-push).
+  bundle:
+    name: Build and push operator-bundle
+    needs: changes
+    if: needs.changes.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
+      BASE_VERSION: ${{ needs.changes.outputs.base_version }}
+      LATEST_NEXT: ${{ needs.changes.outputs.latest_next }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
 
       - name: Setup Go
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: 'go.mod'
 
-      - name: Login to registry (${{env.REGISTRY}})
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
+      - name: Login to registry (${{ env.REGISTRY }})
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Build and push operator-bundle
+        run: |
+          set -euo pipefail
+          sudo apt-get -y update; sudo apt-get -y install podman
+
+          export CONTAINER_TOOL=podman
+          export VERSION="${BASE_VERSION}"
+          export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
+          export IMAGE_TAG_BASE="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}"
+
+          : "${SHORT_SHA:?SHORT_SHA must be set}"
+          : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
+
+          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" make bundle bundle-build bundle-push
+
+          for tag in "${VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
+            podman tag "${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}" "${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${tag}"
+            podman push -q "${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${tag}"
+          done
+        env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
+          GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+
+  build:
+    name: Build (${{ matrix.os }})
+    needs:
+      - changes
+      - bundle
+    if: needs.changes.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
+      BASE_VERSION: ${{ needs.changes.outputs.base_version }}
+      LATEST_NEXT: ${{ needs.changes.outputs.latest_next }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Prepare
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+        run: |
+          set -euo pipefail
+          case "${MATRIX_OS}" in
+            ubuntu-24.04)
+              platform="linux/amd64"
+              ;;
+            ubuntu-24.04-arm)
+              platform="linux/arm64"
+              ;;
+            *)
+              echo "ERROR: Unknown runner OS: ${MATRIX_OS}"
+              exit 1
+              ;;
+          esac
+          echo "PLATFORM=${platform}" >> "$GITHUB_ENV"
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+          echo "PLATFORM_ARCH=${platform#*/}" >> "$GITHUB_ENV"
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Login to registry (${{ env.REGISTRY }})
         uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - name: Build and push operator, bundle, and catalog images
-        # run this stage only if there are changes that match the includes and not the excludes
-        if: steps.changed-files.outputs.any_changed == 'true'
+      - name: Build and push per-arch operator and catalog images
         run: |
-          # install skopeo, podman
-          sudo apt-get -y update; sudo apt-get -y install skopeo podman
+          set -euo pipefail
+          sudo apt-get -y update; sudo apt-get -y install podman
 
           export CONTAINER_TOOL=podman
-          latestNext="next"
-          # for main branch, use next tags; for 1.y branches, use :latest tags
-          if [[ $(git rev-parse --abbrev-ref HEAD) != "main" ]]; then
-            latestNext="latest" 
-          fi
+          export VERSION="${BASE_VERSION}"
+          export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
+          export IMAGE_TAG_BASE="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}"
+          # Point catalog-build's bundle reference at the already-published, stable bundle
+          # tag from the dedicated `bundle` job instead of rebuilding/pushing it again here.
+          export BUNDLE_IMGS="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}"
 
-          export VERSION=${{ env.BASE_VERSION }}
-          export REGISTRY_WITH_ORG=${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}
-          export OPERATOR_IMAGE_NAME=${OPERATOR_IMAGE_NAME:-operator}
-          export IMAGE_TAG_BASE=${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}
+          : "${PLATFORM:?PLATFORM must be set}"
+          : "${SHORT_SHA:?SHORT_SHA must be set}"
+          : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
 
-          set -ex
+          # Build the operator image, then the catalog image. catalog-build's only other
+          # prerequisite (besides the bundle-push we're skipping) is `opm`, which downloads
+          # the opm CLI if needed -- that still runs normally. `-o bundle-push` tells make to
+          # treat that phony prerequisite as already satisfied, so `opm index add` runs
+          # directly against BUNDLE_IMGS above (a safe concurrent *read* of an already-stable
+          # tag) instead of each matrix leg re-pushing its own bundle to a shared tag first.
+          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" PLATFORM="${PLATFORM}" BUNDLE_IMGS="${BUNDLE_IMGS}" make -o bundle-push image-build catalog-build
 
-          # build 4 container images with a 14d expiry
-          CONTAINER_TOOL=${CONTAINER_TOOL} VERSION=${VERSION} make release-build
+          # Push per-arch tagged images
+          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
+            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${PLATFORM_ARCH}"
+            podman push -q "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${PLATFORM_ARCH}"
 
-          # now copy images from local cache to quay, using 0.0.1-next-f00cafe, 0.0.1-next, and next tags
-          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
-            podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
-            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}-${{ env.SHORT_SHA }}
-            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${latestNext}
+            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${SHORT_SHA}-${PLATFORM_ARCH}"
+            podman push -q "${REGISTRY_WITH_ORG}/${image}:${VERSION}-${SHORT_SHA}-${PLATFORM_ARCH}"
+
+            podman tag "${REGISTRY_WITH_ORG}/${image}:${VERSION}" "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-${PLATFORM_ARCH}"
+            podman push -q "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-${PLATFORM_ARCH}"
           done
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
-          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
-          # to avoid throttling on RHD org, use GH token
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
           GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+
+  merge:
+    name: Create multi-arch manifests
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - build
+    if: always() && (needs.changes.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch') && needs.build.result == 'success'
+    permissions:
+      contents: read
+      packages: write
+    env:
+      HAS_QUAY_OAUTH: ${{ secrets.QUAY_OAUTH_TOKEN != '' }}
+      SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
+      BASE_VERSION: ${{ needs.changes.outputs.base_version }}
+      LATEST_NEXT: ${{ needs.changes.outputs.latest_next }}
+    steps:
+      - name: Login to registry (${{ env.REGISTRY }})
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Create manifest lists and push
+        run: |
+          set -euo pipefail
+          export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
+
+          : "${BASE_VERSION:?BASE_VERSION must be set}"
+          : "${SHORT_SHA:?SHORT_SHA must be set}"
+          : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
+
+          # operator-bundle is not included here: it's architecture-invariant (see the
+          # `bundle` job) and was already published as a single, final image there --
+          # no per-arch tags exist for it to merge.
+          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
+            echo "=== Creating manifest list for ${image} ==="
+
+            # Create manifest list for version tag
+            docker buildx imagetools create \
+              -t "${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}" \
+              "${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-amd64" \
+              "${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-arm64"
+
+            # Create manifest list for version-sha tag (using SHA-scoped per-arch tags)
+            docker buildx imagetools create \
+              -t "${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-${SHORT_SHA}" \
+              "${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-${SHORT_SHA}-amd64" \
+              "${REGISTRY_WITH_ORG}/${image}:${BASE_VERSION}-${SHORT_SHA}-arm64"
+
+            # Create manifest list for latestNext tag (next or latest)
+            docker buildx imagetools create \
+              -t "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}" \
+              "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-amd64" \
+              "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}-arm64"
+
+            echo "=== Inspecting manifest for ${image}:${LATEST_NEXT} ==="
+            docker buildx imagetools inspect "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}"
+          done
+        env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
+
+      - name: Cleanup per-arch tags
+        if: env.HAS_QUAY_OAUTH == 'true'
+        run: |
+          set -euo pipefail
+          export NAMESPACE="${REGISTRY_ORG}"
+
+          : "${BASE_VERSION:?BASE_VERSION must be set}"
+          : "${SHORT_SHA:?SHORT_SHA must be set}"
+          : "${LATEST_NEXT:?LATEST_NEXT must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
+
+          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
+            for arch in amd64 arm64; do
+              for tag in "${BASE_VERSION}-${arch}" "${BASE_VERSION}-${SHORT_SHA}-${arch}" "${LATEST_NEXT}-${arch}"; do
+                echo "Deleting per-arch tag: ${image}:${tag}"
+                status=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE \
+                  -H "Authorization: Bearer ${QUAY_OAUTH_TOKEN}" \
+                  "https://quay.io/api/v1/repository/${NAMESPACE}/${image}/tag/${tag}" \
+                  || true)
+                echo "  -> HTTP ${status} for ${image}:${tag}"
+              done
+            done
+          done
+        env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
+          QUAY_OAUTH_TOKEN: ${{ secrets.QUAY_OAUTH_TOKEN }}
