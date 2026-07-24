@@ -37,7 +37,7 @@ func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, backstage api
 		// Apply the unstructured object
 		lg.V(1).Info("apply plugin dependency: ", "name", obj.GetName(), "kind", obj.GetKind(), "namespace", obj.GetNamespace())
 
-		if err = r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+		if err = r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil { //nolint:staticcheck // SA1019: client.Apply is deprecated: Further investigation needed
 			errs = append(errs, err)
 		}
 	}

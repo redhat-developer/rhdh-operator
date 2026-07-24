@@ -50,7 +50,8 @@ type BackstageReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
 // +kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
-// +kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get
+// +kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get;list;watch
+// +kubebuilder:rbac:groups="config.openshift.io",resources=apiservers,verbs=get;list;watch
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;update;patch;delete
 
@@ -169,7 +170,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 		return nil
 	}
 
-	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil { //nolint:staticcheck // SA1019: client.Apply is deprecated: Further investigation needed
 		return fmt.Errorf("failed to apply object: %w", err)
 	}
 	lg.V(1).Info("apply object ", objDispKind(obj, r.Scheme), obj.GetName())
