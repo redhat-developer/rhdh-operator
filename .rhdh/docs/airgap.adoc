@@ -56,10 +56,16 @@ Besides the prerequisites listed above, you will also need:
 # NOTES:
 # 1. Omit `--to-registry` if you are connected against an OpenShift cluster and want the script to expose the internal cluster registry and use that for mirroring.
 # 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
+# 3. `--olm-version` defaults to `auto`: on clusters with OLM v1 CRDs (for example OpenShift 4.21+),
+#    the script installs via ClusterCatalog + ClusterExtension; otherwise it uses CatalogSource + Subscription (OLM v0).
+#    Force with `--olm-version v0` or `--olm-version v1` when needed.
+# 4. With `--use-oc-mirror true`, catalog resources come from oc-mirror's native manifests under
+#    `working-dir/cluster-resources/` (`cc-*.yaml` for OLM v1, `cs-*.yaml` for OLM v0).
 
 bash prepare-restricted-environment.sh \
     [--to-registry my.registry.example.com/namespace] \
-    [--use-oc-mirror true]
+    [--use-oc-mirror true] \
+    [--olm-version auto]
 
 #----------------------------------------------------
 
@@ -73,13 +79,15 @@ bash prepare-restricted-environment.sh \
 # 3. Specify `*` for `--filter-versions` to disable version filtering. It will include all channels of the rhdh package from the index image.
 # 4. '--ci-index true' causes the script to replace all references
   to the internal Red Hat registries with quay.io
+# 5. See the GA notes above for `--olm-version` and oc-mirror catalog manifests (`cc-*.yaml` / `cs-*.yaml`).
 
 bash prepare-restricted-environment.sh \
     --index-image "quay.io/rhdh/iib:next-v4.18-x86_64" \
     --ci-index true \
     [--filter-versions '*'] \
     [--to-registry my.registry.example.com/namespace] \
-    [--use-oc-mirror true]
+    [--use-oc-mirror true] \
+    [--olm-version auto]
 ----
 +
 Be patient, the script can take several minutes to complete. It will automatically install the RHDH Operator.
@@ -178,11 +186,14 @@ NOTE: If you used `oc-mirror` to mirror to disk, you must also use `oc-mirror` w
 # NOTES:
 # 1. Omit `--to-registry` if you are connected against an OpenShift cluster and want the script to expose the internal cluster registry and use that for mirroring.
 # 2. Omit `--use-oc-mirror` if you don't want to use `oc-mirror`. `oc-mirror` makes sense only if targetting OpenShift.
+# 3. `--olm-version` defaults to `auto` (ClusterCatalog + ClusterExtension on OLM v1 clusters, CatalogSource + Subscription otherwise).
+#    With `--use-oc-mirror true`, the catalog comes from native `cc-*.yaml` (v1) or `cs-*.yaml` (v0) under `working-dir/cluster-resources/`.
 
 bash prepare-restricted-environment.sh \
     --from-dir /absolute/path/to/my/mirror/folder \
     [--to-registry my.registry.example.com/namespace] \
-    [--use-oc-mirror true]
+    [--use-oc-mirror true] \
+    [--olm-version auto]
 ----
 +
 Be patient, the script can take several minutes to complete. It will automatically install the RHDH Operator.
