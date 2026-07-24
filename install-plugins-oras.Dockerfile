@@ -1,0 +1,54 @@
+# =========================================================================
+# STAGE 1: Builder (Red Hat UBI Minimal)
+# =========================================================================
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS builder
+
+ARG TARGETARCH
+
+RUN microdnf install -y tar gzip coreutils-single grep findutils bash sed gawk && \
+    microdnf clean all && \
+    rm -rf /var/cache/yum && \
+    mkdir -p /runtime-bin && \
+    cp /bin/sh /runtime-bin/ && \
+    cp /bin/coreutils /runtime-bin/ && \
+    for cmd in echo mkdir cat chmod rm test ls cp mv ln env printf tr head tail basename dirname wc date; do \
+      ln -s coreutils /runtime-bin/$cmd; \
+    done && \
+    mkdir -p /runtime-lib && \
+    ldd /usr/bin/curl | awk '/=>/ {print $3}' | xargs -I{} cp -L {} /runtime-lib/ 2>/dev/null || true && \
+    ldd /usr/bin/grep | awk '/=>/ {print $3}' | xargs -I{} cp -L {} /runtime-lib/ 2>/dev/null || true && \
+    ldd /usr/bin/bash | awk '/=>/ {print $3}' | xargs -I{} cp -L {} /runtime-lib/ 2>/dev/null || true && \
+    ldd /usr/bin/sed | awk '/=>/ {print $3}' | xargs -I{} cp -L {} /runtime-lib/ 2>/dev/null || true && \
+    ldd /usr/bin/gawk | awk '/=>/ {print $3}' | xargs -I{} cp -L {} /runtime-lib/ 2>/dev/null || true && \
+    ldd /usr/bin/tar | awk '/=>/ {print $3}' | xargs -I{} cp -L {} /runtime-lib/ 2>/dev/null || true
+
+# Download oras
+RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "amd64") && \
+    curl -sL "https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_linux_${ARCH}.tar.gz" | \
+    tar xzf - -C /usr/local/bin oras
+
+# =========================================================================
+# STAGE 2: Runtime (Red Hat UBI Micro)
+# =========================================================================
+FROM registry.access.redhat.com/ubi9/ubi-micro:latest
+
+COPY --from=builder /runtime-bin/ /bin/
+COPY --from=builder /usr/bin/curl /usr/bin/curl
+COPY --from=builder /usr/bin/grep /usr/bin/grep
+COPY --from=builder /usr/bin/xargs /usr/bin/xargs
+COPY --from=builder /usr/bin/bash /usr/bin/bash
+COPY --from=builder /usr/bin/sed /usr/bin/sed
+COPY --from=builder /usr/bin/gawk /usr/bin/awk
+COPY --from=builder /usr/bin/tar /usr/bin/tar
+COPY --from=builder /usr/bin/gzip /usr/bin/gzip
+COPY --from=builder /runtime-lib/ /usr/lib64/
+COPY --from=builder /usr/local/bin/oras /usr/bin/oras
+COPY --from=builder /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+COPY --from=builder /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
+COPY hack/install_plugins.sh /usr/local/bin/install_plugins.sh
+RUN chmod +x /usr/local/bin/install_plugins.sh && \
+    echo "runner:x:1001:0:runner:/:/sbin/nologin" >> /etc/passwd
+
+USER 1001
+
+ENTRYPOINT ["/usr/bin/bash", "/usr/local/bin/install_plugins.sh"]

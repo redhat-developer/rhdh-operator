@@ -16,7 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const PluginsAppConfigFile = "app-config.plugins.yaml"
+const PluginsAppConfigFile = "app-config.dynamic-plugins.yaml"
 
 type AppConfigFactory struct{}
 
