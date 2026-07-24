@@ -1,13 +1,12 @@
-# for main branch, use next tags; for 1.y branches, use :latest tags
+# for main branch, use next tags; for x.y branches, use :latest tags
 name: Build and push operator, bundle, and catalog images
 
 on:
   push:
     branches: 
       - main
-      - rhdh-1.[0-9]+
-      - 1.[0-9]+.x
-      - release-1.[0-9]+
+      - release-[0-9]+.[0-9]+
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -80,7 +79,7 @@ jobs:
       - name: Login to registry (${{env.REGISTRY}})
         # run this stage only if there are changes that match the includes and not the excludes
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
+        uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}
