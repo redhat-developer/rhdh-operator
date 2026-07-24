@@ -170,7 +170,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 		return nil
 	}
 
-	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil { //nolint:staticcheck // SA1019: client.Apply is deprecated: Further investigation needed
 		return fmt.Errorf("failed to apply object: %w", err)
 	}
 	lg.V(1).Info("apply object ", objDispKind(obj, r.Scheme), obj.GetName())

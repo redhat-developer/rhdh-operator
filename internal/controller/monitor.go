@@ -60,7 +60,7 @@ func (r *BackstageReconciler) applyServiceMonitor(ctx context.Context, backstage
 	}
 
 	// Use server-side apply for consistency with other resources
-	if err := r.Patch(ctx, sm, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+	if err := r.Patch(ctx, sm, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil { //nolint:staticcheck // SA1019: client.Apply is deprecated: Further investigation needed
 		return fmt.Errorf("failed to apply ServiceMonitor: %w", err)
 	}
 
