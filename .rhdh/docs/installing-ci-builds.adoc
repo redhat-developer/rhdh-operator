@@ -35,7 +35,7 @@ Besides the prerequisites listed above, you will also need:
 
 . Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator catalog resources in your cluster. By default, it installs the Release Candidate or GA version (from the `release-1.yy` branch), but the `--next` option allows to install the current development build (from the `main` branch).
 +
-The script auto-detects OLM v0 vs v1 from the ClusterExtension CRD (`--olm-version auto|v0|v1`). On OLM v1 it creates a `ClusterCatalog` / `ClusterExtension` and waits until the catalog is Serving and the extension is Installed (and for RHDH, until the `backstages.rhdh.redhat.com` CRD exists) before exiting successfully. On failure it prints diagnostics and exits non-zero. For example:
+The script auto-detects OLM v0 vs v1 from the ClusterExtension CRD (`--olm-version auto|v0|v1`). On OLM v1 it creates a `ClusterCatalog` / `ClusterExtension` and waits until the catalog is Serving and the extension is Installed (and for RHDH, until the `backstages.rhdh.redhat.com` CRD exists) before exiting successfully. On OpenShift, OLM v1 also merges internal-registry credentials into the cluster pull secret (`openshift-config/pull-secret`), matching the approach used by `prepare-restricted-environment.sh`, because catalogd authenticates via that global secret. On failure it prints diagnostics and exits non-zero. For example:
 +
 [source,console]
 ----

@@ -185,6 +185,82 @@ function dump_olm_v1_diagnostics() {
   errorf "===== end OLM v1 diagnostics ====="
 }
 
+# Align with prepare-restricted-environment.sh prepare_olm_v1_secrets:
+# OLM v1 catalogd authenticates via openshift-config/pull-secret (--global-pull-secret),
+# not ClusterCatalog pullSecret fields or image-puller alone.
+function prepare_olm_v1_secrets() {
+  set -euo pipefail
+
+  local catalogd_ns="$1"
+  local controller_ns="$2"
+  local image_namespace="${3:-rhdh}"
+
+  if [[ "${IS_OPENSHIFT}" != "true" ]]; then
+    return 0
+  fi
+
+  local internal_registry_url="image-registry.openshift-image-registry.svc:5000"
+  local external_registry_url
+  external_registry_url=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}' 2>/dev/null || true)
+  if [[ -z "${external_registry_url}" ]]; then
+    errorf "Could not resolve OpenShift internal registry default route; is the registry exposed?"
+    return 1
+  fi
+
+  local token
+  token=$(oc whoami -t)
+  # macOS base64 has no -w0; Linux does. Strip newlines for both.
+  local internal_auth
+  internal_auth=$(echo -n "kubeadmin:${token}" | base64 | tr -d '\n')
+
+  local existing_pull_secret
+  existing_pull_secret=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
+
+  local merged
+  merged=$(echo "${existing_pull_secret}" | jq \
+    --arg url1 "${internal_registry_url}" \
+    --arg url2 "${external_registry_url}" \
+    --arg auth "${internal_auth}" \
+    '.auths[$url1] = {auth: $auth} | .auths[$url2] = {auth: $auth}')
+
+  echo "${merged}" | oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/dev/stdin >&2
+  infof "Merged internal registry credentials into global pull secret (openshift-config/pull-secret)"
+
+  # Namespace-scoped secrets for the operator/installer SA (marketplace secrets already created by ocp_install).
+  if ! invoke_cluster_cli get namespace "${NAMESPACE_SUBSCRIPTION}" &>/dev/null; then
+    invoke_cluster_cli create namespace "${NAMESPACE_SUBSCRIPTION}" >&2
+  fi
+  invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" delete secret internal-reg-ext-auth-for-rhdh --ignore-not-found >&2
+  invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
+    --docker-server="${external_registry_url}" \
+    --docker-username=kubeadmin \
+    --docker-password="${token}" \
+    --docker-email="admin@internal-registry-ext.example.com" >&2
+  invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" delete secret internal-reg-auth-for-rhdh --ignore-not-found >&2
+  invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" create secret docker-registry internal-reg-auth-for-rhdh \
+    --docker-server="${internal_registry_url}" \
+    --docker-username=kubeadmin \
+    --docker-password="${token}" \
+    --docker-email="admin@internal-registry.example.com" >&2
+
+  local catalogd_sa
+  catalogd_sa=$(invoke_cluster_cli get deployment -n "${catalogd_ns}" -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
+  catalogd_sa="${catalogd_sa:-catalogd-controller-manager}"
+
+  local controller_sa
+  controller_sa=$(invoke_cluster_cli get deployment -n "${controller_ns}" -l 'app.kubernetes.io/name=operator-controller' \
+    -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
+  controller_sa="${controller_sa:-operator-controller-controller-manager}"
+
+  debugf "Granting image-puller in namespace '${image_namespace}' to OLM v1 service accounts"
+  if ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${catalogd_ns}:${catalogd_sa}" -n "${image_namespace}" || \
+     ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${controller_ns}:${controller_sa}" -n "${image_namespace}"; then
+    errorf "Failed to grant image-puller to OLM v1 controller SAs in namespace ${image_namespace}"
+    return 1
+  fi
+}
+
 function render_iib() {
   set -euo pipefail
 
@@ -1040,20 +1116,9 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   fi
   debugf "Using operator-controller namespace: ${NAMESPACE_OLM_CONTROLLER}"
 
-  # Grant image-puller access so OLM v1 can pull rebuilt IIBs from the internal registry
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    CATALOGD_SA=$(invoke_cluster_cli get deployment -n "${NAMESPACE_CATALOGD}" -l 'app.kubernetes.io/name=catalogd' \
-      -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
-    CATALOGD_SA="${CATALOGD_SA:-catalogd-controller-manager}"
-    CONTROLLER_SA=$(invoke_cluster_cli get deployment -n "${NAMESPACE_OLM_CONTROLLER}" -l 'app.kubernetes.io/name=operator-controller' \
-      -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
-    CONTROLLER_SA="${CONTROLLER_SA:-operator-controller-controller-manager}"
-    if ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:${CATALOGD_SA}" -n rhdh || \
-       ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_OLM_CONTROLLER}:${CONTROLLER_SA}" -n rhdh; then
-      errorf "Failed to grant image-puller to OLM v1 controller SAs in namespace rhdh"
-      dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "" "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
-      exit 1
-    fi
+  if ! prepare_olm_v1_secrets "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}" "rhdh"; then
+    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "" "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
+    exit 1
   fi
 
   # Delete existing ClusterCatalog to force re-index
@@ -1074,7 +1139,7 @@ spec:
 
   infof "Waiting for ClusterCatalog/${CATALOGSOURCE_NAME} Serving (timeout ${OLM_V1_WAIT_TIMEOUT}s)..."
   if ! invoke_cluster_cli wait "clustercatalog/${CATALOGSOURCE_NAME}" --for=condition=Serving --timeout="${OLM_V1_WAIT_TIMEOUT}s"; then
-    errorf "ClusterCatalog/${CATALOGSOURCE_NAME} did not become Serving within ${OLM_V1_WAIT_TIMEOUT}s (check image-puller RBAC if on OpenShift)"
+    errorf "ClusterCatalog/${CATALOGSOURCE_NAME} did not become Serving within ${OLM_V1_WAIT_TIMEOUT}s (check openshift-config/pull-secret and image-puller RBAC if on OpenShift)"
     dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "" "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
     exit 1
   fi
