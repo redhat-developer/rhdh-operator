@@ -26,17 +26,15 @@ DEFAULT_VERSION := false
 endif
 
 # IMAGE_TAG_VERSION is the image tag, which might be different from VERSION.
-# For example, the RHDH profile uses 1.y as image tags if VERSION is 1.y.z
+# For example, the RHDH profile uses x.y as image tags if VERSION is x.y.z
 IMAGE_TAG_VERSION = $(VERSION)
 
 ifeq ($(PROFILE), rhdh)
 	# Profile-specific settings
 	ifeq ($(DEFAULT_VERSION), true)
-		# transforming: 0.y.z => 1.y.z. Only if VERSION was not explicitly overridden by the user
-		MAJOR := $(shell echo $(VERSION) | cut -d. -f1)
-		INCREMENTED_MAJOR := $(shell expr $(MAJOR) + 1)
-		MINOR_PATCH := $(shell echo $(VERSION) | cut -d. -f2-)
-		VERSION := $(INCREMENTED_MAJOR).$(MINOR_PATCH)
+		# Keep the same major version as VERSION (community and RHDH are aligned).
+		# Strip the patch for IMAGE_TAG_VERSION (x.y.z => x.y) to match downstream
+		# quay.io/rhdh image tags. Only if VERSION was not explicitly overridden.
 		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
 	endif
 
