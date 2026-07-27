@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  REGISTRY: quay.io
+  REGISTRY: ${{ vars.REGISTRY }}
 
 jobs:
   test:
@@ -55,8 +55,8 @@ jobs:
 
           CONTAINER_TOOL=podman make install-dp-build
 
-      # TODO: remove this after testing, push only on main
       - name: Login to registry (${{ env.REGISTRY }})
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
         with:
           registry: ${{ env.REGISTRY }}
@@ -64,4 +64,5 @@ jobs:
           password: ${{ secrets.QUAY_TOKEN }}
 
       - name: Push image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: CONTAINER_TOOL=podman make install-dp-push
