@@ -11,7 +11,7 @@ PROFILE ?= rhdh
 # Enable operator dynamic plugins processing (default: true)
 OPERATOR_DP_PROCESSING ?= true
 # Install dynamic plugins image (required when OPERATOR_DP_PROCESSING=true)
-INSTALL_DP_IMAGE ?= quay.io/gazarenk/install-plugins:skopeo
+INSTALL_DP_IMAGE ?= quay.io/rhdh-community/plugin-installer:next
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
@@ -260,6 +260,14 @@ image-build: ## Build container image with the manager.
 .PHONY: image-push
 image-push: ## Push container image with the manager.
 	$(CONTAINER_TOOL) push $(IMG)
+
+.PHONY: install-dp-build
+install-dp-build: ## Build the plugin installer image (skopeo variant)
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
+
+.PHONY: install-dp-push
+install-dp-push: ## Push the plugin installer image
+	$(CONTAINER_TOOL) push $(INSTALL_DP_IMAGE)
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
