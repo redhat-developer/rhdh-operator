@@ -68,7 +68,7 @@ func TestMergeDynamicPluginsFunction(t *testing.T) {
 				// Find plugin-b to verify it was overridden
 				var pluginB *DynaPlugin
 				for i := range config.Plugins {
-					if config.Plugins[i].Package == "plugin-b" {
+					if config.Plugins[i].Package == "./plugin-b" {
 						pluginB = &config.Plugins[i]
 						break
 					}
