@@ -108,19 +108,22 @@ func main() {
 
 	// Fetch the TLS profile from apiservers.config.openshift.io/cluster.
 	// Fall back to Intermediate on non-OpenShift clusters (or if the fetch fails).
+	intermediateTLSProfile := *configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
 	tlsSecurityProfileSpec, err := tlspkg.GetTLSProfileSpec(nil)
 	if err != nil {
-		setupLog.Error(err, "unable to get default TLS profile")
-		os.Exit(1)
+		setupLog.Info("unable to get TLS profile from API server, using Intermediate fallback", "error", err)
+		tlsSecurityProfileSpec = intermediateTLSProfile
 	}
 	tlsAdherence := configv1.TLSAdherencePolicyNoOpinion
 
 	k8sClient, err := client.New(restConfig, client.Options{Scheme: scheme})
 	if err != nil {
 		setupLog.Info("unable to create client for TLS profile fetch, using Intermediate fallback", "error", err)
+		tlsSecurityProfileSpec = intermediateTLSProfile
 	} else {
 		if profile, fetchErr := tlspkg.FetchAPIServerTLSProfile(ctx, k8sClient); fetchErr != nil {
 			setupLog.Info("unable to get TLS profile from API server, using Intermediate fallback", "error", fetchErr)
+			tlsSecurityProfileSpec = intermediateTLSProfile
 		} else {
 			tlsSecurityProfileSpec = profile
 		}
