@@ -9,6 +9,8 @@
 #   - url_encode(): Scoped package name encoding
 #   - download_npm(): Integration test with real registry (optional)
 
+# shellcheck disable=SC2329 # Functions are invoked indirectly by test runner
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

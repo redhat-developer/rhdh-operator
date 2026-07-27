@@ -122,7 +122,7 @@ download_oci_oras() {
 
     # Find the layer blob (largest file in blobs/sha256/, skip config and manifest)
     local layer_file
-    layer_file=$(ls -S "${tmp_oci}/blobs/sha256/"* 2>/dev/null | head -1)
+    layer_file=$(find "${tmp_oci}/blobs/sha256" -type f -exec ls -S {} + 2>/dev/null | head -1)
 
     if [[ -z "${layer_file}" || ! -f "${layer_file}" ]]; then
         echo "[FAIL] ${plugin_name}: could not find layer blob" >&2
@@ -177,7 +177,7 @@ download_oci_skopeo() {
 
     # Find the layer blob (largest file, skip manifest.json and version)
     local layer_file
-    layer_file=$(ls -S "${tmp_dir}"/* 2>/dev/null | grep -v manifest | grep -v version | head -1)
+    layer_file=$(find "${tmp_dir}" -maxdepth 1 -type f ! -name "*manifest*" ! -name "*version*" -exec ls -S {} + 2>/dev/null | head -1)
 
     if [[ -z "${layer_file}" || ! -f "${layer_file}" ]]; then
         echo "[FAIL] ${plugin_name}: could not find layer blob" >&2
@@ -536,29 +536,30 @@ download_plugin() {
     echo "[DOWN] ${url}" # ${plugin_name}"
 
     # Route based on URL prefix
+    local result=0
     case "${url}" in
         oci://*)
             # OCI uses digest in URL for verification, integrity ignored
-            download_oci "${url}" "${plugin_name}" "${plugin_dir}"
+            download_oci "${url}" "${plugin_name}" "${plugin_dir}" || result=$?
             ;;
         http://*|https://*)
-            download_http "${url}" "${plugin_name}" "${plugin_dir}" "${integrity}"
+            download_http "${url}" "${plugin_name}" "${plugin_dir}" "${integrity}" || result=$?
             ;;
         @*)
             # Scoped npm package: @scope/package or @scope/package@version
-            download_npm "${url}" "${plugin_name}" "${plugin_dir}" "${integrity}"
+            download_npm "${url}" "${plugin_name}" "${plugin_dir}" "${integrity}" || result=$?
             ;;
         ./*)
-            download_local "${url}" "${plugin_name}" "${plugin_dir}"
+            download_local "${url}" "${plugin_name}" "${plugin_dir}" || result=$?
             ;;
         *@*)
             # Unscoped npm package with version: package@version
-            download_npm "${url}" "${plugin_name}" "${plugin_dir}" "${integrity}"
+            download_npm "${url}" "${plugin_name}" "${plugin_dir}" "${integrity}" || result=$?
             ;;
         *)
             # Assume unscoped npm package without version, or fail
             if [[ "${url}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
-                download_npm "${url}" "${plugin_name}" "${plugin_dir}" "${integrity}"
+                download_npm "${url}" "${plugin_name}" "${plugin_dir}" "${integrity}" || result=$?
             else
                 echo "[FAIL] ${plugin_name}: unknown URL format: ${url}" >&2
                 return 1
@@ -566,9 +567,10 @@ download_plugin() {
             ;;
     esac
 
-    if [[ $? -eq 0 ]]; then
+    if [[ ${result} -eq 0 ]]; then
         echo "[DONE] ${plugin_name}"
     fi
+    return ${result}
 }
 
 # ============================================================================
@@ -594,19 +596,20 @@ mkdir -p "${OUTPUT_DIR}"
 export -f download_plugin download_oci download_oci_oras download_oci_skopeo download_http download_npm download_local detect_oci_tool parse_npmrc url_encode verify_integrity
 export OUTPUT_DIR OCI_TOOL NPM_REGISTRY NPM_AUTH_TOKEN
 
-total=$(grep -v '^#' "${INPUT_FILE}" | grep -v '^$' | wc -l | tr -d ' ')
+total=$(grep -cv '^#\|^$' "${INPUT_FILE}")
 
 echo "=== Downloading ${total} plugins to ${OUTPUT_DIR} (${PARALLEL_JOBS} parallel) ==="
 echo ""
 
 # Use xargs for parallel execution
+# shellcheck disable=SC2016 # Single quotes intentional - variables expand in inner bash
 grep -v '^#' "${INPUT_FILE}" | grep -v '^$' | \
     xargs -P "${PARALLEL_JOBS}" -I {} bash -c 'download_plugin "$1" "$2"' _ {} "${OUTPUT_DIR}"
 
 echo ""
 echo "=== Complete ==="
 echo "Plugins in ${OUTPUT_DIR}:"
-ls -d "${OUTPUT_DIR}"/*/ 2>/dev/null | xargs -I {} basename {} | head -20
+find "${OUTPUT_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | head -20
 
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))
