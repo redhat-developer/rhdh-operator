@@ -16,8 +16,6 @@ UPSTREAM_IIB_OVERRIDE=""
 INSTALL_PLAN_APPROVAL="Automatic"
 OLM_VERSION="auto"
 RESOLVED_OLM_VERSION=""
-# Timeout (seconds) for OLM v1 readiness waits (ClusterCatalog Serving, ClusterExtension Installed, CRD).
-OLM_V1_WAIT_TIMEOUT="${OLM_V1_WAIT_TIMEOUT:-300}"
 MAX_PARALLEL="${MAX_PARALLEL:-10}"
 if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
   echo "[ERROR] MAX_PARALLEL must be a positive integer, got: '$MAX_PARALLEL'" >&2
@@ -200,12 +198,9 @@ function prepare_olm_v1_secrets() {
   fi
 
   local internal_registry_url="image-registry.openshift-image-registry.svc:5000"
+  # External route is optional; ClusterCatalog pulls via the internal svc URL.
   local external_registry_url
   external_registry_url=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}' 2>/dev/null || true)
-  if [[ -z "${external_registry_url}" ]]; then
-    errorf "Could not resolve OpenShift internal registry default route; is the registry exposed?"
-    return 1
-  fi
 
   local token
   token=$(oc whoami -t)
@@ -218,10 +213,17 @@ function prepare_olm_v1_secrets() {
 
   local merged
   merged=$(echo "${existing_pull_secret}" | jq \
-    --arg url1 "${internal_registry_url}" \
-    --arg url2 "${external_registry_url}" \
+    --arg url "${internal_registry_url}" \
     --arg auth "${internal_auth}" \
-    '.auths[$url1] = {auth: $auth} | .auths[$url2] = {auth: $auth}')
+    '.auths[$url] = {auth: $auth}')
+  if [[ -n "${external_registry_url}" ]]; then
+    merged=$(echo "${merged}" | jq \
+      --arg url "${external_registry_url}" \
+      --arg auth "${internal_auth}" \
+      '.auths[$url] = {auth: $auth}')
+  else
+    warnf "OpenShift registry default-route not found; merged credentials for ${internal_registry_url} only"
+  fi
 
   echo "${merged}" | oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/dev/stdin >&2
   infof "Merged internal registry credentials into global pull secret (openshift-config/pull-secret)"
@@ -230,18 +232,20 @@ function prepare_olm_v1_secrets() {
   if ! invoke_cluster_cli get namespace "${NAMESPACE_SUBSCRIPTION}" &>/dev/null; then
     invoke_cluster_cli create namespace "${NAMESPACE_SUBSCRIPTION}" >&2
   fi
-  invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" delete secret internal-reg-ext-auth-for-rhdh --ignore-not-found >&2
-  invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
-    --docker-server="${external_registry_url}" \
-    --docker-username=kubeadmin \
-    --docker-password="${token}" \
-    --docker-email="admin@internal-registry-ext.example.com" >&2
   invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" delete secret internal-reg-auth-for-rhdh --ignore-not-found >&2
   invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" create secret docker-registry internal-reg-auth-for-rhdh \
     --docker-server="${internal_registry_url}" \
     --docker-username=kubeadmin \
     --docker-password="${token}" \
     --docker-email="admin@internal-registry.example.com" >&2
+  if [[ -n "${external_registry_url}" ]]; then
+    invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" delete secret internal-reg-ext-auth-for-rhdh --ignore-not-found >&2
+    invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
+      --docker-server="${external_registry_url}" \
+      --docker-username=kubeadmin \
+      --docker-password="${token}" \
+      --docker-email="admin@internal-registry-ext.example.com" >&2
+  fi
 
   local catalogd_sa
   catalogd_sa=$(invoke_cluster_cli get deployment -n "${catalogd_ns}" -l 'app.kubernetes.io/name=catalogd' \
@@ -1137,9 +1141,9 @@ spec:
       ref: ${newIIBImage}
 " > "$TMPDIR"/ClusterCatalog.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterCatalog.yml
 
-  infof "Waiting for ClusterCatalog/${CATALOGSOURCE_NAME} Serving (timeout ${OLM_V1_WAIT_TIMEOUT}s)..."
-  if ! invoke_cluster_cli wait "clustercatalog/${CATALOGSOURCE_NAME}" --for=condition=Serving --timeout="${OLM_V1_WAIT_TIMEOUT}s"; then
-    errorf "ClusterCatalog/${CATALOGSOURCE_NAME} did not become Serving within ${OLM_V1_WAIT_TIMEOUT}s (check openshift-config/pull-secret and image-puller RBAC if on OpenShift)"
+  infof "Waiting for ClusterCatalog/${CATALOGSOURCE_NAME} Serving (timeout 300s)..."
+  if ! invoke_cluster_cli wait "clustercatalog/${CATALOGSOURCE_NAME}" --for=condition=Serving --timeout=300s; then
+    errorf "ClusterCatalog/${CATALOGSOURCE_NAME} did not become Serving within 300s (check openshift-config/pull-secret and image-puller RBAC if on OpenShift)"
     dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "" "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
     exit 1
   fi
@@ -1217,9 +1221,9 @@ spec:
         enforcement: None
 " > "$TMPDIR"/ClusterExtension.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterExtension.yml
 
-  infof "Waiting for ClusterExtension/${OPERATOR_NAME_TO_INSTALL} Installed (timeout ${OLM_V1_WAIT_TIMEOUT}s)..."
-  if ! invoke_cluster_cli wait "clusterextension/${OPERATOR_NAME_TO_INSTALL}" --for=condition=Installed --timeout="${OLM_V1_WAIT_TIMEOUT}s"; then
-    errorf "ClusterExtension/${OPERATOR_NAME_TO_INSTALL} did not become Installed within ${OLM_V1_WAIT_TIMEOUT}s"
+  infof "Waiting for ClusterExtension/${OPERATOR_NAME_TO_INSTALL} Installed (timeout 300s)..."
+  if ! invoke_cluster_cli wait "clusterextension/${OPERATOR_NAME_TO_INSTALL}" --for=condition=Installed --timeout=300s; then
+    errorf "ClusterExtension/${OPERATOR_NAME_TO_INSTALL} did not become Installed within 300s"
     dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}" \
       "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
     exit 1
@@ -1227,8 +1231,8 @@ spec:
 
   # When installing RHDH, also wait for the Backstage CRD before reporting success.
   if [[ "${OPERATOR_NAME_IN_CS}" == "rhdh" || "${OPERATOR_NAME_TO_INSTALL}" == "rhdh" ]]; then
-    infof "Waiting for CRD backstages.rhdh.redhat.com (timeout ${OLM_V1_WAIT_TIMEOUT}s)..."
-    deadline=$((SECONDS + OLM_V1_WAIT_TIMEOUT))
+    infof "Waiting for CRD backstages.rhdh.redhat.com (timeout 300s)..."
+    deadline=$((SECONDS + 300))
     while (( SECONDS < deadline )); do
       if invoke_cluster_cli get crd backstages.rhdh.redhat.com &>/dev/null; then
         break
@@ -1236,7 +1240,7 @@ spec:
       sleep 5
     done
     if ! invoke_cluster_cli get crd backstages.rhdh.redhat.com &>/dev/null; then
-      errorf "CRD backstages.rhdh.redhat.com was not created within ${OLM_V1_WAIT_TIMEOUT}s"
+      errorf "CRD backstages.rhdh.redhat.com was not created within 300s"
       dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}" \
         "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
       exit 1
