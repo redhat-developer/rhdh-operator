@@ -20,7 +20,6 @@ concurrency:
 
 env:
   REGISTRY: quay.io
-  IMAGE_NAME: rhdh-community/plugin-installer
 
 jobs:
   test:
@@ -35,17 +34,13 @@ jobs:
           sudo apt-get -y update
           sudo apt-get -y install skopeo
 
-      - name: Run unit tests
-        run: ./plugin-installer/install_plugins_test.sh
-
-      - name: Run integration tests
+      - name: Run tests
         run: RUN_INTEGRATION_TESTS=true ./plugin-installer/install_plugins_test.sh
 
-  build-push:
-    name: Build and push image
+  build:
+    name: Build image
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
@@ -53,11 +48,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Get short SHA
+      - name: Build image
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+          sudo apt-get -y update
+          sudo apt-get -y install podman
 
+          CONTAINER_TOOL=podman make install-dp-build
+
+      # TODO: remove this after testing, push only on main
       - name: Login to registry (${{ env.REGISTRY }})
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
         with:
@@ -65,19 +63,5 @@ jobs:
           username: ${{ vars.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - name: Build and push image
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install skopeo podman
-
-          export CONTAINER_TOOL=podman
-          export INSTALL_DP_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next
-
-          # Build the image
-          make install-dp-build
-
-          # Push with multiple tags: next and next-<sha>
-          podman push -q ${INSTALL_DP_IMAGE}
-          skopeo --insecure-policy copy --all \
-            docker://${INSTALL_DP_IMAGE} \
-            docker://${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-${{ env.SHORT_SHA }}
+      - name: Push image
+        run: CONTAINER_TOOL=podman make install-dp-push
