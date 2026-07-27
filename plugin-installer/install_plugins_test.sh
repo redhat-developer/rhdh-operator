@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 # Tests for install_plugins.sh npm implementation
 #
 # Usage: ./install_plugins_test.sh
@@ -206,7 +206,7 @@ EOF
 
     # Set env var - but file should override it
     NPM_REGISTRY="https://npm.fromenv.com"
-    NPM_CONFIG_USERCONFIG="${npmrc}"
+    export NPM_CONFIG_USERCONFIG="${npmrc}"
 
     parse_npmrc
 
@@ -308,7 +308,7 @@ test_verify_integrity_skip_env() {
     # Wrong hash but SKIP_INTEGRITY_CHECK=true
     local integrity="sha256-wronghashAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
-    SKIP_INTEGRITY_CHECK=true
+    export SKIP_INTEGRITY_CHECK=true
     local result
     if verify_integrity "${test_file}" "${integrity}"; then
         result=0
