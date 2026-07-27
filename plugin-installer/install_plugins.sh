@@ -121,8 +121,9 @@ download_oci_oras() {
     fi
 
     # Find the layer blob (largest file in blobs/sha256/, skip config and manifest)
+    # shellcheck disable=SC2012 # OCI blob filenames are SHA256 hashes (alphanumeric only)
     local layer_file
-    layer_file=$(find "${tmp_oci}/blobs/sha256" -type f -exec ls -S {} + 2>/dev/null | head -1)
+    layer_file=$(find "${tmp_oci}/blobs/sha256" -type f -print0 | xargs -0 ls -S 2>/dev/null | head -1)
 
     if [[ -z "${layer_file}" || ! -f "${layer_file}" ]]; then
         echo "[FAIL] ${plugin_name}: could not find layer blob" >&2
@@ -176,8 +177,9 @@ download_oci_skopeo() {
     fi
 
     # Find the layer blob (largest file, skip manifest.json and version)
+    # shellcheck disable=SC2012 # Skopeo dir: filenames are SHA256 hashes (alphanumeric only)
     local layer_file
-    layer_file=$(find "${tmp_dir}" -maxdepth 1 -type f ! -name "*manifest*" ! -name "*version*" -exec ls -S {} + 2>/dev/null | head -1)
+    layer_file=$(find "${tmp_dir}" -maxdepth 1 -type f ! -name "*manifest*" ! -name "*version*" -print0 | xargs -0 ls -S 2>/dev/null | head -1)
 
     if [[ -z "${layer_file}" || ! -f "${layer_file}" ]]; then
         echo "[FAIL] ${plugin_name}: could not find layer blob" >&2

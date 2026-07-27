@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2329
 # Tests for install_plugins.sh npm implementation
 #
 # Usage: ./install_plugins_test.sh
@@ -8,8 +9,6 @@
 #   - verify_integrity(): SHA256/384/512 verification
 #   - url_encode(): Scoped package name encoding
 #   - download_npm(): Integration test with real registry (optional)
-
-# shellcheck disable=SC2329 # Functions are invoked indirectly by test runner
 
 set -euo pipefail
 
