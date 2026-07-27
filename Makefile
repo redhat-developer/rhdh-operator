@@ -38,8 +38,8 @@ ifeq ($(PROFILE), rhdh)
 		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
 	endif
 
-	# Downstream: IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator or registry.redhat.io/rhdh/rhdh-rhel9-operator
-	IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
+	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
+	IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator
 	DEFAULT_CHANNEL ?= fast
 	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
