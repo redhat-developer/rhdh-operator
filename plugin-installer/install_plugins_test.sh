@@ -350,6 +350,9 @@ test_download_npm_real_package() {
         return 0
     fi
 
+    # Clean up env vars from previous tests
+    unset NPM_REGISTRY NPM_AUTH_TOKEN NPM_CONFIG_USERCONFIG SKIP_INTEGRITY_CHECK
+
     local plugin_dir="${TEST_TMP_DIR}/is-odd"
 
     # Run the actual script in bash (not eval'd functions) to ensure bash semantics
@@ -358,11 +361,15 @@ test_download_npm_real_package() {
     echo "is-odd@3.0.1" > "${test_input}"
 
     # Run install_plugins.sh with our test input
-    if INPUT_FILE="${test_input}" OUTPUT_DIR="${TEST_TMP_DIR}" PARALLEL_JOBS=1 \
-       bash "${SCRIPT_DIR}/install_plugins.sh" >/dev/null 2>&1; then
+    local output
+    output=$(INPUT_FILE="${test_input}" OUTPUT_DIR="${TEST_TMP_DIR}" PARALLEL_JOBS=1 \
+       bash "${SCRIPT_DIR}/install_plugins.sh" 2>&1)
+    local exit_code=$?
+    if [[ ${exit_code} -eq 0 ]]; then
         assert_file_exists "${plugin_dir}/package.json" "package.json exists"
     else
-        echo "install_plugins.sh failed"
+        echo "install_plugins.sh failed (exit ${exit_code}):"
+        echo "${output}"
         return 1
     fi
 }
