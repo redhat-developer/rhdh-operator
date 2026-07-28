@@ -58,11 +58,9 @@ function usage() {
 This script streamlines testing IIB images by configuring an OpenShift or Kubernetes cluster to enable it to use the specified IIB image
 as a catalog source. On OLM v0, a CatalogSource is created in 'openshift-marketplace' (OpenShift) or 'olm' (Kubernetes). On OLM v1,
 a ClusterCatalog is created (cluster-scoped); when --install-operator is also provided, a ClusterExtension, ServiceAccount, and
-ClusterRoleBinding are created in the '${NAMESPACE_SUBSCRIPTION}' namespace. The script waits for ClusterCatalog Serving and
-(when installing) ClusterExtension Installed before exiting successfully. By default, the OLM version is auto-detected based on
-the presence of the ClusterExtension CRD (prefers v1 when present, on both OpenShift and Kubernetes). The default
-catalog/resource name is 'operatorName-channelName' (eg., rhdh-fast), or 'brew-registry-stage' when using --catalog-source
-with a brew IIB override
+ClusterRoleBinding are created in the '${NAMESPACE_SUBSCRIPTION}' namespace. By default, the OLM version is auto-detected based on
+the presence of the ClusterExtension CRD. When installing an operator, the script waits for readiness before exiting successfully.
+The default catalog/resource name is 'operatorName-channelName' (eg., rhdh-fast).
 
 If IIB installation fails, see https://docs.engineering.redhat.com/display/CFC/Test and
 follow steps in section 'Adding Brew Pull Secret'
@@ -75,9 +73,9 @@ Options:
   --latest                            : Install from iib quay.io/rhdh/iib:latest-\$OCP_VER-\$OCP_ARCH (eg., latest-v4.14-x86_64) [default]
   --next                              : Install from iib quay.io/rhdh/iib:next-\$OCP_VER-\$OCP_ARCH (eg., next-v4.14-x86_64)
   --catalog-source                    : Install from specified catalog source, like brew.registry.redhat.io/rh-osbs/iib-pub-pending:v4.18
-  --install-operator <NAME>           : Install operator named \$NAME after creating catalog resources
-  --install-plan-approval <STRATEGY>  : Specify the install plan strategy for the subscription (default: Automatic; OLM v0 only)
-  --olm-version v0|v1|auto            : Force OLM version for catalog/operator resources (default: auto-detect via ClusterExtension CRD)
+  --install-operator <NAME>           : Install operator named \$NAME after creating CatalogSource
+  --install-plan-approval <STRATEGY>  : Specify the install plan strategy for the subscription (default: Automatic)
+  --olm-version v0|v1|auto            : Force OLM version for catalog/operator resources (default: auto-detect)
 
 Examples:
   $0 \\
@@ -158,11 +156,10 @@ function resolve_olm_version() {
   fi
 }
 
+# On failure, print ClusterCatalog / ClusterExtension status so CI logs show why Serving/Installed never became True.
 function dump_olm_v1_diagnostics() {
   local catalog_name="${1:-}"
   local extension_name="${2:-}"
-  local catalogd_ns="${3:-}"
-  local controller_ns="${4:-}"
 
   errorf "===== OLM v1 diagnostics ====="
   [[ -n "${catalog_name}" ]] && invoke_cluster_cli describe clustercatalog "${catalog_name}" 2>&1 || true
@@ -171,19 +168,9 @@ function dump_olm_v1_diagnostics() {
     invoke_cluster_cli get clusterextension "${extension_name}" -o jsonpath='{.status.conditions}' 2>&1 || true
     echo
   fi
-  if [[ -n "${catalogd_ns}" ]]; then
-    invoke_cluster_cli get events -n "${catalogd_ns}" --sort-by='.lastTimestamp' 2>&1 | tail -n 20 || true
-    invoke_cluster_cli logs -n "${catalogd_ns}" -l 'app.kubernetes.io/name=catalogd' --tail=50 2>&1 || true
-  fi
-  if [[ -n "${controller_ns}" ]]; then
-    invoke_cluster_cli get events -n "${controller_ns}" --sort-by='.lastTimestamp' 2>&1 | tail -n 20 || true
-    invoke_cluster_cli logs -n "${controller_ns}" -l 'app.kubernetes.io/name=operator-controller' --tail=50 2>&1 || true
-  fi
-  invoke_cluster_cli get pods -n "${NAMESPACE_SUBSCRIPTION}" -o wide 2>&1 || true
   errorf "===== end OLM v1 diagnostics ====="
 }
 
-# Align with prepare-restricted-environment.sh prepare_olm_v1_secrets:
 # OLM v1 catalogd authenticates via openshift-config/pull-secret (--global-pull-secret),
 # not ClusterCatalog pullSecret fields or image-puller alone.
 function prepare_olm_v1_secrets() {
@@ -270,14 +257,11 @@ function render_iib() {
 
   mkdir -p "${TMPDIR}/rhdh/rhdh"
   debugf "Rendering IIB $UPSTREAM_IIB as a local file..."
-  if ! opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"; then
-    errorf "'opm render ${UPSTREAM_IIB}' failed. Try: skopeo inspect docker://${UPSTREAM_IIB}"
-    return 1
-  fi
+  opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
   if [ ! -s "${TMPDIR}/rhdh/rhdh/render.yaml" ]; then
     errorf "
-[ERROR] 'opm render ${UPSTREAM_IIB}' returned an empty output, which likely means that this IIB Image does not contain any operators in it.
-Try: skopeo inspect docker://${UPSTREAM_IIB} — then retry, or reach out to the RHDH Productization team.
+[ERROR] 'opm render $UPSTREAM_IIB' returned an empty output, which likely means that this IIB Image does not contain any operators in it.
+Please reach out to the RHDH Productization team.
 "
     return 1
   fi
@@ -1121,7 +1105,7 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   debugf "Using operator-controller namespace: ${NAMESPACE_OLM_CONTROLLER}"
 
   if ! prepare_olm_v1_secrets "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}" "rhdh"; then
-    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "" "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
+    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}"
     exit 1
   fi
 
@@ -1144,7 +1128,7 @@ spec:
   infof "Waiting for ClusterCatalog/${CATALOGSOURCE_NAME} Serving (timeout 300s)..."
   if ! invoke_cluster_cli wait "clustercatalog/${CATALOGSOURCE_NAME}" --for=condition=Serving --timeout=300s; then
     errorf "ClusterCatalog/${CATALOGSOURCE_NAME} did not become Serving within 300s (check openshift-config/pull-secret and image-puller RBAC if on OpenShift)"
-    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "" "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
+    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}"
     exit 1
   fi
 
@@ -1191,8 +1175,7 @@ subjects:
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
     if ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME}" -n rhdh; then
       errorf "Failed to grant image-puller to installer SA '${SA_NAME}' in namespace rhdh"
-      dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}" \
-        "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
+      dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}"
       exit 1
     fi
   fi
@@ -1224,8 +1207,7 @@ spec:
   infof "Waiting for ClusterExtension/${OPERATOR_NAME_TO_INSTALL} Installed (timeout 300s)..."
   if ! invoke_cluster_cli wait "clusterextension/${OPERATOR_NAME_TO_INSTALL}" --for=condition=Installed --timeout=300s; then
     errorf "ClusterExtension/${OPERATOR_NAME_TO_INSTALL} did not become Installed within 300s"
-    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}" \
-      "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
+    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}"
     exit 1
   fi
 
@@ -1241,8 +1223,7 @@ spec:
     done
     if ! invoke_cluster_cli get crd backstages.rhdh.redhat.com &>/dev/null; then
       errorf "CRD backstages.rhdh.redhat.com was not created within 300s"
-      dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}" \
-        "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}"
+      dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}"
       exit 1
     fi
   fi

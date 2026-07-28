@@ -33,9 +33,7 @@ Besides the prerequisites listed above, you will also need:
 
 ==== Procedure
 
-. Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator catalog resources in your cluster. By default, it installs the Release Candidate or GA version (from the `release-1.yy` branch), but the `--next` option allows to install the current development build (from the `main` branch).
-+
-The script auto-detects OLM v0 vs v1 from the ClusterExtension CRD (`--olm-version auto|v0|v1`). On OLM v1 it creates a `ClusterCatalog` / `ClusterExtension` and waits until the catalog is Serving and the extension is Installed (and for RHDH, until the `backstages.rhdh.redhat.com` CRD exists) before exiting successfully. On OpenShift, OLM v1 also merges internal-registry credentials into the cluster pull secret (`openshift-config/pull-secret`), matching the approach used by `prepare-restricted-environment.sh`, because catalogd authenticates via that global secret. On failure it prints diagnostics and exits non-zero. For example:
+. Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate or GA version (from the `release-1.yy` branch), but the `--next` option allows to install the current development build (from the `main` branch). The script auto-detects OLM v0 or v1 and waits for the operator to be ready before exiting. For example:
 +
 [source,console]
 ----
@@ -43,17 +41,14 @@ cd /tmp
 curl -sSLO https://raw.githubusercontent.com/redhat-developer/rhdh-operator/main/.rhdh/scripts/install-rhdh-catalog-source.sh
 chmod +x install-rhdh-catalog-source.sh
 
-# install catalog and operator, for the latest downstream stable, RC or GA build from the release-1.yy branch
-./install-rhdh-catalog-source.sh --latest --install-operator rhdh
+# install catalog source and operator subscription, for the latest downstream stable, RC or GA build from the release-1.yy branch
+./install-rhdh-catalog-source.sh --latest --install-operator rhdh  
 
-# OR, install catalog and operator, for the next downstream CI build from the main branch
-./install-rhdh-catalog-source.sh --next --install-operator rhdh
-
-# Force classic OLM v0 (CatalogSource + Subscription) if needed
-./install-rhdh-catalog-source.sh --next --install-operator rhdh --olm-version v0
+# OR, install catalog source and operator subscription, for the next donwstream CI build from the main branch
+./install-rhdh-catalog-source.sh --next --install-operator rhdh  
 ----
 
-. If you did not install the operator in the previous step (`--install-operator`), you can do so now. On OpenShift with OLM v0, open the *Administrator* perspective of the web console, then go to *Operators* → *OperatorHub*, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator. For more info, see link:https://docs.openshift.com/container-platform/4.14/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster[Installing from OperatorHub using the web console].
+. If you did not create a subscription in the previous step, you can do so now. On OpenShift, open the *Administrator* perspective of the web console, then go to *Operators* → *OperatorHub*, search for Red Hat Developer Hub, and install the Red Hat Developer Hub Operator. For more info, see link:https://docs.openshift.com/container-platform/4.14/operators/admin/olm-adding-operators-to-cluster.html#olm-installing-from-operatorhub-using-web-console_olm-adding-operators-to-a-cluster[Installing from OperatorHub using the web console].
 
 === Deploying RHDH
 
