@@ -244,6 +244,11 @@ function prepare_olm_v1_secrets() {
     -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
   controller_sa="${controller_sa:-operator-controller-controller-manager}"
 
+  # Image project for the rebuilt IIB (created by ocp_install); ensure it exists before grants.
+  if ! oc get namespace "${image_namespace}" &>/dev/null; then
+    oc create namespace "${image_namespace}" >&2
+  fi
+
   debugf "Granting image-puller in namespace '${image_namespace}' to OLM v1 service accounts"
   if ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${catalogd_ns}:${catalogd_sa}" -n "${image_namespace}" || \
      ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${controller_ns}:${controller_sa}" -n "${image_namespace}"; then
@@ -1104,7 +1109,16 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   fi
   debugf "Using operator-controller namespace: ${NAMESPACE_OLM_CONTROLLER}"
 
-  if ! prepare_olm_v1_secrets "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}" "rhdh"; then
+  # OpenShift IIB is rebuilt into the internal registry under <project>/iib:...
+  # (ocp_install uses "rhdh"). Derive the project from the image ref instead of
+  # assuming the RHDH app deploy namespace (e.g. showcase).
+  IMAGE_NAMESPACE="rhdh"
+  if [[ "${newIIBImage}" =~ ^image-registry\.openshift-image-registry\.svc:5000/([^/]+)/ ]]; then
+    IMAGE_NAMESPACE="${BASH_REMATCH[1]}"
+  fi
+  debugf "Using image namespace for OLM v1 puller grants: ${IMAGE_NAMESPACE}"
+
+  if ! prepare_olm_v1_secrets "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}" "${IMAGE_NAMESPACE}"; then
     dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}"
     exit 1
   fi
@@ -1173,8 +1187,8 @@ subjects:
 " > "$TMPDIR"/ClusterRoleBinding.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterRoleBinding.yml
 
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    if ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME}" -n rhdh; then
-      errorf "Failed to grant image-puller to installer SA '${SA_NAME}' in namespace rhdh"
+    if ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME}" -n "${IMAGE_NAMESPACE}"; then
+      errorf "Failed to grant image-puller to installer SA '${SA_NAME}' in namespace ${IMAGE_NAMESPACE}"
       dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}"
       exit 1
     fi
@@ -1211,18 +1225,11 @@ spec:
     exit 1
   fi
 
-  # When installing RHDH, also wait for the Backstage CRD before reporting success.
+  # When installing RHDH, wait until the Backstage CRD is Established (not merely present).
   if [[ "${OPERATOR_NAME_IN_CS}" == "rhdh" || "${OPERATOR_NAME_TO_INSTALL}" == "rhdh" ]]; then
-    infof "Waiting for CRD backstages.rhdh.redhat.com (timeout 300s)..."
-    deadline=$((SECONDS + 300))
-    while (( SECONDS < deadline )); do
-      if invoke_cluster_cli get crd backstages.rhdh.redhat.com &>/dev/null; then
-        break
-      fi
-      sleep 5
-    done
-    if ! invoke_cluster_cli get crd backstages.rhdh.redhat.com &>/dev/null; then
-      errorf "CRD backstages.rhdh.redhat.com was not created within 300s"
+    infof "Waiting for CRD backstages.rhdh.redhat.com Established (timeout 300s)..."
+    if ! invoke_cluster_cli wait --for=condition=Established crd/backstages.rhdh.redhat.com --timeout=300s; then
+      errorf "CRD backstages.rhdh.redhat.com was not Established within 300s"
       dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}"
       exit 1
     fi
