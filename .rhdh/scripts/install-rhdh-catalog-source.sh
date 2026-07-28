@@ -59,8 +59,8 @@ This script streamlines testing IIB images by configuring an OpenShift or Kubern
 as a catalog source. On OLM v0, a CatalogSource is created in 'openshift-marketplace' (OpenShift) or 'olm' (Kubernetes). On OLM v1,
 a ClusterCatalog is created (cluster-scoped); when --install-operator is also provided, a ClusterExtension, ServiceAccount, and
 ClusterRoleBinding are created in the '${NAMESPACE_SUBSCRIPTION}' namespace. By default, the OLM version is auto-detected based on
-the presence of the ClusterExtension CRD. The default catalog/resource name is 'operatorName-channelName' (eg., rhdh-fast),
-or 'brew-registry-stage' when using --catalog-source with a brew IIB override
+the presence of the ClusterExtension CRD. When installing an operator, the script waits for readiness before exiting successfully.
+The default catalog/resource name is 'operatorName-channelName' (eg., rhdh-fast).
 
 If IIB installation fails, see https://docs.engineering.redhat.com/display/CFC/Test and
 follow steps in section 'Adding Brew Pull Secret'
@@ -153,6 +153,107 @@ function resolve_olm_version() {
 
   if [[ "${RESOLVED_OLM_VERSION}" == "v1" && "${INSTALL_PLAN_APPROVAL}" != "Automatic" ]]; then
     warnf "--install-plan-approval is only relevant with OLM v0 and will be ignored with OLM v1"
+  fi
+}
+
+# On failure, print ClusterCatalog / ClusterExtension status so CI logs show why Serving/Installed never became True.
+function dump_olm_v1_diagnostics() {
+  local catalog_name="${1:-}"
+  local extension_name="${2:-}"
+
+  errorf "===== OLM v1 diagnostics ====="
+  [[ -n "${catalog_name}" ]] && invoke_cluster_cli describe clustercatalog "${catalog_name}" 2>&1 || true
+  if [[ -n "${extension_name}" ]]; then
+    invoke_cluster_cli describe clusterextension "${extension_name}" 2>&1 || true
+    invoke_cluster_cli get clusterextension "${extension_name}" -o jsonpath='{.status.conditions}' 2>&1 || true
+    echo
+  fi
+  errorf "===== end OLM v1 diagnostics ====="
+}
+
+# OLM v1 catalogd authenticates via openshift-config/pull-secret (--global-pull-secret),
+# not ClusterCatalog pullSecret fields or image-puller alone.
+function prepare_olm_v1_secrets() {
+  set -euo pipefail
+
+  local catalogd_ns="$1"
+  local controller_ns="$2"
+  local image_namespace="${3:-rhdh}"
+
+  if [[ "${IS_OPENSHIFT}" != "true" ]]; then
+    return 0
+  fi
+
+  local internal_registry_url="image-registry.openshift-image-registry.svc:5000"
+  # External route is optional; ClusterCatalog pulls via the internal svc URL.
+  local external_registry_url
+  external_registry_url=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}' 2>/dev/null || true)
+
+  local token
+  token=$(oc whoami -t)
+  # macOS base64 has no -w0; Linux does. Strip newlines for both.
+  local internal_auth
+  internal_auth=$(echo -n "kubeadmin:${token}" | base64 | tr -d '\n')
+
+  local existing_pull_secret
+  existing_pull_secret=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
+
+  local merged
+  merged=$(echo "${existing_pull_secret}" | jq \
+    --arg url "${internal_registry_url}" \
+    --arg auth "${internal_auth}" \
+    '.auths[$url] = {auth: $auth}')
+  if [[ -n "${external_registry_url}" ]]; then
+    merged=$(echo "${merged}" | jq \
+      --arg url "${external_registry_url}" \
+      --arg auth "${internal_auth}" \
+      '.auths[$url] = {auth: $auth}')
+  else
+    warnf "OpenShift registry default-route not found; merged credentials for ${internal_registry_url} only"
+  fi
+
+  echo "${merged}" | oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/dev/stdin >&2
+  infof "Merged internal registry credentials into global pull secret (openshift-config/pull-secret)"
+
+  # Namespace-scoped secrets for the operator/installer SA (marketplace secrets already created by ocp_install).
+  if ! invoke_cluster_cli get namespace "${NAMESPACE_SUBSCRIPTION}" &>/dev/null; then
+    invoke_cluster_cli create namespace "${NAMESPACE_SUBSCRIPTION}" >&2
+  fi
+  invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" delete secret internal-reg-auth-for-rhdh --ignore-not-found >&2
+  invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" create secret docker-registry internal-reg-auth-for-rhdh \
+    --docker-server="${internal_registry_url}" \
+    --docker-username=kubeadmin \
+    --docker-password="${token}" \
+    --docker-email="admin@internal-registry.example.com" >&2
+  if [[ -n "${external_registry_url}" ]]; then
+    invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" delete secret internal-reg-ext-auth-for-rhdh --ignore-not-found >&2
+    invoke_cluster_cli -n "${NAMESPACE_SUBSCRIPTION}" create secret docker-registry internal-reg-ext-auth-for-rhdh \
+      --docker-server="${external_registry_url}" \
+      --docker-username=kubeadmin \
+      --docker-password="${token}" \
+      --docker-email="admin@internal-registry-ext.example.com" >&2
+  fi
+
+  local catalogd_sa
+  catalogd_sa=$(invoke_cluster_cli get deployment -n "${catalogd_ns}" -l 'app.kubernetes.io/name=catalogd' \
+    -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
+  catalogd_sa="${catalogd_sa:-catalogd-controller-manager}"
+
+  local controller_sa
+  controller_sa=$(invoke_cluster_cli get deployment -n "${controller_ns}" -l 'app.kubernetes.io/name=operator-controller' \
+    -o jsonpath='{.items[0].spec.template.spec.serviceAccountName}' 2>/dev/null || true)
+  controller_sa="${controller_sa:-operator-controller-controller-manager}"
+
+  # Image project for the rebuilt IIB (created by ocp_install); ensure it exists before grants.
+  if ! oc get namespace "${image_namespace}" &>/dev/null; then
+    oc create namespace "${image_namespace}" >&2
+  fi
+
+  debugf "Granting image-puller in namespace '${image_namespace}' to OLM v1 service accounts"
+  if ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${catalogd_ns}:${catalogd_sa}" -n "${image_namespace}" || \
+     ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${controller_ns}:${controller_sa}" -n "${image_namespace}"; then
+    errorf "Failed to grant image-puller to OLM v1 controller SAs in namespace ${image_namespace}"
+    return 1
   fi
 }
 
@@ -1008,12 +1109,18 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
   fi
   debugf "Using operator-controller namespace: ${NAMESPACE_OLM_CONTROLLER}"
 
-  # Grant image-puller access to OLM v1 controller SAs so they can pull images from the internal registry
-  if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_CATALOGD}:catalogd-controller-manager" -n rhdh ||
-      warnf "Failed to grant image-puller to catalogd SA; catalog image pulls from internal registry may fail"
-    oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_OLM_CONTROLLER}:operator-controller-controller-manager" -n rhdh ||
-      warnf "Failed to grant image-puller to operator-controller SA; operator image pulls from internal registry may fail"
+  # OpenShift IIB is rebuilt into the internal registry under <project>/iib:...
+  # (ocp_install uses "rhdh"). Derive the project from the image ref instead of
+  # assuming the RHDH app deploy namespace (e.g. showcase).
+  IMAGE_NAMESPACE="rhdh"
+  if [[ "${newIIBImage}" =~ ^image-registry\.openshift-image-registry\.svc:5000/([^/]+)/ ]]; then
+    IMAGE_NAMESPACE="${BASH_REMATCH[1]}"
+  fi
+  debugf "Using image namespace for OLM v1 puller grants: ${IMAGE_NAMESPACE}"
+
+  if ! prepare_olm_v1_secrets "${NAMESPACE_CATALOGD}" "${NAMESPACE_OLM_CONTROLLER}" "${IMAGE_NAMESPACE}"; then
+    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}"
+    exit 1
   fi
 
   # Delete existing ClusterCatalog to force re-index
@@ -1023,6 +1130,8 @@ if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
 kind: ClusterCatalog
 metadata:
   name: ${CATALOGSOURCE_NAME}
+  labels:
+    olm.operatorframework.io/metadata.name: ${CATALOGSOURCE_NAME}
 spec:
   source:
     type: Image
@@ -1030,9 +1139,16 @@ spec:
       ref: ${newIIBImage}
 " > "$TMPDIR"/ClusterCatalog.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterCatalog.yml
 
+  infof "Waiting for ClusterCatalog/${CATALOGSOURCE_NAME} Serving (timeout 300s)..."
+  if ! invoke_cluster_cli wait "clustercatalog/${CATALOGSOURCE_NAME}" --for=condition=Serving --timeout=300s; then
+    errorf "ClusterCatalog/${CATALOGSOURCE_NAME} did not become Serving within 300s (check openshift-config/pull-secret and image-puller RBAC if on OpenShift)"
+    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}"
+    exit 1
+  fi
+
   if [[ -z "${TO_INSTALL}" ]]; then
     echo
-    echo "Done. ClusterCatalog '${CATALOGSOURCE_NAME}' created."
+    echo "Done. ClusterCatalog '${CATALOGSOURCE_NAME}' is Serving."
     echo "To install the operator, create a ClusterExtension, ServiceAccount, and ClusterRoleBinding."
     exit 0
   fi
@@ -1070,10 +1186,12 @@ subjects:
   namespace: ${NAMESPACE_SUBSCRIPTION}
 " > "$TMPDIR"/ClusterRoleBinding.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterRoleBinding.yml
 
-  # Grant installer SA image-puller access so it can pull operator images from the internal registry
   if [[ "${IS_OPENSHIFT}" = "true" ]]; then
-    oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME}" -n rhdh ||
-      warnf "Failed to grant image-puller to installer SA '${SA_NAME}'; operator image pulls from internal registry may fail"
+    if ! oc policy add-role-to-user system:image-puller "system:serviceaccount:${NAMESPACE_SUBSCRIPTION}:${SA_NAME}" -n "${IMAGE_NAMESPACE}"; then
+      errorf "Failed to grant image-puller to installer SA '${SA_NAME}' in namespace ${IMAGE_NAMESPACE}"
+      dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}"
+      exit 1
+    fi
   fi
 
   # Create ClusterExtension
@@ -1094,13 +1212,34 @@ spec:
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: ${CATALOGSOURCE_NAME}
+  install:
+    preflight:
+      crdUpgradeSafety:
+        enforcement: None
 " > "$TMPDIR"/ClusterExtension.yml && invoke_cluster_cli apply -f "$TMPDIR"/ClusterExtension.yml
+
+  infof "Waiting for ClusterExtension/${OPERATOR_NAME_TO_INSTALL} Installed (timeout 300s)..."
+  if ! invoke_cluster_cli wait "clusterextension/${OPERATOR_NAME_TO_INSTALL}" --for=condition=Installed --timeout=300s; then
+    errorf "ClusterExtension/${OPERATOR_NAME_TO_INSTALL} did not become Installed within 300s"
+    dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}"
+    exit 1
+  fi
+
+  # When installing RHDH, wait until the Backstage CRD is Established (not merely present).
+  if [[ "${OPERATOR_NAME_IN_CS}" == "rhdh" || "${OPERATOR_NAME_TO_INSTALL}" == "rhdh" ]]; then
+    infof "Waiting for CRD backstages.rhdh.redhat.com Established (timeout 300s)..."
+    if ! invoke_cluster_cli wait --for=condition=Established crd/backstages.rhdh.redhat.com --timeout=300s; then
+      errorf "CRD backstages.rhdh.redhat.com was not Established within 300s"
+      dump_olm_v1_diagnostics "${CATALOGSOURCE_NAME}" "${OPERATOR_NAME_TO_INSTALL}"
+      exit 1
+    fi
+  fi
 
   # Post-install output
   CLUSTER_ROUTER_BASE=$(invoke_cluster_cli get ingress.config.openshift.io/cluster '-o=jsonpath={.spec.domain}' 2>/dev/null || true)
 
   echo "
-Done. ClusterExtension '${OPERATOR_NAME_TO_INSTALL}' created via OLM v1.
+Done. ClusterExtension '${OPERATOR_NAME_TO_INSTALL}' is Installed via OLM v1.
 
 To create an RHDH instance:
 ${CR_EXAMPLE}
