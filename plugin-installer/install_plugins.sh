@@ -114,8 +114,9 @@ download_oci_oras() {
     local tmp_oci
     tmp_oci=$(mktemp -d)
 
-    if ! oras copy "${clean_url}" --to-oci-layout "${tmp_oci}:latest" >/dev/null 2>&1; then
-        echo "[FAIL] ${plugin_name}: oras copy failed" >&2
+    local oras_err
+    if ! oras_err=$(oras copy "${clean_url}" --to-oci-layout "${tmp_oci}:latest" 2>&1); then
+        echo "[FAIL] ${plugin_name}: oras copy failed: ${oras_err}" >&2
         rm -rf "${tmp_oci}"
         return 1
     fi
@@ -170,8 +171,9 @@ download_oci_skopeo() {
     tmp_dir=$(mktemp -d)
 
     # Copy image to dir: transport (extracts layers as files)
-    if ! skopeo copy "${docker_url}" "dir:${tmp_dir}" 2>/dev/null; then
-        echo "[FAIL] ${plugin_name}: skopeo copy failed" >&2
+    local skopeo_err
+    if ! skopeo_err=$(skopeo copy "${docker_url}" "dir:${tmp_dir}" 2>&1); then
+        echo "[FAIL] ${plugin_name}: skopeo copy failed: ${skopeo_err}" >&2
         rm -rf "${tmp_dir}"
         return 1
     fi
