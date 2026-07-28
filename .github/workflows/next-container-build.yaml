@@ -300,7 +300,7 @@ jobs:
           OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
 
       - name: Cleanup per-arch tags
-        if: env.HAS_QUAY_OAUTH == 'true'
+        if: env.HAS_QUAY_OAUTH == 'true' && vars.REGISTRY == 'quay.io'
         run: |
           set -euo pipefail
           export NAMESPACE="${REGISTRY_ORG}"
