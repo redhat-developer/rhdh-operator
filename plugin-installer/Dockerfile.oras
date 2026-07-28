@@ -1,3 +1,5 @@
+# NOTE: Multiplatform build not supported - oras binary only available for amd64/arm64.
+# Use Dockerfile.skopeo for multiplatform builds.
 # =========================================================================
 # STAGE 1: Builder (Red Hat UBI Minimal)
 # =========================================================================
@@ -24,7 +26,7 @@ RUN microdnf install -y tar gzip coreutils-single grep findutils bash sed gawk &
 
 # Download oras
 RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "amd64") && \
-    curl -sL "https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_linux_${ARCH}.tar.gz" | \
+    curl -sSL --proto '=https' "https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_linux_${ARCH}.tar.gz" | \
     tar xzf - -C /usr/local/bin oras
 
 # =========================================================================

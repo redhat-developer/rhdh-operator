@@ -214,9 +214,7 @@ download_oci_skopeo() {
 # OCI Registry - router (oci://)
 # ============================================================================
 download_oci() {
-    local url="$1"
     local plugin_name="$2"
-    local plugin_dir="$3"
 
     case "${OCI_TOOL}" in
         oras)
@@ -251,12 +249,10 @@ download_http() {
     fi
 
     # Verify integrity if provided
-    if [[ -n "${integrity}" ]]; then
-        if ! verify_integrity "${tmp_file}" "${integrity}"; then
-            echo "[FAIL] ${plugin_name}: integrity verification failed" >&2
-            rm -f "${tmp_file}"
-            return 1
-        fi
+    if [[ -n "${integrity}" ]] && ! verify_integrity "${tmp_file}" "${integrity}"; then
+        echo "[FAIL] ${plugin_name}: integrity verification failed" >&2
+        rm -f "${tmp_file}"
+        return 1
     fi
 
     mkdir -p "${plugin_dir}"
