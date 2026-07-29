@@ -55,11 +55,13 @@ jobs:
 
       - name: Compute image metadata
         id: meta
+        env:
+          BRANCH_REF: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           SHORT_SHA=$(git rev-parse --short HEAD)
           BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
-          if [[ "${{ github.ref_name }}" == "main" ]]; then
+          if [[ "${BRANCH_REF}" == "main" ]]; then
             LATEST_NEXT="next"
           else
             LATEST_NEXT="latest"
@@ -175,7 +177,6 @@ jobs:
               ;;
           esac
           echo "PLATFORM=${platform}" >> "$GITHUB_ENV"
-          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
           echo "PLATFORM_ARCH=${platform#*/}" >> "$GITHUB_ENV"
 
       - name: Setup Go
@@ -319,6 +320,9 @@ jobs:
                   "https://quay.io/api/v1/repository/${NAMESPACE}/${image}/tag/${tag}" \
                   || true)
                 echo "  -> HTTP ${status} for ${image}:${tag}"
+                if [[ "${status}" != "200" && "${status}" != "204" && "${status}" != "404" ]]; then
+                  echo "::warning::Unexpected HTTP ${status} deleting tag ${image}:${tag}"
+                fi
               done
             done
           done
