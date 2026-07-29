@@ -227,7 +227,7 @@ validate-image-digests: ## Validate that Dockerfile digests are manifest lists (
 	@hack/validate-image-digests.sh
 
 CRD_FILE ?= config/crd/bases/rhdh.redhat.com_backstages.yaml
-CRD_BASELINE_REF ?= origin/main
+CRD_BASELINE_REF ?= main
 
 .PHONY: crd-upgrade-check
 crd-upgrade-check: crdify ## Check CRD upgrade safety against the base branch.

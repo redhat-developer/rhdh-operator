@@ -31,7 +31,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Fetch base branch
-        run: git fetch origin ${{ github.base_ref }}
+        run: git fetch origin ${{ github.base_ref }}:${{ github.base_ref }}
 
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -39,4 +39,4 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Run CRD upgrade safety check
-        run: make crd-upgrade-check CRD_BASELINE_REF="origin/${{ github.base_ref }}"
+        run: make crd-upgrade-check CRD_BASELINE_REF="${{ github.base_ref }}"
