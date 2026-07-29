@@ -226,6 +226,34 @@ validate-image-digests: ## Validate that Dockerfile digests are manifest lists (
 	@echo
 	@hack/validate-image-digests.sh
 
+CRD_FILE ?= config/crd/bases/rhdh.redhat.com_backstages.yaml
+CRD_BASELINE_REF ?= $(shell git tag --sort=-v:refname | head -1)
+
+.PHONY: crd-upgrade-check
+crd-upgrade-check: crdify ## Check CRD upgrade safety against the latest release tag.
+	@if [ -z "$(CRD_BASELINE_REF)" ]; then \
+		echo "No release tags found. Skipping CRD upgrade safety check."; \
+		exit 0; \
+	fi; \
+	echo "Checking CRD upgrade safety: $(CRD_BASELINE_REF) -> current working tree"; \
+	RESULTS=$$($(CRDIFY) "git://$(CRD_BASELINE_REF)?path=$(CRD_FILE)" "file://$(CRD_FILE)" \
+		--config .crdify.yaml -o json 2>&1) || true; \
+	echo "$$RESULTS" | jq -r . 2>/dev/null || echo "$$RESULTS"; \
+	CRD_ERRORS=$$(echo "$$RESULTS" | jq '[(.crdValidation // [])[] | (.errors // [])[] ] | length' 2>/dev/null || echo "0"); \
+	SAME_VER_ERRORS=$$(echo "$$RESULTS" | jq '[(.sameVersionValidation // [])[] | (.errors // [])[] ] | length' 2>/dev/null || echo "0"); \
+	SERVED_VER_ERRORS=$$(echo "$$RESULTS" | jq '[(.servedVersionValidation // [])[] | (.errors // [])[] ] | length' 2>/dev/null || echo "0"); \
+	if [ "$$SERVED_VER_ERRORS" -gt 0 ]; then \
+		echo "WARNING: $$SERVED_VER_ERRORS served-version cross-compatibility issue(s) found (non-blocking)."; \
+	fi; \
+	BLOCKING_ERRORS=$$(($$CRD_ERRORS + $$SAME_VER_ERRORS)); \
+	if [ "$$BLOCKING_ERRORS" -gt 0 ]; then \
+		echo "ERROR: CRD upgrade safety check failed with $$BLOCKING_ERRORS blocking error(s)."; \
+		echo "  CRD-level errors: $$CRD_ERRORS"; \
+		echo "  Same-version errors: $$SAME_VER_ERRORS"; \
+		exit 1; \
+	fi; \
+	echo "CRD upgrade safety check passed."
+
 ##@ Build
 
 .PHONY: build
@@ -514,6 +542,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
 GOSEC ?= $(LOCALBIN)/gosec
 GINKGO ?= $(LOCALBIN)/ginkgo
+CRDIFY ?= $(LOCALBIN)/crdify
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
@@ -523,6 +552,7 @@ GOLANGCI_LINT_VERSION ?= v2.12.2
 GOIMPORTS_VERSION ?= v0.46.0
 GOSEC_VERSION ?= v2.27.1
 GINKGO_VERSION ?= v2.28.1
+CRDIFY_VERSION ?= v0.6.0
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
@@ -570,6 +600,11 @@ $(GOSEC): $(LOCALBIN)
 ginkgo: $(GINKGO) ## Download Ginkgo locally if necessary.
 $(GINKGO): $(LOCALBIN)
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
+
+.PHONY: crdify
+crdify: $(CRDIFY) ## Download crdify locally if necessary.
+$(CRDIFY): $(LOCALBIN)
+	$(call go-install-tool,$(CRDIFY),sigs.k8s.io/crdify,$(CRDIFY_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)

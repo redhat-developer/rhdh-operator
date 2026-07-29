@@ -1,0 +1,72 @@
+name: PR CRD Upgrade Safety Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - 'main'
+      - 'release-[0-9]+.[0-9]+'
+    paths:
+      - '.github/workflows/pr-crd-upgrade-check.yaml'
+      - '.crdify.yaml'
+      - 'config/crd/**'
+      - 'api/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  crd-upgrade-check:
+    name: CRD Upgrade Safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Determine baseline tag
+        id: baseline
+        run: |
+          BASE_BRANCH="${{ github.base_ref }}"
+          if [[ "$BASE_BRANCH" =~ ^release-([0-9]+\.[0-9]+)$ ]]; then
+            VERSION_PREFIX="${BASH_REMATCH[1]}"
+            TAG=$(git tag --sort=-v:refname | grep "^${VERSION_PREFIX}\." | head -1)
+          else
+            TAG=$(git tag --sort=-v:refname | head -1)
+          fi
+          if [ -z "$TAG" ]; then
+            echo "No baseline tag found. CRD upgrade check will be skipped."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Baseline tag: $TAG"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify CRD exists at baseline
+        if: steps.baseline.outputs.skip != 'true'
+        id: verify
+        run: |
+          CRD_PATH="config/crd/bases/rhdh.redhat.com_backstages.yaml"
+          if git show "${{ steps.baseline.outputs.tag }}:${CRD_PATH}" > /dev/null 2>&1; then
+            echo "CRD found at ${{ steps.baseline.outputs.tag }}"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "CRD not found at ${{ steps.baseline.outputs.tag }}. Skipping."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run CRD upgrade safety check
+        if: steps.baseline.outputs.skip != 'true' && steps.verify.outputs.exists == 'true'
+        run: make crd-upgrade-check CRD_BASELINE_REF="${{ steps.baseline.outputs.tag }}"
