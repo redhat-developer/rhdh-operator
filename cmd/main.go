@@ -10,6 +10,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 
@@ -106,28 +107,13 @@ func main() {
 
 	restConfig := ctrl.GetConfigOrDie()
 
-	// Fetch the TLS profile from apiservers.config.openshift.io/cluster.
-	// Fall back to Intermediate on non-OpenShift clusters (or if the fetch fails).
-	tlsSecurityProfileSpec := *configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
-	tlsAdherence := configv1.TLSAdherencePolicyNoOpinion
-
-	k8sClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+	plf, err := controller.DetectPlatform()
 	if err != nil {
-		setupLog.Info("unable to create client for TLS profile fetch, using Intermediate fallback", "error", err)
-	} else {
-		if profile, fetchErr := tlspkg.FetchAPIServerTLSProfile(ctx, k8sClient); fetchErr != nil {
-			setupLog.Info("unable to get TLS profile from API server, using Intermediate fallback", "error", fetchErr)
-		} else {
-			tlsSecurityProfileSpec = profile
-		}
-		if adherence, fetchErr := tlspkg.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient); fetchErr != nil {
-			setupLog.Info("unable to get TLS adherence policy from API server", "error", fetchErr)
-		} else {
-			tlsAdherence = adherence
-		}
+		setupLog.Error(err, "unable to detect platform. Make sure your cluster is running and accessible")
+		os.Exit(1)
 	}
 
-	tlsConfig, unsupportedCiphers := tlspkg.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers := getTLSProfileConfig(ctx, restConfig, plf.IsOpenshift())
 	if len(unsupportedCiphers) > 0 {
 		setupLog.Info("TLS profile contains ciphers unsupported by Go that will be ignored", "ciphers", unsupportedCiphers)
 	}
@@ -274,12 +260,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	plf, err := controller.DetectPlatform()
-	if err != nil {
-		setupLog.Error(err, "unable to detect platform. Make sure your cluster is running and accessible")
-		os.Exit(1)
-	}
-
 	if err = (&controller.BackstageReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
@@ -290,28 +270,9 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	// Watch for TLS profile changes and restart so the new config is applied.
-	if plf.IsOpenshift() {
-		if err := (&tlspkg.SecurityProfileWatcher{
-			Client:                    mgr.GetClient(),
-			InitialTLSProfileSpec:     tlsSecurityProfileSpec,
-			InitialTLSAdherencePolicy: tlsAdherence,
-			OnProfileChange: func(_ context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
-				setupLog.Info("TLS profile changed, shutting down to reload",
-					"old", oldTLSProfileSpec, "new", newTLSProfileSpec)
-				cancel()
-			},
-			OnAdherencePolicyChange: func(_ context.Context, oldTLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
-				setupLog.Info("TLS adherence policy changed, shutting down to reload",
-					"old", oldTLSAdherencePolicy, "new", newTLSAdherencePolicy)
-				cancel()
-			},
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create TLS security profile watcher")
-			os.Exit(1)
-		}
-	} else {
-		setupLog.Info("TLS profile watcher is not supported on non-OpenShift clusters")
+	if err := setupTLSProfileWatcher(mgr, plf.IsOpenshift(), tlsSecurityProfileSpec, tlsAdherence, cancel); err != nil {
+		setupLog.Error(err, "unable to create TLS profile watcher")
+		os.Exit(1)
 	}
 
 	if metricsCertWatcher != nil {
@@ -347,4 +308,61 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func getTLSProfileConfig(
+	ctx context.Context,
+	restConfig *rest.Config,
+	isOpenshift bool,
+) (configv1.TLSProfileSpec, configv1.TLSAdherencePolicy, func(*tls.Config), []string) {
+	tlsSecurityProfileSpec := *configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
+	tlsAdherence := configv1.TLSAdherencePolicyNoOpinion
+
+	if isOpenshift {
+		k8sClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+		if err != nil {
+			setupLog.Info("unable to create client for TLS profile fetch, using Intermediate fallback", "error", err)
+		} else {
+			if profile, err := tlspkg.FetchAPIServerTLSProfile(ctx, k8sClient); err != nil {
+				setupLog.Info("unable to get TLS profile from API server, using Intermediate fallback", "error", err)
+			} else {
+				tlsSecurityProfileSpec = profile
+			}
+
+			if adherence, err := tlspkg.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient); err != nil {
+				setupLog.Info("unable to get TLS adherence policy from API server", "error", err)
+			} else {
+				tlsAdherence = adherence
+			}
+		}
+	}
+
+	tlsConfig, unsupportedCiphers := tlspkg.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	return tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers
+}
+
+func setupTLSProfileWatcher(
+	mgr ctrl.Manager,
+	isOpenshift bool,
+	tlsSecurityProfileSpec configv1.TLSProfileSpec,
+	tlsAdherence configv1.TLSAdherencePolicy,
+	cancel context.CancelFunc,
+) error {
+	if !isOpenshift {
+		return nil
+	}
+
+	return (&tlspkg.SecurityProfileWatcher{
+		Client:                    mgr.GetClient(),
+		InitialTLSProfileSpec:     tlsSecurityProfileSpec,
+		InitialTLSAdherencePolicy: tlsAdherence,
+		OnProfileChange: func(_ context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
+			setupLog.Info("TLS profile changed, shutting down to reload", "old", oldTLSProfileSpec, "new", newTLSProfileSpec)
+			cancel()
+		},
+		OnAdherencePolicyChange: func(_ context.Context, oldTLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
+			setupLog.Info("TLS adherence policy changed, shutting down to reload", "old", oldTLSAdherencePolicy, "new", newTLSAdherencePolicy)
+			cancel()
+		},
+	}).SetupWithManager(mgr)
 }
