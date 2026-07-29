@@ -1154,7 +1154,9 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1alpha4
+  - deprecated: true
+    deprecationWarning: v1alpha4 is not served
+    name: v1alpha4
     schema:
       openAPIV3Schema:
         description: |-
@@ -1646,7 +1648,7 @@ spec:
                 type: array
             type: object
         type: object
-    served: true
+    served: false
     storage: false
     subresources:
       status: {}

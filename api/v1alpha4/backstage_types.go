@@ -265,6 +265,8 @@ type BackstageStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// +kubebuilder:unservedversion
+// +kubebuilder:deprecatedversion:warning="v1alpha4 is not served"
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"

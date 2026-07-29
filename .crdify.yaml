@@ -1,3 +1,0 @@
-validations:
-  - name: description
-    enforcement: Warn
