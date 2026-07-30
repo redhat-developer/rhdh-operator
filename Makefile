@@ -240,11 +240,10 @@ run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
 	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) INSTALL_DP_IMAGE=$(INSTALL_DP_IMAGE) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
-# TODO @IMAGE=$(CATALOG_INDEX_IMAGE) ./hack/create-local-dynamic-plugins.sh - when catalog become stable
 .PHONY: local-dynamic-plugins
 local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-index image for local testing
 	@echo "Generating local-test dynamic-plugins.yaml from catalog-index image..."
-	./hack/create-local-dynamic-plugins.sh
+	IMAGE=$(CATALOG_INDEX_IMAGE) ./hack/create-local-dynamic-plugins.sh
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
@@ -268,7 +267,7 @@ install-dp-build: ## Build the plugin installer image (skopeo variant, single pl
 
 .PHONY: install-dp-buildx
 install-dp-buildx: ## Build and push multiplatform plugin installer image (skopeo variant)
-	$(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
+	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
 
 .PHONY: install-dp-push
 install-dp-push: ## Push the plugin installer image
@@ -281,6 +280,7 @@ install-dp-push: ## Push the plugin installer image
 # - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
 # To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+MIN_PLATFORMS ?= linux/amd64,linux/arm64
 .PHONY: docker-buildx
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile

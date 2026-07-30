@@ -10,12 +10,16 @@
 #   oci://ghcr.io/org/repo/plugin@sha256:...  - OCI registry
 #   https://example.com/plugin.tgz            - HTTP(S) download
 #   @backstage/plugin-techdocs                - NPM package
-#   ./path/to/plugin                          - Local file/directory
+#   file:/path/to/plugin                      - Local directory (file: protocol)
 #
 # Input file format (one per line):
 #   url [integrity]
 # Where integrity is optional (sha512-..., sha384-..., or sha256-...)
 # For OCI URLs, integrity is ignored (digest in URL provides verification)
+#
+# Catalog Index (Extensions UI):
+#   Set CATALOG_INDEX_IMAGE to extract catalog-entities from an OCI image.
+#   Entities are copied to CATALOG_ENTITIES_EXTRACT_DIR/catalog-entities.
 #
 # OCI Download Tools:
 #   - skopeo (preferred): Red Hat certified, FIPS compliant, CVE tracked.
@@ -30,6 +34,10 @@ INPUT_FILE="${1:-${INPUT_FILE:-/input/packages.txt}}"
 OUTPUT_DIR="${2:-${OUTPUT_DIR:-/dynamic-plugins-root}}"
 PARALLEL_JOBS="${3:-${PARALLEL_JOBS:-4}}"
 LOCK_FILE="${OUTPUT_DIR}/install-dynamic-plugins.lock"
+
+# Catalog index settings (for Extensions UI catalog entities)
+CATALOG_INDEX_IMAGE="${CATALOG_INDEX_IMAGE:-}"
+CATALOG_ENTITIES_EXTRACT_DIR="${CATALOG_ENTITIES_EXTRACT_DIR:-/tmp/extensions}"
 
 # ============================================================================
 # Signal Handling - Forward SIGTERM to process group so children are terminated
@@ -100,136 +108,100 @@ detect_oci_tool() {
 }
 
 # ============================================================================
-# OCI Registry - oras implementation (uses oras copy for single optimized operation)
+# OCI Registry - shared extraction helper
+# Downloads OCI image and extracts layers to a directory
+# Sets EXTRACT_DIR to the path of extracted content (caller must clean up)
 # ============================================================================
-download_oci_oras() {
-    local url="$1"
-    local plugin_name="$2"
-    local plugin_dir="$3"
+extract_oci_image() {
+    local image="$1"
+    local label="$2"  # For error messages
 
-    # Strip oci:// prefix
-    local clean_url="${url#oci://}"
+    # Strip oci:// prefix if present
+    local clean_url="${image#oci://}"
 
-    # Copy to OCI layout (single optimized operation, ~30% faster than manifest+blob)
     local tmp_oci
     tmp_oci=$(mktemp -d)
 
-    local oras_err
-    if ! oras_err=$(oras copy "${clean_url}" --to-oci-layout "${tmp_oci}:latest" 2>&1); then
-        echo "[FAIL] ${plugin_name}: oras copy failed: ${oras_err}" >&2
-        rm -rf "${tmp_oci}"
-        return 1
-    fi
+    # Download using detected OCI tool
+    # Workaround: Force linux/amd64 platform for manifest list images.
+    # The catalog-index is built by Konflux as a manifest list but contains only
+    # platform-independent YAML files. Without --override-arch/--override-os,
+    # skopeo fails on non-Linux platforms (e.g., macOS). See RHDHBUGS-2747.
+    local download_err
+    case "${OCI_TOOL}" in
+        skopeo)
+            if ! download_err=$(skopeo copy --override-arch amd64 --override-os linux "docker://${clean_url}" "dir:${tmp_oci}" 2>&1); then
+                echo "[FAIL] ${label}: skopeo copy failed: ${download_err}" >&2
+                rm -rf "${tmp_oci}"
+                return 1
+            fi
+            ;;
+        oras)
+            if ! download_err=$(oras copy --platform linux/amd64 "${clean_url}" --to-oci-layout "${tmp_oci}:latest" 2>&1); then
+                echo "[FAIL] ${label}: oras copy failed: ${download_err}" >&2
+                rm -rf "${tmp_oci}"
+                return 1
+            fi
+            ;;
+        *)
+            echo "[FAIL] ${label}: no OCI tool available" >&2
+            rm -rf "${tmp_oci}"
+            return 1
+            ;;
+    esac
 
-    # Find the layer blob (largest file in blobs/sha256/, skip config and manifest)
+    # Find layer files (skip manifests/config)
     # shellcheck disable=SC2012 # OCI blob filenames are SHA256 hashes (alphanumeric only)
     local layer_file
-    layer_file=$(find "${tmp_oci}/blobs/sha256" -type f -print0 | xargs -0 ls -S 2>/dev/null | head -1)
+    if [[ "${OCI_TOOL}" == "oras" ]]; then
+        layer_file=$(find "${tmp_oci}/blobs/sha256" -type f -print0 | xargs -0 ls -S 2>/dev/null | head -1)
+    else
+        layer_file=$(find "${tmp_oci}" -maxdepth 1 -type f ! -name "*manifest*" ! -name "*version*" -print0 | xargs -0 ls -S 2>/dev/null | head -1)
+    fi
 
     if [[ -z "${layer_file}" || ! -f "${layer_file}" ]]; then
-        echo "[FAIL] ${plugin_name}: could not find layer blob" >&2
+        echo "[FAIL] ${label}: could not find layer blob" >&2
         rm -rf "${tmp_oci}"
         return 1
     fi
 
-    # Extract to temp directory, then move only the plugin subfolder
-    local tmp_extract
-    tmp_extract=$(mktemp -d)
-
-    if tar -xzf "${layer_file}" -C "${tmp_extract}" 2>/dev/null || \
-       tar -xf "${layer_file}" -C "${tmp_extract}" 2>/dev/null; then
-        # Move only the plugin subfolder (skip index.json etc)
-        if [[ -d "${tmp_extract}/${plugin_name}" ]]; then
-            mv "${tmp_extract}/${plugin_name}" "${plugin_dir}"
-        else
-            echo "[FAIL] ${plugin_name}: expected subfolder not found" >&2
-            rm -rf "${tmp_oci}" "${tmp_extract}"
-            return 1
-        fi
-    else
-        echo "[FAIL] ${plugin_name}: extraction failed" >&2
-        rm -rf "${tmp_oci}" "${tmp_extract}"
+    # Extract layer to temp directory
+    EXTRACT_DIR=$(mktemp -d)
+    if ! tar -xzf "${layer_file}" -C "${EXTRACT_DIR}" 2>/dev/null && \
+       ! tar -xf "${layer_file}" -C "${EXTRACT_DIR}" 2>/dev/null; then
+        echo "[FAIL] ${label}: extraction failed" >&2
+        rm -rf "${tmp_oci}" "${EXTRACT_DIR}"
+        EXTRACT_DIR=""
         return 1
     fi
 
-    rm -rf "${tmp_oci}" "${tmp_extract}"
+    rm -rf "${tmp_oci}"
+    # EXTRACT_DIR is set for caller to use and clean up
 }
 
 # ============================================================================
-# OCI Registry - skopeo implementation
+# OCI Registry - plugin download (oci://)
 # ============================================================================
-download_oci_skopeo() {
+download_oci() {
     local url="$1"
     local plugin_name="$2"
     local plugin_dir="$3"
 
-    # Strip oci:// prefix and convert to docker:// format
-    local clean_url="${url#oci://}"
-    local docker_url="docker://${clean_url}"
-
-    local tmp_dir
-    tmp_dir=$(mktemp -d)
-
-    # Copy image to dir: transport (extracts layers as files)
-    local skopeo_err
-    if ! skopeo_err=$(skopeo copy "${docker_url}" "dir:${tmp_dir}" 2>&1); then
-        echo "[FAIL] ${plugin_name}: skopeo copy failed: ${skopeo_err}" >&2
-        rm -rf "${tmp_dir}"
+    EXTRACT_DIR=""
+    if ! extract_oci_image "${url}" "${plugin_name}"; then
         return 1
     fi
 
-    # Find the layer blob (largest file, skip manifest.json and version)
-    # shellcheck disable=SC2012 # Skopeo dir: filenames are SHA256 hashes (alphanumeric only)
-    local layer_file
-    layer_file=$(find "${tmp_dir}" -maxdepth 1 -type f ! -name "*manifest*" ! -name "*version*" -print0 | xargs -0 ls -S 2>/dev/null | head -1)
-
-    if [[ -z "${layer_file}" || ! -f "${layer_file}" ]]; then
-        echo "[FAIL] ${plugin_name}: could not find layer blob" >&2
-        rm -rf "${tmp_dir}"
-        return 1
-    fi
-
-    # Extract to temp directory, then move only the plugin subfolder
-    local tmp_extract
-    tmp_extract=$(mktemp -d)
-
-    if tar -xzf "${layer_file}" -C "${tmp_extract}" 2>/dev/null || \
-       tar -xf "${layer_file}" -C "${tmp_extract}" 2>/dev/null; then
-        # Move only the plugin subfolder (skip index.json etc)
-        if [[ -d "${tmp_extract}/${plugin_name}" ]]; then
-            mv "${tmp_extract}/${plugin_name}" "${plugin_dir}"
-        else
-            echo "[FAIL] ${plugin_name}: expected subfolder not found" >&2
-            rm -rf "${tmp_dir}" "${tmp_extract}"
-            return 1
-        fi
+    # Move only the plugin subfolder
+    if [[ -d "${EXTRACT_DIR}/${plugin_name}" ]]; then
+        mv "${EXTRACT_DIR}/${plugin_name}" "${plugin_dir}"
     else
-        echo "[FAIL] ${plugin_name}: extraction failed" >&2
-        rm -rf "${tmp_dir}" "${tmp_extract}"
+        echo "[FAIL] ${plugin_name}: expected subfolder not found" >&2
+        rm -rf "${EXTRACT_DIR}"
         return 1
     fi
 
-    rm -rf "${tmp_dir}" "${tmp_extract}"
-}
-
-# ============================================================================
-# OCI Registry - router (oci://)
-# ============================================================================
-download_oci() {
-    local plugin_name="$2"
-
-    case "${OCI_TOOL}" in
-        oras)
-            download_oci_oras "$@"
-            ;;
-        skopeo)
-            download_oci_skopeo "$@"
-            ;;
-        *)
-            echo "[FAIL] ${plugin_name}: no OCI tool available" >&2
-            return 1
-            ;;
-    esac
+    rm -rf "${EXTRACT_DIR}"
 }
 
 # ============================================================================
@@ -511,6 +483,71 @@ download_local() {
 }
 
 # ============================================================================
+# File URL (file:/) - directory only
+# ============================================================================
+download_file() {
+    local url="$1"
+    local plugin_name="$2"
+    local plugin_dir="$3"
+
+    # Strip file:// or file:/ prefix
+    local path="${url#file://}"
+    path="${path#file:}"
+
+    if [[ ! -d "${path}" ]]; then
+        echo "[FAIL] ${plugin_name}: directory not found: ${path}" >&2
+        return 1
+    fi
+
+    mkdir -p "${plugin_dir}"
+    cp -r "${path}"/* "${plugin_dir}/" 2>/dev/null || \
+    cp -r "${path}"/. "${plugin_dir}/"
+}
+
+# ============================================================================
+# Catalog Index Extraction
+# Extracts catalog-entities from CATALOG_INDEX_IMAGE for Extensions UI
+# ============================================================================
+extract_catalog_entities() {
+    local image="$1"
+    local dest_dir="$2"
+
+    if [[ -z "${image}" ]]; then
+        return 0
+    fi
+
+    echo "=== Extracting catalog entities from ${image} ==="
+
+    EXTRACT_DIR=""
+    if ! extract_oci_image "${image}" "catalog-index"; then
+        echo "WARNING: Failed to extract catalog index" >&2
+        return 1
+    fi
+
+    # Look for catalog-entities/extensions
+    local entities_src=""
+    if [[ -d "${EXTRACT_DIR}/catalog-entities/extensions" ]]; then
+        entities_src="${EXTRACT_DIR}/catalog-entities/extensions"
+    elif [[ -d "${EXTRACT_DIR}/catalog-entities" ]]; then
+        entities_src="${EXTRACT_DIR}/catalog-entities"
+    fi
+
+    if [[ -n "${entities_src}" && -d "${entities_src}" ]]; then
+        local entities_dest="${dest_dir}/catalog-entities"
+        mkdir -p "${dest_dir}"
+        rm -rf "${entities_dest}"
+        cp -r "${entities_src}" "${entities_dest}"
+        local count
+        count=$(find "${entities_dest}" -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | wc -l | tr -d ' ')
+        echo "Catalog entities extracted to ${entities_dest} (${count} files)"
+    else
+        echo "WARNING: No catalog-entities found in ${image}" >&2
+    fi
+
+    rm -rf "${EXTRACT_DIR}"
+}
+
+# ============================================================================
 # Main download router
 # ============================================================================
 download_plugin() {
@@ -524,7 +561,7 @@ download_plugin() {
 
     # Extract plugin name from URL
     local plugin_name
-    plugin_name=$(echo "${url}" | sed 's|oci://||' | sed 's|https\?://||' | sed 's|@sha256:.*||' | sed 's|@.*||' | awk -F'/' '{print $NF}')
+    plugin_name=$(echo "${url}" | sed 's|oci://||' | sed 's|https\?://||' | sed 's|file://||' | sed 's|file:||' | sed 's|@sha256:.*||' | sed 's|@.*||' | awk -F'/' '{print $NF}')
 
     local plugin_dir="${output_dir}/${plugin_name}"
 
@@ -551,6 +588,9 @@ download_plugin() {
             ;;
         ./*)
             download_local "${url}" "${plugin_name}" "${plugin_dir}" || result=$?
+            ;;
+        file:*)
+            download_file "${url}" "${plugin_name}" "${plugin_dir}" || result=$?
             ;;
         *@*)
             # Unscoped npm package with version: package@version
@@ -593,7 +633,14 @@ detect_oci_tool
 # Create output directory (may already exist from create_lock)
 mkdir -p "${OUTPUT_DIR}"
 
-export -f download_plugin download_oci download_oci_oras download_oci_skopeo download_http download_npm download_local detect_oci_tool parse_npmrc url_encode verify_integrity
+# Extract catalog entities from catalog index image (for Extensions UI)
+if [[ -n "${CATALOG_INDEX_IMAGE}" ]]; then
+    extract_catalog_entities "${CATALOG_INDEX_IMAGE}" "${CATALOG_ENTITIES_EXTRACT_DIR}"
+else
+    echo "=== CATALOG_INDEX_IMAGE not set, skipping catalog entities extraction"
+fi
+
+export -f download_plugin extract_oci_image download_oci download_http download_npm download_local download_file detect_oci_tool parse_npmrc url_encode verify_integrity
 export OUTPUT_DIR OCI_TOOL NPM_REGISTRY NPM_AUTH_TOKEN
 
 total=$(grep -cv '^#\|^$' "${INPUT_FILE}")

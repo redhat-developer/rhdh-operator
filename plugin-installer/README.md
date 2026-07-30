@@ -67,6 +67,8 @@ docker build -f plugin-installer/Dockerfile.oras -t myregistry/plugin-installer:
 | `NPM_AUTH_TOKEN` | NPM authentication token |
 | `NPM_CONFIG_USERCONFIG` | Path to .npmrc file (default: `~/.npmrc`) |
 | `SKIP_INTEGRITY_CHECK` | Set to `true` to skip integrity verification |
+| `CATALOG_INDEX_IMAGE` | OCI image containing catalog-entities for Extensions UI |
+| `CATALOG_ENTITIES_EXTRACT_DIR` | Directory for extracted catalog entities (default: `/tmp/extensions`) |
 
 ## Input File Format
 
@@ -136,6 +138,22 @@ is-odd@3.0.1
 - Resolves `latest` version if not specified
 - Verifies integrity (from registry or user-provided)
 
+### Local Directory (`file:` protocol)
+
+Copies from local filesystem directory.
+
+```
+# Absolute paths
+file:/path/to/plugin
+file:///path/to/plugin    # also valid (empty authority)
+
+# Relative paths
+file:./path/to/plugin     # explicit relative
+file:path/to/plugin       # also relative
+```
+
+**Note:** Bare relative paths (`./path`) without `file:` prefix are not supported.
+
 ## NPM Configuration
 
 The script reads NPM configuration from `.npmrc`:
@@ -152,6 +170,18 @@ NPM_REGISTRY=https://npm.example.com \
 NPM_AUTH_TOKEN=secret_token \
 ./install_plugins.sh packages.txt ./plugins
 ```
+
+## Catalog Index (Extensions UI)
+
+When `CATALOG_INDEX_IMAGE` is set, the script extracts catalog entities from the OCI image:
+
+```bash
+CATALOG_INDEX_IMAGE=quay.io/rhdh/plugin-catalog-index:1.10 \
+CATALOG_ENTITIES_EXTRACT_DIR=/extensions \
+./install_plugins.sh packages.txt ./plugins
+```
+
+The script looks for `catalog-entities/extensions` in the image layers and copies them to `CATALOG_ENTITIES_EXTRACT_DIR/catalog-entities`.
 
 ## Integrity Verification
 

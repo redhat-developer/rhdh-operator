@@ -123,6 +123,9 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 			b.podSpec().InitContainers[i].Image = idpImage
 			b.podSpec().InitContainers[i].Command = []string{}
 			b.container().Args = []string{}
+
+			// TODO temporarily until stabilize
+			b.podSpec().InitContainers[i].ImagePullPolicy = corev1.PullAlways
 		}
 
 		if err := b.setDeployment(backstage); err != nil {
