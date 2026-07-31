@@ -28,8 +28,8 @@ metadata:
     capabilities: Seamless Upgrades
     categories: Developer Tools
     certified: "true"
-    containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.11
-    createdAt: "2026-07-17T09:46:46Z"
+    containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:2.0
+    createdAt: "2026-07-27T14:17:23Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -49,12 +49,12 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <1.11.0'
+    skipRange: '>=1.0.0 <2.0.0'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.arm64: supported
-  name: rhdh-operator.v1.11.0
+  name: rhdh-operator.v2.0.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -318,7 +318,7 @@ spec:
                   value: quay.io/fedora/postgresql-15:latest
                 - name: RELATED_IMAGE_backstage
                   value: quay.io/rhdh-community/rhdh:next
-                image: quay.io/rhdh/rhdh-rhel9-operator:1.11
+                image: quay.io/rhdh/rhdh-rhel9-operator:2.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -450,4 +450,4 @@ spec:
   - image: quay.io/rhdh-community/rhdh:next
     name: backstage
   replaces: rhdh-operator.v1.10.0
-  version: 1.11.0
+  version: 2.0.0
