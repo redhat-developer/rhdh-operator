@@ -245,6 +245,7 @@ jobs:
       packages: write
       id-token: write
     env:
+      HAS_QUAY_AUTH: ${{ secrets.QUAY_USERNAME != '' && secrets.QUAY_TOKEN != '' }}
       HAS_QUAY_OAUTH: ${{ secrets.QUAY_OAUTH_TOKEN != '' }}
       SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
       BASE_VERSION: ${{ needs.changes.outputs.base_version }}
@@ -305,12 +306,18 @@ jobs:
           OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
 
       - name: Sign the published images
+        if: env.HAS_QUAY_AUTH == 'true'
         run: |
           set -euo pipefail
           export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
 
           for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
-            DIGEST=$(docker buildx imagetools inspect --format '{{json .Manifest}}' "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}" | jq -r '.digest')
+            DIGEST=$(docker buildx imagetools inspect "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}" --format '{{println .Digest}}')
+
+            if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+              echo "::warning::Could not resolve digest for ${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}, skipping signing"
+              continue
+            fi
 
             for tag in "${BASE_VERSION}" "${BASE_VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
               echo "Signing ${REGISTRY_WITH_ORG}/${image}:${tag}@${DIGEST}"
