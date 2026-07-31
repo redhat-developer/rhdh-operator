@@ -314,7 +314,7 @@ jobs:
           for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
             for tag in "${BASE_VERSION}" "${BASE_VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
               FULL_REF="${REGISTRY_WITH_ORG}/${image}:${tag}"
-              DIGEST=$(docker buildx imagetools inspect "$FULL_REF" --format '{{println .Digest}}')
+              DIGEST=$(docker buildx imagetools inspect "$FULL_REF" | grep '^Digest:' | awk '{print $2}')
               if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
                 echo "::error::Could not resolve digest for ${FULL_REF}"
                 exit 1
