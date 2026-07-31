@@ -312,16 +312,15 @@ jobs:
           export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
 
           for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
-            DIGEST=$(docker buildx imagetools inspect "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}" --format '{{println .Digest}}')
-
-            if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
-              echo "::warning::Could not resolve digest for ${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}, skipping signing"
-              continue
-            fi
-
             for tag in "${BASE_VERSION}" "${BASE_VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
-              echo "Signing ${REGISTRY_WITH_ORG}/${image}:${tag}@${DIGEST}"
-              cosign sign --yes "${REGISTRY_WITH_ORG}/${image}:${tag}@${DIGEST}"
+              FULL_REF="${REGISTRY_WITH_ORG}/${image}:${tag}"
+              DIGEST=$(docker buildx imagetools inspect "$FULL_REF" --format '{{println .Digest}}')
+              if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+                echo "::error::Could not resolve digest for ${FULL_REF}"
+                exit 1
+              fi
+              echo "Signing ${FULL_REF}@${DIGEST}"
+              cosign sign --yes "${FULL_REF}@${DIGEST}"
             done
           done
         env:
