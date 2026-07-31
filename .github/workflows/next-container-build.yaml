@@ -245,7 +245,7 @@ jobs:
       packages: write
       id-token: write
     env:
-      HAS_QUAY_AUTH: ${{ secrets.QUAY_USERNAME != '' && secrets.QUAY_TOKEN != '' }}
+      HAS_QUAY_AUTH: ${{ vars.QUAY_USERNAME != '' && secrets.QUAY_TOKEN != '' }}
       HAS_QUAY_OAUTH: ${{ secrets.QUAY_OAUTH_TOKEN != '' }}
       SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
       BASE_VERSION: ${{ needs.changes.outputs.base_version }}
@@ -310,6 +310,13 @@ jobs:
         run: |
           set -euo pipefail
           export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
+
+          : "${REGISTRY:?REGISTRY must be set}"
+          : "${REGISTRY_ORG:?REGISTRY_ORG must be set}"
+          : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
+          : "${BASE_VERSION:?BASE_VERSION must be set}"
+          : "${SHORT_SHA:?SHORT_SHA must be set}"
+          : "${LATEST_NEXT:?LATEST_NEXT must be set}"
 
           for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
             for tag in "${BASE_VERSION}" "${BASE_VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
