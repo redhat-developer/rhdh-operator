@@ -11,11 +11,23 @@ type BackstageConditionReason string
 type BackstageConditionType string
 
 const (
+	// Condition types
 	BackstageConditionTypeDeployed BackstageConditionType = "Deployed"
+	BackstageConditionTypeRuntime  BackstageConditionType = "Runtime"
+	BackstageConditionTypeConfig   BackstageConditionType = "Config"
 
+	// Deployed condition reasons
 	BackstageConditionReasonDeployed   BackstageConditionReason = "Deployed"
 	BackstageConditionReasonFailed     BackstageConditionReason = "DeployFailed"
 	BackstageConditionReasonInProgress BackstageConditionReason = "DeployInProgress"
+
+	// Runtime condition reasons
+	BackstageConditionReasonRunning         BackstageConditionReason = "Running"
+	BackstageConditionReasonContainerFailed BackstageConditionReason = "ContainerFailed"
+	BackstageConditionReasonPending         BackstageConditionReason = "Pending"
+
+	// Config condition reasons
+	BackstageConditionReasonInvalid BackstageConditionReason = "Invalid"
 )
 
 // BackstageSpec defines the desired state of Backstage
@@ -266,6 +278,9 @@ type BackstageStatus struct {
 	// Conditions is the list of conditions describing the state of the runtime
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	// Plugins is the list of enabled dynamic plugin names, sorted alphabetically
+	// +optional
+	Plugins []string `json:"plugins,omitempty"`
 }
 
 // +kubebuilder:object:root=true

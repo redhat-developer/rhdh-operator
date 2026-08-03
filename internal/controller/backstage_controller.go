@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -89,37 +90,41 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// 2. Make some validation to fail fast
 	externalConfig, err := r.preprocessSpec(ctx, backstage)
 	if err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to preprocess backstage spec", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeConfig, api.BackstageConditionReasonInvalid, "failed to preprocess backstage spec", err)
 	}
 
 	// Apply the ServiceMonitor if monitoring is enabled
 	if err := r.applyServiceMonitor(ctx, &backstage); err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply ServiceMonitor", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeDeployed, api.BackstageConditionReasonFailed, "failed to apply ServiceMonitor", err)
 	}
 
 	// This creates array of model objects to be reconciled
 	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
 	if err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeConfig, api.BackstageConditionReasonInvalid, "failed to initialize backstage model", err)
 	}
 
 	// Apply the plugin dependencies
 	if err := r.applyPluginDeps(ctx, backstage, bsModel); err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply plugin dependencies", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeDeployed, api.BackstageConditionReasonFailed, "failed to apply plugin dependencies", err)
 	}
 
 	// Apply the runtime objects
 	err = r.applyObjects(ctx, bsModel.GetRuntimeObjects())
 	if err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply backstage objects", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeDeployed, api.BackstageConditionReasonFailed, "failed to apply backstage objects", err)
 	}
 
-	r.setDeploymentStatus(ctx, &backstage, *bsModel)
+	isReady := r.reconcileStatus(ctx, &backstage, *bsModel)
+	if !isReady {
+		// Requeue to check pod status again (for init container failures, etc.)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
 	return ctrl.Result{}, nil
 }
 
-func errorAndStatus(backstage *api.Backstage, msg string, err error) error {
-	setStatusCondition(backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonFailed, fmt.Sprintf("%s %s", msg, err))
+func errorAndStatus(backstage *api.Backstage, condType api.BackstageConditionType, reason api.BackstageConditionReason, msg string, err error) error {
+	setStatusCondition(backstage, condType, metav1.ConditionFalse, reason, err.Error())
 	return fmt.Errorf("%s: %w", msg, err)
 }
 
