@@ -270,9 +270,11 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	if err := setupTLSProfileWatcher(mgr, plf.IsOpenshift(), tlsSecurityProfileSpec, tlsAdherence, cancel); err != nil {
-		setupLog.Error(err, "unable to create TLS profile watcher")
-		os.Exit(1)
+	if plf.IsOpenshift() {
+		if err := setupTLSProfileWatcher(mgr, tlsSecurityProfileSpec, tlsAdherence, cancel); err != nil {
+			setupLog.Error(err, "unable to create TLS profile watcher")
+			os.Exit(1)
+		}
 	}
 
 	if metricsCertWatcher != nil {
@@ -343,15 +345,10 @@ func getTLSProfileConfig(
 
 func setupTLSProfileWatcher(
 	mgr ctrl.Manager,
-	isOpenshift bool,
 	tlsSecurityProfileSpec configv1.TLSProfileSpec,
 	tlsAdherence configv1.TLSAdherencePolicy,
 	cancel context.CancelFunc,
 ) error {
-	if !isOpenshift {
-		return nil
-	}
-
 	return (&tlspkg.SecurityProfileWatcher{
 		Client:                    mgr.GetClient(),
 		InitialTLSProfileSpec:     tlsSecurityProfileSpec,

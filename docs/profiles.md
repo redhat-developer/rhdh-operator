@@ -47,9 +47,9 @@ As of January 2025, there are three predefined profiles:
 
 For reference, this profile performs the following specific customizations:
 
-* Incrementing the minor element in the version, i.e., from `x.y.z` to `(x+1).y.z`. For example, if the default version in the Makefile is 0.1.2, the RHDH version would actually set it to 1.1.2. This is done so to align with the Red Hat Developer Hub versioning.
+* Keeping the same major version as the Makefile `VERSION` so the community and RHDH operators stay aligned (for example, `2.0.0` remains `2.0.0`)
 * Switching the default image base from [`quay.io/rhdh-community/operator`](https://quay.io/rhdh-community/operator) to [`quay.io/rhdh/rhdh-rhel9-operator`](https://quay.io/rhdh/rhdh-rhel9-operator)
-* Removing the patch element from the version semver, i.e., from `x.y.z` to `x.y`, because that's how the downstream images on [`quay.io/rhdh`] are being tagged
+* Removing the patch element from the image tag, i.e., from `x.y.z` to `x.y`, because that's how the downstream images on [`quay.io/rhdh`] are being tagged
 * Changing the bundle channels from `alpha` to `fast` and `fast-${CI_X_VERSION}.${CI_Y_VERSION}` (which will be ultimately replaced in the final downstream pipelines)
 * Changing the package name into `rhdh`
 * When generating the bundle manifests by running either `make bundle [PROFILE=rhdh]` or `make bundles`, the resulting [`ClusterServiceVersion`](https://sdk.operatorframework.io/docs/olm-integration/generation/#clusterserviceversion-manifests) is renamed into `rhdh-operator`
