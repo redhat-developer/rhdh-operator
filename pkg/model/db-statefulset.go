@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -95,6 +96,11 @@ func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage, scheme *runti
 			b.setDbSecretEnvVar(b.container(), secret.Name)
 		}
 	}
+
+	if backstage.GetAnnotations()[IdleAnnotation] == "true" {
+		b.statefulSet.Spec.Replicas = ptr.To(int32(0))
+	}
+
 	return nil
 }
 

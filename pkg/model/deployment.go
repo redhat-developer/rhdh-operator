@@ -138,6 +138,10 @@ func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage, _ *runt
 		return fmt.Errorf("can not add env vars from db secret: %w", err)
 	}
 
+	if backstage.GetAnnotations()[IdleAnnotation] == "true" {
+		b.deployable.SetReplicas(ptr.To(int32(0)))
+	}
+
 	return nil
 }
 
