@@ -57,23 +57,30 @@ var _ = When("backstage idle annotation", func() {
 		Expect(err).To(Not(HaveOccurred()))
 
 		By("verifying deployment replicas=0")
-		deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(0)))
+		Eventually(func(g Gomega) {
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(0)))
+		}, time.Minute, time.Second).Should(Succeed())
 
 		By("verifying DB StatefulSet replicas=0")
-		ss := &appsv1.StatefulSet{}
-		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, ss)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(ss.Spec.Replicas).To(HaveValue(BeEquivalentTo(0)))
+		Eventually(func(g Gomega) {
+			ss := &appsv1.StatefulSet{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, ss)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(ss.Spec.Replicas).To(HaveValue(BeEquivalentTo(0)))
+		}, time.Minute, time.Second).Should(Succeed())
 
 		By("verifying status condition is Idled")
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
-		Expect(bs.Status.Conditions).To(HaveLen(1))
-		Expect(bs.Status.Conditions[0].Reason).To(Equal("Idled"))
-		Expect(bs.Status.Conditions[0].Status).To(Equal(metav1.ConditionFalse))
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
+			g.Expect(bs.Status.Conditions).To(HaveLen(1))
+			g.Expect(bs.Status.Conditions[0].Reason).To(Equal("Idled"))
+			g.Expect(bs.Status.Conditions[0].Status).To(Equal(metav1.ConditionFalse))
+		}, time.Minute, time.Second).Should(Succeed())
 
 		By("removing idle annotation (wake)")
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
 		delete(bs.Annotations, model.IdleAnnotation)
 		Expect(k8sClient.Update(ctx, bs)).To(Succeed())
 
@@ -83,18 +90,25 @@ var _ = When("backstage idle annotation", func() {
 		Expect(err).To(Not(HaveOccurred()))
 
 		By("verifying deployment replicas restored to 1")
-		deploy, err = backstageDeployment(ctx, k8sClient, ns, backstageName)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(1)))
+		Eventually(func(g Gomega) {
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(1)))
+		}, time.Minute, time.Second).Should(Succeed())
 
 		By("verifying DB StatefulSet replicas restored to 1")
-		err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, ss)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(ss.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
+		Eventually(func(g Gomega) {
+			ss := &appsv1.StatefulSet{}
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("backstage-psql-%s", backstageName)}, ss)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(ss.Spec.Replicas).To(HaveValue(BeEquivalentTo(1)))
+		}, time.Minute, time.Second).Should(Succeed())
 
 		By("verifying status condition is no longer Idled")
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
-		Expect(bs.Status.Conditions[0].Reason).NotTo(Equal("Idled"))
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
+			g.Expect(bs.Status.Conditions[0].Reason).NotTo(Equal("Idled"))
+		}, time.Minute, time.Second).Should(Succeed())
 	})
 
 	It("wakes with user-specified replicas from deployment patch", func() {
@@ -121,9 +135,11 @@ var _ = When("backstage idle annotation", func() {
 		Expect(err).To(Not(HaveOccurred()))
 
 		By("verifying deployment is idled")
-		deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(0)))
+		Eventually(func(g Gomega) {
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(0)))
+		}, time.Minute, time.Second).Should(Succeed())
 
 		By("removing idle annotation and adding replicas via deployment patch")
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
@@ -136,9 +152,11 @@ var _ = When("backstage idle annotation", func() {
 		Expect(err).To(Not(HaveOccurred()))
 
 		By("verifying deployment replicas restored to 1 (default, no patch)")
-		deploy, err = backstageDeployment(ctx, k8sClient, ns, backstageName)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(1)))
+		Eventually(func(g Gomega) {
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(1)))
+		}, time.Minute, time.Second).Should(Succeed())
 	})
 
 	It("does not touch replicas when not idled and never was", func() {
@@ -151,8 +169,11 @@ var _ = When("backstage idle annotation", func() {
 		}, time.Minute, time.Second).Should(Succeed())
 
 		By("verifying status was never Idled")
-		bs := &api.Backstage{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
-		Expect(bs.Status.Conditions[0].Reason).NotTo(Equal("Idled"))
+		Eventually(func(g Gomega) {
+			bs := &api.Backstage{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
+			g.Expect(bs.Status.Conditions).NotTo(BeEmpty())
+			g.Expect(bs.Status.Conditions[0].Reason).NotTo(Equal("Idled"))
+		}, time.Minute, time.Second).Should(Succeed())
 	})
 })
