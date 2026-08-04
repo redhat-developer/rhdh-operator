@@ -35,6 +35,12 @@ OUTPUT_DIR="${2:-${OUTPUT_DIR:-/dynamic-plugins-root}}"
 PARALLEL_JOBS="${3:-${PARALLEL_JOBS:-4}}"
 LOCK_FILE="${OUTPUT_DIR}/install-dynamic-plugins.lock"
 
+# Termination message file for Kubernetes to read on container exit
+TERMINATION_LOG="${TERMINATION_LOG:-/dev/termination-log}"
+
+# File to track download failures (for parallel execution)
+FAILURE_LOG="${FAILURE_LOG:-/tmp/plugin-failures.log}"
+
 # Catalog index settings (for Extensions UI catalog entities)
 CATALOG_INDEX_IMAGE="${CATALOG_INDEX_IMAGE:-}"
 CATALOG_ENTITIES_EXTRACT_DIR="${CATALOG_ENTITIES_EXTRACT_DIR:-/tmp/extensions}"
@@ -45,6 +51,35 @@ CATALOG_ENTITIES_EXTRACT_DIR="${CATALOG_ENTITIES_EXTRACT_DIR:-/tmp/extensions}"
 # Note: SIGKILL (signal 9) cannot be trapped - this is a kernel limitation.
 # ============================================================================
 trap 'trap - TERM; kill 0' TERM
+
+# ============================================================================
+# Termination Message - Write error details for Kubernetes to expose in status
+# ============================================================================
+write_termination_msg() {
+    local msg="$1"
+    # Write to termination log (Kubernetes reads this on container exit)
+    # Truncate to 4KB (Kubernetes limit)
+    echo "${msg}" | head -c 4096 > "${TERMINATION_LOG}" 2>/dev/null || true
+}
+
+# Exit with error and termination message
+fail_with_msg() {
+    local msg="$1"
+    local exit_code="${2:-1}"
+    write_termination_msg "${msg}"
+    echo "Error: ${msg}" >&2
+    exit "${exit_code}"
+}
+
+# Record a plugin failure (only first failure is kept)
+record_failure() {
+    local plugin_name="$1"
+    local error_msg="$2"
+    # Only write if no failure recorded yet (first failure wins)
+    if [[ ! -f "${FAILURE_LOG}" ]]; then
+        echo "${plugin_name}: ${error_msg}" > "${FAILURE_LOG}" 2>/dev/null || true
+    fi
+}
 
 # ============================================================================
 # Lock Management - Prevent concurrent plugin installations
@@ -101,8 +136,7 @@ detect_oci_tool() {
     elif command -v oras &> /dev/null; then
         OCI_TOOL="oras"
     else
-        echo "Error: Neither skopeo nor oras found. Install one to download OCI artifacts." >&2
-        exit 1
+        fail_with_msg "Neither skopeo nor oras found. Install one to download OCI artifacts."
     fi
     echo "Using OCI tool: ${OCI_TOOL}"
 }
@@ -609,6 +643,8 @@ download_plugin() {
 
     if [[ ${result} -eq 0 ]]; then
         echo "[DONE] ${plugin_name}"
+    else
+        record_failure "${plugin_name}" "download failed from ${url}"
     fi
     return ${result}
 }
@@ -620,12 +656,14 @@ download_plugin() {
 START_TIME=$(date +%s)
 
 if [[ ! -f "${INPUT_FILE}" ]]; then
-    echo "Error: Input file not found: ${INPUT_FILE}" >&2
-    exit 1
+    fail_with_msg "Input file not found: ${INPUT_FILE}"
 fi
 
 # Acquire lock to prevent concurrent installations
 create_lock
+
+# Clear failure log from previous runs
+rm -f "${FAILURE_LOG}"
 
 # Detect OCI tool (skopeo preferred, oras fallback)
 detect_oci_tool
@@ -640,8 +678,8 @@ else
     echo "=== CATALOG_INDEX_IMAGE not set, skipping catalog entities extraction"
 fi
 
-export -f download_plugin extract_oci_image download_oci download_http download_npm download_local download_file detect_oci_tool parse_npmrc url_encode verify_integrity
-export OUTPUT_DIR OCI_TOOL NPM_REGISTRY NPM_AUTH_TOKEN
+export -f download_plugin extract_oci_image download_oci download_http download_npm download_local download_file detect_oci_tool parse_npmrc url_encode verify_integrity record_failure
+export OUTPUT_DIR OCI_TOOL NPM_REGISTRY NPM_AUTH_TOKEN FAILURE_LOG
 
 total=$(grep -cv '^#\|^$' "${INPUT_FILE}")
 
@@ -654,11 +692,23 @@ grep -v '^#' "${INPUT_FILE}" | grep -v '^$' | \
     xargs -P "${PARALLEL_JOBS}" -I {} bash -c 'download_plugin "$1" "$2"' _ {} "${OUTPUT_DIR}"
 
 echo ""
-echo "=== Complete ==="
-echo "Plugins in ${OUTPUT_DIR}:"
-find "${OUTPUT_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | head -20
 
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))
+
+# Check for failure and write termination message
+if [[ -f "${FAILURE_LOG}" ]]; then
+    echo "=== FAILED ==="
+    cat "${FAILURE_LOG}"
+    echo ""
+    echo "Elapsed time: ${ELAPSED}s"
+    # Write termination message with failure details
+    write_termination_msg "$(cat "${FAILURE_LOG}")"
+    exit 1
+fi
+
+echo "=== Complete ==="
+echo "Plugins in ${OUTPUT_DIR}:"
+find "${OUTPUT_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | head -20
 echo ""
 echo "Elapsed time: ${ELAPSED}s"

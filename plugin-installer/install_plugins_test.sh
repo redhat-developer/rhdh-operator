@@ -54,6 +54,12 @@ source_functions() {
 
     # Extract download_npm function (for integration tests)
     eval "$(awk '/^download_npm\(\)/{found=1} found{print; if(/^}$/){found=0}}' "$script")"
+
+    # Extract write_termination_msg function
+    eval "$(awk '/^write_termination_msg\(\)/{found=1} found{print; if(/^}$/){found=0}}' "$script")"
+
+    # Extract record_failure function
+    eval "$(awk '/^record_failure\(\)/{found=1} found{print; if(/^}$/){found=0}}' "$script")"
 }
 
 assert_equals() {
@@ -341,6 +347,87 @@ test_verify_integrity_unsupported_algorithm() {
 }
 
 # ============================================================================
+# Tests: Termination Message
+# ============================================================================
+
+test_write_termination_msg_writes_to_file() {
+    TERMINATION_LOG="${TEST_TMP_DIR}/termination.log"
+
+    write_termination_msg "plugin failed: download error"
+
+    assert_file_exists "${TERMINATION_LOG}" "termination log created" && \
+    assert_equals "plugin failed: download error" "$(cat "${TERMINATION_LOG}")" "message content"
+}
+
+test_write_termination_msg_truncates_long_message() {
+    TERMINATION_LOG="${TEST_TMP_DIR}/termination.log"
+
+    # Create a message longer than 4KB
+    local long_msg
+    long_msg=$(printf 'x%.0s' {1..5000})
+
+    write_termination_msg "${long_msg}"
+
+    local size
+    size=$(wc -c < "${TERMINATION_LOG}" | tr -d ' ')
+
+    if [[ ${size} -le 4096 ]]; then
+        return 0
+    else
+        echo "Message should be truncated to 4KB, got ${size} bytes"
+        return 1
+    fi
+}
+
+test_record_failure_creates_file() {
+    FAILURE_LOG="${TEST_TMP_DIR}/failures.log"
+    rm -f "${FAILURE_LOG}"
+
+    record_failure "my-plugin" "download failed"
+
+    assert_file_exists "${FAILURE_LOG}" "failure log created" && \
+    assert_equals "my-plugin: download failed" "$(cat "${FAILURE_LOG}")" "failure content"
+}
+
+test_record_failure_only_first() {
+    FAILURE_LOG="${TEST_TMP_DIR}/failures.log"
+    rm -f "${FAILURE_LOG}"
+
+    record_failure "first-plugin" "first error"
+    record_failure "second-plugin" "second error"
+
+    local content
+    content=$(cat "${FAILURE_LOG}")
+
+    assert_equals "first-plugin: first error" "${content}" "only first failure recorded"
+}
+
+test_termination_msg_on_missing_input() {
+    TERMINATION_LOG="${TEST_TMP_DIR}/termination.log"
+    rm -f "${TERMINATION_LOG}"
+
+    local output
+    output=$(INPUT_FILE="${TEST_TMP_DIR}/nonexistent.txt" \
+             OUTPUT_DIR="${TEST_TMP_DIR}/output" \
+             TERMINATION_LOG="${TERMINATION_LOG}" \
+             bash "${SCRIPT_DIR}/install_plugins.sh" 2>&1) || true
+
+    if [[ -f "${TERMINATION_LOG}" ]]; then
+        local msg
+        msg=$(cat "${TERMINATION_LOG}")
+        if [[ "${msg}" == *"Input file not found"* ]]; then
+            return 0
+        else
+            echo "Expected 'Input file not found' in termination message, got: ${msg}"
+            return 1
+        fi
+    else
+        echo "Termination log should be created on failure"
+        return 1
+    fi
+}
+
+# ============================================================================
 # Integration Tests (optional, requires network)
 # ============================================================================
 
@@ -414,6 +501,15 @@ main() {
     run_test "empty skips" test_verify_integrity_empty_skips
     run_test "skip env var" test_verify_integrity_skip_env
     run_test "unsupported algorithm" test_verify_integrity_unsupported_algorithm
+    echo ""
+
+    # Termination message tests
+    echo "--- Termination message tests ---"
+    run_test "write termination msg" test_write_termination_msg_writes_to_file
+    run_test "truncate long message" test_write_termination_msg_truncates_long_message
+    run_test "record failure creates file" test_record_failure_creates_file
+    run_test "record only first failure" test_record_failure_only_first
+    run_test "termination msg on missing input" test_termination_msg_on_missing_input
     echo ""
 
     # Integration tests
