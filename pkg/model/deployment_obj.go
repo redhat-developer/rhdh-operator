@@ -56,6 +56,10 @@ func (d *DeploymentObj) SpecReplicas() *int32 {
 	return d.Obj.Spec.Replicas
 }
 
+func (d *DeploymentObj) SetReplicas(r *int32) {
+	d.Obj.Spec.Replicas = r
+}
+
 // toStatefulSet converts a Deployment to a StatefulSet
 func toStatefulSet(dep *appv1.Deployment) *appv1.StatefulSet {
 	ss := &appv1.StatefulSet{

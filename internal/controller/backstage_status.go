@@ -54,6 +54,15 @@ func setStatusCondition(backstage *api.Backstage, condType api.BackstageConditio
 	})
 }
 
+func hasConditionReason(backstage *api.Backstage, reason api.BackstageConditionReason) bool {
+	for _, c := range backstage.Status.Conditions {
+		if c.Type == string(api.BackstageConditionTypeDeployed) && c.Reason == string(reason) {
+			return true
+		}
+	}
+	return false
+}
+
 func deploymentState(deploy *appsv1.Deployment) (state api.BackstageConditionReason, msg string) {
 	desired := int32(1)
 	if deploy.Spec.Replicas != nil {

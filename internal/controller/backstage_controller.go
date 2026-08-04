@@ -103,6 +103,16 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
 	}
 
+	// Handle idle/wake annotation
+	isIdle := backstage.GetAnnotations()[model.IdleAnnotation] == "true"
+	wasIdled := hasConditionReason(&backstage, api.BackstageConditionReasonIdled)
+
+	if isIdle {
+		bsModel.SetIdleReplicas()
+	} else if wasIdled {
+		bsModel.WakeReplicas()
+	}
+
 	// Apply the plugin dependencies
 	if err := r.applyPluginDeps(ctx, backstage, bsModel); err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply plugin dependencies", err)
@@ -112,6 +122,11 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	err = r.applyObjects(ctx, bsModel.GetRuntimeObjects())
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply backstage objects", err)
+	}
+
+	if isIdle {
+		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonIdled, "Instance is idled")
+		return ctrl.Result{}, nil
 	}
 
 	r.setDeploymentStatus(ctx, &backstage, *bsModel)

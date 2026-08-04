@@ -24,6 +24,8 @@ type Deployable interface {
 	SpecSelector() *metav1.LabelSelector
 	// SpecReplicas returns the spec.replicas of the deployable object
 	SpecReplicas() *int32
+	// SetReplicas sets the spec.replicas of the deployable object
+	SetReplicas(r *int32)
 	// ConvertTo converts the deployable object to the specified kind (Deployment or StatefulSet)
 	ConvertTo(kind string) (Deployable, error)
 	// SetEmpty sets the deployable object to an empty object of its type

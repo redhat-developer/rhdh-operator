@@ -385,6 +385,141 @@ func TestDeploymentKind(t *testing.T) {
 	assert.Equal(t, depPodSpec, ssPodSpec)
 }
 
+func TestSetIdleReplicas(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(true)}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.NotNil(t, deployment)
+
+	model.SetIdleReplicas()
+
+	assert.Equal(t, int32(0), *deployment.deployable.SpecReplicas())
+
+	dbSS := model.getDbStatefulSet()
+	assert.NotNil(t, dbSS)
+	assert.NotNil(t, dbSS.statefulSet)
+	assert.Equal(t, int32(0), *dbSS.statefulSet.Spec.Replicas)
+}
+
+func TestWakeReplicasWithExistingValue(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(true)}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.NotNil(t, deployment.deployable.SpecReplicas())
+
+	model.WakeReplicas()
+
+	// replicas already set by default config — WakeReplicas should not override
+	assert.Equal(t, int32(1), *deployment.deployable.SpecReplicas())
+
+	dbSS := model.getDbStatefulSet()
+	assert.NotNil(t, dbSS)
+	assert.Equal(t, int32(1), *dbSS.statefulSet.Spec.Replicas)
+}
+
+func TestWakeReplicasFromNil(t *testing.T) {
+	depObj := &DeploymentObj{Obj: &appv1.Deployment{}}
+	assert.Nil(t, depObj.SpecReplicas())
+
+	ssObj := &StatefulSetObj{Obj: &appv1.StatefulSet{}}
+	assert.Nil(t, ssObj.SpecReplicas())
+
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(true)}
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	// Simulate replicas being nil (as in production default config)
+	deployment := model.getDeployment()
+	deployment.deployable.SetReplicas(nil)
+	dbSS := model.getDbStatefulSet()
+	dbSS.statefulSet.Spec.Replicas = nil
+
+	model.WakeReplicas()
+
+	assert.Equal(t, int32(1), *deployment.deployable.SpecReplicas())
+	assert.Equal(t, int32(1), *dbSS.statefulSet.Spec.Replicas)
+}
+
+func TestWakeReplicasPreservesPatchValue(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(false)}
+	bs.Spec.Deployment = &api.BackstageDeployment{
+		Patch: &apiextensionsv1.JSON{
+			Raw: []byte(`
+spec:
+  replicas: 3
+`),
+		},
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.Equal(t, int32(3), *deployment.deployable.SpecReplicas())
+
+	model.WakeReplicas()
+
+	assert.Equal(t, int32(3), *deployment.deployable.SpecReplicas())
+}
+
+func TestIdleWithExternalDb(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(false)}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	assert.Nil(t, model.getDbStatefulSet())
+
+	model.SetIdleReplicas()
+
+	deployment := model.getDeployment()
+	assert.Equal(t, int32(0), *deployment.deployable.SpecReplicas())
+
+	model.WakeReplicas()
+
+	// Replicas already set to 0 by SetIdleReplicas, WakeReplicas leaves it
+	// because SpecReplicas() is non-nil. In the real controller flow, the
+	// model is rebuilt from scratch on the wake reconcile, so SpecReplicas()
+	// would reflect the default config value, not the idled 0.
+}
+
+func TestSetReplicasOnDeployable(t *testing.T) {
+	depObj := &DeploymentObj{Obj: &appv1.Deployment{}}
+	assert.Nil(t, depObj.SpecReplicas())
+
+	depObj.SetReplicas(ptr.To(int32(5)))
+	assert.Equal(t, int32(5), *depObj.SpecReplicas())
+
+	depObj.SetReplicas(nil)
+	assert.Nil(t, depObj.SpecReplicas())
+
+	ssObj := &StatefulSetObj{Obj: &appv1.StatefulSet{}}
+	assert.Nil(t, ssObj.SpecReplicas())
+
+	ssObj.SetReplicas(ptr.To(int32(2)))
+	assert.Equal(t, int32(2), *ssObj.SpecReplicas())
+}
+
 func TestPatchedStatefulSet(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Deployment = &api.BackstageDeployment{}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 
@@ -24,6 +25,7 @@ import (
 )
 
 const BackstageAppLabel = "rhdh.redhat.com/app"
+const IdleAnnotation = "rhdh.redhat.com/idle"
 const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
 const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
 const DefaultSubPathAnnotation = "rhdh.redhat.com/sub-path"
@@ -97,6 +99,40 @@ func (m *BackstageModel) getDeployment() *BackstageDeployment {
 		return nil
 	}
 	return obj.(*BackstageDeployment)
+}
+
+func (m *BackstageModel) getDbStatefulSet() *DbStatefulSet {
+	obj := m.GetRuntimeObject(DbStatefulSetKey)
+	if obj == nil {
+		return nil
+	}
+	return obj.(*DbStatefulSet)
+}
+
+// SetIdleReplicas forces replicas=0 on all managed workloads.
+func (m *BackstageModel) SetIdleReplicas() {
+	if dep := m.getDeployment(); dep != nil {
+		dep.deployable.SetReplicas(ptr.To(int32(0)))
+	}
+	if db := m.getDbStatefulSet(); db != nil && db.statefulSet != nil {
+		db.statefulSet.Spec.Replicas = ptr.To(int32(0))
+	}
+}
+
+// WakeReplicas restores replicas after idling. If replicas was not explicitly
+// set (e.g. by spec.deployment.patch), defaults to 1. If already set by the
+// user's patch, leaves it unchanged.
+func (m *BackstageModel) WakeReplicas() {
+	if dep := m.getDeployment(); dep != nil {
+		if dep.deployable.SpecReplicas() == nil {
+			dep.deployable.SetReplicas(ptr.To(int32(1)))
+		}
+	}
+	if db := m.getDbStatefulSet(); db != nil && db.statefulSet != nil {
+		if db.statefulSet.Spec.Replicas == nil {
+			db.statefulSet.Spec.Replicas = ptr.To(int32(1))
+		}
+	}
 }
 
 func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
