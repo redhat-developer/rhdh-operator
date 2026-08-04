@@ -920,7 +920,7 @@ The Operator supports idling and waking Backstage instances via the `rhdh.redhat
 
 #### How it works
 
-When the annotation `rhdh.redhat.com/idle` is set to `"true"` on the Backstage CR, the Operator overrides replicas to 0 on both the Backstage Deployment (or StatefulSet) and the local DB StatefulSet (if enabled). The status condition reason is set to `Idled`.
+When the annotation `rhdh.redhat.com/idle` is set to `"true"` on the Backstage CR, the Operator overrides replicas to 0 on both the Backstage Deployment (or StatefulSet) and the local DB StatefulSet (if enabled), in the same namespace as the Backstage CR. The status condition reason is set to `Idled`.
 
 When the annotation is removed (or set to any value other than `"true"`), the Operator restores replicas:
 - If the user specified replicas via `spec.deployment.patch`, that value is preserved.
@@ -936,7 +936,7 @@ When the local DB is disabled (`spec.database.enableLocalDb: false`), only the B
 kubectl annotate backstage <cr-name> rhdh.redhat.com/idle=true
 ```
 
-Or declaratively:
+Or declaratively (assumes the RHDH Operator is installed, which registers the `Backstage` CRD):
 
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha5
@@ -957,13 +957,15 @@ Reason: Idled
 Message: Instance is idled
 ```
 
+> **Note for CI and monitoring scripts:** An idled instance reports `Deployed=False` with `Reason=Idled`. Scripts that wait for `Deployed=True` should check the `Reason` field to distinguish an intentionally idled instance from a deployment failure. To ensure readiness checks succeed, remove the `rhdh.redhat.com/idle` annotation before waiting for deployment.
+
 #### Waking an instance
 
 ```bash
 kubectl annotate backstage <cr-name> rhdh.redhat.com/idle-
 ```
 
-The Operator detects that the instance was previously idled (via the `Idled` status condition reason) and restores replicas. The status condition transitions back to its normal deployed state.
+The Operator restores replicas from the default config or from the user's `spec.deployment.patch` value. The status condition transitions back to its normal deployed state.
 
 ### Database Configuration
 

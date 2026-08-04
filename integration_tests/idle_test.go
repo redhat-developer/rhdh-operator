@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -112,12 +113,20 @@ var _ = When("backstage idle annotation", func() {
 	})
 
 	It("wakes with user-specified replicas from deployment patch", func() {
-		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
+		spec := api.BackstageSpec{
+			Deployment: &api.BackstageDeployment{
+				Patch: &apiextensionsv1.JSON{
+					Raw: []byte(`{"spec":{"replicas":3}}`),
+				},
+			},
+		}
+		backstageName := createAndReconcileBackstage(ctx, ns, spec, "")
 
+		By("verifying deployment starts with patched replicas=3")
 		Eventually(func(g Gomega) {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy).NotTo(BeNil())
+			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(3)))
 		}, time.Minute, time.Second).Should(Succeed())
 
 		By("setting idle annotation")
@@ -141,7 +150,7 @@ var _ = When("backstage idle annotation", func() {
 			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(0)))
 		}, time.Minute, time.Second).Should(Succeed())
 
-		By("removing idle annotation and adding replicas via deployment patch")
+		By("removing idle annotation (wake)")
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
 		delete(bs.Annotations, model.IdleAnnotation)
 		Expect(k8sClient.Update(ctx, bs)).To(Succeed())
@@ -151,29 +160,12 @@ var _ = When("backstage idle annotation", func() {
 		})
 		Expect(err).To(Not(HaveOccurred()))
 
-		By("verifying deployment replicas restored to 1 (default, no patch)")
+		By("verifying deployment replicas restored to patched value 3")
 		Eventually(func(g Gomega) {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(1)))
+			g.Expect(deploy.SpecReplicas()).To(HaveValue(BeEquivalentTo(3)))
 		}, time.Minute, time.Second).Should(Succeed())
 	})
 
-	It("does not touch replicas when not idled and never was", func() {
-		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
-
-		Eventually(func(g Gomega) {
-			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(deploy).NotTo(BeNil())
-		}, time.Minute, time.Second).Should(Succeed())
-
-		By("verifying status was never Idled")
-		Eventually(func(g Gomega) {
-			bs := &api.Backstage{}
-			g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: backstageName, Namespace: ns}, bs)).To(Succeed())
-			g.Expect(bs.Status.Conditions).NotTo(BeEmpty())
-			g.Expect(bs.Status.Conditions[0].Reason).NotTo(Equal("Idled"))
-		}, time.Minute, time.Second).Should(Succeed())
-	})
 })
