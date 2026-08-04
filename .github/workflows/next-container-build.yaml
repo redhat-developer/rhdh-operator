@@ -86,7 +86,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     env:
+      HAS_QUAY_AUTH: ${{ vars.QUAY_USERNAME != '' && secrets.QUAY_TOKEN != '' }}
       SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
       BASE_VERSION: ${{ needs.changes.outputs.base_version }}
       LATEST_NEXT: ${{ needs.changes.outputs.latest_next }}
@@ -107,6 +109,10 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Install cosign
+        if: env.HAS_QUAY_AUTH == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Build and push operator-bundle
         run: |
@@ -132,6 +138,26 @@ jobs:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
           OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
           GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+
+      - name: Sign the published bundle image
+        if: env.HAS_QUAY_AUTH == 'true'
+        run: |
+          set -euo pipefail
+          export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
+
+          for tag in "${BASE_VERSION}" "${BASE_VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
+            FULL_REF="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${tag}"
+            DIGEST=$(skopeo inspect --format '{{.Digest}}' "docker://${FULL_REF}")
+            if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+              echo "::error::Could not resolve digest for ${FULL_REF}"
+              exit 1
+            fi
+            echo "Signing ${FULL_REF}@${DIGEST}"
+            cosign sign --yes "${FULL_REF}@${DIGEST}"
+          done
+        env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
 
   build:
     name: Build (${{ matrix.os }})
@@ -262,6 +288,7 @@ jobs:
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Install cosign
+        if: env.HAS_QUAY_AUTH == 'true'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Create manifest lists and push
