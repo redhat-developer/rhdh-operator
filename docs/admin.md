@@ -153,3 +153,27 @@ metadata:
     rhdh.redhat.com/external-config: "true"
 ...
 ```
+
+## Resource Deletion Policy
+
+When the Backstage CR configuration changes in a way that makes certain resources no longer needed (for example, switching from local database to external database), the operator **does not automatically delete** those orphaned resources.
+
+This is by design: automatic deletion of resources could lead to unexpected data loss. For example, deleting a local PostgreSQL PersistentVolumeClaim would permanently destroy all Backstage data stored in that database.
+
+**Users are responsible for manually cleaning up resources they no longer need.**
+
+To identify resources created by the operator for a specific Backstage instance, look for resources with matching labels in the same namespace:
+
+```bash
+oc get all,configmap,pvc,secret -l app.kubernetes.io/name=backstage,app.kubernetes.io/instance=<cr-name> -n <namespace>
+```
+
+This command queries multiple resource types at once: `all` covers common resources (Pods, Services, Deployments, StatefulSets), while `configmap`, `pvc` and `secret` are added explicitly as they're not included in `all`.
+
+**Note:** The local PostgreSQL PVC (created via StatefulSet volumeClaimTemplates) uses different labels and is not included in the above query. To find it:
+
+```bash
+oc get pvc -n <namespace> | grep backstage-psql-<cr-name>
+```
+
+Review carefully before deleting, especially PersistentVolumeClaims which contain data.
