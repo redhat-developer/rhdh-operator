@@ -2349,9 +2349,12 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - apiservers
   - ingresses
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -2796,7 +2799,7 @@ spec:
         - --metrics-bind-address=:8443
         command:
         - /manager
-        image: quay.io/rhdh-community/operator:0.11.0
+        image: quay.io/rhdh-community/operator:2.0.0
         livenessProbe:
           httpGet:
             path: /healthz
