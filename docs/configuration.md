@@ -914,59 +914,6 @@ spec:
             $patch: delete
 ```
 
-### Instance Idling
-
-The Operator supports idling and waking Backstage instances via the `rhdh.redhat.com/idle` annotation on the Backstage CR. This is useful for environments like Dev Sandbox where instances should be scaled to zero when inactive.
-
-#### How it works
-
-When the annotation `rhdh.redhat.com/idle` is set to `"true"` on the Backstage CR, the Operator overrides replicas to 0 on both the Backstage Deployment (or StatefulSet) and the local DB StatefulSet (if enabled), in the same namespace as the Backstage CR. The status condition reason is set to `Idled`.
-
-When the annotation is removed (or set to any value other than `"true"`), the Operator restores replicas:
-- If the user specified replicas via `spec.deployment.patch`, that value is preserved.
-- Otherwise, replicas defaults to 1.
-
-On the next reconciliation after waking, the Operator stops managing the replicas field, releasing field ownership so that Horizontal Pod Autoscalers (HPAs) or other external controllers can manage scaling.
-
-When the local DB is disabled (`spec.database.enableLocalDb: false`), only the Backstage Deployment is affected. The external database is never touched.
-
-#### Idling an instance
-
-```bash
-kubectl annotate backstage <cr-name> rhdh.redhat.com/idle=true
-```
-
-Or declaratively (assumes the RHDH Operator is installed, which registers the `Backstage` CRD):
-
-```yaml
-apiVersion: rhdh.redhat.com/v1alpha5
-kind: Backstage
-metadata:
-  name: my-backstage
-  annotations:
-    rhdh.redhat.com/idle: "true"
-spec: {}
-```
-
-After reconciliation, the Backstage Deployment and local DB StatefulSet (if enabled) will have `replicas: 0`, and the status condition will show:
-
-```
-Type: Deployed
-Status: False
-Reason: Idled
-Message: Instance is idled
-```
-
-> **Note for CI and monitoring scripts:** An idled instance reports `Deployed=False` with `Reason=Idled`. Scripts that wait for `Deployed=True` should check the `Reason` field to distinguish an intentionally idled instance from a deployment failure. To ensure readiness checks succeed, remove the `rhdh.redhat.com/idle` annotation before waiting for deployment.
-
-#### Waking an instance
-
-```bash
-kubectl annotate backstage <cr-name> rhdh.redhat.com/idle-
-```
-
-The Operator restores replicas from the default config or from the user's `spec.deployment.patch` value. The status condition transitions back to its normal deployed state.
-
 ### Database Configuration
 
 Backstage uses PostgreSQL as a storage solution. The Operator can:

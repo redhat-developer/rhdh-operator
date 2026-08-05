@@ -206,6 +206,15 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		}
 	}
 
+	// Phase 3: idle all workloads if the annotation requests it
+	if ShouldIdle(backstage) {
+		for _, obj := range model.RuntimeObjects {
+			if idleable, ok := obj.(Idler); ok {
+				idleable.Idle()
+			}
+		}
+	}
+
 	return model, nil
 }
 

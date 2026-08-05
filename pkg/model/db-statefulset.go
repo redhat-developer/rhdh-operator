@@ -97,11 +97,16 @@ func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage, scheme *runti
 		}
 	}
 
-	if backstage.GetAnnotations()[IdleAnnotation] == "true" {
+	return nil
+}
+
+// compile-time check
+var _ Idler = (*DbStatefulSet)(nil)
+
+func (b *DbStatefulSet) Idle() {
+	if b.statefulSet != nil {
 		b.statefulSet.Spec.Replicas = ptr.To(int32(0))
 	}
-
-	return nil
 }
 
 func (b *DbStatefulSet) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {

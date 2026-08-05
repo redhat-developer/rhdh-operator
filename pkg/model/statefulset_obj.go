@@ -6,11 +6,15 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// compile-time check
-var _ Deployable = (*StatefulSetObj)(nil)
+// compile-time checks
+var (
+	_ Deployable = (*StatefulSetObj)(nil)
+	_ Idler   = (*StatefulSetObj)(nil)
+)
 
 type StatefulSetObj struct {
 	Obj *appv1.StatefulSet
@@ -56,8 +60,8 @@ func (d *StatefulSetObj) SpecReplicas() *int32 {
 	return d.Obj.Spec.Replicas
 }
 
-func (d *StatefulSetObj) SetReplicas(r *int32) {
-	d.Obj.Spec.Replicas = r
+func (d *StatefulSetObj) Idle() {
+	d.Obj.Spec.Replicas = ptr.To(int32(0))
 }
 
 // toDeployment converts a StatefulSet to a Deployment
