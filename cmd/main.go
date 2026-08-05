@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -9,6 +10,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 
@@ -31,7 +33,9 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
 
+	configv1 "github.com/openshift/api/config/v1"
 	openshift "github.com/openshift/api/route/v1"
+	tlspkg "github.com/openshift/controller-runtime-common/pkg/tls"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -48,6 +52,8 @@ func init() {
 	utilruntime.Must(openshift.Install(scheme))
 
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
+
+	utilruntime.Must(configv1.Install(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -91,8 +97,25 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// Cancel this context when the TLS profile changes so the pod restarts with the new config.
+	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	defer cancel()
+
 	if metricsAddr != "0" && !secureMetrics {
 		setupLog.Info("Metrics are served over plaintext HTTP. This is only intended for local development.")
+	}
+
+	restConfig := ctrl.GetConfigOrDie()
+
+	plf, err := controller.DetectPlatform()
+	if err != nil {
+		setupLog.Error(err, "unable to detect platform. Make sure your cluster is running and accessible")
+		os.Exit(1)
+	}
+
+	tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers := getTLSProfileConfig(ctx, restConfig, plf.IsOpenshift())
+	if len(unsupportedCiphers) > 0 {
+		setupLog.Info("TLS profile contains ciphers unsupported by Go that will be ignored", "ciphers", unsupportedCiphers)
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -106,7 +129,7 @@ func main() {
 		c.NextProtos = []string{"http/1.1"}
 	}
 
-	var tlsOpts []func(*tls.Config)
+	tlsOpts := []func(*tls.Config){tlsConfig}
 	if !enableHTTP2 {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
@@ -231,15 +254,9 @@ func main() {
 		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
+	mgr, err := ctrl.NewManager(restConfig, mgrOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	plf, err := controller.DetectPlatform()
-	if err != nil {
-		setupLog.Error(err, "unable to detect platform. Make sure your cluster is running and accessible")
 		os.Exit(1)
 	}
 
@@ -252,6 +269,13 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
+
+	if plf.IsOpenshift() {
+		if err := setupTLSProfileWatcher(mgr, tlsSecurityProfileSpec, tlsAdherence, cancel); err != nil {
+			setupLog.Error(err, "unable to create TLS profile watcher")
+			os.Exit(1)
+		}
+	}
 
 	if metricsCertWatcher != nil {
 		setupLog.Info("Adding metrics certificate watcher to manager")
@@ -282,8 +306,60 @@ func main() {
 		"env.LOCALBIN", os.Getenv("LOCALBIN"),
 		"platform", plf.Name,
 	)
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func getTLSProfileConfig(
+	ctx context.Context,
+	restConfig *rest.Config,
+	isOpenshift bool,
+) (configv1.TLSProfileSpec, configv1.TLSAdherencePolicy, func(*tls.Config), []string) {
+	tlsSecurityProfileSpec := *configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
+	tlsAdherence := configv1.TLSAdherencePolicyNoOpinion
+
+	if isOpenshift {
+		k8sClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+		if err != nil {
+			setupLog.Info("unable to create client for TLS profile fetch, using Intermediate fallback", "error", err)
+		} else {
+			if profile, err := tlspkg.FetchAPIServerTLSProfile(ctx, k8sClient); err != nil {
+				setupLog.Info("unable to get TLS profile from API server, using Intermediate fallback", "error", err)
+			} else {
+				tlsSecurityProfileSpec = profile
+			}
+
+			if adherence, err := tlspkg.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient); err != nil {
+				setupLog.Info("unable to get TLS adherence policy from API server", "error", err)
+			} else {
+				tlsAdherence = adherence
+			}
+		}
+	}
+
+	tlsConfig, unsupportedCiphers := tlspkg.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	return tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers
+}
+
+func setupTLSProfileWatcher(
+	mgr ctrl.Manager,
+	tlsSecurityProfileSpec configv1.TLSProfileSpec,
+	tlsAdherence configv1.TLSAdherencePolicy,
+	cancel context.CancelFunc,
+) error {
+	return (&tlspkg.SecurityProfileWatcher{
+		Client:                    mgr.GetClient(),
+		InitialTLSProfileSpec:     tlsSecurityProfileSpec,
+		InitialTLSAdherencePolicy: tlsAdherence,
+		OnProfileChange: func(_ context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
+			setupLog.Info("TLS profile changed, shutting down to reload", "old", oldTLSProfileSpec, "new", newTLSProfileSpec)
+			cancel()
+		},
+		OnAdherencePolicyChange: func(_ context.Context, oldTLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
+			setupLog.Info("TLS adherence policy changed, shutting down to reload", "old", oldTLSAdherencePolicy, "new", newTLSAdherencePolicy)
+			cancel()
+		},
+	}).SetupWithManager(mgr)
 }
