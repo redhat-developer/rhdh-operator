@@ -13,7 +13,7 @@ import (
 // compile-time checks
 var (
 	_ Deployable = (*StatefulSetObj)(nil)
-	_ Idler   = (*StatefulSetObj)(nil)
+	_ Idler      = (*StatefulSetObj)(nil)
 )
 
 type StatefulSetObj struct {

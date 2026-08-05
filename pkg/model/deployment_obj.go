@@ -13,7 +13,7 @@ import (
 // compile-time checks
 var (
 	_ Deployable = (*DeploymentObj)(nil)
-	_ Idler   = (*DeploymentObj)(nil)
+	_ Idler      = (*DeploymentObj)(nil)
 )
 
 type DeploymentObj struct {
