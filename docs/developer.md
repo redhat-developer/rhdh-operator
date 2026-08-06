@@ -74,6 +74,11 @@ make local-dynamic-plugins
 
 This command extracts `dynamic-plugins.default.yaml` from the catalog-index image and creates `config/profile/rhdh/local-test/dynamic-plugins.yaml`.
 
+You can specify a different catalog-index image:
+```sh
+IMAGE=quay.io/rhdh/plugin-catalog-index:1.11 make local-dynamic-plugins
+```
+
 **This only needs to be run once.** Re-run it when you want to refresh with newer catalog-index data.
 
 **Requirements:**

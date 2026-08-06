@@ -52,6 +52,7 @@ spec:
             - ./install-dynamic-plugins.sh
             - /dynamic-plugins-root
           # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
+          # image will be replaced with INSTALL_DP_IMAGE if OPERATOR_DP_PROCESSING==true
           image: quay.io/rhdh-community/rhdh:next
           imagePullPolicy: IfNotPresent
           securityContext:
@@ -72,6 +73,8 @@ spec:
               value: "quay.io/rhdh/plugin-catalog-index:next"
             - name: CATALOG_ENTITIES_EXTRACT_DIR
               value: '/extensions'
+            - name: INPUT_FILE
+              value: '/opt/app-root/src/packages.txt'
           volumeMounts:
             - mountPath: /dynamic-plugins-root
               name: dynamic-plugins-root
