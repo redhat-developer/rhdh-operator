@@ -142,13 +142,49 @@ detect_oci_tool() {
 }
 
 # ============================================================================
+# OCI Artifact Validation
+# Validates that the downloaded artifact has the io.backstage.dynamic-packages
+# annotation, confirming it's a valid plugin artifact built by rhdh-cli.
+# ============================================================================
+validate_plugin_artifact() {
+    local oci_dir="$1"
+    local label="$2"
+
+    # For oras layout, check index.json -> manifest -> annotation
+    if [[ -f "${oci_dir}/index.json" ]]; then
+        local digest
+        digest=$(grep -o '"sha256:[^"]*"' "${oci_dir}/index.json" | head -1 | tr -d '"' | sed 's/sha256://')
+        if [[ -n "${digest}" && -f "${oci_dir}/blobs/sha256/${digest}" ]]; then
+            if grep -q '"io.backstage.dynamic-packages"' "${oci_dir}/blobs/sha256/${digest}" 2>/dev/null; then
+                return 0
+            fi
+        fi
+    fi
+
+    # For skopeo dir: transport, check manifest.json directly
+    if [[ -f "${oci_dir}/manifest.json" ]]; then
+        if grep -q '"io.backstage.dynamic-packages"' "${oci_dir}/manifest.json" 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    echo "[FAIL] ${label}: not a valid plugin artifact (missing io.backstage.dynamic-packages annotation)" >&2
+    return 1
+}
+
+# ============================================================================
 # OCI Registry - shared extraction helper
 # Downloads OCI image and extracts layers to a directory
 # Sets EXTRACT_DIR to the path of extracted content (caller must clean up)
+# Args:
+#   $1 - OCI image reference
+#   $2 - Label for error messages
+#   $3 - Optional: "skip-validation" to skip plugin artifact validation
 # ============================================================================
 extract_oci_image() {
     local image="$1"
     local label="$2"  # For error messages
+    local skip_validation="${3:-}"
 
     # Strip oci:// prefix if present
     local clean_url="${image#oci://}"
@@ -183,6 +219,14 @@ extract_oci_image() {
             return 1
             ;;
     esac
+
+    # Validate the artifact has the required annotation (skip for non-plugin artifacts)
+    if [[ "${skip_validation}" != "skip-validation" ]]; then
+        if ! validate_plugin_artifact "${tmp_oci}" "${label}"; then
+            rm -rf "${tmp_oci}"
+            return 1
+        fi
+    fi
 
     # Find layer files (skip manifests/config)
     # shellcheck disable=SC2012 # OCI blob filenames are SHA256 hashes (alphanumeric only)
@@ -250,7 +294,7 @@ download_http() {
     local tmp_file
     tmp_file=$(mktemp)
 
-    if ! curl -sL "${url}" -o "${tmp_file}"; then
+    if ! curl --fail -sL "${url}" -o "${tmp_file}"; then
         echo "[FAIL] ${plugin_name}: download failed" >&2
         rm -f "${tmp_file}"
         return 1
@@ -380,9 +424,8 @@ download_npm() {
     fi
 
     # Build registry URL (encode scoped package names)
-    local encoded_name registry_url
+    local encoded_name
     encoded_name=$(url_encode "${package_name}")
-    registry_url="${NPM_REGISTRY}/${encoded_name}"
 
     # Prepare curl auth headers
     local auth_header=""
@@ -390,86 +433,84 @@ download_npm() {
         auth_header="Authorization: Bearer ${NPM_AUTH_TOKEN}"
     fi
 
-    # Fetch package metadata
-    local metadata
-    metadata=$(mktemp)
+    # Helper function for curl with optional auth
+    npm_curl() {
+        if [[ -n "${auth_header}" ]]; then
+            curl --fail -sL -H "${auth_header}" "$@"
+        else
+            curl --fail -sL "$@"
+        fi
+    }
 
-    if [[ -n "${auth_header}" ]]; then
-        if ! curl -sL -H "${auth_header}" "${registry_url}" -o "${metadata}"; then
+    # Resolve version if not specified (requires full package doc)
+    if [[ -z "${package_version}" ]]; then
+        local full_metadata
+        full_metadata=$(mktemp)
+
+        if ! npm_curl "${NPM_REGISTRY}/${encoded_name}" -o "${full_metadata}"; then
             echo "[FAIL] ${plugin_name}: failed to fetch package metadata" >&2
-            rm -f "${metadata}"
+            rm -f "${full_metadata}"
             return 1
         fi
-    else
-        if ! curl -sL "${registry_url}" -o "${metadata}"; then
-            echo "[FAIL] ${plugin_name}: failed to fetch package metadata" >&2
-            rm -f "${metadata}"
+
+        # Extract "latest" from dist-tags
+        package_version=$(grep -o '"latest":"[^"]*"' "${full_metadata}" | head -1 | cut -d'"' -f4)
+        rm -f "${full_metadata}"
+
+        if [[ -z "${package_version}" ]]; then
+            echo "[FAIL] ${plugin_name}: could not determine latest version" >&2
             return 1
         fi
     fi
 
-    # Check for error response
-    if grep -q '"error"' "${metadata}" 2>/dev/null; then
-        local error_msg
-        error_msg=$(grep -o '"error":"[^"]*"' "${metadata}" | head -1 | cut -d'"' -f4)
-        echo "[FAIL] ${plugin_name}: registry error: ${error_msg:-unknown}" >&2
-        rm -f "${metadata}"
+    # Fetch version-specific metadata (small, unambiguous response)
+    # GET ${registry}/${package}/${version} returns only that version's data
+    local version_metadata
+    version_metadata=$(mktemp)
+
+    if ! npm_curl "${NPM_REGISTRY}/${encoded_name}/${package_version}" -o "${version_metadata}"; then
+        echo "[FAIL] ${plugin_name}: version ${package_version} not found" >&2
+        rm -f "${version_metadata}"
         return 1
     fi
 
-    # Resolve version (use latest if not specified)
-    if [[ -z "${package_version}" ]]; then
-        package_version=$(grep -o '"latest":"[^"]*"' "${metadata}" | head -1 | cut -d'"' -f4)
-        if [[ -z "${package_version}" ]]; then
-            echo "[FAIL] ${plugin_name}: could not determine latest version" >&2
-            rm -f "${metadata}"
-            return 1
-        fi
+    # Check for error response
+    if grep -q '"error"' "${version_metadata}" 2>/dev/null; then
+        local error_msg
+        error_msg=$(grep -o '"error":"[^"]*"' "${version_metadata}" | head -1 | cut -d'"' -f4)
+        echo "[FAIL] ${plugin_name}: registry error: ${error_msg:-unknown}" >&2
+        rm -f "${version_metadata}"
+        return 1
     fi
 
-    # Extract tarball URL for the version
-    # NPM tarball URLs contain the version, so we can match on that
+    # Extract tarball URL (unambiguous in version-specific doc)
     local tarball_url
-
-    # Find tarball URL containing the version (handles nested JSON without jq)
-    tarball_url=$(grep -o "\"tarball\":\"[^\"]*${package_version}[^\"]*\"" "${metadata}" | \
-                  head -1 | cut -d'"' -f4)
+    tarball_url=$(grep -o '"tarball":"[^"]*"' "${version_metadata}" | head -1 | cut -d'"' -f4)
 
     if [[ -z "${tarball_url}" ]]; then
-        echo "[FAIL] ${plugin_name}: could not find tarball URL for version ${package_version}" >&2
-        rm -f "${metadata}"
+        echo "[FAIL] ${plugin_name}: no tarball URL in version metadata" >&2
+        rm -f "${version_metadata}"
         return 1
     fi
 
     # Use user-provided integrity if available, otherwise extract from registry
-    # Registry integrity is in the dist block near the tarball URL
     local integrity
     if [[ -n "${user_integrity}" ]]; then
         integrity="${user_integrity}"
     else
-        # Extract integrity from the dist block (near tarball with same version)
-        integrity=$(grep -o "\"tarball\":\"[^\"]*${package_version}[^\"]*\"[^}]*\"integrity\":\"[^\"]*\"" "${metadata}" | \
-                    grep -o '"integrity":"[^"]*"' | head -1 | cut -d'"' -f4)
+        integrity=$(grep -o '"integrity":"[^"]*"' "${version_metadata}" | head -1 | cut -d'"' -f4)
     fi
 
-    rm -f "${metadata}"
+    rm -f "${version_metadata}"
 
     # Download tarball
     local tmp_file
     tmp_file=$(mktemp)
 
-    if [[ -n "${auth_header}" ]]; then
-        if ! curl -sL -H "${auth_header}" "${tarball_url}" -o "${tmp_file}"; then
-            echo "[FAIL] ${plugin_name}: failed to download tarball" >&2
-            rm -f "${tmp_file}"
-            return 1
-        fi
-    else
-        if ! curl -sL "${tarball_url}" -o "${tmp_file}"; then
-            echo "[FAIL] ${plugin_name}: failed to download tarball" >&2
-            rm -f "${tmp_file}"
-            return 1
-        fi
+    if ! npm_curl "${tarball_url}" -o "${tmp_file}"; then
+        echo "[FAIL] ${plugin_name}: failed to download tarball" >&2
+        rm -f "${tmp_file}"
+        return 1
     fi
 
     # Verify integrity
@@ -553,7 +594,8 @@ extract_catalog_entities() {
     echo "=== Extracting catalog entities from ${image} ==="
 
     EXTRACT_DIR=""
-    if ! extract_oci_image "${image}" "catalog-index"; then
+    # Skip plugin validation - catalog index is not a plugin artifact
+    if ! extract_oci_image "${image}" "catalog-index" "skip-validation"; then
         echo "WARNING: Failed to extract catalog index" >&2
         return 1
     fi
@@ -678,7 +720,7 @@ else
     echo "=== CATALOG_INDEX_IMAGE not set, skipping catalog entities extraction"
 fi
 
-export -f download_plugin extract_oci_image download_oci download_http download_npm download_local download_file detect_oci_tool parse_npmrc url_encode verify_integrity record_failure
+export -f download_plugin extract_oci_image validate_plugin_artifact download_oci download_http download_npm download_local download_file detect_oci_tool parse_npmrc url_encode verify_integrity record_failure
 export OUTPUT_DIR OCI_TOOL NPM_REGISTRY NPM_AUTH_TOKEN FAILURE_LOG
 
 total=$(grep -cv '^#\|^$' "${INPUT_FILE}")

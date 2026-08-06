@@ -60,6 +60,9 @@ source_functions() {
 
     # Extract record_failure function
     eval "$(awk '/^record_failure\(\)/{found=1} found{print; if(/^}$/){found=0}}' "$script")"
+
+    # Extract validate_plugin_artifact function
+    eval "$(awk '/^validate_plugin_artifact\(\)/{found=1} found{print; if(/^}$/){found=0}}' "$script")"
 }
 
 assert_equals() {
@@ -428,30 +431,88 @@ test_termination_msg_on_missing_input() {
 }
 
 # ============================================================================
-# Integration Tests (optional, requires network)
+# Tests: validate_plugin_artifact()
 # ============================================================================
 
-test_download_npm_real_package() {
+test_validate_rejects_non_plugin_image() {
     if [[ "${RUN_INTEGRATION_TESTS:-false}" != "true" ]]; then
         echo -e "${YELLOW}SKIP${NC} (set RUN_INTEGRATION_TESTS=true to enable)"
         return 0
     fi
 
-    # Clean up env vars from previous tests
+    if ! command -v skopeo &> /dev/null; then
+        echo -e "${YELLOW}SKIP${NC} (skopeo not installed)"
+        return 0
+    fi
+
+    local oci_dir="${TEST_TMP_DIR}/alpine_oci"
+    mkdir -p "${oci_dir}"
+
+    # Download alpine (a non-plugin image)
+    if ! skopeo copy --override-arch amd64 --override-os linux \
+        "docker://docker.io/library/alpine:latest" \
+        "dir:${oci_dir}" 2>/dev/null; then
+        echo -e "${YELLOW}SKIP${NC} (could not download alpine)"
+        return 0
+    fi
+
+    # Should reject alpine - it's not a plugin artifact
+    if validate_plugin_artifact "${oci_dir}" "alpine" 2>/dev/null; then
+        echo "Non-plugin image (alpine) should be rejected"
+        return 1
+    else
+        return 0
+    fi
+}
+
+# ============================================================================
+# Integration Tests (optional, requires network)
+# ============================================================================
+
+test_download_npm_with_version() {
+    if [[ "${RUN_INTEGRATION_TESTS:-false}" != "true" ]]; then
+        echo -e "${YELLOW}SKIP${NC} (set RUN_INTEGRATION_TESTS=true to enable)"
+        return 0
+    fi
+
     unset NPM_REGISTRY NPM_AUTH_TOKEN NPM_CONFIG_USERCONFIG SKIP_INTEGRITY_CHECK
 
     local plugin_dir="${TEST_TMP_DIR}/is-odd"
-
-    # Run the actual script in bash (not eval'd functions) to ensure bash semantics
-    # Create a test input file and run install_plugins.sh
     local test_input="${TEST_TMP_DIR}/packages.txt"
     echo "is-odd@3.0.1" > "${test_input}"
 
-    # Run install_plugins.sh with our test input
     local output
     output=$(INPUT_FILE="${test_input}" OUTPUT_DIR="${TEST_TMP_DIR}" PARALLEL_JOBS=1 \
        bash "${SCRIPT_DIR}/install_plugins.sh" 2>&1)
     local exit_code=$?
+
+    if [[ ${exit_code} -eq 0 ]]; then
+        assert_file_exists "${plugin_dir}/package.json" "package.json exists"
+    else
+        echo "install_plugins.sh failed (exit ${exit_code}):"
+        echo "${output}"
+        return 1
+    fi
+}
+
+test_download_npm_latest() {
+    if [[ "${RUN_INTEGRATION_TESTS:-false}" != "true" ]]; then
+        echo -e "${YELLOW}SKIP${NC} (set RUN_INTEGRATION_TESTS=true to enable)"
+        return 0
+    fi
+
+    unset NPM_REGISTRY NPM_AUTH_TOKEN NPM_CONFIG_USERCONFIG SKIP_INTEGRITY_CHECK
+
+    local plugin_dir="${TEST_TMP_DIR}/is-even"
+    local test_input="${TEST_TMP_DIR}/packages.txt"
+    # No version specified - should resolve "latest"
+    echo "is-even" > "${test_input}"
+
+    local output
+    output=$(INPUT_FILE="${test_input}" OUTPUT_DIR="${TEST_TMP_DIR}" PARALLEL_JOBS=1 \
+       bash "${SCRIPT_DIR}/install_plugins.sh" 2>&1)
+    local exit_code=$?
+
     if [[ ${exit_code} -eq 0 ]]; then
         assert_file_exists "${plugin_dir}/package.json" "package.json exists"
     else
@@ -512,9 +573,15 @@ main() {
     run_test "termination msg on missing input" test_termination_msg_on_missing_input
     echo ""
 
+    # validate_plugin_artifact tests
+    echo "--- validate_plugin_artifact() tests ---"
+    run_test "rejects non-plugin image (alpine)" test_validate_rejects_non_plugin_image
+    echo ""
+
     # Integration tests
     echo "--- Integration tests ---"
-    run_test "download real npm package" test_download_npm_real_package
+    run_test "npm with explicit version" test_download_npm_with_version
+    run_test "npm with latest resolution" test_download_npm_latest
     echo ""
 
     # Teardown
