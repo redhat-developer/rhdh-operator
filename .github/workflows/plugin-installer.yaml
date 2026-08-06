@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'release-[2-9].[0-9]*'
     paths:
       - 'plugin-installer/**'
       - '.github/workflows/plugin-installer.yaml'
