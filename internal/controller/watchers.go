@@ -77,8 +77,30 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 
 	// Watch operator-owned Deployments and StatefulSets for status tracking.
 	// Owns() maps events back to the owning Backstage CR via ownerReferences.
-	b.Owns(&appsv1.Deployment{}).
-		Owns(&appsv1.StatefulSet{})
+	logEvent := func(eventType string, obj client.Object) {
+		log.Log.V(1).Info("enqueuing reconcile on change of",
+			"event", eventType,
+			"kind", obj.GetObjectKind().GroupVersionKind().Kind,
+			"name", obj.GetName(),
+			"namespace", obj.GetNamespace())
+	}
+	commonPreds := builder.WithPredicates(predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			logEvent("create", e.Object)
+			return true
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			logEvent("update", e.ObjectNew)
+			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			logEvent("delete", e.Object)
+			return true
+		},
+	})
+
+	b.Owns(&appsv1.Deployment{}, commonPreds).
+		Owns(&appsv1.StatefulSet{}, commonPreds)
 
 	return nil
 }
