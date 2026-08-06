@@ -7,6 +7,7 @@ import (
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -74,53 +75,10 @@ func (r *BackstageReconciler) addWatchers(b *builder.Builder) error {
 				}))
 	}
 
-	// Watch Deployment for the Backstage CR status if enabled
-	labelPred, err := predicate.LabelSelectorPredicate(metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{
-				Key:      utils.BackstageAppLabel,
-				Values:   []string{utils.BackstageAppName},
-				Operator: metav1.LabelSelectorOpIn,
-			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to construct the predicate for backstage deployment. This should not happen: %w", err)
-	}
-
-	commonPreds := builder.WithPredicates(labelPred, predicate.Funcs{
-		DeleteFunc: func(e event.DeleteEvent) bool { return true },
-		UpdateFunc: func(e event.UpdateEvent) bool { return true },
-		CreateFunc: func(e event.CreateEvent) bool { return true },
-	})
-
-	metaFor := func(kind string) *metav1.PartialObjectMetadata {
-		m := &metav1.PartialObjectMetadata{}
-		m.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   "apps",
-			Version: "v1",
-			Kind:    kind,
-		})
-		return m
-	}
-
-	// Deployment
-	b.WatchesMetadata(
-		metaFor("Deployment"),
-		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-			return r.requestByAppLabels(ctx, o)
-		}),
-		commonPreds,
-	)
-
-	// StatefulSet
-	b.WatchesMetadata(
-		metaFor("StatefulSet"),
-		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-			return r.requestByAppLabels(ctx, o)
-		}),
-		commonPreds,
-	)
+	// Watch operator-owned Deployments and StatefulSets for status tracking.
+	// Owns() maps events back to the owning Backstage CR via ownerReferences.
+	b.Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{})
 
 	return nil
 }
@@ -182,17 +140,4 @@ func (r *BackstageReconciler) requestByExtConfigLabel(ctx context.Context, objec
 	lg.V(1).Info("enqueuing reconcile for", object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), "new hash: ", newHash, "old hash: ", oldHash)
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: backstage.Name, Namespace: object.GetNamespace()}}}
 
-}
-
-// requestByAppLabels returns a request with current Namespace and Backstage Object name taken from label
-func (r *BackstageReconciler) requestByAppLabels(ctx context.Context, object client.Object) []reconcile.Request {
-	lg := log.FromContext(ctx)
-
-	backstageName := object.GetLabels()[utils.BackstageInstanceLabel]
-	if object.GetLabels()[utils.BackstageAppLabel] == "" || backstageName == "" {
-		return []reconcile.Request{}
-	}
-
-	lg.V(1).Info("enqueuing reconcile on change of ", "kind: ", object.GetObjectKind().GroupVersionKind().Kind, "name: ", object.GetName(), "namespace: ", object.GetNamespace())
-	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: backstageName, Namespace: object.GetNamespace()}}}
 }
