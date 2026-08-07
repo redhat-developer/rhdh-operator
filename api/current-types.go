@@ -53,6 +53,7 @@ const (
 	BackstageConditionReasonDeployed   BackstageConditionReason = bsv1.BackstageConditionReasonDeployed
 	BackstageConditionReasonFailed     BackstageConditionReason = bsv1.BackstageConditionReasonFailed
 	BackstageConditionReasonInProgress BackstageConditionReason = bsv1.BackstageConditionReasonInProgress
+	BackstageConditionReasonIdled      BackstageConditionReason = bsv1.BackstageConditionReasonIdled
 )
 
 // AddToScheme adds the current API version's types to the scheme.

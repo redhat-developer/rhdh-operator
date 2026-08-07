@@ -36,7 +36,14 @@ func (r *BackstageReconciler) setDeploymentStatus(ctx context.Context, backstage
 		return
 	}
 
-	state, msg := resolveState(obj)
+	var state api.BackstageConditionReason
+	var msg string
+	if backstage.GetAnnotations()[model.IdleAnnotation] == "true" {
+		state = api.BackstageConditionReasonIdled
+		msg = "Instance is idled"
+	} else {
+		state, msg = resolveState(obj)
+	}
 	status := metav1.ConditionFalse
 	if state == api.BackstageConditionReasonDeployed {
 		status = metav1.ConditionTrue
@@ -87,8 +94,6 @@ func statefulSetState(deploy *appsv1.StatefulSet) (state api.BackstageConditionR
 	if deploy.Spec.Replicas != nil {
 		desired = *deploy.Spec.Replicas
 	}
-
-	//if deploy.Status.ReadyReplicas == desired {
 	if deploy.Status.ReadyReplicas == desired && deploy.Status.CurrentReplicas == deploy.Status.UpdatedReplicas {
 		return api.BackstageConditionReasonDeployed, ""
 	}

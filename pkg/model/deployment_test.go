@@ -391,6 +391,44 @@ func TestDeploymentKind(t *testing.T) {
 	assert.Equal(t, depPodSpec, ssPodSpec)
 }
 
+func TestIdleAnnotationSetsReplicasToZero(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(true)}
+	bs.Annotations = map[string]string{
+		IdleAnnotation: "true",
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.NotNil(t, deployment)
+	assert.Equal(t, int32(0), *deployment.deployable.SpecReplicas())
+
+	dbSS := model.GetRuntimeObject(DbStatefulSetKey).(*DbStatefulSet)
+	assert.NotNil(t, dbSS)
+	assert.NotNil(t, dbSS.statefulSet)
+	assert.Equal(t, int32(0), *dbSS.statefulSet.Spec.Replicas)
+}
+
+func TestIdleWithExternalDb(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(false)}
+	bs.Annotations = map[string]string{
+		IdleAnnotation: "true",
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.Equal(t, int32(0), *deployment.deployable.SpecReplicas())
+}
+
 func TestPatchedStatefulSet(t *testing.T) {
 	bs := *deploymentTestBackstage.DeepCopy()
 	bs.Spec.Deployment = &api.BackstageDeployment{}
