@@ -730,8 +730,10 @@ echo ""
 
 # Use xargs for parallel execution
 # shellcheck disable=SC2016 # Single quotes intentional - variables expand in inner bash
+# Capture xargs exit code - it returns 123 if any command fails
+XARGS_EXIT=0
 grep -v '^#' "${INPUT_FILE}" | grep -v '^$' | \
-    xargs -P "${PARALLEL_JOBS}" -I {} bash -c 'download_plugin "$1" "$2"' _ {} "${OUTPUT_DIR}"
+    xargs -P "${PARALLEL_JOBS}" -I {} bash -c 'download_plugin "$1" "$2"' _ {} "${OUTPUT_DIR}" || XARGS_EXIT=$?
 
 echo ""
 
@@ -746,6 +748,14 @@ if [[ -f "${FAILURE_LOG}" ]]; then
     echo "Elapsed time: ${ELAPSED}s"
     # Write termination message with failure details
     write_termination_msg "$(cat "${FAILURE_LOG}")"
+    exit 1
+elif [[ ${XARGS_EXIT} -ne 0 ]]; then
+    # Fallback if FAILURE_LOG wasn't created but xargs failed
+    echo "=== FAILED ==="
+    echo "Plugin installation failed (exit code ${XARGS_EXIT})"
+    echo ""
+    echo "Elapsed time: ${ELAPSED}s"
+    write_termination_msg "Plugin installation failed (exit code ${XARGS_EXIT})"
     exit 1
 fi
 

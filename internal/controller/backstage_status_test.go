@@ -96,6 +96,44 @@ func TestCheckContainerState_MainContainer(t *testing.T) {
 			expectedReason: api.BackstageConditionReasonContainerFailed,
 			expectedMsg:    `container "backstage" failed with exit code 137: OOMKilled`,
 		},
+		{
+			name: "crash loop - running but has previous failure",
+			status: corev1.ContainerStatus{
+				Name:         "backstage",
+				RestartCount: 3,
+				Ready:        false,
+				State: corev1.ContainerState{
+					Running: &corev1.ContainerStateRunning{},
+				},
+				LastTerminationState: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						ExitCode: 1,
+						Message:  "connection refused",
+					},
+				},
+			},
+			expectedReason: api.BackstageConditionReasonContainerFailed,
+			expectedMsg:    `container "backstage" crashed (restart #3), last exit code 1: connection refused`,
+		},
+		{
+			name: "recovered after crash - running and ready with restart history",
+			status: corev1.ContainerStatus{
+				Name:         "backstage",
+				RestartCount: 2,
+				Ready:        true,
+				State: corev1.ContainerState{
+					Running: &corev1.ContainerStateRunning{},
+				},
+				LastTerminationState: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						ExitCode: 1,
+						Reason:   "Error",
+					},
+				},
+			},
+			expectedReason: "",
+			expectedMsg:    "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -187,6 +225,24 @@ func TestCheckContainerState_InitContainer(t *testing.T) {
 			expectedReason: api.BackstageConditionReasonPending,
 			expectedMsg:    `init container "install-plugins" not completed`,
 		},
+		{
+			name: "crash loop - running but has previous failure",
+			status: corev1.ContainerStatus{
+				Name:         "install-plugins",
+				RestartCount: 2,
+				State: corev1.ContainerState{
+					Running: &corev1.ContainerStateRunning{},
+				},
+				LastTerminationState: corev1.ContainerState{
+					Terminated: &corev1.ContainerStateTerminated{
+						ExitCode: 1,
+						Reason:   "Error",
+					},
+				},
+			},
+			expectedReason: api.BackstageConditionReasonContainerFailed,
+			expectedMsg:    `init container "install-plugins" crashed (restart #2), last exit code 1 (Error)`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -216,7 +272,7 @@ func TestDeploymentState(t *testing.T) {
 				},
 			},
 			expectedReason: api.BackstageConditionReasonDeployed,
-			expectedMsg:    "",
+			expectedMsg:    "1/1 replicas ready",
 		},
 		{
 			name: "multiple replicas ready",
@@ -229,7 +285,7 @@ func TestDeploymentState(t *testing.T) {
 				},
 			},
 			expectedReason: api.BackstageConditionReasonDeployed,
-			expectedMsg:    "",
+			expectedMsg:    "3/3 replicas ready",
 		},
 		{
 			name: "partial replicas ready",
@@ -308,7 +364,7 @@ func TestDeploymentState(t *testing.T) {
 				},
 			},
 			expectedReason: api.BackstageConditionReasonDeployed,
-			expectedMsg:    "",
+			expectedMsg:    "1/1 replicas ready",
 		},
 	}
 
@@ -341,7 +397,7 @@ func TestStatefulSetState(t *testing.T) {
 				},
 			},
 			expectedReason: api.BackstageConditionReasonDeployed,
-			expectedMsg:    "",
+			expectedMsg:    "1/1 replicas ready",
 		},
 		{
 			name: "ready but not updated",
