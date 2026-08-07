@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,7 @@ import (
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	configv1 "github.com/openshift/api/config/v1"
 	openshift "github.com/openshift/api/route/v1"
@@ -231,10 +233,34 @@ func main() {
 	// With many resources, managedFields can consume 70%+ of the informer cache heap.
 	mgrOpts.Cache.DefaultTransform = cache.TransformStripManagedFields()
 
-	// Configure cache to only watch labeled Secrets and ConfigMaps if flag is enabled
+	// Restrict Deployment/StatefulSet cache to operator-managed objects only.
+	// The operator only needs Deployments/StatefulSets it creates, and those always
+	// carry app.kubernetes.io/name=backstage. Without this filter, the metadata
+	// informers cache every Deployment and StatefulSet cluster-wide, which on
+	// large multi-tenant clusters consumes hundreds of MB of heap.
+	backstageLabelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			utils.BackstageAppLabel: utils.BackstageAppName,
+		},
+	})
+	if err != nil {
+		setupLog.Error(err, "failed to create backstage label selector")
+		os.Exit(1)
+	}
+
+	mgrOpts.Cache.ByObject = map[client.Object]cache.ByObject{
+		&appsv1.Deployment{}: {
+			Label: backstageLabelSelector,
+		},
+		&appsv1.StatefulSet{}: {
+			Label: backstageLabelSelector,
+		},
+	}
+
+	// Optionally restrict Secret/ConfigMap cache to labeled objects.
 	if enableCacheLabelFilter {
 		setupLog.Info("Enabling cache label filter for Secrets and ConfigMaps")
-		labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		extConfigLabelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"rhdh.redhat.com/external-config": "true",
 			},
@@ -244,13 +270,11 @@ func main() {
 			os.Exit(1)
 		}
 
-		mgrOpts.Cache.ByObject = map[client.Object]cache.ByObject{
-			&corev1.Secret{}: {
-				Label: labelSelector,
-			},
-			&corev1.ConfigMap{}: {
-				Label: labelSelector,
-			},
+		mgrOpts.Cache.ByObject[&corev1.Secret{}] = cache.ByObject{
+			Label: extConfigLabelSelector,
+		}
+		mgrOpts.Cache.ByObject[&corev1.ConfigMap{}] = cache.ByObject{
+			Label: extConfigLabelSelector,
 		}
 	}
 
