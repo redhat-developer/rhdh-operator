@@ -154,14 +154,20 @@ func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage, _ *runt
 		return fmt.Errorf("can not add env vars from db secret: %w", err)
 	}
 
+	if backstage.GetAnnotations()[IdleAnnotation] == "true" {
+		b.idle()
+	}
+
 	return nil
 }
 
-// compile-time check
-var _ Idler = (*BackstageDeployment)(nil)
-
-func (b *BackstageDeployment) Idle() {
-	b.deployable.(Idler).Idle()
+func (b *BackstageDeployment) idle() {
+	switch d := b.deployable.(type) {
+	case *DeploymentObj:
+		d.Obj.Spec.Replicas = new(int32)
+	case *StatefulSetObj:
+		d.Obj.Spec.Replicas = new(int32)
+	}
 }
 
 func (b *BackstageDeployment) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {

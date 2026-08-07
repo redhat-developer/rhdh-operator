@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -97,16 +96,11 @@ func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage, scheme *runti
 		}
 	}
 
-	return nil
-}
-
-// compile-time check
-var _ Idler = (*DbStatefulSet)(nil)
-
-func (b *DbStatefulSet) Idle() {
-	if b.statefulSet != nil {
-		b.statefulSet.Spec.Replicas = ptr.To(int32(0))
+	if backstage.GetAnnotations()[IdleAnnotation] == "true" {
+		b.statefulSet.Spec.Replicas = new(int32)
 	}
+
+	return nil
 }
 
 func (b *DbStatefulSet) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {

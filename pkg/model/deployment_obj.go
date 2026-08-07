@@ -6,15 +6,11 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// compile-time checks
-var (
-	_ Deployable = (*DeploymentObj)(nil)
-	_ Idler      = (*DeploymentObj)(nil)
-)
+// compile-time check
+var _ Deployable = (*DeploymentObj)(nil)
 
 type DeploymentObj struct {
 	Obj *appv1.Deployment
@@ -58,10 +54,6 @@ func (d *DeploymentObj) SpecSelector() *metav1.LabelSelector {
 
 func (d *DeploymentObj) SpecReplicas() *int32 {
 	return d.Obj.Spec.Replicas
-}
-
-func (d *DeploymentObj) Idle() {
-	d.Obj.Spec.Replicas = ptr.To(int32(0))
 }
 
 // toStatefulSet converts a Deployment to a StatefulSet

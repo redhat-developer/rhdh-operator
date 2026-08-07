@@ -29,7 +29,6 @@ It is highly recommended to read the [Design](design.md) document to understand 
   - [Deployment Configuration](#deployment-configuration)
     - [Deployment Kind](#deployment-kind) 
     - [Deployment Patching](#deployment-patching)
-  - [Instance Idling](#instance-idling)
   - [Database Configuration](#database-configuration)
 
 

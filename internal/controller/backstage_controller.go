@@ -115,7 +115,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply backstage objects", err)
 	}
 
-	if model.ShouldIdle(backstage) {
+	if backstage.GetAnnotations()[model.IdleAnnotation] == "true" {
 		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonIdled, "Instance is idled")
 		return ctrl.Result{}, nil
 	}
