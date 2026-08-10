@@ -729,9 +729,9 @@ echo "=== Downloading ${total} plugins to ${OUTPUT_DIR} (${PARALLEL_JOBS} parall
 echo ""
 
 # Use xargs for parallel execution
-# shellcheck disable=SC2016 # Single quotes intentional - variables expand in inner bash
 # Capture xargs exit code - it returns 123 if any command fails
 XARGS_EXIT=0
+# shellcheck disable=SC2016 # Single quotes intentional - $1/$2 expand in inner bash
 grep -v '^#' "${INPUT_FILE}" | grep -v '^$' | \
     xargs -P "${PARALLEL_JOBS}" -I {} bash -c 'download_plugin "$1" "$2"' _ {} "${OUTPUT_DIR}" || XARGS_EXIT=$?
 
