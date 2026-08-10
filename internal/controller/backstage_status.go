@@ -85,7 +85,8 @@ func (r *BackstageReconciler) setDeployedCondition(ctx context.Context, backstag
 // Provides detailed container-level info for debugging (complements Deployed condition).
 // Returns true if runtime is healthy (all containers running), false otherwise.
 func (r *BackstageReconciler) setRuntimeCondition(ctx context.Context, backstage *api.Backstage) bool {
-	reason, msg := api.BackstageConditionReasonRunning, ""
+	var reason api.BackstageConditionReason
+	var msg string
 
 	podList := &corev1.PodList{}
 	labelSelector := client.MatchingLabels{
