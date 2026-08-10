@@ -149,21 +149,21 @@ var _ = When("create default rhdh", func() {
 
 			mainCont := backstageContainer(*deploy.PodSpec())
 			g.Expect(mainCont.Args[0]).To(Equal("--config"))
-			// additional from deployment manifest exists but not working if OperatorDPProcessing
-			g.Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
 
 			if model.IsOperatorDPProcessing() {
-				// additional from deployment manifest is not used
-				g.Expect(mainCont.Args).To(HaveLen(6))
-				g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/app-config.plugins.yaml"))
-				g.Expect(mainCont.Args[5]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
+				// With OperatorDPProcessing
+				g.Expect(mainCont.Args).To(HaveLen(4))
+				g.Expect(mainCont.Args[1]).To(Equal("/opt/app-root/src/app-config.dynamic-plugins.yaml"))
+				g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 				mainContainerExpectedVolumeMounts = append(mainContainerExpectedVolumeMounts, corev1.VolumeMount{
 					Name:      model.DefaultMultiObjectName("appconfig", backstageName, "plugins-appconfig"),
-					MountPath: "/opt/app-root/src/app-config.plugins.yaml",
-					SubPath:   "app-config.plugins.yaml",
+					MountPath: "/opt/app-root/src/app-config.dynamic-plugins.yaml",
+					SubPath:   "app-config.dynamic-plugins.yaml",
 				})
 			} else {
+				// Without OperatorDPProcessing
 				g.Expect(mainCont.Args).To(HaveLen(4))
+				g.Expect(mainCont.Args[1]).To(Equal("dynamic-plugins-root/app-config.dynamic-plugins.yaml"))
 				g.Expect(mainCont.Args[3]).To(Equal("/opt/app-root/src/default.app-config.yaml"))
 			}
 

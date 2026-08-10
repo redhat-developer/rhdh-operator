@@ -2796,6 +2796,7 @@ data:
                 - ./install-dynamic-plugins.sh
                 - /dynamic-plugins-root
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
+              # image will be replaced with INSTALL_DP_IMAGE if OPERATOR_DP_PROCESSING==true
               image: quay.io/rhdh-community/rhdh:next
               imagePullPolicy: IfNotPresent
               securityContext:
@@ -2817,6 +2818,8 @@ data:
                   value: "quay.io/rhdh/plugin-catalog-index:next"
                 - name: CATALOG_ENTITIES_EXTRACT_DIR
                   value: '/extensions'
+                - name: INPUT_FILE
+                  value: '/opt/app-root/src/packages.txt'
               volumeMounts:
                 - mountPath: /dynamic-plugins-root
                   name: dynamic-plugins-root
@@ -4045,6 +4048,8 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
+        - name: INSTALL_DP_IMAGE
+          value: quay.io/gazarenk/install-plugins:skopeo
         image: quay.io/rhdh/rhdh-rhel9-operator:2.0
         livenessProbe:
           httpGet:

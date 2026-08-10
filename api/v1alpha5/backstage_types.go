@@ -16,6 +16,7 @@ const (
 	BackstageConditionReasonDeployed   BackstageConditionReason = "Deployed"
 	BackstageConditionReasonFailed     BackstageConditionReason = "DeployFailed"
 	BackstageConditionReasonInProgress BackstageConditionReason = "DeployInProgress"
+	BackstageConditionReasonIdled      BackstageConditionReason = "Idled"
 )
 
 // BackstageSpec defines the desired state of Backstage

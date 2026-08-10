@@ -29,6 +29,7 @@ import (
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
 const OperatorDPProcessingEnvVar = "OPERATOR_DP_PROCESSING"
+const InstallDpImageEnvVar = "INSTALL_DP_IMAGE"
 
 type DynamicPluginsFactory struct{}
 
