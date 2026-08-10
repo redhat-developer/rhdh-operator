@@ -20,7 +20,6 @@ const (
 	BackstageConditionReasonDeployed   BackstageConditionReason = "Deployed"
 	BackstageConditionReasonFailed     BackstageConditionReason = "DeployFailed"
 	BackstageConditionReasonInProgress BackstageConditionReason = "DeployInProgress"
-	BackstageConditionReasonIdled      BackstageConditionReason = "Idled"
 
 	// Runtime condition reasons
 	BackstageConditionReasonRunning         BackstageConditionReason = "Running"

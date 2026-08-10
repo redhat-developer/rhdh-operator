@@ -99,6 +99,8 @@ The **Deployed** condition reflects the Deployment (or StatefulSet) level status
 | `DeployInProgress` | False | Rollout in progress. Message shows "X/X replicas ready" or "no conditions reported yet" |
 | `DeployFailed` | False | Deployment failed. Message contains the error details |
 
+**Idled instances:** When the `rhdh.redhat.com/idle: true` annotation is set, the deployment scales to 0 replicas. The Deployed condition shows `Deployed` with message "0/0 replicas ready (Idled)".
+
 ### Runtime Condition
 
 The **Runtime** condition provides Pod and container-level status, offering more immediate feedback about application health:
@@ -138,7 +140,24 @@ status:
     - "@backstage/plugin-techdocs"
 ```
 
+### Idled Example
+
+When idled via annotation `rhdh.redhat.com/idle: true`:
+
+```yaml
+status:
+  conditions:
+    - type: Deployed
+      status: "True"
+      reason: Deployed
+      message: "0/0 replicas ready (Idled)"
+    - type: Runtime
+      status: "False"
+      reason: Pending
+      message: "no pods found"
+```
+
 ### Plugins Status
 
-When the deployment is healthy (both Deployed and Runtime conditions are True), the status includes a list of enabled dynamic plugins in the `plugins` field. This field is cleared when the deployment is not healthy.
+When the deployment is healthy (both Deployed and Runtime conditions are True), the status includes a list of enabled dynamic plugins in the `plugins` field. This field is cleared when the deployment is not healthy or idled.
 

@@ -62,15 +62,11 @@ func (r *BackstageReconciler) setDeployedCondition(ctx context.Context, backstag
 		return false
 	}
 
-	var state api.BackstageConditionReason
-	var msg string
+	state, msg := resolveState(obj)
 	if backstage.GetAnnotations()[model.IdleAnnotation] == "true" {
-		state = api.BackstageConditionReasonIdled
-		msg = "Instance is idled"
-	} else {
-		state, msg = resolveState(obj)
+		msg += " (Idled)"
 	}
-	//state, msg := resolveState(obj)
+
 	isReady := state == api.BackstageConditionReasonDeployed
 	status := metav1.ConditionFalse
 	if isReady {
