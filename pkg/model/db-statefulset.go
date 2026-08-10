@@ -95,6 +95,11 @@ func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage, scheme *runti
 			b.setDbSecretEnvVar(b.container(), secret.Name)
 		}
 	}
+
+	if backstage.GetAnnotations()[IdleAnnotation] == "true" {
+		b.statefulSet.Spec.Replicas = new(int32)
+	}
+
 	return nil
 }
 

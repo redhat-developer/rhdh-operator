@@ -24,6 +24,7 @@ import (
 )
 
 const BackstageAppLabel = "rhdh.redhat.com/app"
+const IdleAnnotation = "rhdh.redhat.com/idle"
 const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
 const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
 const DefaultSubPathAnnotation = "rhdh.redhat.com/sub-path"

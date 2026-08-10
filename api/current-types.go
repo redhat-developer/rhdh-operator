@@ -66,6 +66,7 @@ const (
 
 	// Config condition reasons
 	BackstageConditionReasonInvalid BackstageConditionReason = bsv1.BackstageConditionReasonInvalid
+	BackstageConditionReasonIdled      BackstageConditionReason = bsv1.BackstageConditionReasonIdled
 )
 
 // AddToScheme adds the current API version's types to the scheme.

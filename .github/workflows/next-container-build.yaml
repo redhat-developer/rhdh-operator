@@ -243,7 +243,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     env:
+      HAS_QUAY_AUTH: ${{ vars.QUAY_USERNAME != '' && secrets.QUAY_TOKEN != '' }}
       HAS_QUAY_OAUTH: ${{ secrets.QUAY_OAUTH_TOKEN != '' }}
       SHORT_SHA: ${{ needs.changes.outputs.short_sha }}
       BASE_VERSION: ${{ needs.changes.outputs.base_version }}
@@ -258,6 +260,10 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Install cosign
+        if: env.HAS_QUAY_AUTH == 'true'
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Create manifest lists and push
         run: |
@@ -295,6 +301,28 @@ jobs:
 
             echo "=== Inspecting manifest for ${image}:${LATEST_NEXT} ==="
             docker buildx imagetools inspect "${REGISTRY_WITH_ORG}/${image}:${LATEST_NEXT}"
+          done
+        env:
+          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
+          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
+
+      - name: Sign the published images
+        if: env.HAS_QUAY_AUTH == 'true'
+        run: |
+          set -euo pipefail
+          export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
+
+          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-bundle" "${OPERATOR_IMAGE_NAME}-catalog"; do
+            for tag in "${BASE_VERSION}" "${BASE_VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
+              FULL_REF="${REGISTRY_WITH_ORG}/${image}:${tag}"
+              DIGEST=$(docker buildx imagetools inspect "$FULL_REF" | grep '^Digest:' | awk '{print $2}')
+              if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+                echo "::error::Could not resolve digest for ${FULL_REF}"
+                exit 1
+              fi
+              echo "Signing ${FULL_REF}@${DIGEST}"
+              cosign sign --yes "${FULL_REF}@${DIGEST}"
+            done
           done
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}

@@ -177,3 +177,36 @@ oc get pvc -n <namespace> | grep backstage-psql-<cr-name>
 ```
 
 Review carefully before deleting, especially PersistentVolumeClaims which contain data.
+
+## Instance Idling
+
+The Operator supports idling and waking Backstage instances via the `rhdh.redhat.com/idle` annotation on the Backstage CR. When set to `"true"`, the Operator scales all managed workloads (Backstage Deployment or StatefulSet, and the local DB StatefulSet if enabled) to zero replicas in the same namespace as the CR.
+
+When the annotation is removed, the next reconciliation restores replicas to their normal values.
+
+When the local DB is disabled (`spec.database.enableLocalDb: false`), only the Backstage Deployment is affected.
+
+### Idling an instance
+
+```bash
+kubectl annotate backstage <cr-name> rhdh.redhat.com/idle=true
+```
+
+After reconciliation, the status condition will show:
+
+```
+Type: Deployed
+Status: False
+Reason: Idled
+Message: Instance is idled
+```
+
+> **Note for CI and monitoring scripts:** An idled instance reports `Deployed=False` with `Reason=Idled`. Scripts that wait for `Deployed=True` should check the `Reason` field to distinguish an intentionally idled instance from a deployment failure. To ensure readiness checks succeed, remove the `rhdh.redhat.com/idle` annotation before waiting for deployment.
+
+### Waking an instance
+
+```bash
+kubectl annotate backstage <cr-name> rhdh.redhat.com/idle-
+```
+
+The status condition transitions back to its normal deployed state.
