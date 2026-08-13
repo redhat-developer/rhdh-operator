@@ -56,14 +56,20 @@ runs:
         echo "HERMETO_IMAGE=quay.io/konflux-ci/hermeto:latest" >> $GITHUB_ENV
         echo "LOCAL_CACHE_DIR=./hermeto-cache/operator" >> $GITHUB_ENV
 
-    - name: Cache dependencies with hermeto
+    - name: Restore hermeto dependency cache
+      id: cache-deps
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ./hermeto-cache/operator
+        key: hermeto-deps-${{ inputs.platform }}-${{ hashFiles('go.sum', 'rpms.lock.yaml') }}
+
+    - name: Fetch dependencies with hermeto
+      if: steps.cache-deps.outputs.cache-hit != 'true'
       shell: bash
       run: |
         set -ex
 
-        echo "::group::Creating local cache directory"
         mkdir -p "$LOCAL_CACHE_DIR"
-        echo "::endgroup::"
 
         echo "::group::Fetching dependencies with hermeto"
         podman run --rm -v "$PWD:/source:z" -v "$LOCAL_CACHE_DIR:/cachi2:z" -w /source "$HERMETO_IMAGE" \
@@ -92,13 +98,30 @@ runs:
           inject-files /cachi2/output
         echo "::endgroup::"
 
-        echo LOCAL_CACHE_DIR_REALPATH=$(realpath "$LOCAL_CACHE_DIR") >> $GITHUB_ENV
+    - name: Generate env and inject files (cache hit)
+      if: steps.cache-deps.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        set -ex
+        echo "::group::Generating environment file from cached deps"
+        podman run --rm -v "$PWD:/source:z" -v "$LOCAL_CACHE_DIR:/cachi2:z" -w /source "$HERMETO_IMAGE" \
+          --log-level DEBUG \
+          generate-env --format env \
+          --output /cachi2/cachi2.env /cachi2/output
+        echo "::endgroup::"
+
+        echo "::group::Injecting files from cached deps"
+        podman run --rm -v "$PWD:/source:z" -v "$LOCAL_CACHE_DIR:/cachi2:z" -w /source "$HERMETO_IMAGE" \
+          --log-level DEBUG \
+          inject-files /cachi2/output
+        echo "::endgroup::"
 
     - name: Fix cache ownership for non-root buildah
       shell: bash
       run: |
         set -ex
-        sudo chown -R runner "$LOCAL_CACHE_DIR_REALPATH"
+        echo LOCAL_CACHE_DIR_REALPATH=$(realpath "$LOCAL_CACHE_DIR") >> $GITHUB_ENV
+        sudo chown -R runner "$(realpath "$LOCAL_CACHE_DIR")"
 
     - name: Transform Dockerfile for hermetic build
       shell: bash
