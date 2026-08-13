@@ -1,4 +1,4 @@
-# THIS IS USED BY Konflux builds >= 1.4 with Cachi2 enabled
+# Unified Dockerfile for both upstream (Hermeto) and downstream (Konflux/Cachi2) hermetic builds
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
@@ -8,11 +8,6 @@ ARG TARGETARCH
 # hadolint ignore=DL3002
 USER 0
 ENV GOPATH=/go/
-
-# '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
-# Downstream comment
-RUN dnf -q -y update
-#/ Downstream comment
 
 ENV EXTERNAL_SOURCE=.
 ENV CONTAINER_SOURCE=/opt/app-root/src
@@ -39,15 +34,6 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
 # https://registry.access.redhat.com/ubi9-minimal
 FROM registry.access.redhat.com/ubi9-minimal:9.8-1786987521@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41 AS runtime
-
-# Downstream uncomment
-# RUN cat /cachi2/cachi2.env
-#/ Downstream uncomment
-
-# '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
-# Downstream comment
-RUN microdnf update --setopt=install_weak_deps=0 -y
-#/ Downstream comment
 
 RUN microdnf install -y openssl; microdnf clean -y all
 

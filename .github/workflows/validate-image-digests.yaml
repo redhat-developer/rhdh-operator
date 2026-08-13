@@ -8,7 +8,6 @@ on:
       - 'hack/validate-image-digests.sh'
       - 'Dockerfile'
       - '**/*bundle.Dockerfile'
-      - '.rhdh/docker/Dockerfile'
 
 jobs:
   validate-image-digests:

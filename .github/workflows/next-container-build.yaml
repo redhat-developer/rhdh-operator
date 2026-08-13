@@ -191,7 +191,15 @@ jobs:
           username: ${{ vars.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - name: Build and push per-arch operator and catalog images
+      - name: Build operator image (hermetic)
+        uses: ./.github/actions/docker-build
+        with:
+          imageName: ${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}/${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
+          imageTags: type=raw,value=${{ env.BASE_VERSION }}
+          platform: ${{ env.PLATFORM }}
+          skipArtifactUpload: 'true'
+
+      - name: Build catalog image and push per-arch images
         run: |
           set -euo pipefail
           sudo apt-get -y update; sudo apt-get -y install podman
@@ -200,8 +208,6 @@ jobs:
           export VERSION="${BASE_VERSION}"
           export REGISTRY_WITH_ORG="${REGISTRY}/${REGISTRY_ORG}"
           export IMAGE_TAG_BASE="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}"
-          # Point catalog-build's bundle reference at the already-published, stable bundle
-          # tag from the dedicated `bundle` job instead of rebuilding/pushing it again here.
           export BUNDLE_IMGS="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}"
 
           : "${PLATFORM:?PLATFORM must be set}"
@@ -209,13 +215,8 @@ jobs:
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
           : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
 
-          # Build the operator image, then the catalog image. catalog-build's only other
-          # prerequisite (besides the bundle-push we're skipping) is `opm`, which downloads
-          # the opm CLI if needed -- that still runs normally. `-o bundle-push` tells make to
-          # treat that phony prerequisite as already satisfied, so `opm index add` runs
-          # directly against BUNDLE_IMGS above (a safe concurrent *read* of an already-stable
-          # tag) instead of each matrix leg re-pushing its own bundle to a shared tag first.
-          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" PLATFORM="${PLATFORM}" BUNDLE_IMGS="${BUNDLE_IMGS}" make -o bundle-push image-build catalog-build
+          # Build the catalog image only (operator was built hermetically above)
+          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" PLATFORM="${PLATFORM}" BUNDLE_IMGS="${BUNDLE_IMGS}" make -o bundle-push catalog-build
 
           # Push per-arch tagged images
           for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
