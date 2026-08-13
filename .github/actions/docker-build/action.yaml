@@ -50,11 +50,20 @@ runs:
         labels: |
           ${{ inputs.imageLabels }}
 
+    - name: Ensure podman is available
+      shell: bash
+      run: |
+        if ! command -v podman &>/dev/null; then
+          echo "podman not found, installing..."
+          sudo apt-get -y update && sudo apt-get -y install podman
+        fi
+        podman --version
+
     - name: Set up hermetic build variables
       shell: bash
       run: |
-        echo "HERMETO_IMAGE=quay.io/konflux-ci/hermeto:latest" >> $GITHUB_ENV
-        echo "LOCAL_CACHE_DIR=./hermeto-cache/operator" >> $GITHUB_ENV
+        echo "HERMETO_IMAGE=quay.io/konflux-ci/hermeto:latest" >> "$GITHUB_ENV"
+        echo "LOCAL_CACHE_DIR=./hermeto-cache/operator" >> "$GITHUB_ENV"
 
     - name: Restore hermeto dependency cache
       id: cache-deps
@@ -120,7 +129,7 @@ runs:
       shell: bash
       run: |
         set -ex
-        echo LOCAL_CACHE_DIR_REALPATH=$(realpath "$LOCAL_CACHE_DIR") >> $GITHUB_ENV
+        echo LOCAL_CACHE_DIR_REALPATH=$(realpath "$LOCAL_CACHE_DIR") >> "$GITHUB_ENV"
         sudo chown -R runner "$(realpath "$LOCAL_CACHE_DIR")"
 
     - name: Transform Dockerfile for hermetic build
@@ -141,7 +150,7 @@ runs:
         # Prepend cachi2 env sourcing to every RUN command
         sed -i 's/^\s*RUN /RUN . \/cachi2\/cachi2.env \&\& /' "$TRANSFORMED_CONTAINERFILE"
 
-        echo "transformed_containerfile=$TRANSFORMED_CONTAINERFILE" >> $GITHUB_OUTPUT
+        echo "transformed_containerfile=$TRANSFORMED_CONTAINERFILE" >> "$GITHUB_OUTPUT"
 
     - name: Build Docker Image
       id: build
@@ -165,7 +174,8 @@ runs:
         mkdir -p ./operator-podman-artifacts
         echo "Saving images with tags:"
         echo "$TAGS_LIST"
-        podman save $TAGS_LIST -o ./operator-podman-artifacts/image.tar
+        readarray -t tags <<< "$TAGS_LIST"
+        podman save "${tags[@]}" -o ./operator-podman-artifacts/image.tar
         echo "$TAGS_LIST" > ./operator-podman-artifacts/tags.txt
 
     - name: Upload image artifact

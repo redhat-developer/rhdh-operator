@@ -16,8 +16,7 @@
 #
 # This script simulates the Konflux build process locally using Hermeto.
 # It can either build the dependency cache or build a container image.
-set -e
-set -uo pipefail
+set -euo pipefail
 
 #######################################
 # Constants
@@ -126,8 +125,9 @@ transform_containerfile() {
 # Builds the dependency cache using Hermeto.
 #######################################
 build_cache() {
-  local local_cache_dir="$1"
-  local local_cache_output_dir="$2"
+  local component_dir="$1"
+  local local_cache_dir="$2"
+  local local_cache_output_dir="$3"
   local platform_args=()
 
   if [[ -n "${TARGET_PLATFORM}" ]]; then
@@ -139,9 +139,9 @@ build_cache() {
 
   podman pull "${platform_args[@]}" "${HERMETO_IMAGE}"
 
-  podman run --rm -ti \
+  podman run --rm \
     "${platform_args[@]}" \
-    -v "${PWD}:/source:z" \
+    -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
     "${HERMETO_IMAGE}" \
@@ -151,17 +151,17 @@ build_cache() {
     --output /cachi2/output \
     '[{"type": "rpm", "path": "."}, {"type": "gomod", "path": "."}]'
 
-  podman run --rm -ti \
+  podman run --rm \
     "${platform_args[@]}" \
-    -v "${PWD}:/source:z" \
+    -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
     "${HERMETO_IMAGE}" \
     generate-env --format env --output /cachi2/cachi2.env /cachi2/output
 
-  podman run --rm -ti \
+  podman run --rm \
     "${platform_args[@]}" \
-    -v "${PWD}:/source:z" \
+    -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
     "${HERMETO_IMAGE}" \
@@ -195,7 +195,7 @@ build_image() {
 
   # Prevent podman from injecting host RHEL subscriptions into the container
   EMPTY_DIR=$(mktemp -d)
-  trap 'rm -rf "${EMPTY_DIR}"' EXIT
+  trap 'rm -rf "${EMPTY_DIR}" || true' EXIT
 
   podman build -t "${image}" \
     "${platform_args[@]}" \
@@ -285,7 +285,7 @@ main() {
 
   if [[ "${no_cache}" == false ]]; then
     echo "Building cache..."
-    build_cache "${local_cache_dir}" "${local_cache_output_dir}"
+    build_cache "${resolved_component_dir}" "${local_cache_dir}" "${local_cache_output_dir}"
   else
     echo "Skipping cache build (--no-cache specified)"
   fi
