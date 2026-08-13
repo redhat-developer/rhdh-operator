@@ -62,7 +62,8 @@ runs:
     - name: Set up hermetic build variables
       shell: bash
       run: |
-        echo "HERMETO_IMAGE=quay.io/konflux-ci/hermeto:latest" >> "$GITHUB_ENV"
+        # renovate: datasource=docker depName=quay.io/konflux-ci/hermeto
+        echo "HERMETO_IMAGE=quay.io/konflux-ci/hermeto:0.60.1" >> "$GITHUB_ENV"
         echo "LOCAL_CACHE_DIR=./hermeto-cache/operator" >> "$GITHUB_ENV"
 
     - name: Restore hermeto dependency cache

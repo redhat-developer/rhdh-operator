@@ -22,7 +22,7 @@ set -euo pipefail
 # Constants
 #######################################
 readonly LOCAL_CACHE_BASEDIR='./hermeto-cache/'
-readonly HERMETO_IMAGE='quay.io/konflux-ci/hermeto:latest'
+readonly HERMETO_IMAGE='quay.io/konflux-ci/hermeto:0.60.1'
 
 # Target platform for cross-builds (e.g., linux/arm64, linux/amd64)
 TARGET_PLATFORM="${TARGET_PLATFORM:-}"
