@@ -28,7 +28,7 @@ metadata:
     capabilities: Seamless Upgrades
     categories: Developer Tools
     certified: "true"
-    containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:2.0
+    containerImage: registry.redhat.io/rhdh/rhdh-rhel10-operator:2.0
     createdAt: "2026-08-24T09:48:00Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
@@ -324,7 +324,7 @@ spec:
                   value: quay.io/rhdh-community/rhdh:next
                 - name: INSTALL_DP_IMAGE
                   value: quay.io/gazarenk/install-plugins:skopeo
-                image: quay.io/rhdh/rhdh-rhel9-operator:2.0
+                image: quay.io/rhdh/rhdh-rhel10-operator:2.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
