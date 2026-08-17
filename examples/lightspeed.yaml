@@ -4,11 +4,6 @@ metadata:
   name: lightspeed-secrets
 type: Opaque
 stringData:
-  ENABLE_VLLM: ""
-  ENABLE_VERTEX_AI: ""
-  ENABLE_OPENAI: ""
-  ENABLE_OLLAMA: ""
-  ENABLE_VALIDATION: ""
   VLLM_URL: ""
   VLLM_API_KEY: ""
   VLLM_MAX_TOKENS: ""
@@ -16,11 +11,14 @@ stringData:
   OPENAI_API_KEY: ""
   VERTEX_AI_PROJECT: ""
   VERTEX_AI_LOCATION: ""
+  GOOGLE_APPLICATION_CREDENTIALS_HOST_PATH: ""
   GOOGLE_APPLICATION_CREDENTIALS: ""
   OLLAMA_URL: ""
+  ENABLE_VALIDATION: ""
   VALIDATION_PROVIDER: ""
   VALIDATION_MODEL_NAME: ""
   LLAMA_STACK_LOGGING: ""
+  OTEL_SDK_DISABLED: ""
 ---
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage

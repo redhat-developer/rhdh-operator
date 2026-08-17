@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
@@ -98,6 +99,65 @@ func (m *BackstageModel) getDeployment() *BackstageDeployment {
 		return nil
 	}
 	return obj.(*BackstageDeployment)
+}
+
+// InjectContainerEnvVar sets an env var on a named container in the deployment's pod spec.
+// If the container or deployment doesn't exist, it returns an error.
+func (m *BackstageModel) InjectContainerEnvVar(containerName, envName, envValue string) error {
+	deployment := m.getDeployment()
+	if deployment == nil {
+		return fmt.Errorf("backstage deployment not found in model")
+	}
+	c := deployment.containerByName(containerName)
+	if c == nil {
+		return nil
+	}
+	deployment.setOrAppendEnvVar(c, envName, envValue)
+	return nil
+}
+
+// SwapConfigMapDataKey replaces targetKey's content with sourceKey's content,
+// then removes sourceKey. Operates on the first ConfigMap that contains both keys.
+func (m *BackstageModel) SwapConfigMapDataKey(targetKey, sourceKey string) {
+	obj := m.GetRuntimeObject(ConfigMapFilesKey)
+	if obj == nil {
+		return
+	}
+	cmFiles, ok := obj.(*ConfigMapFiles)
+	if !ok || cmFiles.ConfigMaps == nil {
+		return
+	}
+	for _, item := range cmFiles.ConfigMaps.Items {
+		cm, ok := item.(*corev1.ConfigMap)
+		if !ok {
+			continue
+		}
+		sourceVal, hasSource := cm.Data[sourceKey]
+		if _, hasTarget := cm.Data[targetKey]; hasTarget && hasSource {
+			cm.Data[targetKey] = sourceVal
+			delete(cm.Data, sourceKey)
+			return
+		}
+	}
+}
+
+// RemoveConfigMapDataKey removes a data key from all ConfigMaps that contain it.
+func (m *BackstageModel) RemoveConfigMapDataKey(key string) {
+	obj := m.GetRuntimeObject(ConfigMapFilesKey)
+	if obj == nil {
+		return
+	}
+	cmFiles, ok := obj.(*ConfigMapFiles)
+	if !ok || cmFiles.ConfigMaps == nil {
+		return
+	}
+	for _, item := range cmFiles.ConfigMaps.Items {
+		cm, ok := item.(*corev1.ConfigMap)
+		if !ok {
+			continue
+		}
+		delete(cm.Data, key)
+	}
 }
 
 func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {

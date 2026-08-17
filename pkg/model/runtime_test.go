@@ -9,6 +9,7 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -234,4 +235,72 @@ func TestInvalidObjectKind(t *testing.T) {
 		strings.Contains(err.Error(), "failed to read overlay config for the key service.yaml") ||
 			strings.Contains(err.Error(), "failed to read default value for the key service.yaml"),
 		"Error should mention failed to read config for service.yaml")
+}
+
+func newModelWithConfigMapData(data map[string]string) *BackstageModel {
+	cm := &corev1.ConfigMap{
+		Data: data,
+	}
+	cm.SetName("test-config")
+	mo := &multiobject.MultiObject{}
+	mo.Items = append(mo.Items, cm)
+	cmFiles := &ConfigMapFiles{ConfigMaps: mo}
+	m := &BackstageModel{}
+	m.setRuntimeObject(cmFiles)
+	return m
+}
+
+func TestSwapConfigMapDataKey(t *testing.T) {
+	m := newModelWithConfigMapData(map[string]string{
+		"lightspeed-stack.yaml":        "full-config-with-okp",
+		"lightspeed-stack-no-okp.yaml": "stripped-config",
+	})
+
+	m.SwapConfigMapDataKey("lightspeed-stack.yaml", "lightspeed-stack-no-okp.yaml")
+
+	cm := m.GetRuntimeObject(ConfigMapFilesKey).(*ConfigMapFiles).ConfigMaps.Items[0].(*corev1.ConfigMap)
+	assert.Equal(t, "stripped-config", cm.Data["lightspeed-stack.yaml"])
+	_, exists := cm.Data["lightspeed-stack-no-okp.yaml"]
+	assert.False(t, exists, "source key should be deleted after swap")
+}
+
+func TestSwapConfigMapDataKeyMissingSource(t *testing.T) {
+	m := newModelWithConfigMapData(map[string]string{
+		"lightspeed-stack.yaml": "original-config",
+	})
+
+	m.SwapConfigMapDataKey("lightspeed-stack.yaml", "lightspeed-stack-no-okp.yaml")
+
+	cm := m.GetRuntimeObject(ConfigMapFilesKey).(*ConfigMapFiles).ConfigMaps.Items[0].(*corev1.ConfigMap)
+	assert.Equal(t, "original-config", cm.Data["lightspeed-stack.yaml"], "target should be unchanged when source is missing")
+}
+
+func TestSwapConfigMapDataKeyNoConfigMaps(t *testing.T) {
+	m := &BackstageModel{}
+	m.SwapConfigMapDataKey("lightspeed-stack.yaml", "lightspeed-stack-no-okp.yaml")
+}
+
+func TestRemoveConfigMapDataKey(t *testing.T) {
+	m := newModelWithConfigMapData(map[string]string{
+		"lightspeed-stack.yaml":        "full-config",
+		"lightspeed-stack-no-okp.yaml": "stripped-config",
+	})
+
+	m.RemoveConfigMapDataKey("lightspeed-stack-no-okp.yaml")
+
+	cm := m.GetRuntimeObject(ConfigMapFilesKey).(*ConfigMapFiles).ConfigMaps.Items[0].(*corev1.ConfigMap)
+	assert.Equal(t, "full-config", cm.Data["lightspeed-stack.yaml"], "other keys should be preserved")
+	_, exists := cm.Data["lightspeed-stack-no-okp.yaml"]
+	assert.False(t, exists, "key should be removed")
+}
+
+func TestRemoveConfigMapDataKeyMissing(t *testing.T) {
+	m := newModelWithConfigMapData(map[string]string{
+		"lightspeed-stack.yaml": "full-config",
+	})
+
+	m.RemoveConfigMapDataKey("nonexistent-key")
+
+	cm := m.GetRuntimeObject(ConfigMapFilesKey).(*ConfigMapFiles).ConfigMaps.Items[0].(*corev1.ConfigMap)
+	assert.Equal(t, "full-config", cm.Data["lightspeed-stack.yaml"], "existing keys should be untouched")
 }
