@@ -327,7 +327,7 @@ data:
           default: "true"
       steps:
         - name: flatten
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-source.path)
           script: |
             #!/usr/bin/env sh
@@ -366,7 +366,7 @@ data:
           type: string
       steps:
         - name: build-manifests
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-source.path)/flat/$(params.workflowId)
           script: |
             #!/usr/bin/env sh
@@ -394,7 +394,7 @@ data:
           type: string
       steps:
         - name: build-gitops
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-gitops.path)/workflow-gitops
           script: |
             #!/usr/bin/env sh
