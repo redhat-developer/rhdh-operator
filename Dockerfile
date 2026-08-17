@@ -1,8 +1,8 @@
 # THIS IS USED BY Konflux builds >= 1.4 with Cachi2 enabled
 
-#@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
-# https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.8-1782910875@sha256:5488ab924e20c14a7a765b8502e0798fad0e0953f67d552bf43d795583020819 AS builder
+#@follow_tag(registry.redhat.io/rhel10/go-toolset:latest)
+# https://registry.access.redhat.com/ubi10/go-toolset
+FROM registry.access.redhat.com/ubi10/go-toolset:1.26.5-1786496329@sha256:1db86a2b0f77c1197b011de5140236effc27b1a1724c0105d4926857a0756de5 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # hadolint ignore=DL3002
@@ -36,9 +36,9 @@ COPY $EXTERNAL_SOURCE $CONTAINER_SOURCE
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Install openssl for FIPS support
-#@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
-# https://registry.access.redhat.com/ubi9-minimal
-FROM registry.access.redhat.com/ubi9-minimal:9.8-1782797275@sha256:463cae32c6f6f5594b11a5c22de275016bd8545ce58a6373388e8b24f13fc15c AS runtime
+#@follow_tag(registry.redhat.io/ubi10/ubi-minimal:latest)
+# https://registry.access.redhat.com/ubi10-minimal
+FROM registry.access.redhat.com/ubi10-minimal:10.2-1786928543@sha256:a036678b09bd6e5d0efc28ea5554ae14aa6af2bc317d60f9bb0c0dd7610972d0 AS runtime
 
 # Downstream uncomment
 # RUN cat /cachi2/cachi2.env

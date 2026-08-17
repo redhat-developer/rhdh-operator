@@ -3715,7 +3715,7 @@ data:
           default: "true"
       steps:
         - name: flatten
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-source.path)
           script: |
             ROOT=/workspace/workflow
@@ -3753,7 +3753,7 @@ data:
           type: string
       steps:
         - name: build-manifests
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-source.path)/flat/$(params.workflowId)
           script: |
             microdnf install -y tar gzip
@@ -3778,7 +3778,7 @@ data:
           type: string
       steps:
         - name: build-gitops
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-gitops.path)/workflow-gitops
           script: |
             cp $(workspaces.workflow-source.path)/flat/$(params.workflowId)/manifests/* kustomize/base
@@ -4034,7 +4034,7 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
-        image: quay.io/rhdh/rhdh-rhel9-operator:1.11
+        image: quay.io/rhdh/rhdh-rhel10-operator:1.11
         livenessProbe:
           httpGet:
             path: /healthz

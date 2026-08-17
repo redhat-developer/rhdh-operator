@@ -4,18 +4,18 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/o/openssl-3.5.5-4.el9_8.x86_64.rpm
-    repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 1564134
-    checksum: sha256:e0e2c1f901d3f6245ff43f194ac11ba133cf99c630307239722c07a2282a1356
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/o/openssl-3.5.5-6.el10_2.x86_64.rpm
+    repoid: ubi-10-for-x86_64-baseos-rpms
+    size: 1332328
+    checksum: sha256:f1ff63e506d81a69e1c6e6251bce201581ca654538ab693fff29595fd64f7ee3
     name: openssl
-    evr: 1:3.5.5-4.el9_8
-    sourcerpm: openssl-3.5.5-4.el9_8.src.rpm
+    evr: 1:3.5.5-6.el10_2
+    sourcerpm: openssl-3.5.5-6.el10_2.src.rpm
   source:
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/o/openssl-3.5.5-4.el9_8.src.rpm
-    repoid: ubi-9-for-x86_64-baseos-source-rpms
-    size: 53362961
-    checksum: sha256:7f1e764394ad2e1a4915fef182edbaad643dab6b59cbd52679a0962b26cb5d36
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/o/openssl-3.5.5-6.el10_2.src.rpm
+    repoid: ubi-10-for-x86_64-baseos-source-rpms
+    size: 53369050
+    checksum: sha256:b79f08d2d04536fdb6801b6ba7da7174942d174dd2b7969316402c737689d735
     name: openssl
-    evr: 1:3.5.5-4.el9_8
+    evr: 1:3.5.5-6.el10_2
   module_metadata: []
