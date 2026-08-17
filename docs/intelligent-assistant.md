@@ -12,6 +12,9 @@ The Intelligent Assistant flavour (as of v2.1) consists of the following dynamic
 - `@red-hat-developer-hub/backstage-plugin-intelligent-assistant` - Frontend UI with chat interface, floating action button, and drawer components
 - `@red-hat-developer-hub/backstage-plugin-intelligent-assistant-backend` - Backend services for AI processing
 
+**OKP (Offline Knowledge Portal):**
+On OpenShift, the operator also deploys an OKP instance (`Deployment`, `Service`, and `Route`) that provides document retrieval (RAG) for the assistant, replacing the previous RAG init container / FAISS vector store. See [OKP retrieval](#okp-retrieval) below.
+
 These plugins talk to **Lightspeed Core**, which the flavour deploys as a sidecar (`lightspeed-core`).
 
 ### Prerequisites
@@ -116,6 +119,15 @@ Once enabled, users can:
 ### Notes
 
 - The flavour includes all necessary UI components and backend services, including the Lightspeed Core sidecar
+
+### OKP retrieval
+
+The assistant uses **OKP (Offline Knowledge Portal)** for document retrieval (RAG), replacing the previous RAG init container and FAISS vector store.
+
+- **OpenShift:** the operator deploys OKP as a `Deployment`, `Service`, and `Route` (Solr on `8983`, httpd on `8080`), and injects `OKP_SERVICE_URL` into the `lightspeed-core` sidecar so the assistant queries it for grounded answers.
+- **Vanilla Kubernetes:** OKP is **not** deployed (the operator has no Ingress support). The Lightspeed Core config falls back to `lightspeed-stack-no-okp.yaml` (the `rag`/`okp` sections stripped out) so the service starts cleanly without an OKP backend. General chat and Notebooks still work; OKP-backed retrieval is unavailable.
+
+No additional CR configuration is required — OKP is enabled automatically alongside the Intelligent Assistant flavour when running on OpenShift.
 
 For more information about the Flavour-based configuration system, see the [Configuration documentation](configuration.md#flavours).
 

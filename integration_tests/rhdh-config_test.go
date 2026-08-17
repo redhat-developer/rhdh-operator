@@ -349,14 +349,6 @@ var _ = When("create default rhdh", func() {
 			}
 			g.Expect(foundLightspeedCore).To(BeTrue())
 
-			foundInitRagData := false
-			for _, c := range deploy.PodSpec().InitContainers {
-				if c.Name == "init-rag-data" {
-					foundInitRagData = true
-				}
-			}
-			g.Expect(foundInitRagData).To(BeTrue())
-
 		}, 20*time.Second, time.Second).Should(Succeed())
 
 		deleteNamespace(ctx, ns)
@@ -398,14 +390,6 @@ var _ = When("create default rhdh", func() {
 				}
 			}
 			g.Expect(foundLightspeedCore).To(BeFalse())
-
-			foundInitRagData := false
-			for _, c := range deploy.PodSpec().InitContainers {
-				if c.Name == "init-rag-data" {
-					foundInitRagData = true
-				}
-			}
-			g.Expect(foundInitRagData).To(BeFalse())
 
 		}, 20*time.Second, time.Second).Should(Succeed())
 
