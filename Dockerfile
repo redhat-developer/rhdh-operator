@@ -1,4 +1,5 @@
-# Unified Dockerfile for both upstream (Hermeto) and downstream (Konflux/Cachi2) hermetic builds
+# Unified Dockerfile for hermetic builds (Hermeto upstream, Cachi2/Konflux downstream)
+# and standard non-hermetic builds (make image-build)
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
