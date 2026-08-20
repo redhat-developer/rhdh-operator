@@ -169,8 +169,8 @@ func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) erro
 		return err
 	}
 
-	// Extract tarball content to destDir
-	return extractTarGzBytes(result.Content, destDir)
+	// Extract tarball content to destDir (already uncompressed by Uncompressed())
+	return extractTarBytes(result.Content, destDir)
 }
 
 // FetchContent downloads an OCI artifact and returns its content
@@ -222,7 +222,7 @@ func (c *OCIFetcher) FetchContent(ctx context.Context, ref string) (*FetchResult
 	if err != nil {
 		return nil, fmt.Errorf("failed to uncompress layer: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	content, err := io.ReadAll(reader)
 	if err != nil {

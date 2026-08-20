@@ -11,8 +11,8 @@ PROFILE ?= rhdh
 # Enable operator dynamic plugins processing (default: true)
 OPERATOR_DP_PROCESSING ?= true
 # Install dynamic plugins image (required when OPERATOR_DP_PROCESSING=true)
-# INSTALL_DP_IMAGE ?= quay.io/rhdh-community/plugin-installer:next
-INSTALL_DP_IMAGE ?= quay.io/gazarenk/rhdh-plugin-installer:next
+# RELATED_IMAGE_plugin_installer ?= quay.io/rhdh-community/plugin-installer:next
+RELATED_IMAGE_plugin_installer ?= quay.io/gazarenk/rhdh-plugin-installer:next
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
@@ -34,15 +34,15 @@ IMAGE_TAG_VERSION = $(VERSION)
 
 ifeq ($(PROFILE), rhdh)
 	# Profile-specific settings
-	ifeq ($(DEFAULT_VERSION), true)
-		# Keep the same major version as VERSION (community and RHDH are aligned).
-		# Strip the patch for IMAGE_TAG_VERSION (x.y.z => x.y) to match downstream
-		# quay.io/rhdh image tags. Only if VERSION was not explicitly overridden.
-		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
-	endif
+#	ifeq ($(DEFAULT_VERSION), true)
+#		# Keep the same major version as VERSION (community and RHDH are aligned).
+#		# Strip the patch for IMAGE_TAG_VERSION (x.y.z => x.y) to match downstream
+#		# quay.io/rhdh image tags. Only if VERSION was not explicitly overridden.
+#		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
+#	endif
 
 	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
-	IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator
+	IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
 	DEFAULT_CHANNEL ?= fast
 	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
@@ -171,12 +171,12 @@ fmt: goimports ## Format the code using goimports
 .PHONY: test
 test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) INSTALL_DP_IMAGE=$(INSTALL_DP_IMAGE) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) INSTALL_DP_IMAGE=$(INSTALL_DP_IMAGE) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
 POLL_PROGRESS_INTERVAL := 600s
@@ -236,7 +236,7 @@ build: manifests generate fmt vet ## Build manager binary.
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) INSTALL_DP_IMAGE=$(INSTALL_DP_IMAGE) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
 .PHONY: local-dynamic-plugins
 local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-index image for local testing
@@ -261,15 +261,15 @@ image-push: ## Push container image with the manager.
 
 .PHONY: install-dp-build
 install-dp-build: ## Build the plugin installer image (skopeo variant, single platform)
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(RELATED_IMAGE_plugin_installer) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
 
 .PHONY: install-dp-buildx
 install-dp-buildx: ## Build and push multiplatform plugin installer image (skopeo variant)
-	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
+	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(RELATED_IMAGE_plugin_installer) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
 
 .PHONY: install-dp-push
 install-dp-push: ## Push the plugin installer image
-	$(CONTAINER_TOOL) push $(INSTALL_DP_IMAGE)
+	$(CONTAINER_TOOL) push $(RELATED_IMAGE_plugin_installer)
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -300,6 +300,9 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	mkdir -p dist/$(PROFILE)
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/profile/$(PROFILE) > dist/$(PROFILE)/install.yaml
+	@sed $(SED_I) 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' dist/$(PROFILE)/install.yaml
+	@sed $(SED_I) 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' dist/$(PROFILE)/install.yaml
+	@sed $(SED_I) 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' dist/$(PROFILE)/install.yaml
 	@echo "Generated operator installer manifest: dist/$(PROFILE)/install.yaml"
 
 .PHONY: deployment-manifest
@@ -328,7 +331,11 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 		--input-dir ./config/manifests/$(PROFILE)/ \
 		--output-dir ./config/manifests/$(PROFILE)/
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
+	$(KUSTOMIZE) build config/manifests/$(PROFILE) | \
+		sed 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' | \
+		sed 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' | \
+		sed 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' | \
+		$(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 	@sed $(SED_I) 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
 	@sed $(SED_I) 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
@@ -389,7 +396,11 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/profile/$(PROFILE) | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/profile/$(PROFILE) | \
+		sed 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' | \
+		sed 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' | \
+		sed 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' | \
+		$(KUBECTL) apply -f -
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.

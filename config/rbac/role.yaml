@@ -97,6 +97,14 @@ rules:
   - patch
   - update
 - apiGroups:
+  - rhdh.redhat.com
+  resources:
+  - devhubplugincatalogs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - route.openshift.io
   resources:
   - routes

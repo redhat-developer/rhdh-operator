@@ -33,6 +33,7 @@ import (
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
+	"github.com/redhat-developer/rhdh-operator/pkg/catalog"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -292,6 +293,18 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Backstage")
 		os.Exit(1)
 	}
+
+	// Setup DevHubPluginCatalog controller
+	operatorNamespace := getOperatorNamespace()
+	if err = (&controller.DevHubPluginCatalogReconciler{
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		OperatorNamespace: operatorNamespace,
+		Processor:         catalog.NewProcessor(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DevHubPluginCatalog")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if plf.IsOpenshift() {
@@ -386,4 +399,18 @@ func setupTLSProfileWatcher(
 			cancel()
 		},
 	}).SetupWithManager(mgr)
+}
+
+// getOperatorNamespace returns the namespace the operator is running in
+func getOperatorNamespace() string {
+	// Check env var first (set via downward API in deployment)
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns
+	}
+	// Fall back to service account namespace file (auto-mounted by Kubernetes)
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		return string(data)
+	}
+	// Default for local development
+	return "rhdh-operator"
 }

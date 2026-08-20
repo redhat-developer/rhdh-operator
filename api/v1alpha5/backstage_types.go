@@ -366,10 +366,6 @@ type Flavour struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
-func init() {
-	SchemeBuilder.Register(&Backstage{}, &BackstageList{})
-}
-
 // IsLocalDbEnabled returns true if Local database is configured and enabled
 func (s *BackstageSpec) IsLocalDbEnabled() bool {
 	if s.Database == nil {
@@ -395,4 +391,8 @@ func (s *BackstageSpec) IsAuthSecretSpecified() bool {
 // Returns true only when spec.monitoring.enabled is set to true in the CR
 func (s *BackstageSpec) IsMonitoringEnabled() bool {
 	return s.Monitoring.Enabled
+}
+
+func init() {
+	SchemeBuilder.Register(&Backstage{}, &BackstageList{})
 }

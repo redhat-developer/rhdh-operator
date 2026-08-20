@@ -3,7 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
+	"time"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -26,6 +28,9 @@ import (
 
 const (
 	BackstageFieldManager = "backstage-controller"
+
+	// CatalogStatusPath is the path to the catalog readiness marker in the mounted default-config
+	CatalogStatusPath = "/default-config/.catalogs-ready"
 
 	// AutoSyncEnvVar: EXT_CONF_SYNC_backstage env variable which defines the value for rhdh.redhat.com/ext-config-sync annotation of external config object (ConfigMap|Secret)
 	// True by default
@@ -84,6 +89,13 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	if len(backstage.Status.Conditions) == 0 {
 		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Deployment process started")
+	}
+
+	// Check if plugin catalogs are ready before proceeding
+	if !areCatalogsReady() {
+		lg.Info("Waiting for plugin catalogs to be ready")
+		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Waiting for DevHubPluginCatalog resources to be ready")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	// 1. Preliminary read and prepare external config objects from the specs (configMaps, Secrets)
@@ -189,4 +201,24 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return b.Complete(r)
+}
+
+// areCatalogsReady checks if plugin catalogs are ready by reading mounted status file
+// Returns true if:
+// - No status file exists (local dev mode - use static default-config files)
+// - Status file has content (catalogs are ready)
+// Returns false if status file exists but is empty (DHPC controller still processing)
+func areCatalogsReady() bool {
+	info, err := os.Stat(CatalogStatusPath)
+	if os.IsNotExist(err) {
+		// No file → local dev → ready
+		return true
+	}
+	if err != nil {
+		// Error reading file, assume ready
+		return true
+	}
+	// Empty file → still processing → not ready
+	// Has content → ready
+	return info.Size() > 0
 }

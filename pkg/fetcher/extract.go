@@ -41,6 +41,11 @@ func extractTarGzBytes(data []byte, destDir string) error {
 	return extractTarGz(bytes.NewReader(data), destDir)
 }
 
+// extractTarBytes extracts an uncompressed tarball from bytes to destDir
+func extractTarBytes(data []byte, destDir string) error {
+	return extractTar(bytes.NewReader(data), destDir)
+}
+
 // extractTar extracts a tarball from a reader to destDir
 func extractTar(r io.Reader, destDir string) error {
 	tr := tar.NewReader(r)

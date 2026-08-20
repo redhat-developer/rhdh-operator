@@ -8,6 +8,7 @@ import (
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
@@ -29,7 +30,7 @@ import (
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
 const OperatorDPProcessingEnvVar = "OPERATOR_DP_PROCESSING"
-const InstallDpImageEnvVar = "INSTALL_DP_IMAGE"
+const InstallDpImageEnvVar = "RELATED_IMAGE_plugin_installer"
 
 type DynamicPluginsFactory struct{}
 
@@ -145,6 +146,11 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		for _, plugin := range pluginsData {
 			if !plugin.IsDisabled() {
 				p.enabledPlugins = append(p.enabledPlugins, plugin)
+				// Skip local paths - they're built into the image and don't need downloading
+				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
+					klog.V(1).Infof("skipping local path plugin %q (built into image)", plugin.Package)
+					continue
+				}
 				packages = append(packages, plugin.Package)
 			}
 		}
@@ -274,8 +280,10 @@ func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 	if initContainer == nil {
 		return i, nil
 	}
-	// override image with env var
-	if os.Getenv(BackstageImageEnvVar) != "" {
+	// Override image with env var, but only when NOT using operator DP processing.
+	// When OPERATOR_DP_PROCESSING=true, the init container image is already set
+	// to RELATED_IMAGE_plugin_installer in deployment.addToModel() and should not be overwritten.
+	if !IsOperatorDPProcessing() && os.Getenv(BackstageImageEnvVar) != "" {
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
 	return i, initContainer
