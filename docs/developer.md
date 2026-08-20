@@ -170,6 +170,33 @@ You can do it all together using:
 [IMAGE_TAG_BASE=<your-registry>/backstage-operator] make release-build release-push
 ```
 
+#### Hermetic builds
+
+The operator image can be built hermetically (offline/reproducible) using [Hermeto](https://github.com/konflux-ci/hermeto), matching how downstream Konflux builds work. This pre-fetches all Go modules and RPM dependencies, then builds with `--network none` to ensure nothing is downloaded during the build.
+
+Requirements: `podman` must be installed.
+
+```sh
+# Build cache and image in one step
+./scripts/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag
+
+# Build only the dependency cache (no image)
+./scripts/local-hermeto-build.sh -d . --no-image
+
+# Build image using existing cache (skip re-fetching dependencies)
+./scripts/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag --no-cache
+
+# Cross-platform build (e.g., ARM on x86)
+TARGET_PLATFORM=linux/arm64 ./scripts/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag
+```
+
+Or use the Makefile shortcut:
+```sh
+make hermetic-build IMG=<your-registry>/backstage-operator:tag
+```
+
+CI runs hermetic builds automatically on every PR and push to main/release branches.
+
 #### Deploy or update the Catalog Source
 
 ```sh

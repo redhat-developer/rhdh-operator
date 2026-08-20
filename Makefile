@@ -255,6 +255,10 @@ PLATFORM ?= linux/amd64
 image-build: ## Build container image with the manager.
 	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(IMG) --label $(LABEL) .
 
+.PHONY: hermetic-build
+hermetic-build: ## Build operator image hermetically using Hermeto (local simulation of Konflux)
+	scripts/local-hermeto-build.sh -d . -i $(IMG)
+
 .PHONY: image-push
 image-push: ## Push container image with the manager.
 	$(CONTAINER_TOOL) push $(IMG)
