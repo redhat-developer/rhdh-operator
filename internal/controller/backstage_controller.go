@@ -48,7 +48,7 @@ type BackstageReconciler struct {
 // +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=configmaps;secrets;services;persistentvolumeclaims,verbs=get;watch;create;update;list;delete;patch
-// +kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=pods;persistentvolumes,verbs=get;list;watch
 // +kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
 // +kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
 // +kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get;list;watch
@@ -104,6 +104,9 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeConfig, api.BackstageConditionReasonInvalid, "failed to initialize backstage model", err)
 	}
+
+	// Config is valid - remove any stale Config condition from previous failures
+	removeStatusCondition(&backstage, api.BackstageConditionTypeConfig)
 
 	// Apply the plugin dependencies
 	if err := r.applyPluginDeps(ctx, backstage, bsModel); err != nil {

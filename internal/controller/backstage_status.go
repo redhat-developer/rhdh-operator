@@ -42,17 +42,17 @@ func (r *BackstageReconciler) reconcileStatus(ctx context.Context, backstage *ap
 // setDeployedCondition sets the Deployed condition based on Deployment/StatefulSet status.
 func (r *BackstageReconciler) setDeployedCondition(ctx context.Context, backstage *api.Backstage, backstageModel model.BackstageModel) bool {
 	var obj client.Object
-	var resolveState func(client.Object) (api.BackstageConditionReason, string)
+	var resolveState func(client.Object) (metav1.ConditionStatus, api.BackstageConditionReason, string)
 
 	switch backstageModel.GetDeploymentGVK() {
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSet"):
 		obj = &appsv1.StatefulSet{}
-		resolveState = func(o client.Object) (api.BackstageConditionReason, string) {
+		resolveState = func(o client.Object) (metav1.ConditionStatus, api.BackstageConditionReason, string) {
 			return statefulSetState(o.(*appsv1.StatefulSet))
 		}
 	default:
 		obj = &appsv1.Deployment{}
-		resolveState = func(o client.Object) (api.BackstageConditionReason, string) {
+		resolveState = func(o client.Object) (metav1.ConditionStatus, api.BackstageConditionReason, string) {
 			return deploymentState(o.(*appsv1.Deployment))
 		}
 	}
@@ -62,25 +62,20 @@ func (r *BackstageReconciler) setDeployedCondition(ctx context.Context, backstag
 		return false
 	}
 
-	state, msg := resolveState(obj)
-	if backstage.GetAnnotations()[model.IdleAnnotation] == "true" {
+	status, reason, msg := resolveState(obj)
+	if isIdled(backstage) {
 		msg += " (Idled)"
 	}
+	setStatusCondition(backstage, api.BackstageConditionTypeDeployed, status, reason, msg)
 
-	isReady := state == api.BackstageConditionReasonDeployed
-	status := metav1.ConditionFalse
-	if isReady {
-		status = metav1.ConditionTrue
-	}
-	setStatusCondition(backstage, api.BackstageConditionTypeDeployed, status, state, msg)
-
-	return isReady
+	return status == metav1.ConditionTrue
 }
 
 // setRuntimeCondition sets the Runtime condition based on Pod/Container status.
 // Provides detailed container-level info for debugging (complements Deployed condition).
 // Returns true if runtime is healthy (all containers running), false otherwise.
 func (r *BackstageReconciler) setRuntimeCondition(ctx context.Context, backstage *api.Backstage) bool {
+	var status metav1.ConditionStatus
 	var reason api.BackstageConditionReason
 	var msg string
 
@@ -88,16 +83,17 @@ func (r *BackstageReconciler) setRuntimeCondition(ctx context.Context, backstage
 	labelSelector := client.MatchingLabels{
 		model.BackstageAppLabel: utils.BackstageAppLabelValue(backstage.Name),
 	}
+
 	if err := r.List(ctx, podList, client.InNamespace(backstage.Namespace), labelSelector); err != nil {
-		reason, msg = api.BackstageConditionReasonPending, "unable to list pods"
+		status, reason, msg = metav1.ConditionFalse, api.BackstageConditionReasonPending, "unable to list pods"
 	} else if len(podList.Items) == 0 {
-		reason, msg = api.BackstageConditionReasonPending, "no pods found"
+		status, reason, msg = metav1.ConditionFalse, api.BackstageConditionReasonPending, "no pods found"
 	} else {
-		reason, msg = r.checkPodStates(podList.Items)
+		status, reason, msg = checkPodStates(podList.Items)
 	}
 
-	isHealthy := reason == api.BackstageConditionReasonRunning
-	status := metav1.ConditionFalse
+	// Idled instances have 0 pods by design - consider healthy to avoid requeue loop
+	isHealthy := status == metav1.ConditionTrue || isIdled(backstage)
 	if isHealthy {
 		status = metav1.ConditionTrue
 	}
@@ -106,8 +102,8 @@ func (r *BackstageReconciler) setRuntimeCondition(ctx context.Context, backstage
 	return isHealthy
 }
 
-// checkPodStates checks pods for errors, returns Running if all healthy.
-func (r *BackstageReconciler) checkPodStates(pods []corev1.Pod) (api.BackstageConditionReason, string) {
+// checkPodStates checks pods for errors, returns Running/True if all healthy.
+func checkPodStates(pods []corev1.Pod) (metav1.ConditionStatus, api.BackstageConditionReason, string) {
 	// Sort pods by creation time, newest first
 	sort.Slice(pods, func(i, j int) bool {
 		return pods[j].CreationTimestamp.Before(&pods[i].CreationTimestamp)
@@ -116,31 +112,31 @@ func (r *BackstageReconciler) checkPodStates(pods []corev1.Pod) (api.BackstageCo
 	for _, pod := range pods {
 		// Check pod phase for terminal failures
 		if pod.Status.Phase == corev1.PodFailed {
-			return api.BackstageConditionReasonContainerFailed, fmt.Sprintf("pod %q failed", pod.Name)
+			return metav1.ConditionFalse, api.BackstageConditionReasonContainerFailed, fmt.Sprintf("pod %q failed", pod.Name)
 		}
 
 		// Check init containers
 		for _, cs := range pod.Status.InitContainerStatuses {
 			if reason, msg := checkContainerState(cs, true); reason != "" {
-				return reason, msg
+				return metav1.ConditionFalse, reason, msg
 			}
 		}
 
 		// Check main containers
 		for _, cs := range pod.Status.ContainerStatuses {
 			if reason, msg := checkContainerState(cs, false); reason != "" {
-				return reason, msg
+				return metav1.ConditionFalse, reason, msg
 			}
 		}
 
 		// If pod is not Running and no container issues found, it's still pending
 		// This catches the case where pod exists but no container statuses yet
 		if pod.Status.Phase != corev1.PodRunning {
-			return api.BackstageConditionReasonPending, fmt.Sprintf("pod %q is %s", pod.Name, pod.Status.Phase)
+			return metav1.ConditionFalse, api.BackstageConditionReasonPending, fmt.Sprintf("pod %q is %s", pod.Name, pod.Status.Phase)
 		}
 	}
 
-	return api.BackstageConditionReasonRunning, ""
+	return metav1.ConditionTrue, api.BackstageConditionReasonRunning, ""
 }
 
 // checkContainerState checks a single container status and returns reason/message if not healthy.
@@ -213,6 +209,14 @@ func setStatusCondition(backstage *api.Backstage, condType api.BackstageConditio
 	})
 }
 
+func removeStatusCondition(backstage *api.Backstage, condType api.BackstageConditionType) {
+	meta.RemoveStatusCondition(&backstage.Status.Conditions, string(condType))
+}
+
+func isIdled(backstage *api.Backstage) bool {
+	return backstage.GetAnnotations()[model.IdleAnnotation] == "true"
+}
+
 // setEnabledPlugins sets the list of enabled plugin names in status.
 func setEnabledPlugins(backstage *api.Backstage, backstageModel model.BackstageModel) {
 	enabledPlugins := backstageModel.GetEnabledPlugins()
@@ -224,42 +228,42 @@ func setEnabledPlugins(backstage *api.Backstage, backstageModel model.BackstageM
 	backstage.Status.Plugins = pluginNames
 }
 
-func deploymentState(deploy *appsv1.Deployment) (state api.BackstageConditionReason, msg string) {
+func deploymentState(deploy *appsv1.Deployment) (metav1.ConditionStatus, api.BackstageConditionReason, string) {
 	desired := int32(1)
 	if deploy.Spec.Replicas != nil {
 		desired = *deploy.Spec.Replicas
 	}
 	if deploy.Status.ReadyReplicas == desired {
-		return api.BackstageConditionReasonDeployed, fmt.Sprintf("%d/%d replicas ready", desired, desired)
+		return metav1.ConditionTrue, api.BackstageConditionReasonDeployed, fmt.Sprintf("%d/%d replicas ready", desired, desired)
 	}
 
 	if len(deploy.Status.Conditions) == 0 {
-		return api.BackstageConditionReasonInProgress, "no conditions reported yet"
+		return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "no conditions reported yet"
 	}
 
 	// Prefer explicit failure indicators
 	for _, c := range deploy.Status.Conditions {
 		if c.Type == appsv1.DeploymentReplicaFailure && c.Status == corev1.ConditionTrue {
-			return api.BackstageConditionReasonFailed, c.Message
+			return metav1.ConditionFalse, api.BackstageConditionReasonFailed, c.Message
 		}
 	}
 
-	return api.BackstageConditionReasonInProgress, fmt.Sprintf("%d/%d replicas ready", deploy.Status.ReadyReplicas, desired)
+	return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, fmt.Sprintf("%d/%d replicas ready", deploy.Status.ReadyReplicas, desired)
 }
 
-func statefulSetState(deploy *appsv1.StatefulSet) (state api.BackstageConditionReason, msg string) {
+func statefulSetState(sts *appsv1.StatefulSet) (metav1.ConditionStatus, api.BackstageConditionReason, string) {
 	desired := int32(1)
-	if deploy.Spec.Replicas != nil {
-		desired = *deploy.Spec.Replicas
+	if sts.Spec.Replicas != nil {
+		desired = *sts.Spec.Replicas
 	}
 
-	if deploy.Status.ReadyReplicas == desired && deploy.Status.CurrentReplicas == deploy.Status.UpdatedReplicas {
-		return api.BackstageConditionReasonDeployed, fmt.Sprintf("%d/%d replicas ready", desired, desired)
+	if sts.Status.ReadyReplicas == desired && sts.Status.CurrentReplicas == sts.Status.UpdatedReplicas {
+		return metav1.ConditionTrue, api.BackstageConditionReasonDeployed, fmt.Sprintf("%d/%d replicas ready", desired, desired)
 	}
 
-	if len(deploy.Status.Conditions) == 0 {
-		return api.BackstageConditionReasonInProgress, "no conditions reported yet"
+	if len(sts.Status.Conditions) == 0 {
+		return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "no conditions reported yet"
 	}
 
-	return api.BackstageConditionReasonInProgress, fmt.Sprintf("%d/%d replicas ready", deploy.Status.ReadyReplicas, desired)
+	return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, fmt.Sprintf("%d/%d replicas ready", sts.Status.ReadyReplicas, desired)
 }
