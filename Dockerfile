@@ -54,7 +54,7 @@ COPY --from=rpm-builder /mnt/rootfs /
 COPY LICENSE /licenses/
 
 # Copy manager binary
-COPY --from=builder /opt/app-root/src/manager .
+COPY --from=builder /opt/app-root/src/manager /manager
 
 USER 1001
 
