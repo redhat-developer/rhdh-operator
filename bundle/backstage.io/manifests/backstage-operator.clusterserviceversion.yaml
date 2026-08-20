@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-08-10T13:07:07Z"
+    createdAt: "2026-08-20T12:15:43Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -80,6 +80,7 @@ spec:
           - ""
           resources:
           - persistentvolumes
+          - pods
           verbs:
           - get
           - list
