@@ -1,4 +1,4 @@
-name: PR Dockerfile Validation (Hermetic)
+name: PR Dockerfile Validation
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   validate-dockerfile:
-    name: Validate Dockerfile (Hermetic Build)
+    name: Validate Dockerfile
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
