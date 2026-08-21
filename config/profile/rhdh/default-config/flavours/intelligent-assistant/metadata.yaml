@@ -1,4 +1,3 @@
 # Intelligent Assistant flavour metadata
 # This flavour is enabled by default and provides Developer Hub Intelligent Assistant functionality
-# FIXME: temporarily disabled due to DPDY issues; to re-enable in https://redhat.atlassian.net/browse/RHIDP-15458
-enabledByDefault: false
+enabledByDefault: true
