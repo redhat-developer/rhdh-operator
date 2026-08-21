@@ -2070,7 +2070,7 @@ spec:
                 items:
                   description: |-
                     Flavour represents a pre-configured template that extends the default configuration.
-                    Flavours provide domain-specific customizations (e.g., Orchestrator, Lightspeed)
+                    Flavours provide domain-specific customizations (e.g., Orchestrator, Intelligent Assistant)
                     while falling back to base defaults for everything else.
                   properties:
                     enabled:
@@ -2082,7 +2082,7 @@ spec:
                       type: boolean
                     name:
                       description: Name of the flavour to enable (e.g., "orchestrator",
-                        "lightspeed")
+                        "intelligent-assistant")
                       type: string
                   required:
                   - name
@@ -3353,20 +3353,20 @@ data:
     data:
       dynamic-plugins.yaml: |
         plugins:
-          # Lightspeed Plugins
-          - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed:{{inherit}}
+          # Intelligent Assistant Plugins
+          - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant:{{inherit}}
             enabled: true
 
-          - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed-backend:{{inherit}}
+          - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend:{{inherit}}
             enabled: true
   metadata.yaml: |
-    # Lightspeed (AI) flavour metadata
-    # This flavour is enabled by default and provides AI/Lightspeed functionality
+    # Intelligent Assistant flavour metadata
+    # This flavour is enabled by default and provides Developer Hub Intelligent Assistant functionality
     # FIXME: temporarily disabled due to DPDY issues; to re-enable in https://redhat.atlassian.net/browse/RHIDP-15458
     enabledByDefault: false
 kind: ConfigMap
 metadata:
-  name: rhdh-flavour-lightspeed-config
+  name: rhdh-flavour-intelligent-assistant-config
   namespace: rhdh-operator
 ---
 apiVersion: v1
@@ -4090,8 +4090,8 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         volumeMounts:
-        - mountPath: /default-config/flavours/lightspeed
-          name: flavour-lightspeed-config
+        - mountPath: /default-config/flavours/intelligent-assistant
+          name: flavour-intelligent-assistant-config
         - mountPath: /default-config/flavours/orchestrator
           name: flavour-orchestrator-config
         - mountPath: /default-config
@@ -4104,8 +4104,8 @@ spec:
       terminationGracePeriodSeconds: 10
       volumes:
       - configMap:
-          name: rhdh-flavour-lightspeed-config
-        name: flavour-lightspeed-config
+          name: rhdh-flavour-intelligent-assistant-config
+        name: flavour-intelligent-assistant-config
       - configMap:
           name: rhdh-flavour-orchestrator-config
         name: flavour-orchestrator-config
