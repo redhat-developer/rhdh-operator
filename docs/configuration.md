@@ -318,7 +318,7 @@ These configuration variations extend the base default configuration, allowing t
 Workflow orchestration capabilities powered by Serverless Workflow. Disabled by default. See [Orchestrator documentation](orchestrator.md) for details.
 
 ##### Intelligent Assistant
-AI-powered developer assistance with chat interface and Model Context Protocol (MCP) tools. Disabled by default. See [Intelligent Assistant documentation](intelligent-assistant.md) for details.
+AI-powered developer assistance with chat interface and Model Context Protocol (MCP) tools. Enabled by default. See [Intelligent Assistant documentation](intelligent-assistant.md) for details.
 
 #### Usage
 
