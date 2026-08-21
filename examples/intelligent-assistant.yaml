@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: lightspeed-secrets
+  name: intelligent-assistant-secrets
 type: Opaque
 stringData:
   ENABLE_VLLM: ""
@@ -25,12 +25,14 @@ stringData:
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
-  name: lightspeed-test
+  name: intelligent-assistant-test
 spec:
+  flavours:
+    - name: intelligent-assistant
+      enabled: true
   application:
     extraEnvs:
       secrets:
-        - name: lightspeed-secrets
+        - name: intelligent-assistant-secrets
           containers:
             - lightspeed-core
-

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Sync vendored Lightspeed config snippets from upstream.
+# Sync vendored Lightspeed Core config snippets from upstream.
 #
 
 set -euo pipefail
@@ -14,8 +14,8 @@ UPSTREAM_ENV_PATH="env/default-values.env"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-CONFIGMAP_FILE="${REPO_ROOT}/config/profile/rhdh/default-config/flavours/lightspeed/configmap-files.yaml"
-EXAMPLE_SECRET_FILE="${REPO_ROOT}/examples/lightspeed.yaml"
+CONFIGMAP_FILE="${REPO_ROOT}/config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml"
+EXAMPLE_SECRET_FILE="${REPO_ROOT}/examples/intelligent-assistant.yaml"
 
 REF="main"
 UPDATED=0
