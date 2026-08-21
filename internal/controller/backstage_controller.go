@@ -119,15 +119,11 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Inject OKP_SERVICE_URL into lightspeed-core before applying objects
 	r.prepareOkpEnvVar(&backstage, bsModel)
 
-	// Apply the runtime objects
+	// Apply the runtime objects (OKP Deployment/Service/Route are part of the model,
+	// sourced from the lightspeed flavour YAML and gated to OpenShift in pkg/model/okp-*.go)
 	err = r.applyObjects(ctx, bsModel.GetRuntimeObjects())
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeDeployed, api.BackstageConditionReasonFailed, "failed to apply backstage objects", err)
-	}
-
-	// Apply OKP resources if lightspeed flavour is enabled
-	if err := r.applyOkpResources(ctx, &backstage, bsModel); err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeDeployed, api.BackstageConditionReasonFailed, "failed to apply OKP resources", err)
 	}
 
 	isReady := r.reconcileStatus(ctx, &backstage, *bsModel)
