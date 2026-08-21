@@ -24,17 +24,16 @@ To use Intelligent Assistant, you need:
 
 #### Using the Flavour (Recommended)
 
-Starting from version 2.1, RHDH includes an Intelligent Assistant flavour. It is currently **disabled by default**. For deployments that enable it, the requisite containers are running but inert until a Secret is updated with sufficient metadata to interact with an LLM for which you have access:
+Starting from version 2.1, RHDH includes an Intelligent Assistant flavour. It is **enabled by default**. The requisite containers are running but inert until a Secret is updated with sufficient metadata to interact with an LLM for which you have access.
+
+A Backstage CR with an empty spec includes Intelligent Assistant:
 
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-backstage
-spec:
-  flavours:
-    - name: intelligent-assistant
-      enabled: true
+spec: {}
 ```
 
 To disable Intelligent Assistant:

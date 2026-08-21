@@ -292,8 +292,11 @@ var _ = When("create default rhdh", func() {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			// FIXME: restore to Equal(2) when intelligent-assistant is re-enabled (RHIDP-15458)
-			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+			// no default flavour
+			// g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+
+			// with default intelligent-assistant flavour
+			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(2))
 
 			initCont := deploy.PodSpec().InitContainers[0]
 			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
@@ -313,20 +316,13 @@ var _ = When("create default rhdh", func() {
 
 	It("creates rhdh with default Intelligent Assistant flavour", func() {
 
-		// FIXME: re-enable when intelligent-assistant is re-enabled (RHIDP-15458)
-		Skip("Temporarily skipped: intelligent-assistant disabled by default due to DPDY issues")
-
 		if !isProfile("rhdh") {
 			Skip("Skipped for non rhdh config")
 		}
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
-			//Flavours: &[]api.Flavour{
-			//	{Name: "intelligent-assistant", Enabled: true},
-			//},
-		}, "")
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			cmList := &corev1.ConfigMapList{}
