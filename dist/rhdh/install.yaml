@@ -4055,7 +4055,7 @@ spec:
           value: quay.io/rhdh-community/rhdh:next
         - name: INSTALL_DP_IMAGE
           value: quay.io/gazarenk/install-plugins:skopeo
-        image: quay.io/rh-ee-jdubrick/rhdh-operator:ia-rebrand
+        image: quay.io/rhdh/rhdh-rhel9-operator:2.0
         livenessProbe:
           httpGet:
             path: /healthz
