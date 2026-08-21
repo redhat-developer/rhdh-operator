@@ -14,8 +14,8 @@ resources:
 
 images:
 - name: controller
-  newName: quay.io/rh-ee-jdubrick/rhdh-operator
-  newTag: ia-rebrand
+  newName: quay.io/rhdh/rhdh-rhel9-operator
+  newTag: "2.0"
 
 patches:
 - path: patches/deployment-patch.yaml
