@@ -1,0 +1,16 @@
+# OKP (Offline Knowledge Portal) standalone OpenShift Route.
+# name/labels and spec.to.name are set by the operator at runtime (per Backstage CR).
+# Applied on OpenShift only.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: lightspeed-okp
+spec:
+  to:
+    kind: Service
+    name: lightspeed-okp
+  port:
+    targetPort: httpd
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Allow

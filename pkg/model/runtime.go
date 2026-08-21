@@ -47,6 +47,10 @@ const (
 	ConfigMapEnvsKey  = "configmap-envs.yaml"
 	ConfigMapFilesKey = "configmap-files.yaml"
 	PvcsKey           = "pvcs.yaml"
+	// OKP (Offline Knowledge Portal) standalone resources, sourced from the lightspeed flavour.
+	OkpDeploymentKey = "okp-deployment.yaml"
+	OkpServiceKey    = "okp-service.yaml"
+	OkpRouteKey      = "okp-route.yaml"
 )
 
 // Backstage configuration scaffolding with empty BackstageObjects.
