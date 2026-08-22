@@ -55,6 +55,8 @@ The Default Configuration defines the structure of all Backstage instances withi
 | secret-envs.yaml                         | []corev1.Secret                         | backstage-envs-<cr-name>            | No           | Yes   | >=0.2.x  | Backstage environment variables from Secret          |
 | [dynamic-plugins.yaml](#dynamic-plugins) | corev1.ConfigMap                        | backstage-dynamic-plugins-<cr-name> | No           | No    | >=0.2.x  | Dynamic plugins configuration                        |
 | pvcs.yaml                                | []corev1.PersistentVolumeClaim          | backstage-<cr-name>-<pvc-name>      | No           | Yes   | >=0.4.x  | List of PVC objects to be mounted to containers      |
+| networkpolicy.yaml                       | []networkingv1.NetworkPolicy            | backstage-netpol-<cr-name>-<np-name>| No           | Yes   | >=2.0.x | NetworkPolicies for backend pods                     |
+| db-networkpolicy.yaml                    | []networkingv1.NetworkPolicy            | backstage-db-netpol-<cr-name>-<np-name>| For local DB | Yes| >=2.0.x | NetworkPolicies for PostgreSQL pods                  |
 
 **Meanings of "Mandatory" Column:**
 - **Yes** - Must be configured; deployment will fail otherwise.
@@ -222,6 +224,13 @@ For example, Backstage CR named **mybackstage** will create K8s Deployment resou
     - `spec.template.metadata.labels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
 * db-service.yaml
     - `spec.selector[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
+* networkpolicy.yaml
+    - `metadata.labels[rhdh.redhat.com/app] = backstage-<cr-name>`
+    - `spec.podSelector.matchLabels[rhdh.redhat.com/app] = backstage-<cr-name>`
+    - On OpenShift, the `allow-router-ingress` policy's `namespaceSelector` is set to `policy-group.network.openshift.io/ingress: ""`
+* db-networkpolicy.yaml
+    - `metadata.labels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
+    - `spec.podSelector.matchLabels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
 
 ### Multi objects
 
@@ -233,7 +242,9 @@ The following configuration files support multi-object definitions:
 - **configmap-envs.yaml** (since 0.10.0)
 - **secret-files.yaml** 
 - **secret-envs.yaml** 
-- **pvcs.yaml** 
+- **pvcs.yaml**
+- **networkpolicy.yaml** (since 2.0.0)
+- **db-networkpolicy.yaml** (since 2.0.0)
 
 For example, adding the following to **pvcs.yaml** will create 2 PVCs and mount them to the Backstage container:
 

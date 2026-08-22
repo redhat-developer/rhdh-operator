@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: "" # placeholder for 'backstage-psql-<cr-name>'
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: "" # placeholder for 'backstage-psql-<cr-name>'
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-ingress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: "" # placeholder for 'backstage-psql-<cr-name>'
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+      ports:
+        - port: 5432
+          protocol: TCP
