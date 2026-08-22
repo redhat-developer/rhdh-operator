@@ -53,9 +53,9 @@ var _ = When("create default rhdh", func() {
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: defAppConfigName}, &appConfigCm)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			// no lightspeed
+			// no intelligent-assistant
 			//g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(1))
-			// with lightspeed
+			// with intelligent-assistant
 			//g.Expect(deploy.PodSpec().InitContainers).To(HaveLen(2))
 
 			if !model.IsOperatorDPProcessing() {
@@ -118,11 +118,11 @@ var _ = When("create default rhdh", func() {
 				g.Expect(initCont.Env[0].Value).To(Equal("/opt/app-root/src/.npmrc.dynamic-plugins/.npmrc"))
 			}
 
-			// no default lightspeed
+			// no default intelligent-assistant
 			//g.Expect(deploy.PodSpec().Volumes).To(HaveLen(8))
 			//g.Expect(deploy.PodSpec().Containers).To(HaveLen(1))
 
-			// including default lightspeed flavour
+			// including default intelligent-assistant flavour
 			// TODO restore it
 			//g.Expect(deploy.PodSpec().Volumes).To(HaveLen(13))
 			//g.Expect(deploy.PodSpec().Containers).To(HaveLen(7))
@@ -291,8 +291,11 @@ var _ = When("create default rhdh", func() {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			// FIXME: restore to Equal(2) when lightspeed is re-enabled (RHIDP-15458)
-			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+			// no default flavour
+			// g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
+
+			// with default intelligent-assistant flavour
+			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(2))
 
 			initCont := deploy.PodSpec().InitContainers[0]
 			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
@@ -309,10 +312,7 @@ var _ = When("create default rhdh", func() {
 
 	})
 
-	It("creates rhdh with default Lightspeed flavour", func() {
-
-		// FIXME: re-enable when lightspeed is re-enabled (RHIDP-15458)
-		Skip("Temporarily skipped: lightspeed disabled by default due to DPDY issues")
+	It("creates rhdh with default Intelligent Assistant flavour", func() {
 
 		if !isProfile("rhdh") {
 			Skip("Skipped for non rhdh config")
@@ -320,21 +320,17 @@ var _ = When("create default rhdh", func() {
 
 		ctx := context.Background()
 		ns := createNamespace(ctx)
-		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
-			//Flavours: &[]api.Flavour{
-			//	{Name: "lightspeed", Enabled: true},
-			//},
-		}, "")
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{}, "")
 
 		Eventually(func(g Gomega) {
 			cmList := &corev1.ConfigMapList{}
 			err := k8sClient.List(ctx, cmList, client.InNamespace(ns))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			// check if contains ConfigMaps with "flavour-lightspeed" source
+			// check if contains ConfigMaps with "flavour-intelligent-assistant" source
 			foundSource := false
 			for _, cm := range cmList.Items {
-				if cm.Annotations[model.SourceAnnotation] == "flavour-lightspeed" {
+				if cm.Annotations[model.SourceAnnotation] == "flavour-intelligent-assistant" {
 					foundSource = true
 				}
 			}
@@ -381,10 +377,10 @@ var _ = When("create default rhdh", func() {
 			err := k8sClient.List(ctx, cmList, client.InNamespace(ns))
 			g.Expect(err).ShouldNot(HaveOccurred())
 
-			// check if contains ConfigMaps with "flavour-lightspeed" source
+			// check if contains ConfigMaps with "flavour-intelligent-assistant" source
 			foundSource := false
 			for _, cm := range cmList.Items {
-				if cm.Annotations[model.SourceAnnotation] == "flavour-lightspeed" {
+				if cm.Annotations[model.SourceAnnotation] == "flavour-intelligent-assistant" {
 					foundSource = true
 				}
 			}
