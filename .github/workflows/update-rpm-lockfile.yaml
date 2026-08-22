@@ -60,8 +60,8 @@ jobs:
 
       - name: Run rpm-lockfile-prototype
         run: |
-          echo "Running '${HOME}/.local/bin/rpm-lockfile-prototype -f ${{ env.DOCKERFILE_PATH }} rpms.in.yaml' in $(pwd)"
-          ${HOME}/.local/bin/rpm-lockfile-prototype -f ${{ env.DOCKERFILE_PATH }} rpms.in.yaml
+          echo "Running '${HOME}/.local/bin/rpm-lockfile-prototype --bare rpms.in.yaml' in $(pwd)"
+          ${HOME}/.local/bin/rpm-lockfile-prototype --bare rpms.in.yaml
 
       - name: Check for lockfile changes
         id: check-lockfile-changes
