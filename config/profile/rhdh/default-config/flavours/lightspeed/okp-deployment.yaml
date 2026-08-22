@@ -1,0 +1,53 @@
+# OKP (Offline Knowledge Portal) standalone Deployment.
+# name/labels/selector are set by the operator at runtime (per Backstage CR); the values
+# below are placeholders. The image ref is intentionally declared here (not in Go source)
+# so midstream digest-pinning can resolve it in the generated bundle ConfigMap.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lightspeed-okp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lightspeed-okp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lightspeed-okp
+    spec:
+      # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
+      automountServiceAccountToken: false
+      containers:
+        - name: okp
+          image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.10-1786628394
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: httpd
+              containerPort: 8080
+              protocol: TCP
+            - name: solr
+              containerPort: 8983
+              protocol: TCP
+          env:
+            - name: SOLR_JAVA_MEM
+              value: "-Xms1g -Xmx1g"
+            - name: SOLR_HOST_BIND
+              value: "0.0.0.0"
+            # The OKP image's httpd config reads these exact names
+            # (config/httpd conf.d: ServerName ${MIMIR_HTTPD_SERVER_NAME},
+            # Define compressed_${COMPRESSED}_encrypt_${ENCRYPT}); the
+            # HTTPD_-prefixed names are ignored. Matches rhdh-chart.
+            - name: MIMIR_HTTPD_SERVER_NAME
+              value: "localhost"
+            - name: COMPRESSED
+              value: "true"
+            - name: ENCRYPT
+              value: "false"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi

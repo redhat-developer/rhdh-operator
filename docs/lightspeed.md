@@ -6,11 +6,14 @@ Red Hat Developer Hub Lightspeed provides AI-powered developer assistance throug
 
 ### What's Included
 
-The Lightspeed flavour (as of v1.10) consists of the following dynamic plugins:
+The Lightspeed flavour consists of the following dynamic plugins:
 
-**Lightspeed Core:**
-- `backstage-plugin-lightspeed` - Frontend UI with chat interface, floating action button, and drawer components
-- `backstage-plugin-lightspeed-backend` - Backend services for AI processing
+**Intelligent Assistant:**
+- `red-hat-developer-hub-backstage-plugin-intelligent-assistant` - Frontend UI with chat interface, floating action button, and drawer components
+- `red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend` - Backend services for AI processing
+
+**OKP (Offline Knowledge Portal):**
+On OpenShift, the operator also deploys an OKP instance (`Deployment`, `Service`, and `Route`) that provides document retrieval (RAG) for the assistant, replacing the previous RAG init container / FAISS vector store. See [OKP retrieval](#okp-retrieval) below.
 
 
 
@@ -67,11 +70,14 @@ If you prefer to configure plugins manually without using the flavour, refer to 
 includes:
   - dynamic-plugins.default.yaml
 plugins:
-  - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed:bs_1.49.4__2.2.1
+  - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant:{{inherit}}
     enabled: true
-  - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/red-hat-developer-hub-backstage-plugin-lightspeed-backend:bs_1.49.4__2.2.1
+  - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend:{{inherit}}
     enabled: true
 ```
+
+> [!NOTE]
+> The `{{inherit}}` tag resolves the plugin version from the RHDH catalog index that ships with the operator's RHDH image, so the assistant stays aligned with the platform. The `quay.io/rhdh` registry is significant — it matches the operator's `CATALOG_INDEX_IMAGE`, allowing the reference to resolve at the container level.
 
 For more information about configuring dynamic plugins, please refer to the [Configuration documentation](configuration.md).
 
@@ -100,6 +106,14 @@ The Lightspeed chat interface appears as:
 
 These UI elements are configured through the plugin's `pluginConfig` and can be customized in the dynamic plugins configuration.
 
+### OKP retrieval
+
+The assistant uses **OKP (Offline Knowledge Portal)** for document retrieval (RAG), replacing the previous RAG init container and FAISS vector store.
+
+- **OpenShift:** the operator deploys OKP as a `Deployment`, `Service`, and `Route` (Solr on `8983`, httpd on `8080`), and injects `OKP_SERVICE_URL` into the `lightspeed-core` sidecar so the assistant queries it for grounded answers.
+- **Vanilla Kubernetes:** OKP is **not** deployed (the operator has no Ingress support). The Lightspeed Core config falls back to `lightspeed-stack-no-okp.yaml` (the `rag`/`okp` sections stripped out) so the service starts cleanly without an OKP backend. General chat and Notebooks still work; OKP-backed retrieval is unavailable.
+
+No additional CR configuration is required — OKP is enabled automatically alongside the Lightspeed flavour when running on OpenShift.
 
 ### Features
 

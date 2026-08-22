@@ -109,7 +109,14 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply plugin dependencies", err)
 	}
 
-	// Apply the runtime objects
+	// Select OKP config variant based on platform (must run before applyObjects)
+	r.prepareOkpConfig(&backstage, bsModel)
+
+	// Inject OKP_SERVICE_URL into lightspeed-core before applying objects
+	r.prepareOkpEnvVar(&backstage, bsModel)
+
+	// Apply the runtime objects (OKP Deployment/Service/Route are part of the model,
+	// sourced from the lightspeed flavour YAML and gated to OpenShift in pkg/model/okp-*.go)
 	err = r.applyObjects(ctx, bsModel.GetRuntimeObjects())
 	if err != nil {
 		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply backstage objects", err)

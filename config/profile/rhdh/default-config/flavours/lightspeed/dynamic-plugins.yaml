@@ -5,9 +5,39 @@ metadata:
 data:
   dynamic-plugins.yaml: |
     plugins:
-      # Lightspeed Plugins
-      - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed:{{inherit}}
+      # Intelligent Assistant Plugins
+      - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant:{{inherit}}
         enabled: true
+        pluginConfig:
+          dynamicPlugins:
+            frontend:
+              red-hat-developer-hub.backstage-plugin-intelligent-assistant:
+                translationResources:
+                  - importName: lightspeedTranslations
+                    module: Alpha
+                    ref: intelligentAssistantTranslationRef
+                dynamicRoutes:
+                  - path: /intelligent-assistant
+                    importName: LightspeedPage
+                    module: Legacy
+                mountPoints:
+                  - mountPoint: application/listener
+                    importName: LightspeedFAB
+                    module: Legacy
+                  - mountPoint: application/provider
+                    importName: LightspeedDrawerProvider
+                    module: Legacy
+                  - mountPoint: application/internal/drawer-state
+                    importName: LightspeedDrawerStateExposer
+                    module: Legacy
+                    config:
+                      id: intelligent-assistant
+                  - mountPoint: application/internal/drawer-content
+                    importName: LightspeedChatContainer
+                    module: Legacy
+                    config:
+                      id: intelligent-assistant
+                      priority: 100
 
-      - package: oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-lightspeed-backend:{{inherit}}
+      - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend:{{inherit}}
         enabled: true

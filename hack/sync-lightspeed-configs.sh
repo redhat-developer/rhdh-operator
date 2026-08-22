@@ -149,10 +149,12 @@ main() {
 
     local config_file="${TMP_DIR}/config.yaml"
     local stack_file="${TMP_DIR}/lightspeed-stack.yaml"
+    local stack_no_okp_file="${TMP_DIR}/lightspeed-stack-no-okp.yaml"
     local profile_file="${TMP_DIR}/rhdh-profile.py"
     local env_file="${TMP_DIR}/default-values.env"
     local config_block="${TMP_DIR}/config-block.yaml"
     local stack_block="${TMP_DIR}/stack-block.yaml"
+    local stack_no_okp_block="${TMP_DIR}/stack-no-okp-block.yaml"
     local profile_block="${TMP_DIR}/profile-block.yaml"
     local secret_entries="${TMP_DIR}/secret-entries.yaml"
 
@@ -166,8 +168,12 @@ main() {
     indent_file "$profile_file" > "$profile_block"
     render_secret_entries "$env_file" > "$secret_entries"
 
+    yq 'del(.rag, .okp)' "$stack_file" > "$stack_no_okp_file"
+    indent_file "$stack_no_okp_file" > "$stack_no_okp_block"
+
     replace_indented_block "$CONFIGMAP_FILE" "  config.yaml: |" 4 "$config_block"
     replace_indented_block "$CONFIGMAP_FILE" "  lightspeed-stack.yaml: |" 4 "$stack_block"
+    replace_indented_block "$CONFIGMAP_FILE" "  lightspeed-stack-no-okp.yaml: |" 4 "$stack_no_okp_block"
     replace_indented_block "$CONFIGMAP_FILE" "  rhdh-profile.py: |" 4 "$profile_block"
     replace_indented_block "$EXAMPLE_SECRET_FILE" "stringData:" 2 "$secret_entries"
 

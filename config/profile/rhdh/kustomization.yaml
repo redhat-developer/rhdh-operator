@@ -53,6 +53,9 @@ configMapGenerator:
   - default-config/flavours/lightspeed/configmap-files.yaml
   - default-config/flavours/lightspeed/deployment.yaml
   - default-config/flavours/lightspeed/dynamic-plugins.yaml
+  - default-config/flavours/lightspeed/okp-deployment.yaml
+  - default-config/flavours/lightspeed/okp-service.yaml
+  - default-config/flavours/lightspeed/okp-route.yaml
   name: flavour-lightspeed-config
 - files:
   - default-config/flavours/orchestrator/metadata.yaml
