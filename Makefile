@@ -227,6 +227,14 @@ validate-image-digests: ## Validate that Dockerfile digests are manifest lists (
 	@echo
 	@hack/validate-image-digests.sh
 
+CRD_FILE ?= config/crd/bases/rhdh.redhat.com_backstages.yaml
+CRD_BASELINE_REF ?= main
+
+.PHONY: crd-upgrade-check
+crd-upgrade-check: crdify ## Check CRD upgrade safety against the base branch.
+	@echo "Checking CRD upgrade safety: $(CRD_BASELINE_REF) -> current working tree"
+	@$(CRDIFY) "git://$(CRD_BASELINE_REF)?path=$(CRD_FILE)" "file://$(CRD_FILE)"
+
 ##@ Build
 
 .PHONY: build
@@ -531,6 +539,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 GOIMPORTS ?= $(LOCALBIN)/goimports
 GOSEC ?= $(LOCALBIN)/gosec
 GINKGO ?= $(LOCALBIN)/ginkgo
+CRDIFY ?= $(LOCALBIN)/crdify
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
@@ -540,6 +549,7 @@ GOLANGCI_LINT_VERSION ?= v2.12.2
 GOIMPORTS_VERSION ?= v0.46.0
 GOSEC_VERSION ?= v2.27.1
 GINKGO_VERSION ?= v2.28.1
+CRDIFY_VERSION ?= v0.6.0
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
@@ -587,6 +597,11 @@ $(GOSEC): $(LOCALBIN)
 ginkgo: $(GINKGO) ## Download Ginkgo locally if necessary.
 $(GINKGO): $(LOCALBIN)
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
+
+.PHONY: crdify
+crdify: $(CRDIFY) ## Download crdify locally if necessary.
+$(CRDIFY): $(LOCALBIN)
+	$(call go-install-tool,$(CRDIFY),sigs.k8s.io/crdify,$(CRDIFY_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)
