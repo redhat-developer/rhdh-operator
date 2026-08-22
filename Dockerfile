@@ -1,9 +1,9 @@
 # Unified Dockerfile for hermetic builds (Hermeto upstream, Cachi2/Konflux downstream)
 # and standard non-hermetic builds (make image-build)
 
-#@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
-# https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.8-1787080706@sha256:71e89a1a51ab32cc30634d89ee4dc8ea40ad9991057fa1eae3b1af32bc7db73f AS builder
+#@follow_tag(registry.redhat.io/rhel10/go-toolset:latest)
+# https://registry.access.redhat.com/ubi10/go-toolset
+FROM registry.access.redhat.com/ubi10/go-toolset:1.26.5-1786496329@sha256:1db86a2b0f77c1197b011de5140236effc27b1a1724c0105d4926857a0756de5 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # hadolint ignore=DL3002
@@ -32,9 +32,9 @@ COPY $EXTERNAL_SOURCE $CONTAINER_SOURCE
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Install openssl for FIPS support
-#@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
-# https://registry.access.redhat.com/ubi9-minimal
-FROM registry.access.redhat.com/ubi9-minimal:9.8-1786987521@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41 AS runtime
+#@follow_tag(registry.redhat.io/ubi10/ubi-minimal:latest)
+# https://registry.access.redhat.com/ubi10-minimal
+FROM registry.access.redhat.com/ubi10-minimal:10.2-1786928543@sha256:a036678b09bd6e5d0efc28ea5554ae14aa6af2bc317d60f9bb0c0dd7610972d0 AS runtime
 
 RUN microdnf install -y openssl; microdnf clean -y all
 
