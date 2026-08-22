@@ -2161,6 +2161,12 @@ spec:
                   - type
                   type: object
                 type: array
+              plugins:
+                description: Plugins is the list of enabled dynamic plugin names,
+                  sorted alphabetically
+                items:
+                  type: string
+                type: array
             type: object
         type: object
     served: true

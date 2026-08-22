@@ -105,6 +105,17 @@ func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
 	return deployment.deployable.GetObject().GetObjectKind().GroupVersionKind()
 }
 
+// GetEnabledPlugins returns enabled plugins from the model.
+// Returns empty slice if dynamic plugins don't exist in the model.
+func (m *BackstageModel) GetEnabledPlugins() []DynaPlugin {
+	for _, obj := range m.RuntimeObjects {
+		if obj.GetKey() == DynamicPluginsKey {
+			return obj.(*DynamicPlugins).enabledPlugins
+		}
+	}
+	return []DynaPlugin{}
+}
+
 // Registers config object
 func registerConfig(key string, factory ObjectFactory, multiple bool, mergeFunc MergeConfigFunc) {
 	for _, obj := range runtimeConfig {
@@ -200,8 +211,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 	// All objects are now in model, so cross-references are safe
 	// Iterate over RuntimeObjects in their registration order (deterministic)
 	for _, obj := range model.RuntimeObjects {
-		err := obj.updateAndValidate(backstage, scheme)
-		if err != nil {
+		if err := obj.updateAndValidate(backstage, scheme); err != nil {
 			return nil, fmt.Errorf("failed object validation, reason: %w", err)
 		}
 	}

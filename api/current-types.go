@@ -49,11 +49,23 @@ type (
 
 // Condition constants
 const (
-	BackstageConditionTypeDeployed     BackstageConditionType   = bsv1.BackstageConditionTypeDeployed
+	// Condition types
+	BackstageConditionTypeDeployed BackstageConditionType = bsv1.BackstageConditionTypeDeployed
+	BackstageConditionTypeRuntime  BackstageConditionType = bsv1.BackstageConditionTypeRuntime
+	BackstageConditionTypeConfig   BackstageConditionType = bsv1.BackstageConditionTypeConfig
+
+	// Deployed condition reasons
 	BackstageConditionReasonDeployed   BackstageConditionReason = bsv1.BackstageConditionReasonDeployed
 	BackstageConditionReasonFailed     BackstageConditionReason = bsv1.BackstageConditionReasonFailed
 	BackstageConditionReasonInProgress BackstageConditionReason = bsv1.BackstageConditionReasonInProgress
-	BackstageConditionReasonIdled      BackstageConditionReason = bsv1.BackstageConditionReasonIdled
+
+	// Runtime condition reasons
+	BackstageConditionReasonRunning         BackstageConditionReason = bsv1.BackstageConditionReasonRunning
+	BackstageConditionReasonContainerFailed BackstageConditionReason = bsv1.BackstageConditionReasonContainerFailed
+	BackstageConditionReasonPending         BackstageConditionReason = bsv1.BackstageConditionReasonPending
+
+	// Config condition reasons
+	BackstageConditionReasonInvalid BackstageConditionReason = bsv1.BackstageConditionReasonInvalid
 )
 
 // AddToScheme adds the current API version's types to the scheme.

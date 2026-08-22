@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
@@ -172,18 +173,18 @@ var _ = When("create default backstage", func() {
 			bs := &api.Backstage{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(bs.Status.Conditions).To(HaveLen(1))
-			g.Expect(bs.Status.Conditions[0].Reason).To(Equal("DeployInProgress"))
-			g.Expect(bs.Status.Conditions[0].Status).To(Equal(metav1.ConditionFalse))
+			g.Expect(bs.Status.Conditions).To(HaveLen(2))
+			g.Expect(meta.FindStatusCondition(bs.Status.Conditions, string(api.BackstageConditionTypeDeployed)).Reason).To(Equal("DeployInProgress"))
+			g.Expect(meta.FindStatusCondition(bs.Status.Conditions, string(api.BackstageConditionTypeDeployed)).Status).To(Equal(metav1.ConditionFalse))
 		}, time.Minute, time.Second).Should(Succeed())
 
 		Eventually(func(g Gomega) {
 			bs := &api.Backstage{}
 			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: backstageName}, bs)
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(bs.Status.Conditions).To(HaveLen(1))
-			g.Expect(bs.Status.Conditions[0].Reason).To(Equal("Deployed"))
-			g.Expect(bs.Status.Conditions[0].Status).To(Equal(metav1.ConditionTrue))
+			g.Expect(bs.Status.Conditions).To(HaveLen(2))
+			g.Expect(meta.FindStatusCondition(bs.Status.Conditions, string(api.BackstageConditionTypeDeployed)).Reason).To(Equal("Deployed"))
+			g.Expect(meta.FindStatusCondition(bs.Status.Conditions, string(api.BackstageConditionTypeDeployed)).Status).To(Equal(metav1.ConditionTrue))
 		}, 3*time.Minute, time.Second).Should(Succeed())
 
 	})
