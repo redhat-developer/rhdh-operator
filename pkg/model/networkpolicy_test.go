@@ -131,6 +131,41 @@ func TestNetworkPolicyRouterIngressOnKubernetes(t *testing.T) {
 	assert.Empty(t, ns.MatchLabels, "non-OCP should use empty namespaceSelector (match all)")
 }
 
+func TestNetworkPolicyFlavourMergePreservesNamespaceWidePodSelector(t *testing.T) {
+	bs := api.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-flavour-np",
+			Namespace: "test-ns",
+		},
+	}
+	testObj := createBackstageTest(bs).withConfigPath("./testdata/testflavours").withLocalDb(false)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	obj := model.GetRuntimeObject(NetworkPolicyKey)
+	assert.NotNil(t, obj)
+
+	mo := obj.Object().(*multiobject.MultiObject)
+	assert.Equal(t, 7, len(mo.Items), "expected 6 base + 1 flavour NP")
+
+	backendLabel := utils.BackstageAppLabelValue(testObj.backstage.Name)
+	var foundNamespaceWide bool
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-intra-network" &&
+			np.GetAnnotations()[SourceAnnotation] == "flavour-flavor1" {
+			foundNamespaceWide = true
+			_, hasLabel := np.Spec.PodSelector.MatchLabels[BackstageAppLabel]
+			assert.False(t, hasLabel, "flavour NP with podSelector: {} should NOT have rhdh.redhat.com/app in podSelector")
+		} else {
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel],
+				"base NP %s should have backend label in podSelector", np.GetAnnotations()[ConfiguredNameAnnotation])
+		}
+	}
+	assert.True(t, foundNamespaceWide, "expected to find the namespace-wide flavour NP")
+}
+
 func TestNetworkPolicyWithOverlay(t *testing.T) {
 	bs := *networkPolicyTestBackstage.DeepCopy()
 	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("networkpolicy.yaml", "raw-networkpolicy.yaml")

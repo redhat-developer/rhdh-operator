@@ -1,0 +1,67 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-infra-ns-to-workflow-ns # not parameterized per CR; safe because only one Orchestrator-enabled RHDH per namespace (one SonataFlowPlatform allowed per namespace)
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              # Allow knative events to be delivered to workflows.
+              kubernetes.io/metadata.name: knative-eventing
+        - namespaceSelector:
+            matchLabels:
+              # Allow auxiliary knative function for workflow (such as m2k-save-transformation)
+              kubernetes.io/metadata.name: knative-serving
+        - namespaceSelector:
+            matchLabels:
+              # Allow openshift serverless logic operator controller pod to access all pods in sonataflow
+              kubernetes.io/metadata.name: openshift-serverless-logic
+---
+# NetworkPolicy to unblock incoming traffic to the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-communication # not parameterized per CR; safe because only one Orchestrator-enabled RHDH per namespace (one SonataFlowPlatform allowed per namespace)
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              # Allow knative events to be delivered to workflows.
+              policy-group.network.openshift.io/ingress: ""
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-network # not parameterized per CR; safe because only one Orchestrator-enabled RHDH per namespace (one SonataFlowPlatform allowed per namespace)
+spec:
+  # Apply this policy to all pods in the namespace
+  podSelector: {}
+  # Specify policy type as 'Ingress' to control incoming traffic rules
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Allow ingress from any pod within the same namespace
+        - podSelector: {}
+---
+# NetworkPolicy to allow openshift-user-workload-monitoring pods to access all pods within the workflow's namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-to-sonataflow-and-workflows # not parameterized per CR; safe because only one Orchestrator-enabled RHDH per namespace (one SonataFlowPlatform allowed per namespace)
+spec:
+  # Apply this policy to all pods in the namespace
+  podSelector: {}
+  # Specify policy type as 'Ingress' to control incoming traffic rules
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              # Allow openshift-user-workload-monitoring pods to access the workflow.
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring

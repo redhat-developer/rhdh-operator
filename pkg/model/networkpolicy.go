@@ -85,7 +85,9 @@ func (b *BackstageNetworkPolicy) setMetaInfo(backstage api.Backstage, scheme *ru
 	for _, item := range b.networkPolicies.Items {
 		np := item.(*networkingv1.NetworkPolicy)
 
-		np.Spec.PodSelector.MatchLabels[BackstageAppLabel] = backendLabel
+		if _, ok := np.Spec.PodSelector.MatchLabels[BackstageAppLabel]; ok {
+			np.Spec.PodSelector.MatchLabels[BackstageAppLabel] = backendLabel
+		}
 
 		for i := range np.Spec.Egress {
 			for j := range np.Spec.Egress[i].To {
