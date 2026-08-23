@@ -1,7 +1,11 @@
+# TODO(asoro): these Orchestrator policies use podSelector: {} (namespace-wide) and conflict with
+# the ADR's "default deny with selective allow" and "label-scoped policies" principles.
+# They weaken per-component ingress isolation for RHDH backend and DB pods in the same namespace.
+# Review and make stricter by scoping to SonataFlow-specific labels where possible.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-infra-ns-to-workflow-ns # not parameterized per CR; safe because only one Orchestrator-enabled RHDH per namespace (one SonataFlowPlatform allowed per namespace)
+  name: allow-infra-ns-to-workflow-ns
 spec:
   podSelector: {}
   ingress:
@@ -23,7 +27,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-external-communication # not parameterized per CR; safe because only one Orchestrator-enabled RHDH per namespace (one SonataFlowPlatform allowed per namespace)
+  name: allow-external-communication
 spec:
   podSelector: {}
   ingress:
@@ -36,7 +40,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-intra-network # not parameterized per CR; safe because only one Orchestrator-enabled RHDH per namespace (one SonataFlowPlatform allowed per namespace)
+  name: allow-intra-network
 spec:
   # Apply this policy to all pods in the namespace
   podSelector: {}
@@ -52,7 +56,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-monitoring-to-sonataflow-and-workflows # not parameterized per CR; safe because only one Orchestrator-enabled RHDH per namespace (one SonataFlowPlatform allowed per namespace)
+  name: allow-monitoring-to-sonataflow-and-workflows
 spec:
   # Apply this policy to all pods in the namespace
   podSelector: {}
