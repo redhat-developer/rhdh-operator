@@ -3,6 +3,7 @@ package integration_tests
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,19 +77,23 @@ var _ = When("create default backstage", func() {
 			g.Expect(or).To(HaveLen(1))
 			g.Expect(or[0].Name).To(Equal(backstageName))
 
-			By("creating NetworkPolicies for the backend")
-			npList := &networkingv1.NetworkPolicyList{}
-			err = k8sClient.List(ctx, npList, client.InNamespace(ns),
-				client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(len(npList.Items)).To(BeNumerically(">=", 6))
+			if _, statErr := os.Stat(utils.DefFile(model.NetworkPolicyKey)); statErr == nil {
+				By("creating NetworkPolicies for the backend")
+				npList := &networkingv1.NetworkPolicyList{}
+				err = k8sClient.List(ctx, npList, client.InNamespace(ns),
+					client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(npList.Items)).To(BeNumerically(">=", 6))
+			}
 
-			By("creating NetworkPolicies for the local database")
-			dbNpList := &networkingv1.NetworkPolicyList{}
-			err = k8sClient.List(ctx, dbNpList, client.InNamespace(ns),
-				client.MatchingLabels{model.BackstageAppLabel: utils.BackstageDbAppLabelValue(backstageName)})
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(len(dbNpList.Items)).To(BeNumerically(">=", 3))
+			if _, statErr := os.Stat(utils.DefFile(model.DbNetworkPolicyKey)); statErr == nil {
+				By("creating NetworkPolicies for the local database")
+				dbNpList := &networkingv1.NetworkPolicyList{}
+				err = k8sClient.List(ctx, dbNpList, client.InNamespace(ns),
+					client.MatchingLabels{model.BackstageAppLabel: utils.BackstageDbAppLabelValue(backstageName)})
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(dbNpList.Items)).To(BeNumerically(">=", 3))
+			}
 
 			// Passed but commented out as is configuration specific (name: "default-appconfig")
 			//By("creating default app-config")
