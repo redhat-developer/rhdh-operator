@@ -7,6 +7,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
@@ -205,6 +206,20 @@ var _ = When("create default rhdh", func() {
 					g.Expect(appConfigCm).To(HaveAppConfigBaseUrl(BeEmpty()))
 				})
 			}
+
+			By("creating NetworkPolicies for the backend")
+			npList := &networkingv1.NetworkPolicyList{}
+			err = k8sClient.List(ctx, npList, client.InNamespace(ns),
+				client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(len(npList.Items)).To(BeNumerically(">=", 6))
+
+			By("creating NetworkPolicies for the local database")
+			dbNpList := &networkingv1.NetworkPolicyList{}
+			err = k8sClient.List(ctx, dbNpList, client.InNamespace(ns),
+				client.MatchingLabels{model.BackstageAppLabel: utils.BackstageDbAppLabelValue(backstageName)})
+			g.Expect(err).ShouldNot(HaveOccurred())
+			g.Expect(len(dbNpList.Items)).To(BeNumerically(">=", 3))
 
 		}, 20*time.Second, time.Second).Should(Succeed())
 
