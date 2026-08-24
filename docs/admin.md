@@ -194,14 +194,14 @@ kubectl annotate backstage <cr-name> rhdh.redhat.com/idle=true
 
 After reconciliation, the status condition will show:
 
-```
-Type: Deployed
-Status: False
-Reason: Idled
-Message: Instance is idled
+```yaml
+- type: Deployed
+  status: "True"
+  reason: Deployed
+  message: "0/0 replicas ready (Idled)"
 ```
 
-> **Note for CI and monitoring scripts:** An idled instance reports `Deployed=False` with `Reason=Idled`. Scripts that wait for `Deployed=True` should check the `Reason` field to distinguish an intentionally idled instance from a deployment failure. To ensure readiness checks succeed, remove the `rhdh.redhat.com/idle` annotation before waiting for deployment.
+> **Note:** To determine if an instance is idled, check the `rhdh.redhat.com/idle` annotation on the Backstage CR. Absence of this annotation means the instance is not idled.
 
 ### Waking an instance
 

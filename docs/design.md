@@ -171,10 +171,6 @@ status:
       status: "True"
       reason: Deployed
       message: "0/0 replicas ready (Idled)"
-    - type: Runtime
-      status: "False"
-      reason: Pending
-      message: "no pods found"
 ```
 
 ### Plugins Status
