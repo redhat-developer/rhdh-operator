@@ -43,46 +43,134 @@ spec:
 
 TODO: Dynamic plugins can be configured to use container registries for authentication and image pulling. This section should cover the configuration options available for container registry integration with dynamic plugins.
 
-## Catalog Index Configuration
+## Plugin Catalog Configuration
 
-The operator supports loading default plugin configurations from an OCI container image (catalog index). For general information about how the catalog index works, see [Using a Catalog Index Image for Default Plugin Configurations](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-a-catalog-index-image-for-default-plugin-configurations).
+The operator supports loading default plugin configurations from OCI container images (plugin catalogs). For general information about how the catalog index works, see [Using a Catalog Index Image for Default Plugin Configurations](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-a-catalog-index-image-for-default-plugin-configurations).
 
-By default, the `rhdh` profile of operator [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable in the RHDH `install-dynamic-plugins` init container.
-To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for a complete example.
+### DevHubPluginCatalog Resources
 
-### Extra catalog index images
+**Available from operator version 2.0**
 
-In addition to the primary catalog index image, you can configure extra catalog index images using the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. This allows loading plugin configurations from multiple catalog index images. See [Using extra catalog index images](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-extra-catalog-index-images) for more details on how RHDH handles this environment variables.
+Plugin catalogs are defined using `DevHubPluginCatalog` cluster-scoped resources. The operator fetches catalogs from OCI registries, merges them, and makes the configuration available to Backstage instances.
 
-The value is a comma-separated list of entries. Each entry supports two forms:
-- **`name=image_ref`**: Assigns an explicit name to the catalog index image, which controls the extraction subdirectory under `/extensions/extra/<name>/`.
-- **`image_ref`**: A direct image reference without a name; the extraction directory is auto-generated from the image reference.
+**Default Catalog**: The operator automatically includes the default RHDH plugin catalog (`quay.io/rhdh/plugin-catalog-index:<version>`).
 
-To configure extra catalog index images, use the `extraEnvs` field in your Backstage CR:
+#### Basic Example
 
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha5
-kind: Backstage
+kind: DevHubPluginCatalog
 metadata:
-  name: my-backstage
+  name: my-catalog
 spec:
-  application:
-    extraEnvs:
-      envs:
-        - name: EXTRA_CATALOG_INDEX_IMAGES
-          value: "rhdh-community=quay.io/rhdh-community/plugin-catalog-index:1.10,registry.example.com/rhdh-catalog:latest"
-          containers:
-            - install-dynamic-plugins
+  source:
+    ref: quay.io/my-org/plugin-catalog:v1.0
+```
+
+#### Adding Multiple Catalogs
+
+Create additional `DevHubPluginCatalog` resources to add more plugin sources. The operator merges all catalogs automatically.
+
+**Important**: Plugin names must be unique across all catalogs. Duplicate plugin names will cause a reconciliation error.
+
+#### Private Registry Authentication
+
+For private registries, create a Secret with registry credentials in the operator namespace:
+
+```bash
+kubectl create secret docker-registry private-registry-creds \
+  --namespace=rhdh-operator \
+  --docker-server=registry.example.com \
+  --docker-username=YOUR_USERNAME \
+  --docker-password=YOUR_PASSWORD
+```
+
+Then reference it in the DevHubPluginCatalog:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: private-catalog
+spec:
+  source:
+    ref: registry.example.com/rhdh/plugin-catalog:v1.0
+    pullSecret:
+      name: private-registry-creds
+```
+
+The Secret must be of type `kubernetes.io/dockerconfigjson` and exist in the operator namespace.
+
+#### Custom CA Certificate
+
+For registries using self-signed certificates or internal CAs, create a ConfigMap with the CA certificate in the operator namespace:
+
+```bash
+kubectl create configmap internal-ca \
+  --namespace=rhdh-operator \
+  --from-file=ca.crt=/path/to/ca-certificate.pem
+```
+
+Then reference it in the DevHubPluginCatalog:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: internal-catalog
+spec:
+  source:
+    ref: internal-registry.corp.example.com/rhdh/plugin-catalog:latest
+    certificateAuthority:
+      name: internal-ca
+      key: ca.crt          # Optional, defaults to "ca.crt"
+```
+
+#### Skip TLS Verification (Development Only)
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: dev-catalog
+spec:
+  source:
+    ref: dev-registry.local:5000/rhdh/plugin-catalog:dev
+    skipTLSVerify: true
+```
+
+#### Proxy Settings
+
+The operator respects standard proxy environment variables when fetching catalogs:
+
+- `HTTP_PROXY` / `http_proxy` - proxy for HTTP requests
+- `HTTPS_PROXY` / `https_proxy` - proxy for HTTPS requests
+- `NO_PROXY` / `no_proxy` - comma-separated list of hosts to bypass proxy
+
+These variables should be set on the operator deployment. For environments with HTTPS-inspecting proxies that use a corporate CA, combine proxy settings with `certificateAuthority` configuration.
+
+#### Manual Refresh
+
+To manually trigger a catalog refresh (e.g., after pushing a new image with the same tag):
+
+```bash
+kubectl annotate devhubplugincatalog my-catalog rhdh.redhat.com/refresh=$(date +%s) --overwrite
 ```
 
 ### Extensions Catalog Entities
 
-Starting from version 1.9, the `rhdh` profile of the operator instructs the RHDH `install-dynamic-plugins` init container to extract catalog entities from the catalog index image to a new `/extensions` volume mount by default.
+Starting from version 1.9, the `rhdh` profile of the operator extracts catalog entities from the catalog index image to a new `/extensions` volume mount by default.
 This allows the extensions backend providers to automatically discover plugin metadata for display in the RHDH Extensions UI.
 
-The extraction directory can be configured via the `CATALOG_ENTITIES_EXTRACT_DIR` environment variable in the `install-dynamic-plugins` init container.
-
 More details in [Catalog Entities Extraction](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#catalog-entities-extraction).
+
+### Init-container processing Mode
+
+When `OPERATOR_DP_PROCESSING=false`, the RHDH `install-dynamic-plugins` init container handles catalog fetching using environment variables.
+
+By default, the `rhdh` profile [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable. To use a different catalog index image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for an example.
+
+For multiple catalog sources in this mode, use the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. See [Using extra catalog index images](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-extra-catalog-index-images) for details.
 
 ## Supported Package URL Formats
 
@@ -98,8 +186,6 @@ More details in [Catalog Entities Extraction](https://github.com/redhat-develope
 ## Plugin URL References
 
 The operator optionally supports special URL reference syntax in plugin package URLs, allowing users to reference plugins from the default configuration by name.
-
-TODO: document Operator Dynamic Plugins processing mode
 
 **Operator behavior:**
 - The operator resolves all references during ConfigMap merge (before passing to the init container)

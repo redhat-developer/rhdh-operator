@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,9 +19,6 @@ const (
 	// DefaultConfigMapName is the name of the default-config ConfigMap to patch
 	// This should match the kustomize-generated name (namePrefix + base name)
 	DefaultConfigMapName = "rhdh-default-config"
-
-	catalogRequeueOnError   = 1 * time.Minute
-	catalogRequeueOnSuccess = 5 * time.Minute
 )
 
 // DevHubPluginCatalogReconciler reconciles DevHubPluginCatalog objects
@@ -56,7 +52,7 @@ func (r *DevHubPluginCatalogReconciler) Reconcile(ctx context.Context, req ctrl.
 	// 2. Process all catalogs (fetch and merge)
 	content, err := r.Processor.Process(ctx, inputs)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: catalogRequeueOnError}, fmt.Errorf("failed to process catalogs: %w", err)
+		return ctrl.Result{}, fmt.Errorf("failed to process catalogs: %w", err)
 	}
 
 	// 3. Apply merged ConfigMap
@@ -65,7 +61,7 @@ func (r *DevHubPluginCatalogReconciler) Reconcile(ctx context.Context, req ctrl.
 	}
 
 	lg.Info("Successfully reconciled all DevHubPluginCatalogs", "count", len(inputs))
-	return ctrl.Result{RequeueAfter: catalogRequeueOnSuccess}, nil
+	return ctrl.Result{}, nil
 }
 
 // buildCatalogInputs lists all catalogs and builds processor inputs
@@ -89,22 +85,24 @@ func (r *DevHubPluginCatalogReconciler) buildCatalogInputs(ctx context.Context) 
 		if dhpc.Spec.Source.PullSecret != nil {
 			secret := &corev1.Secret{}
 			key := types.NamespacedName{Name: dhpc.Spec.Source.PullSecret.Name, Namespace: r.OperatorNamespace}
-			if err := r.Get(ctx, key, secret); err == nil {
-				input.DockerConfig = secret.Data[".dockerconfigjson"]
+			if err := r.Get(ctx, key, secret); err != nil {
+				return nil, fmt.Errorf("failed to get pull secret %q for catalog %q: %w", dhpc.Spec.Source.PullSecret.Name, dhpc.Name, err)
 			}
+			input.DockerConfig = secret.Data[".dockerconfigjson"]
 		}
 
 		// Get CA certificate
 		if dhpc.Spec.Source.CertificateAuthority != nil {
 			cm := &corev1.ConfigMap{}
 			key := types.NamespacedName{Name: dhpc.Spec.Source.CertificateAuthority.Name, Namespace: r.OperatorNamespace}
-			if err := r.Get(ctx, key, cm); err == nil {
-				caKey := dhpc.Spec.Source.CertificateAuthority.Key
-				if caKey == "" {
-					caKey = "ca.crt"
-				}
-				input.CACert = []byte(cm.Data[caKey])
+			if err := r.Get(ctx, key, cm); err != nil {
+				return nil, fmt.Errorf("failed to get CA ConfigMap %q for catalog %q: %w", dhpc.Spec.Source.CertificateAuthority.Name, dhpc.Name, err)
 			}
+			caKey := dhpc.Spec.Source.CertificateAuthority.Key
+			if caKey == "" {
+				caKey = "ca.crt"
+			}
+			input.CACert = []byte(cm.Data[caKey])
 		}
 
 		inputs = append(inputs, input)

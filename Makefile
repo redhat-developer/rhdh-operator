@@ -41,6 +41,7 @@ ifeq ($(PROFILE), rhdh)
 #		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
 #	endif
 
+	# TODO: Changed to 'rhdh-community' at least until 'rhdh' does not support arm64
 	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
 	IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
 	DEFAULT_CHANNEL ?= fast

@@ -128,10 +128,12 @@ func (p *Processor) fetch(ctx context.Context, cat CatalogInput) ([]byte, error)
 	return content, nil
 }
 
-// merge combines multiple catalog contents, deduplicating by package name
+// merge combines multiple catalog contents, validating no duplicate plugin names exist.
+// Plugins are identified by name (last path segment of the package URL, without tag/digest).
+// Returns an error if duplicate plugin names are found across catalogs.
 func (p *Processor) merge(catalogs [][]byte) ([]byte, error) {
 	var allPlugins []model.DynaPlugin
-	seen := make(map[string]bool)
+	seen := make(map[string]string) // plugin name -> package URL (for error reporting)
 
 	for _, content := range catalogs {
 		var catalog model.DynaPluginsConfig
@@ -139,10 +141,15 @@ func (p *Processor) merge(catalogs [][]byte) ([]byte, error) {
 			return nil, fmt.Errorf("failed to parse catalog: %w", err)
 		}
 		for _, plugin := range catalog.Plugins {
-			if !seen[plugin.Package] {
-				allPlugins = append(allPlugins, plugin)
-				seen[plugin.Package] = true
+			name := plugin.Name()
+			if name == "" {
+				return nil, fmt.Errorf("invalid plugin package %q: cannot extract plugin name", plugin.Package)
 			}
+			if existingPkg, exists := seen[name]; exists {
+				return nil, fmt.Errorf("duplicate plugin name %q: found in both %q and %q", name, existingPkg, plugin.Package)
+			}
+			allPlugins = append(allPlugins, plugin)
+			seen[name] = plugin.Package
 		}
 	}
 
