@@ -64,13 +64,13 @@ runs:
       run: |
         # renovate: datasource=docker depName=quay.io/konflux-ci/hermeto
         echo "HERMETO_IMAGE=quay.io/konflux-ci/hermeto:0.60.1" >> "$GITHUB_ENV"
-        echo "LOCAL_CACHE_DIR=./hermeto-cache/operator" >> "$GITHUB_ENV"
+        echo "LOCAL_CACHE_DIR=/tmp/hermeto-cache/operator" >> "$GITHUB_ENV"
 
     - name: Restore hermeto dependency cache
       id: cache-deps
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: ./hermeto-cache/operator
+        path: /tmp/hermeto-cache/operator
         key: hermeto-deps-${{ inputs.platform }}-${{ hashFiles('go.mod', 'go.sum', 'rpms.lock.yaml') }}
 
     - name: Fetch dependencies with hermeto
