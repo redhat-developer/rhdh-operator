@@ -55,9 +55,10 @@ const (
 	BackstageConditionTypeConfig   BackstageConditionType = bsv1.BackstageConditionTypeConfig
 
 	// Deployed condition reasons
-	BackstageConditionReasonDeployed   BackstageConditionReason = bsv1.BackstageConditionReasonDeployed
-	BackstageConditionReasonFailed     BackstageConditionReason = bsv1.BackstageConditionReasonFailed
-	BackstageConditionReasonInProgress BackstageConditionReason = bsv1.BackstageConditionReasonInProgress
+	BackstageConditionReasonDeployed       BackstageConditionReason = bsv1.BackstageConditionReasonDeployed
+	BackstageConditionReasonFailed         BackstageConditionReason = bsv1.BackstageConditionReasonFailed
+	BackstageConditionReasonInProgress     BackstageConditionReason = bsv1.BackstageConditionReasonInProgress
+	BackstageConditionReasonRolloutStalled BackstageConditionReason = bsv1.BackstageConditionReasonRolloutStalled
 
 	// Runtime condition reasons
 	BackstageConditionReasonRunning         BackstageConditionReason = bsv1.BackstageConditionReasonRunning

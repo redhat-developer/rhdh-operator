@@ -128,7 +128,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 func errorAndStatus(backstage *api.Backstage, condType api.BackstageConditionType, reason api.BackstageConditionReason, msg string, err error) error {
-	setStatusCondition(backstage, condType, metav1.ConditionFalse, reason, err.Error())
+	setStatusCondition(backstage, condType, metav1.ConditionFalse, reason, fmt.Sprintf("%s: %s", msg, err))
 	return fmt.Errorf("%s: %w", msg, err)
 }
 

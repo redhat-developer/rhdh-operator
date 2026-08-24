@@ -17,9 +17,10 @@ const (
 	BackstageConditionTypeConfig   BackstageConditionType = "Config"
 
 	// Deployed condition reasons
-	BackstageConditionReasonDeployed   BackstageConditionReason = "Deployed"
-	BackstageConditionReasonFailed     BackstageConditionReason = "DeployFailed"
-	BackstageConditionReasonInProgress BackstageConditionReason = "DeployInProgress"
+	BackstageConditionReasonDeployed       BackstageConditionReason = "Deployed"
+	BackstageConditionReasonFailed         BackstageConditionReason = "DeployFailed"
+	BackstageConditionReasonInProgress     BackstageConditionReason = "DeployInProgress"
+	BackstageConditionReasonRolloutStalled BackstageConditionReason = "RolloutStalled"
 
 	// Runtime condition reasons
 	BackstageConditionReasonRunning         BackstageConditionReason = "Running"

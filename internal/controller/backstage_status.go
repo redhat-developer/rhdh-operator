@@ -233,7 +233,18 @@ func deploymentState(deploy *appsv1.Deployment) (metav1.ConditionStatus, api.Bac
 	if deploy.Spec.Replicas != nil {
 		desired = *deploy.Spec.Replicas
 	}
-	if deploy.Status.ReadyReplicas == desired {
+
+	ready := deploy.Status.ReadyReplicas
+	updated := deploy.Status.UpdatedReplicas
+
+	// Check for rollout stalled: ready replicas from old spec, but new spec not rolled out
+	if updated < desired && isProgressDeadlineExceeded(deploy) {
+		return metav1.ConditionFalse, api.BackstageConditionReasonRolloutStalled,
+			fmt.Sprintf("%d/%d replicas ready, %d/%d updated (rollout stalled)", ready, desired, updated, desired)
+	}
+
+	// All replicas ready AND running the new spec
+	if ready == desired && updated == desired {
 		return metav1.ConditionTrue, api.BackstageConditionReasonDeployed, fmt.Sprintf("%d/%d replicas ready", desired, desired)
 	}
 
@@ -248,7 +259,24 @@ func deploymentState(deploy *appsv1.Deployment) (metav1.ConditionStatus, api.Bac
 		}
 	}
 
-	return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, fmt.Sprintf("%d/%d replicas ready", deploy.Status.ReadyReplicas, desired)
+	// Rollout in progress
+	if updated < desired {
+		return metav1.ConditionFalse, api.BackstageConditionReasonInProgress,
+			fmt.Sprintf("%d/%d replicas ready, %d/%d updated", ready, desired, updated, desired)
+	}
+
+	return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, fmt.Sprintf("%d/%d replicas ready", ready, desired)
+}
+
+// isProgressDeadlineExceeded checks if the deployment's Progressing condition is False
+// with reason ProgressDeadlineExceeded, indicating the rollout is stalled.
+func isProgressDeadlineExceeded(deploy *appsv1.Deployment) bool {
+	for _, c := range deploy.Status.Conditions {
+		if c.Type == appsv1.DeploymentProgressing {
+			return c.Status == corev1.ConditionFalse && c.Reason == "ProgressDeadlineExceeded"
+		}
+	}
+	return false
 }
 
 func statefulSetState(sts *appsv1.StatefulSet) (metav1.ConditionStatus, api.BackstageConditionReason, string) {
@@ -257,7 +285,11 @@ func statefulSetState(sts *appsv1.StatefulSet) (metav1.ConditionStatus, api.Back
 		desired = *sts.Spec.Replicas
 	}
 
-	if sts.Status.ReadyReplicas == desired && sts.Status.CurrentReplicas == sts.Status.UpdatedReplicas {
+	ready := sts.Status.ReadyReplicas
+	updated := sts.Status.UpdatedReplicas
+
+	// All replicas ready AND running the new spec
+	if ready == desired && updated == desired {
 		return metav1.ConditionTrue, api.BackstageConditionReasonDeployed, fmt.Sprintf("%d/%d replicas ready", desired, desired)
 	}
 
@@ -265,5 +297,11 @@ func statefulSetState(sts *appsv1.StatefulSet) (metav1.ConditionStatus, api.Back
 		return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "no conditions reported yet"
 	}
 
-	return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, fmt.Sprintf("%d/%d replicas ready", sts.Status.ReadyReplicas, desired)
+	// Rollout in progress - show updated count
+	if updated < desired {
+		return metav1.ConditionFalse, api.BackstageConditionReasonInProgress,
+			fmt.Sprintf("%d/%d replicas ready, %d/%d updated", ready, desired, updated, desired)
+	}
+
+	return metav1.ConditionFalse, api.BackstageConditionReasonInProgress, fmt.Sprintf("%d/%d replicas ready", ready, desired)
 }

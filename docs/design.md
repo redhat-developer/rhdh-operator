@@ -95,9 +95,12 @@ The **Deployed** condition reflects the Deployment (or StatefulSet) level status
 
 | Reason | Status | Description |
 |--------|--------|-------------|
-| `Deployed` | True | All replicas are ready. Message shows "X/X replicas ready" |
-| `DeployInProgress` | False | Rollout in progress. Message shows "X/X replicas ready" or "no conditions reported yet" |
+| `Deployed` | True | All replicas are ready and running the current spec. Message shows "X/X replicas ready" |
+| `DeployInProgress` | False | Rollout in progress. Message shows "X/X replicas ready, X/X updated" |
 | `DeployFailed` | False | Deployment failed. Message contains the error details |
+| `RolloutStalled` | False | Rolling update stalled - old pods healthy, new pods failing. Message shows "X/X replicas ready, X/X updated (rollout stalled)" |
+
+**RolloutStalled:** This reason indicates a failed rolling update where old pods continue serving traffic while new pods fail to start. This occurs when Kubernetes' `progressDeadlineSeconds` (default: 600s) is exceeded. To recover, either fix the issue in the Backstage CR or run `kubectl rollout undo deployment/backstage-<cr-name>`.
 
 **Idled instances:** When the `rhdh.redhat.com/idle: true` annotation is set, the deployment scales to 0 replicas. The Deployed condition shows `Deployed` with message "0/0 replicas ready (Idled)".
 
@@ -138,6 +141,23 @@ status:
   plugins:
     - "@backstage/plugin-catalog"
     - "@backstage/plugin-techdocs"
+```
+
+### Rollout Stalled Example
+
+When a rolling update fails (e.g., bad image, missing config):
+
+```yaml
+status:
+  conditions:
+    - type: Deployed
+      status: "False"
+      reason: RolloutStalled
+      message: "2/2 replicas ready, 0/2 updated (rollout stalled)"
+    - type: Runtime
+      status: "False"
+      reason: ContainerFailed
+      message: 'container "backstage": ImagePullBackOff'
 ```
 
 ### Idled Example

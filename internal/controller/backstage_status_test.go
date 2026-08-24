@@ -264,13 +264,14 @@ func TestDeploymentState(t *testing.T) {
 		expectedMsg    string
 	}{
 		{
-			name: "all replicas ready",
+			name: "all replicas ready and updated",
 			deployment: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
 					Replicas: ptr.To(int32(1)),
 				},
 				Status: appsv1.DeploymentStatus{
-					ReadyReplicas: 1,
+					ReadyReplicas:   1,
+					UpdatedReplicas: 1,
 				},
 			},
 			expectedStatus: metav1.ConditionTrue,
@@ -278,13 +279,14 @@ func TestDeploymentState(t *testing.T) {
 			expectedMsg:    "1/1 replicas ready",
 		},
 		{
-			name: "multiple replicas ready",
+			name: "multiple replicas ready and updated",
 			deployment: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
 					Replicas: ptr.To(int32(3)),
 				},
 				Status: appsv1.DeploymentStatus{
-					ReadyReplicas: 3,
+					ReadyReplicas:   3,
+					UpdatedReplicas: 3,
 				},
 			},
 			expectedStatus: metav1.ConditionTrue,
@@ -292,13 +294,14 @@ func TestDeploymentState(t *testing.T) {
 			expectedMsg:    "3/3 replicas ready",
 		},
 		{
-			name: "partial replicas ready",
+			name: "partial replicas ready during rollout",
 			deployment: &appsv1.Deployment{
 				Spec: appsv1.DeploymentSpec{
 					Replicas: ptr.To(int32(3)),
 				},
 				Status: appsv1.DeploymentStatus{
-					ReadyReplicas: 1,
+					ReadyReplicas:   1,
+					UpdatedReplicas: 1,
 					Conditions: []appsv1.DeploymentCondition{
 						{Type: appsv1.DeploymentProgressing, Status: corev1.ConditionTrue},
 					},
@@ -306,7 +309,7 @@ func TestDeploymentState(t *testing.T) {
 			},
 			expectedStatus: metav1.ConditionFalse,
 			expectedReason: api.BackstageConditionReasonInProgress,
-			expectedMsg:    "1/3 replicas ready",
+			expectedMsg:    "1/3 replicas ready, 1/3 updated",
 		},
 		{
 			name: "no replicas ready yet",
@@ -315,7 +318,8 @@ func TestDeploymentState(t *testing.T) {
 					Replicas: ptr.To(int32(1)),
 				},
 				Status: appsv1.DeploymentStatus{
-					ReadyReplicas: 0,
+					ReadyReplicas:   0,
+					UpdatedReplicas: 0,
 					Conditions: []appsv1.DeploymentCondition{
 						{Type: appsv1.DeploymentProgressing, Status: corev1.ConditionTrue},
 					},
@@ -323,7 +327,7 @@ func TestDeploymentState(t *testing.T) {
 			},
 			expectedStatus: metav1.ConditionFalse,
 			expectedReason: api.BackstageConditionReasonInProgress,
-			expectedMsg:    "0/1 replicas ready",
+			expectedMsg:    "0/1 replicas ready, 0/1 updated",
 		},
 		{
 			name: "no conditions yet",
@@ -332,8 +336,9 @@ func TestDeploymentState(t *testing.T) {
 					Replicas: ptr.To(int32(1)),
 				},
 				Status: appsv1.DeploymentStatus{
-					ReadyReplicas: 0,
-					Conditions:    []appsv1.DeploymentCondition{},
+					ReadyReplicas:   0,
+					UpdatedReplicas: 1,
+					Conditions:      []appsv1.DeploymentCondition{},
 				},
 			},
 			expectedStatus: metav1.ConditionFalse,
@@ -347,7 +352,8 @@ func TestDeploymentState(t *testing.T) {
 					Replicas: ptr.To(int32(1)),
 				},
 				Status: appsv1.DeploymentStatus{
-					ReadyReplicas: 0,
+					ReadyReplicas:   0,
+					UpdatedReplicas: 1,
 					Conditions: []appsv1.DeploymentCondition{
 						{
 							Type:    appsv1.DeploymentReplicaFailure,
@@ -368,12 +374,57 @@ func TestDeploymentState(t *testing.T) {
 					Replicas: nil,
 				},
 				Status: appsv1.DeploymentStatus{
-					ReadyReplicas: 1,
+					ReadyReplicas:   1,
+					UpdatedReplicas: 1,
 				},
 			},
 			expectedStatus: metav1.ConditionTrue,
 			expectedReason: api.BackstageConditionReasonDeployed,
 			expectedMsg:    "1/1 replicas ready",
+		},
+		{
+			name: "rollout stalled - old pods ready, new pods failing",
+			deployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To(int32(2)),
+				},
+				Status: appsv1.DeploymentStatus{
+					ReadyReplicas:   2,
+					UpdatedReplicas: 0,
+					Conditions: []appsv1.DeploymentCondition{
+						{
+							Type:   appsv1.DeploymentProgressing,
+							Status: corev1.ConditionFalse,
+							Reason: "ProgressDeadlineExceeded",
+						},
+					},
+				},
+			},
+			expectedStatus: metav1.ConditionFalse,
+			expectedReason: api.BackstageConditionReasonRolloutStalled,
+			expectedMsg:    "2/2 replicas ready, 0/2 updated (rollout stalled)",
+		},
+		{
+			name: "rollout stalled - partial updated",
+			deployment: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: ptr.To(int32(3)),
+				},
+				Status: appsv1.DeploymentStatus{
+					ReadyReplicas:   2,
+					UpdatedReplicas: 1,
+					Conditions: []appsv1.DeploymentCondition{
+						{
+							Type:   appsv1.DeploymentProgressing,
+							Status: corev1.ConditionFalse,
+							Reason: "ProgressDeadlineExceeded",
+						},
+					},
+				},
+			},
+			expectedStatus: metav1.ConditionFalse,
+			expectedReason: api.BackstageConditionReasonRolloutStalled,
+			expectedMsg:    "2/3 replicas ready, 1/3 updated (rollout stalled)",
 		},
 	}
 
@@ -428,7 +479,7 @@ func TestStatefulSetState(t *testing.T) {
 			},
 			expectedStatus: metav1.ConditionFalse,
 			expectedReason: api.BackstageConditionReasonInProgress,
-			expectedMsg:    "1/1 replicas ready",
+			expectedMsg:    "1/1 replicas ready, 0/1 updated",
 		},
 		{
 			name: "partial replicas ready",
