@@ -113,12 +113,18 @@ jobs:
 
           # Build bundle and catalog (operator was built hermetically above)
           make bundle bundle-build
+
+          # Push operator and bundle images before catalog-build — opm render
+          # needs to pull the bundle image from the registry
+          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle; do
+            podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
+          done
+
           BUNDLE_IMGS="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}" make -o bundle-push catalog-build
 
-          # Push all images
+          # Push catalog image and create PR-number tags for all images
+          podman push -q ${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${VERSION} docker://${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${VERSION}
           for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
-            podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
-            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
             skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION%-*}
           done
 
