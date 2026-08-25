@@ -1,18 +1,14 @@
-# THIS IS USED BY Konflux builds >= 1.4 with Cachi2 enabled
+# Unified Dockerfile for hermetic builds (Hermeto upstream, Cachi2/Konflux downstream)
+# and standard non-hermetic builds (make image-build)
 
 #@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
 # https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.8-1786023237@sha256:5d26ff5606bd6590930e7cfc202b510e3fe2c7a7a1720860f444ab49c45128cb AS builder
+FROM registry.access.redhat.com/ubi9/go-toolset:9.8-1787559109@sha256:643754d95cf8907b109b3e9182932e9c6e05334c97a74bb5cd991617e3d03080 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # hadolint ignore=DL3002
 USER 0
 ENV GOPATH=/go/
-
-# '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
-# Downstream comment
-RUN dnf -q -y update
-#/ Downstream comment
 
 ENV EXTERNAL_SOURCE=.
 ENV CONTAINER_SOURCE=/opt/app-root/src
@@ -38,16 +34,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Install openssl for FIPS support
 #@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
 # https://registry.access.redhat.com/ubi9-minimal
-FROM registry.access.redhat.com/ubi9-minimal:9.8-1786323074@sha256:57c8151c51445a07e503dab9dc9211dc3cdeac9d45ed81a10954b7d770659b3b AS runtime
-
-# Downstream uncomment
-# RUN cat /cachi2/cachi2.env
-#/ Downstream uncomment
-
-# '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
-# Downstream comment
-RUN microdnf update --setopt=install_weak_deps=0 -y
-#/ Downstream comment
+FROM registry.access.redhat.com/ubi9-minimal:9.8-1786987521@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41 AS runtime
 
 RUN microdnf install -y openssl; microdnf clean -y all
 

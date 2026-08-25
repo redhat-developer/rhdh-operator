@@ -8,6 +8,8 @@ bin/*
 bundle_tmp*
 testbin/*
 Dockerfile.cross
+Dockerfile.hermeto
+hermeto-cache/
 __debug_bin*
 tmp/*
 

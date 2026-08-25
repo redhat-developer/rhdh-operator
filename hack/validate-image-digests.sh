@@ -27,8 +27,6 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Dockerfiles to validate (these are expected to use multi-arch base images)
 DOCKERFILES=(
     "Dockerfile"
-    ".rhdh/docker/Dockerfile"
-    ".rhdh/docker/bundle.Dockerfile"
     "bundle/rhdh/bundle.Dockerfile"
     "bundle/backstage.io/bundle.Dockerfile"
 )

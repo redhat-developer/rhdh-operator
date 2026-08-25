@@ -23,6 +23,7 @@ rules:
   - ""
   resources:
   - persistentvolumes
+  - pods
   verbs:
   - get
   - list
