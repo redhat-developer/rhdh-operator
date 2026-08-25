@@ -31,30 +31,33 @@ COPY $EXTERNAL_SOURCE $CONTAINER_SOURCE
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
-# Install openssl for FIPS support
-#@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
-# https://registry.access.redhat.com/ubi9-minimal
-FROM registry.access.redhat.com/ubi9-minimal:9.8-1786987521@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41 AS runtime
+# Install openssl for FIPS support into an isolated rootfs
+#@follow_tag(registry.redhat.io/ubi9/ubi:latest)
+# https://registry.access.redhat.com/ubi9/ubi
+FROM registry.access.redhat.com/ubi9/ubi:9.8-1786985871@sha256:5426a8f45e80a07168a30ea24d84f266094b3756624a5508cc53927e6ee39e09 AS rpm-builder
+RUN mkdir -p /mnt/rootfs
+RUN dnf install --installroot /mnt/rootfs \
+    openssl \
+    --releasever 9 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
+    dnf --installroot /mnt/rootfs clean all && \
+    rm -rf /mnt/rootfs/var/cache/* /mnt/rootfs/var/log/* /mnt/rootfs/tmp/*
+RUN echo "backstage:x:1001:0:backstage user:/:/sbin/nologin" >> /mnt/rootfs/etc/passwd
 
-RUN microdnf install -y openssl; microdnf clean -y all
+# Final minimal image using UBI micro
+#@follow_tag(registry.redhat.io/ubi9/ubi-micro:latest)
+# https://registry.access.redhat.com/ubi9/ubi-micro
+FROM registry.access.redhat.com/ubi9/ubi-micro:9.8-1786321990@sha256:7e7f79ab747bf2b452e3043dd89f388e92be4c7fdcc8b815b58adf6c99c39c95
 
-ENV EXTERNAL_SOURCE=.
-ENV CONTAINER_SOURCE=/opt/app-root/src
+COPY --from=rpm-builder /mnt/rootfs /
 
 # RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
-COPY $EXTERNAL_SOURCE/LICENSE /licenses/
-
-ENV HOME=/ \
-    USER_NAME=backstage \
-    USER_UID=1001
-
-RUN echo "${USER_NAME}:x:${USER_UID}:0:${USER_NAME} user:${HOME}:/sbin/nologin" >> /etc/passwd
+COPY LICENSE /licenses/
 
 # Copy manager binary
-COPY --from=builder $CONTAINER_SOURCE/manager .
+COPY --from=builder /opt/app-root/src/manager /manager
 
-USER ${USER_UID}
+USER 1001
 
-WORKDIR ${HOME}
+WORKDIR /
 
 ENTRYPOINT ["/manager"]
