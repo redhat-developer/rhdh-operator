@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-08-06T10:03:19Z"
+    createdAt: "2026-08-25T13:29:27Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -53,6 +53,9 @@ spec:
       displayName: Red Hat Developer Hub
       kind: Backstage
       name: backstages.rhdh.redhat.com
+      version: v1alpha5
+    - kind: DevHubPluginCatalog
+      name: devhubplugincatalogs.rhdh.redhat.com
       version: v1alpha5
   description: |
     Backstage Operator
@@ -154,6 +157,14 @@ spec:
           - patch
           - update
         - apiGroups:
+          - rhdh.redhat.com
+          resources:
+          - devhubplugincatalogs
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
           - route.openshift.io
           resources:
           - routes
@@ -218,6 +229,15 @@ spec:
                 - --metrics-bind-address=:8443
                 command:
                 - /manager
+                env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
                 image: quay.io/rhdh-community/operator:2.0.0
                 livenessProbe:
                   httpGet:
@@ -256,6 +276,8 @@ spec:
                   name: default-config
                 - mountPath: /plugin-deps
                   name: plugin-deps
+                - mountPath: /tmp
+                  name: tmp
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: backstage-controller-manager
@@ -268,6 +290,8 @@ spec:
                   name: plugin-deps
                   optional: true
                 name: plugin-deps
+              - emptyDir: {}
+                name: tmp
       permissions:
       - rules:
         - apiGroups:
