@@ -69,6 +69,7 @@ func main() {
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
 	var enableCacheLabelFilter bool
+	var disableCatalogController bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -91,6 +92,8 @@ func main() {
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableCacheLabelFilter, "enable-cache-label-filter", os.Getenv("ENABLE_CACHE_LABEL_FILTER") == "true",
 		"If set, the cache will only store Secrets and ConfigMaps with the label 'rhdh.redhat.com/external-config=true'. This reduces memory consumption. Can also be set via ENABLE_CACHE_LABEL_FILTER env var.")
+	flag.BoolVar(&disableCatalogController, "disable-catalog-controller", os.Getenv("DISABLE_CATALOG_CONTROLLER") == "true",
+		"If set, the DevHubPluginCatalog controller will not be started. Useful for local development. Can also be set via DISABLE_CATALOG_CONTROLLER env var.")
 
 	opts := zap.Options{
 		Development: true,
@@ -295,15 +298,19 @@ func main() {
 	}
 
 	// Setup DevHubPluginCatalog controller
-	operatorNamespace := getOperatorNamespace()
-	if err = (&controller.DevHubPluginCatalogReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		OperatorNamespace: operatorNamespace,
-		Processor:         catalog.NewProcessor(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DevHubPluginCatalog")
-		os.Exit(1)
+	if !disableCatalogController {
+		operatorNamespace := getOperatorNamespace()
+		if err = (&controller.DevHubPluginCatalogReconciler{
+			Client:            mgr.GetClient(),
+			Scheme:            mgr.GetScheme(),
+			OperatorNamespace: operatorNamespace,
+			Processor:         catalog.NewProcessor(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "DevHubPluginCatalog")
+			os.Exit(1)
+		}
+	} else {
+		setupLog.Info("DevHubPluginCatalog controller disabled")
 	}
 	// +kubebuilder:scaffold:builder
 

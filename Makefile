@@ -172,12 +172,12 @@ fmt: goimports ## Format the code using goimports
 .PHONY: test
 test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
 POLL_PROGRESS_INTERVAL := 600s
@@ -237,7 +237,7 @@ build: manifests generate fmt vet ## Build manager binary.
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
 .PHONY: local-dynamic-plugins
 local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-index image for local testing
