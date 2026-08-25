@@ -264,6 +264,7 @@ var _ = When("create default rhdh", func() {
 
 		}, 10*time.Second, time.Second).Should(Succeed())
 
+		deleteNamespace(ctx, ns)
 	})
 
 	It("replaces .npmrc", func() {
@@ -322,6 +323,7 @@ var _ = When("create default rhdh", func() {
 
 		}, 10*time.Second, time.Second).Should(Succeed())
 
+		deleteNamespace(ctx, ns)
 	})
 
 	It("creates rhdh with default Lightspeed flavour", func() {
