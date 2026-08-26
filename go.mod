@@ -5,6 +5,7 @@ go 1.26.0
 toolchain go1.26.6
 
 require (
+	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/google/go-containerregistry v0.21.9
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1

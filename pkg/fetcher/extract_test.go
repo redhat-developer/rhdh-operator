@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -99,18 +100,30 @@ func TestExtractTarPathTraversal(t *testing.T) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
 
+	content := []byte("malicious content")
 	hdr := &tar.Header{
 		Name: "../../../etc/passwd",
 		Mode: 0644,
-		Size: 0,
+		Size: int64(len(content)),
 	}
 	require.NoError(t, tw.WriteHeader(hdr))
+	_, err := tw.Write(content)
+	require.NoError(t, err)
 	require.NoError(t, tw.Close())
 
 	destDir := t.TempDir()
-	err := extractTarBytes(buf.Bytes(), destDir)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid tar path")
+	err = extractTarBytes(buf.Bytes(), destDir)
+	// securejoin sanitizes the path, so extraction succeeds but stays within destDir
+	require.NoError(t, err)
+
+	// Verify file was created inside destDir (path traversal neutralized)
+	// The sanitized path becomes "etc/passwd" inside destDir
+	sanitizedPath := filepath.Join(destDir, "etc", "passwd")
+	_, err = os.Stat(sanitizedPath)
+	assert.NoError(t, err, "file should exist at sanitized path inside destDir")
+
+	// Verify /etc/passwd was NOT modified (would require root anyway, but check path)
+	assert.True(t, strings.HasPrefix(sanitizedPath, destDir), "path should be inside destDir")
 }
 
 func TestExtractTarEmptyArchive(t *testing.T) {

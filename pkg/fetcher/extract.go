@@ -9,7 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
+
+	securejoin "github.com/cyphar/filepath-securejoin"
 )
 
 // DefaultMaxEntrySize is the default maximum file size for extraction (40MB)
@@ -74,10 +75,10 @@ func extractTar(r io.Reader, destDir string) error {
 			return fmt.Errorf("entry %q exceeds maximum size: %d > %d", header.Name, header.Size, maxEntrySize)
 		}
 
-		// Construct and validate safe path
-		target, err := safePath(destDir, header.Name)
+		// Construct safe path using securejoin to prevent zip slip attacks
+		target, err := securejoin.SecureJoin(destDir, header.Name)
 		if err != nil {
-			return err
+			return fmt.Errorf("invalid tar path %q: %w", header.Name, err)
 		}
 
 		switch header.Typeflag {
@@ -98,24 +99,6 @@ func extractTar(r io.Reader, destDir string) error {
 		}
 	}
 	return nil
-}
-
-// safePath constructs a safe path within destDir, preventing path traversal attacks.
-// Returns error if the resulting path would escape destDir.
-func safePath(destDir, name string) (string, error) {
-	// Clean the name to remove any . or .. components
-	cleaned := filepath.Clean(name)
-	if strings.HasPrefix(cleaned, "..") || filepath.IsAbs(cleaned) {
-		return "", fmt.Errorf("invalid tar path: %s", name)
-	}
-
-	// Join with destination and verify it's still within destDir
-	target := filepath.Join(destDir, cleaned)
-	if !strings.HasPrefix(target, destDir+string(os.PathSeparator)) && target != destDir {
-		return "", fmt.Errorf("invalid tar path: %s", name)
-	}
-
-	return target, nil
 }
 
 // extractFile extracts a single file from tar reader.
