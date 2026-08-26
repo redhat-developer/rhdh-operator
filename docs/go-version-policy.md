@@ -42,7 +42,7 @@ UBI images are rebuilt and distributed on approximately a six-week cadence, or s
 
 The operator's Dockerfile references the go-toolset image from the unauthenticated registry (currently `registry.access.redhat.com/ubi9/go-toolset`; the UBI base version will change when the project transitions to a newer UBI). The `#@follow_tag` annotation in the Dockerfile indicates the corresponding authenticated registry path and is used by automated tooling to track the latest available tag. The image reference is pinned by digest for reproducibility; the digest is updated when a new go-toolset image becomes available.
 
-The runtime stage of the Dockerfile uses a UBI minimal image, a stripped-down UBI variant that includes only `microdnf` and a minimal set of packages. The compiled operator binary is copied from the builder stage into this minimal image, keeping the final shipped image small and reducing the attack surface.
+The runtime stage of the Dockerfile uses a UBI Micro image in a distroless-style pattern. An intermediate rpm-builder stage uses the full UBI image to install minimal runtime dependencies (openssl for FIPS support) into an isolated rootfs via `dnf install --installroot`. This rootfs is then overlaid onto a UBI Micro base image, and the compiled operator binary is copied from the builder stage. This approach produces a smaller final image with a reduced attack surface compared to UBI Minimal, while still providing the RPM-based packages required for Red Hat certification.
 
 A version gap between the `go.mod` directive and the go-toolset compiler is expected and intentional. On release branches, it is a direct consequence of freezing `go.mod` while continuing to update the build image, and it is the mechanism that allows release branches to remain secure without destabilizing the module's declared compatibility. This gap can also exist temporarily on the main branch until the scheduled `go` directive bump task is implemented (for example, go-toolset may ship Go 1.26 while main still declares `go 1.25` until the bump is completed).
 
@@ -111,5 +111,5 @@ skopeo inspect docker://registry.access.redhat.com/ubi9/go-toolset:latest | \
 - [Red Hat UBI: Images, Repositories, Packages, and Source Code](https://access.redhat.com/articles/4238681) — comprehensive UBI reference
 - [Universal Base Images FAQ](https://developers.redhat.com/articles/ubi-faq) — licensing, redistribution, and certification requirements
 - [Go Toolset for UBI 9 — Red Hat Ecosystem Catalog](https://catalog.redhat.com/en/software/containers/ubi9/go-toolset/61e5c00b4ec9945c18787690) — available go-toolset image tags and metadata
-- [UBI 9 Minimal — Red Hat Ecosystem Catalog](https://catalog.redhat.com/en/software/containers/ubi9/ubi-minimal/61832888c0d15aff4912fe0d) — the runtime base image
+- [UBI 9 Micro — Red Hat Ecosystem Catalog](https://catalog.redhat.com/en/software/containers/ubi9/ubi-micro/615bd480b75f4efe6f60e1a0) — the runtime base image
 - [RHIDP-14096](https://redhat.atlassian.net/browse/RHIDP-14096) — the Jira issue that prompted this policy document

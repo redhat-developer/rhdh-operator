@@ -15,7 +15,7 @@ jobs:
   validate-dockerfile:
     name: Validate Dockerfile
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -31,6 +31,7 @@ jobs:
         with:
           files: |
             .github/workflows/pr-dockerbuild-validation.yaml
+            .github/actions/docker-build/**
             Makefile
             **/*.go
             bundle/**
@@ -42,19 +43,20 @@ jobs:
             **/Containerfile
             **/*.Dockerfile
             **/.dockerignore
+            rpms.in.yaml
+            rpms.lock.yaml
+            scripts/**
           files_ignore: |
             **/*.md
             **/*.adoc
             .rhdh/**
             tests/**
 
-      - name: Setup Go
+      - name: Build operator image (hermetic)
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        uses: ./.github/actions/docker-build
         with:
-          go-version-file: 'go.mod'
-
-      - name: Test build Dockerfile (no push)
-        if: steps.changed-files.outputs.any_changed == 'true'
-        run: |
-          make image-build IMG=localhost/operator:validate
+          imageName: localhost/operator
+          imageTags: type=raw,value=validate
+          platform: linux/amd64
+          skipArtifactUpload: 'true'

@@ -82,21 +82,26 @@ jobs:
           echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
 
       - name: Login to registry
-        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ vars.QUAY_USERNAME }}
           password: ${{ secrets.QUAY_TOKEN }}
 
-      - name: Build and push images
+      - name: Build operator image (hermetic)
+        uses: ./.github/actions/docker-build
+        with:
+          imageName: ${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}/${{ vars.OPERATOR_IMAGE_NAME }}
+          imageTags: type=raw,value=${{ env.BASE_VERSION }}-pr-${{ steps.pr.outputs.number }}-${{ env.SHORT_SHA }}
+          platform: linux/amd64
+          skipArtifactUpload: 'true'
+
+      - name: Build bundle and catalog images, then push all
         # We explicitly do NOT pass GH_TOKEN or RHDH_BOT_TOKEN here.
-        # This makes running 'make' safe, even if the Makefile is malicious,
-        # because there are no secrets in the env to steal.
         env:
           REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
           OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
           CONTAINER_TOOL: podman
-          # Construct version safely
           VERSION: ${{ env.BASE_VERSION }}-pr-${{ steps.pr.outputs.number }}-${{ env.SHORT_SHA }}
         run: |
           sudo apt-get -y update; sudo apt-get -y install skopeo podman
@@ -106,14 +111,20 @@ jobs:
 
           set -ex
 
-          # Run ONLY release-build (Lint removed)
-          # We use 'make' here for convenience, but it is sandboxed from secrets.
-          make release-build
+          # Build bundle and catalog (operator was built hermetically above)
+          make bundle bundle-build
 
-          # Push logic
-          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
+          # Push operator and bundle images before catalog-build — opm render
+          # needs to pull the bundle image from the registry
+          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle; do
             podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
-            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
+          done
+
+          BUNDLE_IMGS="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}" make -o bundle-push catalog-build
+
+          # Push catalog image and create PR-number tags for all images
+          podman push -q ${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${VERSION} docker://${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${VERSION}
+          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
             skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION%-*}
           done
 

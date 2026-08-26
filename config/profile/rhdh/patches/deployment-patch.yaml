@@ -28,6 +28,8 @@ spec:
               value: quay.io/fedora/postgresql-15:latest
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh-community/rhdh:next
+            - name: INSTALL_DP_IMAGE
+              value: quay.io/gazarenk/install-plugins:skopeo
           volumeMounts:
             - mountPath: /default-config/flavours/lightspeed
               name: flavour-lightspeed-config
