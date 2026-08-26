@@ -93,15 +93,8 @@ func extractTar(r io.Reader, destDir string) error {
 				return err
 			}
 		case tar.TypeSymlink:
-			// Validate symlink target doesn't escape destDir
-			linkTarget, err := safePath(destDir, filepath.Join(filepath.Dir(header.Name), header.Linkname))
-			if err != nil {
-				return fmt.Errorf("symlink escapes destination: %s -> %s", header.Name, header.Linkname)
-			}
-			_ = linkTarget // validated, use original relative linkname for symlink
-			if err := os.Symlink(header.Linkname, target); err != nil {
-				return err
-			}
+			// Skip symlinks - not needed for catalog extraction and avoids path traversal risks
+			continue
 		}
 	}
 	return nil

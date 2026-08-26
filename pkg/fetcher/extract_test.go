@@ -113,62 +113,6 @@ func TestExtractTarPathTraversal(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid tar path")
 }
 
-func TestExtractTarSymlinkEscape(t *testing.T) {
-	// Create a tar with symlink escape attempt
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-
-	hdr := &tar.Header{
-		Name:     "escape-link",
-		Mode:     0777,
-		Typeflag: tar.TypeSymlink,
-		Linkname: "../../../etc/passwd",
-	}
-	require.NoError(t, tw.WriteHeader(hdr))
-	require.NoError(t, tw.Close())
-
-	destDir := t.TempDir()
-	err := extractTarBytes(buf.Bytes(), destDir)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "symlink escapes destination")
-}
-
-func TestExtractTarValidSymlink(t *testing.T) {
-	// Create a tar with valid internal symlink
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-
-	// Add target file
-	content := []byte("target content")
-	hdr := &tar.Header{
-		Name: "target.txt",
-		Mode: 0644,
-		Size: int64(len(content)),
-	}
-	require.NoError(t, tw.WriteHeader(hdr))
-	_, err := tw.Write(content)
-	require.NoError(t, err)
-
-	// Add symlink to target
-	linkHdr := &tar.Header{
-		Name:     "link.txt",
-		Mode:     0777,
-		Typeflag: tar.TypeSymlink,
-		Linkname: "target.txt",
-	}
-	require.NoError(t, tw.WriteHeader(linkHdr))
-	require.NoError(t, tw.Close())
-
-	destDir := t.TempDir()
-	err = extractTarBytes(buf.Bytes(), destDir)
-	require.NoError(t, err)
-
-	// Verify symlink works
-	data, err := os.ReadFile(filepath.Join(destDir, "link.txt"))
-	require.NoError(t, err)
-	assert.Equal(t, "target content", string(data))
-}
-
 func TestExtractTarEmptyArchive(t *testing.T) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
