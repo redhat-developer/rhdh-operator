@@ -22,6 +22,14 @@ spec:
         - name: okp
           image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.10-1786628394
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - name: httpd
               containerPort: 8080

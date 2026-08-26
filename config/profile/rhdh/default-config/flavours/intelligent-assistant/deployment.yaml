@@ -8,6 +8,15 @@ spec:
         - name: lightspeed-core
           image: quay.io/lightspeed-core/lightspeed-stack:dev-20260811-0da4b12
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - containerPort: 8080
               name: lcs-backend
@@ -25,6 +34,8 @@ spec:
           env:
             - name: HF_HOME
               value: /tmp/hf_cache
+            - name: OTEL_SDK_DISABLED
+              value: "true"
           volumeMounts:
             - mountPath: /tmp
               name: lightspeed-data

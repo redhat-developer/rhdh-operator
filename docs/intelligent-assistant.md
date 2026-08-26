@@ -65,9 +65,9 @@ If you prefer to configure plugins manually without using the flavour, refer to 
 includes:
   - dynamic-plugins.default.yaml
 plugins:
-  - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant:{{inherit}}
+  - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant
     enabled: true
-  - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend:{{inherit}}
+  - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend
     enabled: true
 ```
 
@@ -125,7 +125,7 @@ Once enabled, users can:
 The assistant uses **OKP (Offline Knowledge Portal)** for document retrieval (RAG), replacing the previous RAG init container and FAISS vector store.
 
 - **OpenShift:** the operator deploys OKP as a `Deployment`, `Service`, and `Route` (Solr on `8983`, httpd on `8080`), and injects `OKP_SERVICE_URL` into the `lightspeed-core` sidecar so the assistant queries it for grounded answers.
-- **Vanilla Kubernetes:** OKP is **not** deployed (the operator has no Ingress support). The Lightspeed Core config falls back to `lightspeed-stack-no-okp.yaml` (the `rag`/`okp` sections stripped out) so the service starts cleanly without an OKP backend. General chat and Notebooks still work; OKP-backed retrieval is unavailable.
+- **Vanilla Kubernetes:** OKP is **not** deployed (the operator has no Ingress support). The Lightspeed Core config falls back to `lightspeed-stack-no-okp.yaml` (the `rag`/`okp` sections stripped out) so the service starts cleanly without an OKP backend. General chat and Notebooks still work; however, responses related to RHDH, Intelligent Assistant, and Red Hat products may be less accurate without a knowledge base to ground them.
 
 No additional CR configuration is required — OKP is enabled automatically alongside the Intelligent Assistant flavour when running on OpenShift.
 
