@@ -37,10 +37,19 @@ func setupCatalogTestReconciler(objects ...client.Object) *DevHubPluginCatalogRe
 	}
 }
 
+// listAndBuildInputs is a test helper that lists catalogs and builds inputs
+func listAndBuildInputs(r *DevHubPluginCatalogReconciler, ctx context.Context) ([]catalog.CatalogInput, error) {
+	catalogList := &api.DevHubPluginCatalogList{}
+	if err := r.List(ctx, catalogList); err != nil {
+		return nil, err
+	}
+	return r.buildCatalogInputs(ctx, catalogList)
+}
+
 func TestBuildCatalogInputs_NoCatalogs(t *testing.T) {
 	r := setupCatalogTestReconciler()
 
-	inputs, err := r.buildCatalogInputs(context.TODO())
+	inputs, err := listAndBuildInputs(r, context.TODO())
 	require.NoError(t, err)
 	assert.Empty(t, inputs)
 }
@@ -59,7 +68,7 @@ func TestBuildCatalogInputs_SingleCatalog(t *testing.T) {
 
 	r := setupCatalogTestReconciler(dhpc)
 
-	inputs, err := r.buildCatalogInputs(context.TODO())
+	inputs, err := listAndBuildInputs(r, context.TODO())
 	require.NoError(t, err)
 	require.Len(t, inputs, 1)
 	assert.Equal(t, "oci://registry.example.com/rhdh/plugin-catalog:v1", inputs[0].Ref)
@@ -83,7 +92,7 @@ func TestBuildCatalogInputs_WithSkipTLSVerify(t *testing.T) {
 
 	r := setupCatalogTestReconciler(dhpc)
 
-	inputs, err := r.buildCatalogInputs(context.TODO())
+	inputs, err := listAndBuildInputs(r, context.TODO())
 	require.NoError(t, err)
 	require.Len(t, inputs, 1)
 	assert.True(t, inputs[0].SkipTLSVerify)
@@ -116,7 +125,7 @@ func TestBuildCatalogInputs_WithPullSecret(t *testing.T) {
 
 	r := setupCatalogTestReconciler(dhpc, secret)
 
-	inputs, err := r.buildCatalogInputs(context.TODO())
+	inputs, err := listAndBuildInputs(r, context.TODO())
 	require.NoError(t, err)
 	require.Len(t, inputs, 1)
 	assert.NotNil(t, inputs[0].DockerConfig)
@@ -157,7 +166,7 @@ MIIBkTCB+wIJAKHBfpegPjMCMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnRl
 
 	r := setupCatalogTestReconciler(dhpc, cm)
 
-	inputs, err := r.buildCatalogInputs(context.TODO())
+	inputs, err := listAndBuildInputs(r, context.TODO())
 	require.NoError(t, err)
 	require.Len(t, inputs, 1)
 	assert.NotNil(t, inputs[0].CACert)
@@ -198,7 +207,7 @@ MIIBkTCB+wIJAKHBfpegPjMCMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnRl
 
 	r := setupCatalogTestReconciler(dhpc, cm)
 
-	inputs, err := r.buildCatalogInputs(context.TODO())
+	inputs, err := listAndBuildInputs(r, context.TODO())
 	require.NoError(t, err)
 	require.Len(t, inputs, 1)
 	assert.NotNil(t, inputs[0].CACert)
@@ -229,7 +238,7 @@ func TestBuildCatalogInputs_MultipleCatalogs(t *testing.T) {
 
 	r := setupCatalogTestReconciler(dhpc1, dhpc2)
 
-	inputs, err := r.buildCatalogInputs(context.TODO())
+	inputs, err := listAndBuildInputs(r, context.TODO())
 	require.NoError(t, err)
 	assert.Len(t, inputs, 2)
 }
@@ -251,7 +260,7 @@ func TestBuildCatalogInputs_MissingSecret_Fails(t *testing.T) {
 
 	r := setupCatalogTestReconciler(dhpc)
 
-	_, err := r.buildCatalogInputs(context.TODO())
+	_, err := listAndBuildInputs(r, context.TODO())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get pull secret")
 	assert.Contains(t, err.Error(), "non-existent-secret")
@@ -276,7 +285,7 @@ func TestBuildCatalogInputs_MissingCACert_Fails(t *testing.T) {
 
 	r := setupCatalogTestReconciler(dhpc)
 
-	_, err := r.buildCatalogInputs(context.TODO())
+	_, err := listAndBuildInputs(r, context.TODO())
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get CA ConfigMap")
 	assert.Contains(t, err.Error(), "non-existent-ca")

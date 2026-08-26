@@ -44,14 +44,14 @@ func (r *DevHubPluginCatalogReconciler) Reconcile(ctx context.Context, req ctrl.
 	lg := log.FromContext(ctx)
 	lg.V(1).Info("Reconciling DevHubPluginCatalog", "name", req.Name)
 
-	// 1. List all catalogs
+	// 1. List catalogs in operator namespace only
 	catalogList := &api.DevHubPluginCatalogList{}
-	if err := r.List(ctx, catalogList); err != nil {
+	if err := r.List(ctx, catalogList, client.InNamespace(r.OperatorNamespace)); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to list catalogs: %w", err)
 	}
 
 	// 2. Build inputs from catalogs
-	inputs, err := r.buildCatalogInputs(ctx)
+	inputs, err := r.buildCatalogInputs(ctx, catalogList)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -83,13 +83,8 @@ func (r *DevHubPluginCatalogReconciler) Reconcile(ctx context.Context, req ctrl.
 	return ctrl.Result{}, nil
 }
 
-// buildCatalogInputs lists all catalogs and builds processor inputs
-func (r *DevHubPluginCatalogReconciler) buildCatalogInputs(ctx context.Context) ([]catalog.CatalogInput, error) {
-	catalogList := &api.DevHubPluginCatalogList{}
-	if err := r.List(ctx, catalogList); err != nil {
-		return nil, fmt.Errorf("failed to list catalogs: %w", err)
-	}
-
+// buildCatalogInputs builds processor inputs from the catalog list
+func (r *DevHubPluginCatalogReconciler) buildCatalogInputs(ctx context.Context, catalogList *api.DevHubPluginCatalogList) ([]catalog.CatalogInput, error) {
 	inputs := make([]catalog.CatalogInput, 0, len(catalogList.Items))
 
 	for i := range catalogList.Items {
