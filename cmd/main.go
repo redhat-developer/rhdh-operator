@@ -289,9 +289,10 @@ func main() {
 	}
 
 	if err = (&controller.BackstageReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Platform: plf,
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Platform:          plf,
+		OperatorNamespace: getOperatorNamespace(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backstage")
 		os.Exit(1)
@@ -299,11 +300,10 @@ func main() {
 
 	// Setup DevHubPluginCatalog controller
 	if !disableCatalogController {
-		operatorNamespace := getOperatorNamespace()
 		if err = (&controller.DevHubPluginCatalogReconciler{
 			Client:            mgr.GetClient(),
 			Scheme:            mgr.GetScheme(),
-			OperatorNamespace: operatorNamespace,
+			OperatorNamespace: getOperatorNamespace(),
 			Processor:         catalog.NewProcessor(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "DevHubPluginCatalog")
@@ -410,14 +410,11 @@ func setupTLSProfileWatcher(
 
 // getOperatorNamespace returns the namespace the operator is running in
 func getOperatorNamespace() string {
-	// Check env var first (set via downward API in deployment)
 	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
 		return ns
 	}
-	// Fall back to service account namespace file (auto-mounted by Kubernetes)
 	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
 		return string(data)
 	}
-	// Default for local development
 	return "rhdh-operator"
 }

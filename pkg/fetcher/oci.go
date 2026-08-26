@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -91,35 +90,13 @@ func WithPluginValidation() OCIOption {
 // Fetch methods
 // ----------------------------------------------------------------------------
 
-// FetchResult contains the result of fetching an artifact
-type FetchResult struct {
-	// Digest is the artifact digest (sha256:...)
-	Digest string
-
-	// Content is the extracted artifact content
-	Content []byte
-
-	// MediaType of the artifact
-	MediaType string
-}
-
-// Fetch downloads an OCI artifact and extracts it to destDir
+// Fetch downloads an OCI artifact and extracts it to destDir.
+// Streams directly to extraction without buffering the entire layer in memory.
 func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) error {
-	result, err := c.FetchContent(ctx, ref)
-	if err != nil {
-		return err
-	}
-
-	// Extract tarball content to destDir (already uncompressed by Uncompressed())
-	return extractTarBytes(result.Content, destDir)
-}
-
-// FetchContent downloads an OCI artifact and returns its content
-func (c *OCIFetcher) FetchContent(ctx context.Context, ref string) (*FetchResult, error) {
 	// 1. Parse reference
 	imgRef, err := name.ParseReference(ref)
 	if err != nil {
-		return nil, fmt.Errorf("invalid OCI reference %q: %w", ref, err)
+		return fmt.Errorf("invalid OCI reference %q: %w", ref, err)
 	}
 
 	// 2. Configure remote options
@@ -134,51 +111,39 @@ func (c *OCIFetcher) FetchContent(ctx context.Context, ref string) (*FetchResult
 	// 3. Fetch artifact
 	desc, err := remote.Get(imgRef, remoteOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch %q: %w", ref, err)
+		return fmt.Errorf("failed to fetch %q: %w", ref, err)
 	}
 
-	// 4. Handle image vs artifact
+	// 4. Get image
 	img, err := desc.Image()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image: %w", err)
+		return fmt.Errorf("failed to get image: %w", err)
 	}
 
-	// 5. Validate plugin artifact (optional, for plugins only)
+	// 5. Validate plugin artifact (optional)
 	if c.validatePlugin {
 		if err := validatePluginArtifact(img); err != nil {
-			return nil, fmt.Errorf("validation failed for %q: %w", ref, err)
+			return fmt.Errorf("validation failed for %q: %w", ref, err)
 		}
 	}
 
-	// 6. Extract content from first layer
+	// 6. Get first layer
 	layers, err := img.Layers()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get layers: %w", err)
+		return fmt.Errorf("failed to get layers: %w", err)
 	}
 	if len(layers) == 0 {
-		return nil, fmt.Errorf("artifact has no layers")
+		return fmt.Errorf("artifact has no layers")
 	}
 
+	// 7. Stream layer directly to extraction (no buffering)
 	reader, err := layers[0].Uncompressed()
 	if err != nil {
-		return nil, fmt.Errorf("failed to uncompress layer: %w", err)
+		return fmt.Errorf("failed to uncompress layer: %w", err)
 	}
 	defer func() { _ = reader.Close() }()
 
-	content, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read layer: %w", err)
-	}
-
-	digest, err := img.Digest()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get digest: %w", err)
-	}
-
-	return &FetchResult{
-		Digest:  digest.String(),
-		Content: content,
-	}, nil
+	return extractTar(reader, destDir)
 }
 
 // ----------------------------------------------------------------------------

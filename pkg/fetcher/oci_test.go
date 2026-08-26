@@ -259,19 +259,6 @@ func createDockerConfig(t *testing.T, auths map[string]authEntry) []byte {
 	return data
 }
 
-// TestFetchResult verifies the FetchResult struct
-func TestFetchResult(t *testing.T) {
-	result := &FetchResult{
-		Digest:    "sha256:abc123",
-		Content:   []byte("test content"),
-		MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
-	}
-
-	assert.Equal(t, "sha256:abc123", result.Digest)
-	assert.Equal(t, []byte("test content"), result.Content)
-	assert.Equal(t, "application/vnd.oci.image.layer.v1.tar+gzip", result.MediaType)
-}
-
 // TestPluginAnnotation verifies the constant
 func TestPluginAnnotation(t *testing.T) {
 	assert.Equal(t, "io.backstage.dynamic-packages", PluginAnnotation)

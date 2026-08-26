@@ -180,22 +180,53 @@ func TestExtractTarEmptyArchive(t *testing.T) {
 }
 
 func TestGetMaxEntrySize(t *testing.T) {
-	// Test default value
-	os.Unsetenv("MAX_ENTRY_SIZE")
+	// Test default value (env not set)
 	assert.Equal(t, int64(DefaultMaxEntrySize), getMaxEntrySize())
 
 	// Test custom value
-	os.Setenv("MAX_ENTRY_SIZE", "1000")
+	t.Setenv("MAX_ENTRY_SIZE", "1000")
 	assert.Equal(t, int64(1000), getMaxEntrySize())
 
 	// Test invalid value falls back to default
-	os.Setenv("MAX_ENTRY_SIZE", "invalid")
+	t.Setenv("MAX_ENTRY_SIZE", "invalid")
 	assert.Equal(t, int64(DefaultMaxEntrySize), getMaxEntrySize())
 
 	// Test negative value falls back to default
-	os.Setenv("MAX_ENTRY_SIZE", "-100")
+	t.Setenv("MAX_ENTRY_SIZE", "-100")
 	assert.Equal(t, int64(DefaultMaxEntrySize), getMaxEntrySize())
+}
 
-	// Cleanup
-	os.Unsetenv("MAX_ENTRY_SIZE")
+func TestExtractTarHeaderSizeCheck(t *testing.T) {
+	// Set a small max size for testing
+	t.Setenv("MAX_ENTRY_SIZE", "100")
+
+	// Create a tar with a file larger than the limit
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	// Create content larger than MAX_ENTRY_SIZE
+	content := make([]byte, 200)
+	for i := range content {
+		content[i] = 'x'
+	}
+
+	hdr := &tar.Header{
+		Name: "large-file.txt",
+		Mode: 0644,
+		Size: int64(len(content)), // 200 bytes exceeds MAX_ENTRY_SIZE of 100
+	}
+	require.NoError(t, tw.WriteHeader(hdr))
+	_, err := tw.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+
+	destDir := t.TempDir()
+	err = extractTarBytes(buf.Bytes(), destDir)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum size")
+}
+
+func TestDefaultMaxEntrySize(t *testing.T) {
+	// Verify the default is 40MB
+	assert.Equal(t, int64(40_000_000), int64(DefaultMaxEntrySize))
 }

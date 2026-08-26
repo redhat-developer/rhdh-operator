@@ -29,9 +29,6 @@ import (
 const (
 	BackstageFieldManager = "backstage-controller"
 
-	// CatalogStatusPath is the path to the catalog readiness marker in the mounted default-config
-	CatalogStatusPath = "/default-config/.catalogs-ready"
-
 	// AutoSyncEnvVar: EXT_CONF_SYNC_backstage env variable which defines the value for rhdh.redhat.com/ext-config-sync annotation of external config object (ConfigMap|Secret)
 	// True by default
 	AutoSyncEnvVar = "EXT_CONF_SYNC_backstage"
@@ -44,8 +41,9 @@ const (
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Platform platform.Platform
+	Scheme            *runtime.Scheme
+	Platform          platform.Platform
+	OperatorNamespace string
 }
 
 // +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
@@ -92,7 +90,7 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Check if plugin catalogs are ready before proceeding
-	if !areCatalogsReady() {
+	if !r.areCatalogsReady(ctx) {
 		lg.Info("Waiting for plugin catalogs to be ready")
 		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Waiting for DevHubPluginCatalog resources to be ready")
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
@@ -210,22 +208,47 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return b.Complete(r)
 }
 
-// areCatalogsReady checks if plugin catalogs are ready by reading mounted status file
+// areCatalogsReady checks if plugin catalogs are ready by checking DevHubPluginCatalog status.
 // Returns true if:
-// - No status file exists (local dev mode - use static default-config files)
-// - Status file has content (catalogs are ready)
-// Returns false if status file exists but is empty (DHPC controller still processing)
-func areCatalogsReady() bool {
-	info, err := os.Stat(CatalogStatusPath)
-	if os.IsNotExist(err) {
-		// No file → local dev → ready
+// - Catalog controller is disabled (DISABLE_CATALOG_CONTROLLER=true)
+// - No DevHubPluginCatalog resources exist
+// - All DevHubPluginCatalog resources have Ready=True condition
+// Returns false if any catalog is not ready.
+func (r *BackstageReconciler) areCatalogsReady(ctx context.Context) bool {
+	if isCatalogControllerDisabled() {
 		return true
 	}
-	if err != nil {
-		// Error reading file, assume ready
+
+	catalogList := &api.DevHubPluginCatalogList{}
+	if err := r.List(ctx, catalogList, client.InNamespace(r.OperatorNamespace)); err != nil {
+		// Can't list catalogs, assume not ready
+		return false
+	}
+
+	if len(catalogList.Items) == 0 {
+		// No catalogs defined, nothing to wait for
 		return true
 	}
-	// Empty file → still processing → not ready
-	// Has content → ready
-	return info.Size() > 0
+
+	// Check if all catalogs have Ready=True
+	for i := range catalogList.Items {
+		catalog := &catalogList.Items[i]
+		ready := false
+		for _, cond := range catalog.Status.Conditions {
+			if cond.Type == "Ready" && cond.Status == "True" {
+				ready = true
+				break
+			}
+		}
+		if !ready {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isCatalogControllerDisabled returns true if DISABLE_CATALOG_CONTROLLER env var is set to "true"
+func isCatalogControllerDisabled() bool {
+	return os.Getenv("DISABLE_CATALOG_CONTROLLER") == "true"
 }

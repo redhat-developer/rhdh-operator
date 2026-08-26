@@ -12,8 +12,8 @@ import (
 	"strings"
 )
 
-// DefaultMaxEntrySize is the default maximum file size for extraction (1GB)
-const DefaultMaxEntrySize = 1 << 30
+// DefaultMaxEntrySize is the default maximum file size for extraction (40MB)
+const DefaultMaxEntrySize = 40_000_000
 
 // getMaxEntrySize returns the maximum entry size from MAX_ENTRY_SIZE env var or default
 func getMaxEntrySize() int64 {
@@ -31,7 +31,7 @@ func extractTarGz(r io.Reader, destDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
-	defer gzr.Close()
+	defer func() { _ = gzr.Close() }()
 
 	return extractTar(gzr, destDir)
 }
@@ -49,10 +49,15 @@ func extractTarBytes(data []byte, destDir string) error {
 // extractTar extracts a tarball from a reader to destDir
 func extractTar(r io.Reader, destDir string) error {
 	tr := tar.NewReader(r)
+	maxEntrySize := getMaxEntrySize()
 
-	// Ensure destDir exists
+	// Ensure destDir exists and get absolute path for validation
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return err
+	}
+	destDir, err := filepath.Abs(destDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
 	for {
@@ -64,11 +69,15 @@ func extractTar(r io.Reader, destDir string) error {
 			return err
 		}
 
-		target := filepath.Join(destDir, header.Name)
+		// Check header size before extraction (fail fast)
+		if header.Size > maxEntrySize {
+			return fmt.Errorf("entry %q exceeds maximum size: %d > %d", header.Name, header.Size, maxEntrySize)
+		}
 
-		// Security: prevent path traversal
-		if !strings.HasPrefix(filepath.Clean(target), filepath.Clean(destDir)+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid tar path: %s", header.Name)
+		// Construct and validate safe path
+		target, err := safePath(destDir, header.Name)
+		if err != nil {
+			return err
 		}
 
 		switch header.Typeflag {
@@ -80,15 +89,16 @@ func extractTar(r io.Reader, destDir string) error {
 			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 				return err
 			}
-			if err := extractFile(tr, target, header.Mode); err != nil {
+			if err := extractFile(tr, target, header.Size, maxEntrySize); err != nil {
 				return err
 			}
 		case tar.TypeSymlink:
-			// Handle symlinks - validate they don't escape destDir
-			linkTarget := filepath.Join(filepath.Dir(target), header.Linkname)
-			if !strings.HasPrefix(filepath.Clean(linkTarget), filepath.Clean(destDir)) {
+			// Validate symlink target doesn't escape destDir
+			linkTarget, err := safePath(destDir, filepath.Join(filepath.Dir(header.Name), header.Linkname))
+			if err != nil {
 				return fmt.Errorf("symlink escapes destination: %s -> %s", header.Name, header.Linkname)
 			}
+			_ = linkTarget // validated, use original relative linkname for symlink
 			if err := os.Symlink(header.Linkname, target); err != nil {
 				return err
 			}
@@ -97,20 +107,50 @@ func extractTar(r io.Reader, destDir string) error {
 	return nil
 }
 
-// extractFile extracts a single file from tar reader
-func extractFile(tr *tar.Reader, path string, mode int64) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(mode))
+// safePath constructs a safe path within destDir, preventing path traversal attacks.
+// Returns error if the resulting path would escape destDir.
+func safePath(destDir, name string) (string, error) {
+	// Clean the name to remove any . or .. components
+	cleaned := filepath.Clean(name)
+	if strings.HasPrefix(cleaned, "..") || filepath.IsAbs(cleaned) {
+		return "", fmt.Errorf("invalid tar path: %s", name)
+	}
+
+	// Join with destination and verify it's still within destDir
+	target := filepath.Join(destDir, cleaned)
+	if !strings.HasPrefix(target, destDir+string(os.PathSeparator)) && target != destDir {
+		return "", fmt.Errorf("invalid tar path: %s", name)
+	}
+
+	return target, nil
+}
+
+// extractFile extracts a single file from tar reader.
+// expectedSize is the size declared in the tar header.
+// maxSize is the maximum allowed size (defense in depth).
+func extractFile(tr *tar.Reader, path string, expectedSize, maxSize int64) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	// Limit copy size to prevent decompression bombs
-	// Uses MAX_ENTRY_SIZE env var or defaults to 1GB
-	maxSize := getMaxEntrySize()
-	_, err = io.CopyN(f, tr, maxSize)
+	// Use expected size from header, but cap at maxSize (defense in depth)
+	limit := expectedSize
+	if limit > maxSize {
+		limit = maxSize
+	}
+	// Add 1 byte to detect if actual content exceeds declared size
+	written, err := io.CopyN(f, tr, limit+1)
 	if err == io.EOF {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	// If we read limit+1 bytes, the file is larger than declared
+	if written > limit {
+		return fmt.Errorf("file %q actual size exceeds declared size", path)
+	}
+	return nil
 }

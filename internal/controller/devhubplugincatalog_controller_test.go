@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/catalog"
+	"github.com/redhat-developer/rhdh-operator/pkg/model"
 )
 
 func setupCatalogTestReconciler(objects ...client.Object) *DevHubPluginCatalogReconciler {
@@ -280,20 +282,32 @@ func TestBuildCatalogInputs_MissingCACert_Fails(t *testing.T) {
 	assert.Contains(t, err.Error(), "non-existent-ca")
 }
 
-func TestApplyConfigMap(t *testing.T) {
+func TestApplyConfigMap_WithExistingDynamicPlugins(t *testing.T) {
+	// Simulate default-config ConfigMap with existing dynamic-plugins.yaml
 	existingCM := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultConfigMapName,
 			Namespace: "rhdh-operator",
 		},
 		Data: map[string]string{
-			"existing-key": "existing-value",
+			"app-config.yaml": "app:\n  title: My Backstage\n",
+			"dynamic-plugins.yaml": `plugins:
+  - package: "oci://old-registry.com/old-plugin:1.0"
+    disabled: false
+`,
 		},
 	}
 
 	r := setupCatalogTestReconciler(existingCM)
 
-	patchBytes := []byte(`{"data":{"dynamic-plugins.yaml":"test content",".catalogs-ready":"true"}}`)
+	// Patch with new plugins from catalog
+	newPluginsYAML := `plugins:
+  - package: "oci://registry.example.com/rhdh/plugin-techdocs:1.0"
+    disabled: false
+  - package: "oci://registry.example.com/rhdh/plugin-kubernetes:2.0"
+    disabled: false
+`
+	patchBytes := []byte(`{"data":{"dynamic-plugins.yaml":"` + escapeJSONString(newPluginsYAML) + `",".catalogs-ready":"true"}}`)
 
 	err := r.applyConfigMap(context.TODO(), patchBytes)
 	require.NoError(t, err)
@@ -305,6 +319,102 @@ func TestApplyConfigMap(t *testing.T) {
 		Namespace: "rhdh-operator",
 	}, cm)
 	require.NoError(t, err)
+
+	// Verify dynamic-plugins.yaml was replaced with new content
+	assert.Contains(t, cm.Data, "dynamic-plugins.yaml")
+	dpContent := cm.Data["dynamic-plugins.yaml"]
+
+	// Content must be parseable as DynaPluginsConfig
+	var config model.DynaPluginsConfig
+	err = yaml.Unmarshal([]byte(dpContent), &config)
+	require.NoError(t, err, "dynamic-plugins.yaml should be parseable as DynaPluginsConfig")
+
+	// Verify plugins from catalog are present
+	assert.Len(t, config.Plugins, 2)
+	assert.Equal(t, "oci://registry.example.com/rhdh/plugin-techdocs:1.0", config.Plugins[0].Package)
+	assert.Equal(t, "oci://registry.example.com/rhdh/plugin-kubernetes:2.0", config.Plugins[1].Package)
+
+	// Verify old plugin is NOT present (was replaced)
+	for _, p := range config.Plugins {
+		assert.NotContains(t, p.Package, "old-registry.com")
+	}
+
+	// Verify catalogs-ready marker
+	assert.Equal(t, "true", cm.Data[".catalogs-ready"])
+
+	// Verify other keys are preserved
+	assert.Equal(t, "app:\n  title: My Backstage\n", cm.Data["app-config.yaml"])
+}
+
+func TestApplyConfigMap_WithoutExistingDynamicPlugins(t *testing.T) {
+	// Simulate default-config ConfigMap WITHOUT dynamic-plugins.yaml
+	existingCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      DefaultConfigMapName,
+			Namespace: "rhdh-operator",
+		},
+		Data: map[string]string{
+			"app-config.yaml": "app:\n  title: My Backstage\n",
+		},
+	}
+
+	r := setupCatalogTestReconciler(existingCM)
+
+	// Patch with plugins from catalog
+	newPluginsYAML := `plugins:
+  - package: "oci://registry.example.com/rhdh/plugin-argocd:1.0"
+    disabled: false
+`
+	patchBytes := []byte(`{"data":{"dynamic-plugins.yaml":"` + escapeJSONString(newPluginsYAML) + `",".catalogs-ready":"true"}}`)
+
+	err := r.applyConfigMap(context.TODO(), patchBytes)
+	require.NoError(t, err)
+
+	// Verify the ConfigMap was patched
+	cm := &corev1.ConfigMap{}
+	err = r.Get(context.TODO(), types.NamespacedName{
+		Name:      DefaultConfigMapName,
+		Namespace: "rhdh-operator",
+	}, cm)
+	require.NoError(t, err)
+
+	// Verify dynamic-plugins.yaml was created
+	assert.Contains(t, cm.Data, "dynamic-plugins.yaml")
+	dpContent := cm.Data["dynamic-plugins.yaml"]
+
+	// Content must be parseable as DynaPluginsConfig
+	var config model.DynaPluginsConfig
+	err = yaml.Unmarshal([]byte(dpContent), &config)
+	require.NoError(t, err, "dynamic-plugins.yaml should be parseable as DynaPluginsConfig")
+
+	// Verify plugin from catalog is present
+	assert.Len(t, config.Plugins, 1)
+	assert.Equal(t, "oci://registry.example.com/rhdh/plugin-argocd:1.0", config.Plugins[0].Package)
+
+	// Verify catalogs-ready marker
+	assert.Equal(t, "true", cm.Data[".catalogs-ready"])
+
+	// Verify other keys are preserved
+	assert.Equal(t, "app:\n  title: My Backstage\n", cm.Data["app-config.yaml"])
+}
+
+// escapeJSONString escapes a string for inclusion in a JSON string value
+func escapeJSONString(s string) string {
+	// Replace newlines and quotes for JSON embedding
+	result := ""
+	for _, c := range s {
+		switch c {
+		case '\n':
+			result += "\\n"
+		case '"':
+			result += "\\\""
+		case '\\':
+			result += "\\\\"
+		default:
+			result += string(c)
+		}
+	}
+	return result
 }
 
 func TestConstants(t *testing.T) {

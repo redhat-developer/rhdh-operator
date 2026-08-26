@@ -15,7 +15,7 @@ type DevHubPluginCatalogSpec struct {
 // CatalogSource defines the source of the plugin catalog
 type CatalogSource struct {
 	// Ref is the OCI artifact reference containing the catalog
-	// Example: registry.redhat.io/rhdh/plugin-catalog:1.5
+	// Example: oci://registry.redhat.io/rhdh/plugin-catalog:1.5
 	// +kubebuilder:validation:Required
 	Ref string `json:"ref"`
 
@@ -33,9 +33,31 @@ type CatalogSource struct {
 	SkipTLSVerify bool `json:"skipTLSVerify,omitempty"`
 }
 
+// DevHubPluginCatalogStatus defines the observed state of DevHubPluginCatalog
+type DevHubPluginCatalogStatus struct {
+	// Conditions represent the latest available observations of the catalog's state
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// Condition types for DevHubPluginCatalog
+const (
+	// ConditionTypeReady indicates whether the catalog has been successfully processed
+	ConditionTypeReady = "Ready"
+)
+
+// Condition reasons for DevHubPluginCatalog
+const (
+	ConditionReasonProcessing = "Processing"
+	ConditionReasonSucceeded  = "Succeeded"
+	ConditionReasonFailed     = "Failed"
+)
+
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster,shortName=dhpc
+// +kubebuilder:resource:scope=Namespaced,shortName=dhpc
+// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Ref",type=string,JSONPath=`.spec.source.ref`
+// +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=="Ready")].status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // DevHubPluginCatalog is the Schema for the devhubplugincatalogs API.
@@ -44,7 +66,8 @@ type DevHubPluginCatalog struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec DevHubPluginCatalogSpec `json:"spec,omitempty"`
+	Spec   DevHubPluginCatalogSpec   `json:"spec,omitempty"`
+	Status DevHubPluginCatalogStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

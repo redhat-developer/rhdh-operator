@@ -5,4 +5,4 @@ metadata:
 spec:
   source:
     # Default value, patched with CATALOG_INDEX_IMAGE from Makefile at build time
-    ref: quay.io/rhdh/plugin-catalog-index:next
+    ref: oci://quay.io/rhdh/plugin-catalog-index:next

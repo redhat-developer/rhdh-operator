@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-08-25T14:23:30Z"
+    createdAt: "2026-08-26T15:35:57Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -153,6 +153,7 @@ spec:
           - rhdh.redhat.com
           resources:
           - backstages/status
+          - devhubplugincatalogs/status
           verbs:
           - get
           - patch

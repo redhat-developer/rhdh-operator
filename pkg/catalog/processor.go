@@ -15,14 +15,8 @@ import (
 )
 
 const (
-	// InternalConfigMapName is the name embedded in the wrapped ConfigMap
-	InternalConfigMapName = "catalog-dynamic-plugins"
-
 	// CatalogFileName is the expected file in OCI artifacts
 	CatalogFileName = "dynamic-plugins.default.yaml"
-
-	// CatalogsReadyKey is the marker key added to ConfigMap when catalogs are ready
-	CatalogsReadyKey = ".catalogs-ready"
 )
 
 // Processor handles fetching, processing, and merging plugin catalogs
@@ -58,40 +52,36 @@ func (p *Processor) Process(ctx context.Context, catalogs []CatalogInput) ([]byt
 		return nil, fmt.Errorf("failed to merge catalogs: %w", err)
 	}
 
-	// Wrap in ConfigMap YAML and build JSON patch
-	wrapped := p.wrapInConfigMap(merged)
+	// Build the inner ConfigMap that will be stored as the value in default-config.
+	// The default-config ConfigMap stores Kubernetes manifests as file values,
+	// so each value must be a complete YAML document (apiVersion, kind, etc.)
+	innerConfigMap := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name": "default-dynamic-plugins",
+			"annotations": map[string]string{
+				"rhdh.redhat.com/managed-by": "DevHubPluginCatalog",
+			},
+		},
+		"data": map[string]string{
+			model.DynamicPluginsFile: string(merged),
+		},
+	}
+
+	innerYAML, err := yaml.Marshal(innerConfigMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal inner ConfigMap: %w", err)
+	}
+
+	// Build JSON patch for the default-config ConfigMap
 	patchData := map[string]interface{}{
 		"data": map[string]string{
-			model.DynamicPluginsFile: string(wrapped),
-			CatalogsReadyKey:         "true",
+			model.DynamicPluginsFile: string(innerYAML),
 		},
 	}
 
 	return json.Marshal(patchData)
-}
-
-// wrapInConfigMap wraps the plugin config in a ConfigMap manifest YAML
-func (p *Processor) wrapInConfigMap(content []byte) []byte {
-	wrapped := fmt.Sprintf(`apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: %s
-data:
-  %s: |
-%s`, InternalConfigMapName, model.DynamicPluginsFile, indentYAML(string(content), 4))
-	return []byte(wrapped)
-}
-
-// indentYAML indents each line of the YAML content by the specified number of spaces
-func indentYAML(content string, spaces int) string {
-	indent := strings.Repeat(" ", spaces)
-	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		if line != "" {
-			lines[i] = indent + line
-		}
-	}
-	return strings.Join(lines, "\n")
 }
 
 // fetch downloads a single catalog

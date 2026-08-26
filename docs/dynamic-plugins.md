@@ -51,7 +51,7 @@ The operator supports loading default plugin configurations from OCI container i
 
 **Available from operator version 2.0**
 
-Plugin catalogs are defined using `DevHubPluginCatalog` cluster-scoped resources. The operator fetches catalogs from OCI registries, merges them, and makes the configuration available to Backstage instances.
+Plugin catalogs are defined using `DevHubPluginCatalog` resources in the operator namespace. The operator fetches catalogs from OCI registries, merges them, and makes the configuration available to Backstage instances.
 
 **Default Catalog**: The operator automatically includes the default RHDH plugin catalog (`quay.io/rhdh/plugin-catalog-index:<version>`).
 
@@ -62,9 +62,10 @@ apiVersion: rhdh.redhat.com/v1alpha5
 kind: DevHubPluginCatalog
 metadata:
   name: my-catalog
+  namespace: rhdh-operator  # Must be in operator namespace
 spec:
   source:
-    ref: quay.io/my-org/plugin-catalog:v1.0
+    ref: oci://quay.io/my-org/plugin-catalog:v1.0
 ```
 
 #### Adding Multiple Catalogs
@@ -92,9 +93,10 @@ apiVersion: rhdh.redhat.com/v1alpha5
 kind: DevHubPluginCatalog
 metadata:
   name: private-catalog
+  namespace: rhdh-operator
 spec:
   source:
-    ref: registry.example.com/rhdh/plugin-catalog:v1.0
+    ref: oci://registry.example.com/rhdh/plugin-catalog:v1.0
     pullSecret:
       name: private-registry-creds
 ```
@@ -118,9 +120,10 @@ apiVersion: rhdh.redhat.com/v1alpha5
 kind: DevHubPluginCatalog
 metadata:
   name: internal-catalog
+  namespace: rhdh-operator
 spec:
   source:
-    ref: internal-registry.corp.example.com/rhdh/plugin-catalog:latest
+    ref: oci://internal-registry.corp.example.com/rhdh/plugin-catalog:latest
     certificateAuthority:
       name: internal-ca
       key: ca.crt          # Optional, defaults to "ca.crt"
@@ -133,9 +136,10 @@ apiVersion: rhdh.redhat.com/v1alpha5
 kind: DevHubPluginCatalog
 metadata:
   name: dev-catalog
+  namespace: rhdh-operator
 spec:
   source:
-    ref: dev-registry.local:5000/rhdh/plugin-catalog:dev
+    ref: oci://dev-registry.local:5000/rhdh/plugin-catalog:dev
     skipTLSVerify: true
 ```
 

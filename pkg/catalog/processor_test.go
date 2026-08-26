@@ -2,7 +2,6 @@ package catalog
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -175,78 +174,6 @@ func TestMerge_PreservesPluginConfig(t *testing.T) {
 	assert.NotNil(t, merged.Plugins[0].PluginConfig)
 }
 
-func TestWrapInConfigMap(t *testing.T) {
-	p := NewProcessor()
-
-	content := []byte(`plugins:
-  - package: "oci://registry.example.com/rhdh/plugin-test:1.0"
-`)
-
-	wrapped := p.wrapInConfigMap(content)
-	wrappedStr := string(wrapped)
-
-	// Verify it's valid YAML
-	var cm map[string]interface{}
-	require.NoError(t, yaml.Unmarshal(wrapped, &cm))
-
-	// Verify structure
-	assert.Equal(t, "v1", cm["apiVersion"])
-	assert.Equal(t, "ConfigMap", cm["kind"])
-
-	metadata, ok := cm["metadata"].(map[interface{}]interface{})
-	require.True(t, ok)
-	assert.Equal(t, InternalConfigMapName, metadata["name"])
-
-	// Verify data key
-	data, ok := cm["data"].(map[interface{}]interface{})
-	require.True(t, ok)
-	assert.Contains(t, data, model.DynamicPluginsFile)
-
-	// The content should contain our plugin
-	assert.Contains(t, wrappedStr, "oci://registry.example.com/rhdh/plugin-test:1.0")
-}
-
-func TestIndentYAML(t *testing.T) {
-	tests := []struct {
-		name     string
-		content  string
-		spaces   int
-		expected string
-	}{
-		{
-			name:     "simple indent",
-			content:  "line1\nline2",
-			spaces:   2,
-			expected: "  line1\n  line2",
-		},
-		{
-			name:     "four spaces",
-			content:  "key: value",
-			spaces:   4,
-			expected: "    key: value",
-		},
-		{
-			name:     "empty lines preserved",
-			content:  "line1\n\nline3",
-			spaces:   2,
-			expected: "  line1\n\n  line3",
-		},
-		{
-			name:     "zero spaces",
-			content:  "no indent",
-			spaces:   0,
-			expected: "no indent",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := indentYAML(tt.content, tt.spaces)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestCatalogInput(t *testing.T) {
 	input := CatalogInput{
 		Ref:           "oci://registry.example.com/rhdh/plugin-catalog-index:v1",
@@ -262,18 +189,39 @@ func TestCatalogInput(t *testing.T) {
 }
 
 func TestConstants(t *testing.T) {
-	assert.Equal(t, "catalog-dynamic-plugins", InternalConfigMapName)
 	assert.Equal(t, "dynamic-plugins.default.yaml", CatalogFileName)
-	assert.Equal(t, ".catalogs-ready", CatalogsReadyKey)
 }
 
 func TestProcessOutputFormat(t *testing.T) {
-	// Verifies the JSON patch structure without actually fetching
+	// Verifies the JSON patch structure contains a ConfigMap YAML (not raw plugin config).
+	// The default-config ConfigMap stores Kubernetes manifests as file values,
+	// so each value must be a complete ConfigMap YAML with apiVersion, kind, metadata, and data.
+
+	// Simulate what Process() outputs
+	pluginConfig := `plugins:
+  - package: "oci://registry.example.com/rhdh/plugin-test:1.0"
+    disabled: false
+`
+	innerConfigMap := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name": "default-dynamic-plugins",
+			"annotations": map[string]string{
+				"rhdh.redhat.com/managed-by": "DevHubPluginCatalog",
+			},
+		},
+		"data": map[string]string{
+			model.DynamicPluginsFile: pluginConfig,
+		},
+	}
+
+	innerYAML, err := yaml.Marshal(innerConfigMap)
+	require.NoError(t, err)
 
 	patchData := map[string]interface{}{
 		"data": map[string]string{
-			model.DynamicPluginsFile: "test content",
-			CatalogsReadyKey:         "true",
+			model.DynamicPluginsFile: string(innerYAML),
 		},
 	}
 
@@ -285,30 +233,22 @@ func TestProcessOutputFormat(t *testing.T) {
 
 	data, ok := parsed["data"].(map[string]interface{})
 	require.True(t, ok)
-	assert.Equal(t, "test content", data[model.DynamicPluginsFile])
-	assert.Equal(t, "true", data[CatalogsReadyKey])
-}
 
-func TestWrapInConfigMap_MultilineContent(t *testing.T) {
-	p := NewProcessor()
+	// Verify the content is a ConfigMap YAML
+	dpContent := data[model.DynamicPluginsFile].(string)
+	var configMap map[string]interface{}
+	require.NoError(t, yaml.Unmarshal([]byte(dpContent), &configMap), "dynamic-plugins.yaml content should be a ConfigMap YAML")
 
-	content := []byte(`plugins:
-  - package: "oci://registry.example.com/rhdh/plugin-github:1.0"
-    disabled: false
-    pluginConfig:
-      catalog:
-        providers:
-          github:
-            organization: my-org
-`)
+	assert.Equal(t, "v1", configMap["apiVersion"])
+	assert.Equal(t, "ConfigMap", configMap["kind"])
 
-	wrapped := p.wrapInConfigMap(content)
+	cmData, ok := configMap["data"].(map[interface{}]interface{})
+	require.True(t, ok, "ConfigMap should have data field")
 
-	// Should produce valid YAML
-	var cm map[string]interface{}
-	require.NoError(t, yaml.Unmarshal(wrapped, &cm))
-
-	wrappedStr := string(wrapped)
-	assert.True(t, strings.Contains(wrappedStr, "data:"))
-	assert.True(t, strings.Contains(wrappedStr, model.DynamicPluginsFile+": |"))
+	// Verify the inner content is parseable as DynaPluginsConfig
+	innerContent := cmData[model.DynamicPluginsFile].(string)
+	var config model.DynaPluginsConfig
+	require.NoError(t, yaml.Unmarshal([]byte(innerContent), &config))
+	assert.Len(t, config.Plugins, 1)
+	assert.Equal(t, "oci://registry.example.com/rhdh/plugin-test:1.0", config.Plugins[0].Package)
 }

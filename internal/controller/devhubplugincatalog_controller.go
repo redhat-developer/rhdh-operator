@@ -3,15 +3,20 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/redhat-developer/rhdh-operator/api"
+	v1alpha5 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/catalog"
 )
 
@@ -30,6 +35,7 @@ type DevHubPluginCatalogReconciler struct {
 }
 
 // +kubebuilder:rbac:groups=rhdh.redhat.com,resources=devhubplugincatalogs,verbs=get;list;watch
+// +kubebuilder:rbac:groups=rhdh.redhat.com,resources=devhubplugincatalogs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
@@ -38,29 +44,42 @@ func (r *DevHubPluginCatalogReconciler) Reconcile(ctx context.Context, req ctrl.
 	lg := log.FromContext(ctx)
 	lg.V(1).Info("Reconciling DevHubPluginCatalog", "name", req.Name)
 
-	// 1. List all catalogs and build inputs
+	// 1. List all catalogs
+	catalogList := &api.DevHubPluginCatalogList{}
+	if err := r.List(ctx, catalogList); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list catalogs: %w", err)
+	}
+
+	// 2. Build inputs from catalogs
 	inputs, err := r.buildCatalogInputs(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if len(inputs) == 0 {
-		lg.Info("No DevHubPluginCatalog resources found")
-		return ctrl.Result{}, nil
+	// 3. Set all catalogs to Processing (if any exist)
+	if len(catalogList.Items) > 0 {
+		r.setAllConditions(ctx, catalogList, metav1.ConditionFalse, v1alpha5.ConditionReasonProcessing, "Processing catalog")
 	}
 
-	// 2. Process all catalogs (fetch and merge)
+	// 4. Process catalogs (handles empty input → empty plugins list)
 	content, err := r.Processor.Process(ctx, inputs)
 	if err != nil {
+		r.setAllConditions(ctx, catalogList, metav1.ConditionFalse, v1alpha5.ConditionReasonFailed, err.Error())
 		return ctrl.Result{}, fmt.Errorf("failed to process catalogs: %w", err)
 	}
 
-	// 3. Apply merged ConfigMap
+	// 5. Apply merged ConfigMap (clears old config if no catalogs)
 	if err := r.applyConfigMap(ctx, content); err != nil {
+		r.setAllConditions(ctx, catalogList, metav1.ConditionFalse, v1alpha5.ConditionReasonFailed, err.Error())
 		return ctrl.Result{}, fmt.Errorf("failed to apply ConfigMap: %w", err)
 	}
 
-	lg.Info("Successfully reconciled all DevHubPluginCatalogs", "count", len(inputs))
+	// 6. Set all catalogs to Ready (if any exist)
+	if len(catalogList.Items) > 0 {
+		r.setAllConditions(ctx, catalogList, metav1.ConditionTrue, v1alpha5.ConditionReasonSucceeded, "Catalog processed successfully")
+	}
+
+	lg.Info("Reconciled DevHubPluginCatalogs", "count", len(inputs))
 	return ctrl.Result{}, nil
 }
 
@@ -125,10 +144,62 @@ func (r *DevHubPluginCatalogReconciler) applyConfigMap(ctx context.Context, patc
 	return nil
 }
 
+// setAllConditions sets the Ready condition on all catalogs in the list
+func (r *DevHubPluginCatalogReconciler) setAllConditions(ctx context.Context, catalogList *api.DevHubPluginCatalogList, status metav1.ConditionStatus, reason, message string) {
+	lg := log.FromContext(ctx)
+	for i := range catalogList.Items {
+		if err := r.setCondition(ctx, &catalogList.Items[i], status, reason, message); err != nil {
+			lg.Error(err, "Failed to set condition", "catalog", catalogList.Items[i].Name)
+		}
+	}
+}
+
+// setCondition sets the Ready condition on a single catalog with retry on conflict
+func (r *DevHubPluginCatalogReconciler) setCondition(ctx context.Context, dhpc *api.DevHubPluginCatalog, status metav1.ConditionStatus, reason, message string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Re-fetch the catalog to get the latest resourceVersion
+		fresh := &api.DevHubPluginCatalog{}
+		if err := r.Get(ctx, types.NamespacedName{Name: dhpc.Name, Namespace: dhpc.Namespace}, fresh); err != nil {
+			return err
+		}
+
+		now := metav1.NewTime(time.Now())
+		condition := metav1.Condition{
+			Type:               v1alpha5.ConditionTypeReady,
+			Status:             status,
+			Reason:             reason,
+			Message:            message,
+			LastTransitionTime: now,
+		}
+
+		// Update condition in status
+		updated := false
+		for i, c := range fresh.Status.Conditions {
+			if c.Type == v1alpha5.ConditionTypeReady {
+				if c.Status != status {
+					fresh.Status.Conditions[i] = condition
+				} else {
+					// Only update message/reason, not LastTransitionTime
+					fresh.Status.Conditions[i].Reason = reason
+					fresh.Status.Conditions[i].Message = message
+				}
+				updated = true
+				break
+			}
+		}
+		if !updated {
+			fresh.Status.Conditions = append(fresh.Status.Conditions, condition)
+		}
+
+		return r.Status().Update(ctx, fresh)
+	})
+}
+
 // SetupWithManager sets up the controller with the Manager
 func (r *DevHubPluginCatalogReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&api.DevHubPluginCatalog{}).
+		WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Named("devhubplugincatalog").
 		Complete(r)
 }
