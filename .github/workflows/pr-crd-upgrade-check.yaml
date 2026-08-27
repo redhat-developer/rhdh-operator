@@ -10,6 +10,7 @@ on:
       - '.github/workflows/pr-crd-upgrade-check.yaml'
       - 'config/crd/**'
       - 'api/**'
+      - 'Makefile'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}
