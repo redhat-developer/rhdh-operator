@@ -27,10 +27,6 @@ RESOLVED_OLM_VERSION=""
 OC_MIRROR_CATALOG_APPLIED="false"
 
 MAX_PARALLEL="${MAX_PARALLEL:-10}"
-if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
-  errorf "--max-parallel must be a positive integer, got: '$MAX_PARALLEL'"
-  exit 1
-fi
 
 # assume mikefarah version of yq is already available on the path; if 1, then install the version shown
 INSTALL_YQ=0
@@ -66,6 +62,12 @@ function debugf() {
 function errorf() {
   logf "ERROR" "\033[0;31m" "$1"
 }
+
+# Validate after errorf is defined (MAX_PARALLEL may come from the environment).
+if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
+  errorf "--max-parallel must be a positive integer, got: '$MAX_PARALLEL'"
+  exit 1
+fi
 
 SEM_FD=""
 
