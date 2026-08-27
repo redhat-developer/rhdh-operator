@@ -2173,6 +2173,12 @@ spec:
                   - type
                   type: object
                 type: array
+              plugins:
+                description: Plugins is the list of enabled dynamic plugin names,
+                  sorted alphabetically
+                items:
+                  type: string
+                type: array
             type: object
         type: object
     served: true
@@ -2320,6 +2326,7 @@ rules:
   - ""
   resources:
   - persistentvolumes
+  - pods
   verbs:
   - get
   - list
@@ -2349,9 +2356,12 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - apiservers
   - ingresses
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
@@ -2793,6 +2803,7 @@ data:
                 - ./install-dynamic-plugins.sh
                 - /dynamic-plugins-root
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
+              # image will be replaced with INSTALL_DP_IMAGE if OPERATOR_DP_PROCESSING==true
               image: quay.io/rhdh-community/rhdh:next
               imagePullPolicy: IfNotPresent
               securityContext:
@@ -2809,11 +2820,12 @@ data:
                   value: /opt/app-root/src/.npmrc.dynamic-plugins/.npmrc
                 - name: MAX_ENTRY_SIZE
                   value: "40000000"
-                # CATALOG_INDEX_IMAGE will be replaced by the value of the `RELATED_IMAGE_catalog_index` env var, if set
                 - name: CATALOG_INDEX_IMAGE
                   value: "quay.io/rhdh/plugin-catalog-index:next"
                 - name: CATALOG_ENTITIES_EXTRACT_DIR
                   value: '/extensions'
+                - name: INPUT_FILE
+                  value: '/opt/app-root/src/packages.txt'
               volumeMounts:
                 - mountPath: /dynamic-plugins-root
                   name: dynamic-plugins-root
@@ -4042,7 +4054,9 @@ spec:
           value: quay.io/fedora/postgresql-15:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
-        image: quay.io/rhdh/rhdh-rhel9-operator:1.11
+        - name: INSTALL_DP_IMAGE
+          value: quay.io/gazarenk/install-plugins:skopeo
+        image: quay.io/rhdh/rhdh-rhel9-operator:2.0
         livenessProbe:
           httpGet:
             path: /healthz

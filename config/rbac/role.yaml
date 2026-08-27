@@ -23,6 +23,7 @@ rules:
   - ""
   resources:
   - persistentvolumes
+  - pods
   verbs:
   - get
   - list
@@ -52,9 +53,12 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - apiservers
   - ingresses
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:

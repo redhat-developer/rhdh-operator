@@ -89,7 +89,7 @@ fi
 echo "Creating ConfigMap at ${OUTPUT_FILE}..."
 
 # Create ConfigMap header
-cat > "${OUTPUT_FILE}" <<'EOF'
+cat > "${OUTPUT_FILE}" <<EOF
 # WARNING: This file is auto-generated!
 #
 # This file is automatically extracted from the catalog-index image
@@ -103,6 +103,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: default-dynamic-plugins
+  annotations:
+    rhdh.redhat.com/created-by: create-local-dynamic-plugins.sh
+    rhdh.redhat.com/created-from: "${IMAGE}"
 data:
   dynamic-plugins.yaml: |
 EOF

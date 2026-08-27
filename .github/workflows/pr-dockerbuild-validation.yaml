@@ -4,8 +4,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
-      - main
-      - release-1.[0-9]+
+      - 'main'
+      - 'release-[0-9]+.[0-9]+'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.pull_request.head.ref }}
@@ -15,13 +15,13 @@ jobs:
   validate-dockerfile:
     name: Validate Dockerfile
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -31,6 +31,7 @@ jobs:
         with:
           files: |
             .github/workflows/pr-dockerbuild-validation.yaml
+            .github/actions/docker-build/**
             Makefile
             **/*.go
             bundle/**
@@ -42,19 +43,20 @@ jobs:
             **/Containerfile
             **/*.Dockerfile
             **/.dockerignore
+            rpms.in.yaml
+            rpms.lock.yaml
+            scripts/**
           files_ignore: |
             **/*.md
             **/*.adoc
             .rhdh/**
             tests/**
 
-      - name: Setup Go
+      - name: Build operator image (hermetic)
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        uses: ./.github/actions/docker-build
         with:
-          go-version-file: 'go.mod'
-
-      - name: Test build Dockerfile (no push)
-        if: steps.changed-files.outputs.any_changed == 'true'
-        run: |
-          make image-build IMG=localhost/operator:validate
+          imageName: localhost/operator
+          imageTags: type=raw,value=validate
+          platform: linux/amd64
+          skipArtifactUpload: 'true'

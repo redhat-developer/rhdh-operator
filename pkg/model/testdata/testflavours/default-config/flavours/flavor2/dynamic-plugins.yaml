@@ -5,5 +5,5 @@ metadata:
 data:
   "dynamic-plugins.yaml": |
     plugins:
-      - package: "plugin-flavor2"
+      - package: "./plugin-flavor2"
         enabled: true

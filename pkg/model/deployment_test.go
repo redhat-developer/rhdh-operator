@@ -68,7 +68,13 @@ func TestOverrideBackstageImage(t *testing.T) {
 	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.Equal(t, 2, len(deployment.podSpec().Containers))
 	assert.Equal(t, "dummy", deployment.container().Image)
-	assert.Equal(t, "dummy", deployment.podSpec().InitContainers[0].Image)
+	// With OPERATOR_DP_PROCESSING=true, init container uses INSTALL_DP_IMAGE (set in model_tests.go)
+	// With OPERATOR_DP_PROCESSING=false, init container uses RELATED_IMAGE_backstage
+	if IsOperatorDPProcessing() {
+		assert.Equal(t, "test-install-dp-image", deployment.podSpec().InitContainers[0].Image)
+	} else {
+		assert.Equal(t, "dummy", deployment.podSpec().InitContainers[0].Image)
+	}
 	assert.Equal(t, "busybox", deployment.podSpec().Containers[1].Image)
 
 }
@@ -383,6 +389,44 @@ func TestDeploymentKind(t *testing.T) {
 
 	ssPodSpec := deployment.podSpec()
 	assert.Equal(t, depPodSpec, ssPodSpec)
+}
+
+func TestIdleAnnotationSetsReplicasToZero(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(true)}
+	bs.Annotations = map[string]string{
+		IdleAnnotation: "true",
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.NotNil(t, deployment)
+	assert.Equal(t, int32(0), *deployment.deployable.SpecReplicas())
+
+	dbSS := model.GetRuntimeObject(DbStatefulSetKey).(*DbStatefulSet)
+	assert.NotNil(t, dbSS)
+	assert.NotNil(t, dbSS.statefulSet)
+	assert.Equal(t, int32(0), *dbSS.statefulSet.Spec.Replicas)
+}
+
+func TestIdleWithExternalDb(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(false)}
+	bs.Annotations = map[string]string{
+		IdleAnnotation: "true",
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.Equal(t, int32(0), *deployment.deployable.SpecReplicas())
 }
 
 func TestPatchedStatefulSet(t *testing.T) {

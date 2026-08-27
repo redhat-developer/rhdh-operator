@@ -40,6 +40,8 @@ func createBackstageTest(bs api.Backstage) *testBackstageObject {
 	utilruntime.Must(api.AddToScheme(b.scheme))
 	utilruntime.Must(clientgoscheme.AddToScheme(b.scheme))
 	utilruntime.Must(openshift.Install(b.scheme))
+	// Set dummy INSTALL_DP_IMAGE for tests that use deployments with install-dynamic-plugins init container
+	_ = os.Setenv(InstallDpImageEnvVar, "test-install-dp-image")
 	return b
 }
 

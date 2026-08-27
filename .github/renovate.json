@@ -12,7 +12,7 @@
   ],
   "baseBranchPatterns": [
     "main",
-    "/^release-1\\..*/"
+    "/^release-\\d+\\..*/"
   ],
   "constraints": {
     "go": "1.26"
@@ -105,7 +105,7 @@
       ],
       "matchBaseBranches": [
         "main",
-        "/^release-1\\..*/"
+        "/^release-\\d+\\..*/"
       ],
       "automerge": false
     },
