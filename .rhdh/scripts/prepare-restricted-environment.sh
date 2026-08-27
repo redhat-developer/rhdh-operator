@@ -136,6 +136,9 @@ Options:
   --filter-versions <list>               : Comma-separated list of operator minor versions to keep in the catalog (default: * (all versions)).
                                             Specify '*' to disable version filtering and include all channels and all versions.
                                             Useful for CI index images for example.
+  --max-parallel <N>                     : Max concurrent image/bundle operations (default: 10, or MAX_PARALLEL env).
+                                            Lower this if disk space or registry rate limits are constrained.
+                                            Setting to 1 restores fully sequential behavior.
   --to-registry <registry_url>           : Mirror the images into the specified registry, assuming you are already logged into it.
                                             If this is not set and --to-dir is not set, it will attempt to use the builtin OCP registry
                                             if the target cluster is OCP. Otherwise, it will error out.
@@ -288,6 +291,27 @@ while [[ "$#" -gt 0 ]]; do
       NO_VERSION_FILTER="true"
     else
       IFS=',' read -r -a FILTERED_VERSIONS <<<"$2"
+      # Guard against unquoted '*' expanding to filenames in the cwd (e.g. api, bin, ...).
+      for v in "${FILTERED_VERSIONS[@]}"; do
+        if ! [[ "$v" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+          errorf "--filter-versions values must look like minor versions (e.g. 1.10,1.11), got: '$v'"
+          errorf "If you meant all versions, pass --filter-versions '*' (quoted)."
+          exit 1
+        fi
+      done
+    fi
+    shift 1
+    ;;
+  '--max-parallel')
+    if [[ $# -lt 2 ]]; then
+      errorf "--max-parallel requires a positive integer value."
+      usage
+      exit 1
+    fi
+    MAX_PARALLEL="$2"
+    if ! [[ "$MAX_PARALLEL" =~ ^[0-9]+$ ]] || [[ "$MAX_PARALLEL" -lt 1 ]]; then
+      errorf "--max-parallel must be a positive integer, got: '$MAX_PARALLEL'"
+      exit 1
     fi
     shift 1
     ;;
@@ -683,12 +707,34 @@ function cleanup() {
   fi
 }
 
+# Recursively TERM all descendants. Needed because bash background jobs ignore
+# keyboard SIGINT, so Ctrl+C alone will not stop nested skopeo/umoci children.
+function kill_descendants() {
+  local pid=$1
+  local child
+  for child in $(pgrep -P "${pid}" 2>/dev/null || true); do
+    kill_descendants "${child}"
+    kill -TERM "${child}" 2>/dev/null || true
+  done
+}
+
 function on_interrupt() {
   local exit_code="${1:-130}"
-  # Prevent re-entry when process-group TERM reaches this shell.
+  # Prevent re-entry when TERM reaches this shell.
   trap - EXIT INT TERM
-  # Kill the whole process group so background skopeo/umoci/podman children stop too.
-  kill -TERM -$$ 2>/dev/null || true
+  kill_descendants $$
+  # If we are the process-group leader (typical foreground run), signal the group too.
+  local pgid
+  pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ' || true)
+  if [[ -n "${pgid}" && "${pgid}" == "$$" ]]; then
+    kill -TERM -"${pgid}" 2>/dev/null || true
+  fi
+  wait 2>/dev/null || true
+  # Escalate stubborn children (e.g. ignoring TERM).
+  local child
+  for child in $(pgrep -P $$ 2>/dev/null || true); do
+    kill -KILL "${child}" 2>/dev/null || true
+  done
   wait 2>/dev/null || true
   if [[ -z "${TO_DIR:-}" && -n "${TMPDIR:-}" ]]; then
     rm -fr "$TMPDIR" || true
