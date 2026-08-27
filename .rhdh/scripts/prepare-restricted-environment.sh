@@ -826,9 +826,18 @@ function render_index() {
   prod_operator_name="${prod_operator_package_name}-operator"
   debugf "Fetching metadata for the ${prod_operator_package_name} operator catalog channel, packages, and bundles."
 
-  # Filtering out to keep only the elements related to RHDH and to the versions selected
+  # Always restrict to the RHDH package. NO_VERSION_FILTER means all RHDH channels/versions,
+  # not the entire redhat-operator-index (which would mirror unrelated operators).
   if [[ "${NO_VERSION_FILTER}" == "true" ]]; then
-    opm render "${INDEX_IMAGE}" --output=yaml >"${local_index_file}"
+    debugf "No version filter: keeping all RHDH package/channel/bundle entries from the index"
+    opm render "${INDEX_IMAGE}" --output=yaml |
+      "$YQ" 'select(
+          (.schema == "olm.package" and .name == "'${prod_operator_package_name}'")
+          or
+          (.schema == "olm.channel" and .package == "'${prod_operator_package_name}'")
+          or
+          (.schema == "olm.bundle" and .package == "'${prod_operator_package_name}'")
+        )' >"${local_index_file}"
   else
     chanFilterList=""
     bundleFilterList=""
@@ -1149,7 +1158,8 @@ function process_single_bundle() {
 function process_bundles() {
 
   local bundle_images
-  bundle_images=$(grep -E '^image: .*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
+  # RHDH-only: render.yaml is package-filtered, but still require /rhdh/ in the image path.
+  bundle_images=$(grep -E '^image: .*/rhdh/.*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
 
   local total_bundles
   total_bundles=$(echo "$bundle_images" | wc -l | tr -d ' ')
@@ -1309,7 +1319,7 @@ function process_bundles_from_dir() {
   done
 
   local bundle_images
-  bundle_images=$(grep -E '^image: .*operator-bundle' "${FROM_DIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
+  bundle_images=$(grep -E '^image: .*/rhdh/.*operator-bundle' "${FROM_DIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
 
   local total_bundles
   total_bundles=$(echo "$bundle_images" | wc -l | tr -d ' ')
