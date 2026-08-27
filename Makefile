@@ -227,13 +227,18 @@ validate-image-digests: ## Validate that Dockerfile digests are manifest lists (
 	@echo
 	@hack/validate-image-digests.sh
 
-CRD_FILE ?= config/crd/bases/rhdh.redhat.com_backstages.yaml
 CRD_BASELINE_REF ?= main
 
 .PHONY: crd-upgrade-check
-crd-upgrade-check: crdify ## Check CRD upgrade safety against the base branch.
+crd-upgrade-check: crdify kustomize ## Check CRD upgrade safety against the base branch.
 	@echo "Checking CRD upgrade safety: $(CRD_BASELINE_REF) -> current working tree"
-	@$(CRDIFY) "git://$(CRD_BASELINE_REF)?path=$(CRD_FILE)" "file://$(CRD_FILE)"
+	@tmpdir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	$(KUSTOMIZE) build config/crd > "$$tmpdir/current.yaml"; \
+	mkdir -p "$$tmpdir/baseline"; \
+	git archive "$(CRD_BASELINE_REF)" config/crd | tar -x -C "$$tmpdir/baseline"; \
+	$(KUSTOMIZE) build "$$tmpdir/baseline/config/crd" > "$$tmpdir/baseline.yaml"; \
+	$(CRDIFY) "file://$$tmpdir/baseline.yaml" "file://$$tmpdir/current.yaml"
 
 ##@ Build
 
