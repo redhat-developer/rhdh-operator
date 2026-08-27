@@ -1218,8 +1218,10 @@ function process_single_bundle() {
 function process_bundles() {
 
   local bundle_images
-  # RHDH-only: render.yaml is package-filtered, but still require /rhdh/ in the image path.
-  bundle_images=$(grep -E '^image: .*/rhdh/.*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
+  # Prod: .../rhdh/...operator-bundle; CI: .../rh-osbs/rhdh-...operator-bundle
+  # (CI refs are rewritten by replaceInternalRegIfNeeded after discovery.)
+  # Primary isolation is package filtering in render_index; this is defense in depth.
+  bundle_images=$(grep -E '^image: .*(/rhdh/|rh-osbs/rhdh-).*operator-bundle' "${TMPDIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
 
   local total_bundles
   total_bundles=$(echo "$bundle_images" | wc -l | tr -d ' ')
@@ -1379,7 +1381,8 @@ function process_bundles_from_dir() {
   done
 
   local bundle_images
-  bundle_images=$(grep -E '^image: .*/rhdh/.*operator-bundle' "${FROM_DIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
+  # Same discovery rule as process_bundles (prod /rhdh/ and CI rh-osbs/rhdh-).
+  bundle_images=$(grep -E '^image: .*(/rhdh/|rh-osbs/rhdh-).*operator-bundle' "${FROM_DIR}/rhdh/rhdh/render.yaml" | awk '{print $2}' | uniq)
 
   local total_bundles
   total_bundles=$(echo "$bundle_images" | wc -l | tr -d ' ')
