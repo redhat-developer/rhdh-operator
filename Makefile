@@ -233,6 +233,7 @@ CRD_BASELINE_REF ?= main
 crd-upgrade-check: crdify kustomize ## Check CRD upgrade safety against the base branch.
 	@echo "Checking CRD upgrade safety: $(CRD_BASELINE_REF) -> current working tree"
 	@tmpdir=$$(mktemp -d); \
+	set -e; \
 	trap 'rm -rf "$$tmpdir"' EXIT; \
 	$(KUSTOMIZE) build config/crd > "$$tmpdir/current.yaml"; \
 	mkdir -p "$$tmpdir/baseline"; \
