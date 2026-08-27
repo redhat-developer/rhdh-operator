@@ -671,19 +671,18 @@ else
 fi
 
 function cleanup() {
-  local bg_pids
-  bg_pids=$(jobs -p 2>/dev/null || true)
-  if [[ -n "$bg_pids" ]]; then
-    # shellcheck disable=SC2086
-    kill $bg_pids 2>/dev/null || true
-    wait 2>/dev/null || true
-  fi
-  if [[ -z "${TO_DIR}" ]]; then
+  # Ignore further signals so process-group TERM (below) does not re-enter this trap.
+  trap - EXIT INT TERM
+  # Kill the whole process group so background skopeo/umoci/podman children stop too.
+  kill -TERM -$$ 2>/dev/null || true
+  wait 2>/dev/null || true
+  if [[ -z "${TO_DIR:-}" && -n "${TMPDIR:-}" ]]; then
     rm -fr "$TMPDIR" || true
   fi
 }
 trap cleanup EXIT
-trap 'exit 1' INT TERM
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 pushd "${TMPDIR}" >/dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
