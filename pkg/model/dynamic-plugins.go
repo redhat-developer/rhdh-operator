@@ -145,12 +145,13 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		packages := []string{}
 		for _, plugin := range pluginsData {
 			if !plugin.IsDisabled() {
-				p.enabledPlugins = append(p.enabledPlugins, plugin)
 				// Skip local paths - they're built into the image and don't need downloading
+				// TODO temporary workaround to not to fail until wrappers removed
 				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
-					klog.V(1).Infof("skipping local path plugin %q (built into image)", plugin.Package)
+					klog.Warningf("Skipping local path plugin %q (built into image)", plugin.Package)
 					continue
 				}
+				p.enabledPlugins = append(p.enabledPlugins, plugin)
 				packages = append(packages, plugin.Package)
 			}
 		}

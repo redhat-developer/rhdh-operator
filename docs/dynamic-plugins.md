@@ -72,7 +72,12 @@ spec:
 
 Create additional `DevHubPluginCatalog` resources to add more plugin sources. The operator merges all catalogs automatically.
 
-**Important**: Plugin names must be unique across all catalogs. Duplicate plugin names will cause a reconciliation error.
+**Merge Strategy**:
+- Plugin entries are **appended** in catalog processing order (alphabetical by resource name)
+- Plugin objects are **not recursively merged** - each plugin entry is treated as a complete unit
+- **Duplicate plugin names fail reconciliation** - if the same plugin name appears in multiple catalogs, the operator reports an error rather than silently overriding
+
+This means you cannot override a plugin's configuration by defining it in a second catalog. To customize a plugin from the default catalog, exclude it and provide your own complete plugin entry.
 
 #### Private Registry Authentication
 

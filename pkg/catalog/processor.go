@@ -35,26 +35,49 @@ type CatalogInput struct {
 	SkipTLSVerify bool
 }
 
-// Process fetches all catalogs, merges them, and returns JSON patch bytes ready to apply
-func (p *Processor) Process(ctx context.Context, catalogs []CatalogInput) ([]byte, error) {
-	var allContent [][]byte
+// PluginMap maps plugin names to plugins for duplicate detection
+type PluginMap map[string]model.DynaPlugin
 
-	for _, cat := range catalogs {
-		content, err := p.fetch(ctx, cat)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch catalog %s: %w", cat.Ref, err)
-		}
-		allContent = append(allContent, content)
+// AddCatalog fetches a single catalog and adds its plugins to the map, checking for duplicates
+func (p *Processor) AddCatalog(ctx context.Context, catalog CatalogInput, plugins PluginMap) error {
+	content, err := p.fetch(ctx, catalog)
+	if err != nil {
+		return fmt.Errorf("failed to fetch catalog %s: %w", catalog.Ref, err)
 	}
 
-	merged, err := p.merge(allContent)
+	var config model.DynaPluginsConfig
+	if err := yaml.Unmarshal(content, &config); err != nil {
+		return fmt.Errorf("failed to parse catalog %s: %w", catalog.Ref, err)
+	}
+
+	for _, plugin := range config.Plugins {
+		name := plugin.Name()
+		if name == "" {
+			return fmt.Errorf("invalid plugin package %q: cannot extract plugin name", plugin.Package)
+		}
+		if existing, exists := plugins[name]; exists {
+			return fmt.Errorf("duplicate plugin name %q: found in both %q and %q", name, existing.Package, plugin.Package)
+		}
+		plugins[name] = plugin
+	}
+
+	return nil
+}
+
+// BuildPatch creates a JSON patch for the default-config ConfigMap from accumulated plugins
+func (p *Processor) BuildPatch(plugins PluginMap) ([]byte, error) {
+	// Convert map to slice
+	list := make([]model.DynaPlugin, 0, len(plugins))
+	for _, plugin := range plugins {
+		list = append(list, plugin)
+	}
+
+	merged, err := yaml.Marshal(model.DynaPluginsConfig{Plugins: list})
 	if err != nil {
-		return nil, fmt.Errorf("failed to merge catalogs: %w", err)
+		return nil, fmt.Errorf("failed to marshal plugins: %w", err)
 	}
 
 	// Build the inner ConfigMap that will be stored as the value in default-config.
-	// The default-config ConfigMap stores Kubernetes manifests as file values,
-	// so each value must be a complete YAML document (apiVersion, kind, etc.)
 	innerConfigMap := map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
@@ -116,32 +139,4 @@ func (p *Processor) fetch(ctx context.Context, cat CatalogInput) ([]byte, error)
 	}
 
 	return content, nil
-}
-
-// merge combines multiple catalog contents, validating no duplicate plugin names exist.
-// Plugins are identified by name (last path segment of the package URL, without tag/digest).
-// Returns an error if duplicate plugin names are found across catalogs.
-func (p *Processor) merge(catalogs [][]byte) ([]byte, error) {
-	var allPlugins []model.DynaPlugin
-	seen := make(map[string]string) // plugin name -> package URL (for error reporting)
-
-	for _, content := range catalogs {
-		var catalog model.DynaPluginsConfig
-		if err := yaml.Unmarshal(content, &catalog); err != nil {
-			return nil, fmt.Errorf("failed to parse catalog: %w", err)
-		}
-		for _, plugin := range catalog.Plugins {
-			name := plugin.Name()
-			if name == "" {
-				return nil, fmt.Errorf("invalid plugin package %q: cannot extract plugin name", plugin.Package)
-			}
-			if existingPkg, exists := seen[name]; exists {
-				return nil, fmt.Errorf("duplicate plugin name %q: found in both %q and %q", name, existingPkg, plugin.Package)
-			}
-			allPlugins = append(allPlugins, plugin)
-			seen[name] = plugin.Package
-		}
-	}
-
-	return yaml.Marshal(model.DynaPluginsConfig{Plugins: allPlugins})
 }

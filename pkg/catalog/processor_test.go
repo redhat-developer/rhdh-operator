@@ -11,13 +11,42 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 )
 
+// addPluginsFromYAML is a test helper that parses YAML and adds plugins to the map
+func addPluginsFromYAML(t *testing.T, plugins PluginMap, content string) error {
+	var config model.DynaPluginsConfig
+	if err := yaml.Unmarshal([]byte(content), &config); err != nil {
+		return err
+	}
+	for _, plugin := range config.Plugins {
+		name := plugin.Name()
+		if name == "" {
+			t.Fatalf("invalid plugin package %q: cannot extract plugin name", plugin.Package)
+		}
+		if existing, exists := plugins[name]; exists {
+			return &duplicatePluginError{name: name, existingPkg: existing.Package, newPkg: plugin.Package}
+		}
+		plugins[name] = plugin
+	}
+	return nil
+}
+
+type duplicatePluginError struct {
+	name        string
+	existingPkg string
+	newPkg      string
+}
+
+func (e *duplicatePluginError) Error() string {
+	return "duplicate plugin name " + e.name + ": found in both " + e.existingPkg + " and " + e.newPkg
+}
+
 func TestNewProcessor(t *testing.T) {
 	p := NewProcessor()
 	assert.NotNil(t, p)
 }
 
-func TestMerge_SingleCatalog(t *testing.T) {
-	p := NewProcessor()
+func TestPluginMap_SingleCatalog(t *testing.T) {
+	plugins := make(PluginMap)
 
 	catalog := `plugins:
   - package: "oci://registry.example.com/rhdh/plugin-techdocs:1.0"
@@ -25,18 +54,13 @@ func TestMerge_SingleCatalog(t *testing.T) {
   - package: "oci://registry.example.com/rhdh/plugin-kubernetes:1.0"
     disabled: false
 `
-
-	result, err := p.merge([][]byte{[]byte(catalog)})
+	err := addPluginsFromYAML(t, plugins, catalog)
 	require.NoError(t, err)
-
-	var merged model.DynaPluginsConfig
-	require.NoError(t, yaml.Unmarshal(result, &merged))
-
-	assert.Len(t, merged.Plugins, 2)
+	assert.Len(t, plugins, 2)
 }
 
-func TestMerge_MultipleCatalogs(t *testing.T) {
-	p := NewProcessor()
+func TestPluginMap_MultipleCatalogs(t *testing.T) {
+	plugins := make(PluginMap)
 
 	catalog1 := `plugins:
   - package: "oci://registry.example.com/rhdh/plugin-techdocs:1.0"
@@ -44,25 +68,19 @@ func TestMerge_MultipleCatalogs(t *testing.T) {
   - package: "oci://registry.example.com/rhdh/plugin-kubernetes:1.0"
     disabled: false
 `
-
 	catalog2 := `plugins:
   - package: "oci://registry.example.com/rhdh/plugin-argocd:1.0"
     disabled: false
   - package: "oci://registry.example.com/rhdh/plugin-search:1.0"
     disabled: false
 `
-
-	result, err := p.merge([][]byte{[]byte(catalog1), []byte(catalog2)})
-	require.NoError(t, err)
-
-	var merged model.DynaPluginsConfig
-	require.NoError(t, yaml.Unmarshal(result, &merged))
-
-	assert.Len(t, merged.Plugins, 4)
+	require.NoError(t, addPluginsFromYAML(t, plugins, catalog1))
+	require.NoError(t, addPluginsFromYAML(t, plugins, catalog2))
+	assert.Len(t, plugins, 4)
 }
 
-func TestMerge_DuplicateSameURL_Fails(t *testing.T) {
-	p := NewProcessor()
+func TestPluginMap_DuplicateSameURL_Fails(t *testing.T) {
+	plugins := make(PluginMap)
 
 	catalog := `plugins:
   - package: "oci://registry.example.com/rhdh/plugin-techdocs:1.0"
@@ -70,15 +88,14 @@ func TestMerge_DuplicateSameURL_Fails(t *testing.T) {
   - package: "oci://registry.example.com/rhdh/plugin-techdocs:1.0"
     disabled: true
 `
-
-	_, err := p.merge([][]byte{[]byte(catalog)})
+	err := addPluginsFromYAML(t, plugins, catalog)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate plugin name")
 	assert.Contains(t, err.Error(), "plugin-techdocs")
 }
 
-func TestMerge_DuplicateDifferentURL_Fails(t *testing.T) {
-	p := NewProcessor()
+func TestPluginMap_DuplicateDifferentURL_Fails(t *testing.T) {
+	plugins := make(PluginMap)
 
 	// Same plugin name but different registries/tags
 	catalog := `plugins:
@@ -87,72 +104,42 @@ func TestMerge_DuplicateDifferentURL_Fails(t *testing.T) {
   - package: "oci://other-registry.com/path/plugin-techdocs@sha256:abc123"
     disabled: false
 `
-
-	_, err := p.merge([][]byte{[]byte(catalog)})
+	err := addPluginsFromYAML(t, plugins, catalog)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate plugin name")
 	assert.Contains(t, err.Error(), "plugin-techdocs")
 }
 
-func TestMerge_DuplicateAcrossCatalogs_Fails(t *testing.T) {
-	p := NewProcessor()
+func TestPluginMap_DuplicateAcrossCatalogs_Fails(t *testing.T) {
+	plugins := make(PluginMap)
 
 	catalog1 := `plugins:
   - package: "oci://registry.example.com/rhdh/plugin-techdocs:1.0"
     disabled: false
 `
-
 	catalog2 := `plugins:
   - package: "oci://other-registry.com/rhdh/plugin-techdocs:2.0"
     disabled: false
 `
-
-	_, err := p.merge([][]byte{[]byte(catalog1), []byte(catalog2)})
+	require.NoError(t, addPluginsFromYAML(t, plugins, catalog1))
+	err := addPluginsFromYAML(t, plugins, catalog2)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate plugin name")
 	assert.Contains(t, err.Error(), "plugin-techdocs")
 }
 
-func TestMerge_EmptyCatalog(t *testing.T) {
-	p := NewProcessor()
+func TestPluginMap_EmptyCatalog(t *testing.T) {
+	plugins := make(PluginMap)
 
 	catalog := `plugins: []`
 
-	result, err := p.merge([][]byte{[]byte(catalog)})
+	err := addPluginsFromYAML(t, plugins, catalog)
 	require.NoError(t, err)
-
-	var merged model.DynaPluginsConfig
-	require.NoError(t, yaml.Unmarshal(result, &merged))
-
-	assert.Empty(t, merged.Plugins)
+	assert.Empty(t, plugins)
 }
 
-func TestMerge_InvalidYAML(t *testing.T) {
-	p := NewProcessor()
-
-	invalidYAML := `this is not: valid: yaml: [}`
-
-	_, err := p.merge([][]byte{[]byte(invalidYAML)})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse catalog")
-}
-
-func TestMerge_InvalidPluginPackage(t *testing.T) {
-	p := NewProcessor()
-
-	// Plugin with unsupported URL format that results in empty name
-	catalog := `plugins:
-  - package: "invalid-format"
-    disabled: false
-`
-
-	_, err := p.merge([][]byte{[]byte(catalog)})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "cannot extract plugin name")
-}
-
-func TestMerge_PreservesPluginConfig(t *testing.T) {
-	p := NewProcessor()
+func TestPluginMap_PreservesPluginConfig(t *testing.T) {
+	plugins := make(PluginMap)
 
 	catalog := `plugins:
   - package: "oci://registry.example.com/rhdh/plugin-github:1.0"
@@ -163,15 +150,66 @@ func TestMerge_PreservesPluginConfig(t *testing.T) {
           github:
             organization: my-org
 `
+	err := addPluginsFromYAML(t, plugins, catalog)
+	require.NoError(t, err)
+	assert.Len(t, plugins, 1)
+	assert.NotNil(t, plugins["plugin-github"].PluginConfig)
+}
 
-	result, err := p.merge([][]byte{[]byte(catalog)})
+func TestBuildPatch(t *testing.T) {
+	p := NewProcessor()
+	plugins := make(PluginMap)
+
+	plugins["plugin-test"] = model.DynaPlugin{
+		Package:  "oci://registry.example.com/rhdh/plugin-test:1.0",
+		Disabled: false,
+	}
+
+	patchBytes, err := p.BuildPatch(plugins)
 	require.NoError(t, err)
 
-	var merged model.DynaPluginsConfig
-	require.NoError(t, yaml.Unmarshal(result, &merged))
+	// Verify JSON structure
+	var parsed map[string]interface{}
+	require.NoError(t, json.Unmarshal(patchBytes, &parsed))
 
-	assert.Len(t, merged.Plugins, 1)
-	assert.NotNil(t, merged.Plugins[0].PluginConfig)
+	data, ok := parsed["data"].(map[string]interface{})
+	require.True(t, ok)
+
+	// Verify the content is a ConfigMap YAML
+	dpContent := data[model.DynamicPluginsFile].(string)
+	var configMap map[string]interface{}
+	require.NoError(t, yaml.Unmarshal([]byte(dpContent), &configMap))
+
+	assert.Equal(t, "v1", configMap["apiVersion"])
+	assert.Equal(t, "ConfigMap", configMap["kind"])
+}
+
+func TestBuildPatch_Empty(t *testing.T) {
+	p := NewProcessor()
+	plugins := make(PluginMap)
+
+	patchBytes, err := p.BuildPatch(plugins)
+	require.NoError(t, err)
+
+	// Verify JSON structure
+	var parsed map[string]interface{}
+	require.NoError(t, json.Unmarshal(patchBytes, &parsed))
+
+	data, ok := parsed["data"].(map[string]interface{})
+	require.True(t, ok)
+
+	// Verify the content is a ConfigMap YAML with empty plugins
+	dpContent := data[model.DynamicPluginsFile].(string)
+	var configMap map[string]interface{}
+	require.NoError(t, yaml.Unmarshal([]byte(dpContent), &configMap))
+
+	cmData, ok := configMap["data"].(map[interface{}]interface{})
+	require.True(t, ok)
+
+	innerContent := cmData[model.DynamicPluginsFile].(string)
+	var config model.DynaPluginsConfig
+	require.NoError(t, yaml.Unmarshal([]byte(innerContent), &config))
+	assert.Empty(t, config.Plugins)
 }
 
 func TestCatalogInput(t *testing.T) {
@@ -190,65 +228,4 @@ func TestCatalogInput(t *testing.T) {
 
 func TestConstants(t *testing.T) {
 	assert.Equal(t, "dynamic-plugins.default.yaml", CatalogFileName)
-}
-
-func TestProcessOutputFormat(t *testing.T) {
-	// Verifies the JSON patch structure contains a ConfigMap YAML (not raw plugin config).
-	// The default-config ConfigMap stores Kubernetes manifests as file values,
-	// so each value must be a complete ConfigMap YAML with apiVersion, kind, metadata, and data.
-
-	// Simulate what Process() outputs
-	pluginConfig := `plugins:
-  - package: "oci://registry.example.com/rhdh/plugin-test:1.0"
-    disabled: false
-`
-	innerConfigMap := map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
-			"name": "default-dynamic-plugins",
-			"annotations": map[string]string{
-				"rhdh.redhat.com/managed-by": "DevHubPluginCatalog",
-			},
-		},
-		"data": map[string]string{
-			model.DynamicPluginsFile: pluginConfig,
-		},
-	}
-
-	innerYAML, err := yaml.Marshal(innerConfigMap)
-	require.NoError(t, err)
-
-	patchData := map[string]interface{}{
-		"data": map[string]string{
-			model.DynamicPluginsFile: string(innerYAML),
-		},
-	}
-
-	jsonBytes, err := json.Marshal(patchData)
-	require.NoError(t, err)
-
-	var parsed map[string]interface{}
-	require.NoError(t, json.Unmarshal(jsonBytes, &parsed))
-
-	data, ok := parsed["data"].(map[string]interface{})
-	require.True(t, ok)
-
-	// Verify the content is a ConfigMap YAML
-	dpContent := data[model.DynamicPluginsFile].(string)
-	var configMap map[string]interface{}
-	require.NoError(t, yaml.Unmarshal([]byte(dpContent), &configMap), "dynamic-plugins.yaml content should be a ConfigMap YAML")
-
-	assert.Equal(t, "v1", configMap["apiVersion"])
-	assert.Equal(t, "ConfigMap", configMap["kind"])
-
-	cmData, ok := configMap["data"].(map[interface{}]interface{})
-	require.True(t, ok, "ConfigMap should have data field")
-
-	// Verify the inner content is parseable as DynaPluginsConfig
-	innerContent := cmData[model.DynamicPluginsFile].(string)
-	var config model.DynaPluginsConfig
-	require.NoError(t, yaml.Unmarshal([]byte(innerContent), &config))
-	assert.Len(t, config.Plugins, 1)
-	assert.Equal(t, "oci://registry.example.com/rhdh/plugin-test:1.0", config.Plugins[0].Package)
 }

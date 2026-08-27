@@ -50,83 +50,77 @@ func (r *DevHubPluginCatalogReconciler) Reconcile(ctx context.Context, req ctrl.
 		return ctrl.Result{}, fmt.Errorf("failed to list catalogs: %w", err)
 	}
 
-	// 2. Build inputs from catalogs
-	inputs, err := r.buildCatalogInputs(ctx, catalogList)
-	if err != nil {
-		return ctrl.Result{}, err
+	// 2. Process each catalog
+	plugins := make(catalog.PluginMap)
+	for i := range catalogList.Items {
+		dhpc := &catalogList.Items[i]
+		r.setCondition(ctx, dhpc, metav1.ConditionFalse, v1alpha5.ConditionReasonProcessing, "Processing catalog")
+
+		input, err := r.buildCatalogInput(ctx, dhpc)
+		if err != nil {
+			r.setCondition(ctx, dhpc, metav1.ConditionFalse, v1alpha5.ConditionReasonFailed, err.Error())
+			return ctrl.Result{}, err
+		}
+		if err := r.Processor.AddCatalog(ctx, input, plugins); err != nil {
+			r.setCondition(ctx, dhpc, metav1.ConditionFalse, v1alpha5.ConditionReasonFailed, err.Error())
+			return ctrl.Result{}, fmt.Errorf("failed to process catalog %q: %w", dhpc.Name, err)
+		}
 	}
 
-	// 3. Set all catalogs to Processing (if any exist)
-	if len(catalogList.Items) > 0 {
-		r.setAllConditions(ctx, catalogList, metav1.ConditionFalse, v1alpha5.ConditionReasonProcessing, "Processing catalog")
-	}
-
-	// 4. Process catalogs (handles empty input → empty plugins list)
-	content, err := r.Processor.Process(ctx, inputs)
-	if err != nil {
-		r.setAllConditions(ctx, catalogList, metav1.ConditionFalse, v1alpha5.ConditionReasonFailed, err.Error())
-		return ctrl.Result{}, fmt.Errorf("failed to process catalogs: %w", err)
-	}
-
-	// 5. Apply merged ConfigMap (clears old config if no catalogs)
-	if err := r.applyConfigMap(ctx, content); err != nil {
+	// 3. Apply merged ConfigMap (clears old config if no catalogs)
+	if err := r.applyConfigMap(ctx, plugins); err != nil {
 		r.setAllConditions(ctx, catalogList, metav1.ConditionFalse, v1alpha5.ConditionReasonFailed, err.Error())
 		return ctrl.Result{}, fmt.Errorf("failed to apply ConfigMap: %w", err)
 	}
 
-	// 6. Set all catalogs to Ready (if any exist)
-	if len(catalogList.Items) > 0 {
-		r.setAllConditions(ctx, catalogList, metav1.ConditionTrue, v1alpha5.ConditionReasonSucceeded, "Catalog processed successfully")
-	}
+	// 4. Set all catalogs to Ready
+	r.setAllConditions(ctx, catalogList, metav1.ConditionTrue, v1alpha5.ConditionReasonSucceeded, "Catalog processed successfully")
 
-	lg.Info("Reconciled DevHubPluginCatalogs", "count", len(inputs))
+	lg.Info("Reconciled DevHubPluginCatalogs", "count", len(catalogList.Items))
 	return ctrl.Result{}, nil
 }
 
-// buildCatalogInputs builds processor inputs from the catalog list
-func (r *DevHubPluginCatalogReconciler) buildCatalogInputs(ctx context.Context, catalogList *api.DevHubPluginCatalogList) ([]catalog.CatalogInput, error) {
-	inputs := make([]catalog.CatalogInput, 0, len(catalogList.Items))
-
-	for i := range catalogList.Items {
-		dhpc := &catalogList.Items[i]
-
-		input := catalog.CatalogInput{
-			Ref:           dhpc.Spec.Source.Ref,
-			SkipTLSVerify: dhpc.Spec.Source.SkipTLSVerify,
-		}
-
-		// Get pull secret
-		if dhpc.Spec.Source.PullSecret != nil {
-			secret := &corev1.Secret{}
-			key := types.NamespacedName{Name: dhpc.Spec.Source.PullSecret.Name, Namespace: r.OperatorNamespace}
-			if err := r.Get(ctx, key, secret); err != nil {
-				return nil, fmt.Errorf("failed to get pull secret %q for catalog %q: %w", dhpc.Spec.Source.PullSecret.Name, dhpc.Name, err)
-			}
-			input.DockerConfig = secret.Data[".dockerconfigjson"]
-		}
-
-		// Get CA certificate
-		if dhpc.Spec.Source.CertificateAuthority != nil {
-			cm := &corev1.ConfigMap{}
-			key := types.NamespacedName{Name: dhpc.Spec.Source.CertificateAuthority.Name, Namespace: r.OperatorNamespace}
-			if err := r.Get(ctx, key, cm); err != nil {
-				return nil, fmt.Errorf("failed to get CA ConfigMap %q for catalog %q: %w", dhpc.Spec.Source.CertificateAuthority.Name, dhpc.Name, err)
-			}
-			caKey := dhpc.Spec.Source.CertificateAuthority.Key
-			if caKey == "" {
-				caKey = "ca.crt"
-			}
-			input.CACert = []byte(cm.Data[caKey])
-		}
-
-		inputs = append(inputs, input)
+// buildCatalogInput builds a processor input from a single catalog
+func (r *DevHubPluginCatalogReconciler) buildCatalogInput(ctx context.Context, dhpc *api.DevHubPluginCatalog) (catalog.CatalogInput, error) {
+	input := catalog.CatalogInput{
+		Ref:           dhpc.Spec.Source.Ref,
+		SkipTLSVerify: dhpc.Spec.Source.SkipTLSVerify,
 	}
 
-	return inputs, nil
+	// Get pull secret
+	if dhpc.Spec.Source.PullSecret != nil {
+		secret := &corev1.Secret{}
+		key := types.NamespacedName{Name: dhpc.Spec.Source.PullSecret.Name, Namespace: r.OperatorNamespace}
+		if err := r.Get(ctx, key, secret); err != nil {
+			return input, fmt.Errorf("failed to get pull secret %q for catalog %q: %w", dhpc.Spec.Source.PullSecret.Name, dhpc.Name, err)
+		}
+		input.DockerConfig = secret.Data[".dockerconfigjson"]
+	}
+
+	// Get CA certificate
+	if dhpc.Spec.Source.CertificateAuthority != nil {
+		cm := &corev1.ConfigMap{}
+		key := types.NamespacedName{Name: dhpc.Spec.Source.CertificateAuthority.Name, Namespace: r.OperatorNamespace}
+		if err := r.Get(ctx, key, cm); err != nil {
+			return input, fmt.Errorf("failed to get CA ConfigMap %q for catalog %q: %w", dhpc.Spec.Source.CertificateAuthority.Name, dhpc.Name, err)
+		}
+		caKey := dhpc.Spec.Source.CertificateAuthority.Key
+		if caKey == "" {
+			caKey = "ca.crt"
+		}
+		input.CACert = []byte(cm.Data[caKey])
+	}
+
+	return input, nil
 }
 
-// applyConfigMap patches the default-config ConfigMap with pre-built patch bytes.
-func (r *DevHubPluginCatalogReconciler) applyConfigMap(ctx context.Context, patchBytes []byte) error {
+// applyConfigMap builds patch from plugins and applies it to the default-config ConfigMap.
+func (r *DevHubPluginCatalogReconciler) applyConfigMap(ctx context.Context, plugins catalog.PluginMap) error {
+	patchBytes, err := r.Processor.BuildPatch(plugins)
+	if err != nil {
+		return fmt.Errorf("failed to build patch: %w", err)
+	}
+
 	cm := &corev1.ConfigMap{}
 	cm.Name = DefaultConfigMapName
 	cm.Namespace = r.OperatorNamespace
@@ -141,17 +135,15 @@ func (r *DevHubPluginCatalogReconciler) applyConfigMap(ctx context.Context, patc
 
 // setAllConditions sets the Ready condition on all catalogs in the list
 func (r *DevHubPluginCatalogReconciler) setAllConditions(ctx context.Context, catalogList *api.DevHubPluginCatalogList, status metav1.ConditionStatus, reason, message string) {
-	lg := log.FromContext(ctx)
 	for i := range catalogList.Items {
-		if err := r.setCondition(ctx, &catalogList.Items[i], status, reason, message); err != nil {
-			lg.Error(err, "Failed to set condition", "catalog", catalogList.Items[i].Name)
-		}
+		r.setCondition(ctx, &catalogList.Items[i], status, reason, message)
 	}
 }
 
-// setCondition sets the Ready condition on a single catalog with retry on conflict
-func (r *DevHubPluginCatalogReconciler) setCondition(ctx context.Context, dhpc *api.DevHubPluginCatalog, status metav1.ConditionStatus, reason, message string) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+// setCondition sets the Ready condition on a single catalog with retry on conflict.
+// Errors are logged internally; controller will retry on next reconciliation.
+func (r *DevHubPluginCatalogReconciler) setCondition(ctx context.Context, dhpc *api.DevHubPluginCatalog, status metav1.ConditionStatus, reason, message string) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Re-fetch the catalog to get the latest resourceVersion
 		fresh := &api.DevHubPluginCatalog{}
 		if err := r.Get(ctx, types.NamespacedName{Name: dhpc.Name, Namespace: dhpc.Namespace}, fresh); err != nil {
@@ -188,6 +180,9 @@ func (r *DevHubPluginCatalogReconciler) setCondition(ctx context.Context, dhpc *
 
 		return r.Status().Update(ctx, fresh)
 	})
+	if err != nil {
+		log.FromContext(ctx).Error(err, "Failed to set condition", "catalog", dhpc.Name, "reason", reason)
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager
