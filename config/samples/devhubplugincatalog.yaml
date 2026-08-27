@@ -1,0 +1,54 @@
+# DevHubPluginCatalog defines a source for plugin catalogs fetched from OCI registries.
+# The operator fetches catalogs from all DevHubPluginCatalog resources, merges them,
+# and makes them available to Backstage instances.
+#
+# This is a cluster-scoped resource.
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: default-catalog
+spec:
+  source:
+    # OCI artifact URL containing the plugin catalog
+    # The artifact must contain a dynamic-plugins.default.yaml file
+    ref: oci://quay.io/rhdh/plugin-catalog-index:next
+
+---
+# Example with private registry authentication
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: private-catalog
+spec:
+  source:
+    ref: oci://registry.example.com/rhdh/plugin-catalog:v1.0
+    # Reference to a Secret containing .dockerconfigjson for registry authentication
+    # The Secret must exist in the operator namespace
+    pullSecret:
+      name: private-registry-creds
+
+---
+# Example with custom CA certificate
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: internal-catalog
+spec:
+  source:
+    ref: oci://internal-registry.corp.example.com/rhdh/plugin-catalog:latest
+    # Reference to a ConfigMap containing the CA certificate
+    # The ConfigMap must exist in the operator namespace
+    certificateAuthority:
+      name: internal-ca
+      key: ca.crt  # Optional, defaults to "ca.crt"
+
+---
+# Example with TLS verification disabled (not recommended for production)
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: dev-catalog
+spec:
+  source:
+    ref: oci://dev-registry.local:5000/rhdh/plugin-catalog:dev
+    skipTLSVerify: true
