@@ -71,6 +71,19 @@ func TestNetworkPoliciesWithoutLocalDb(t *testing.T) {
 		assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel],
 			"all NPs should have backend label when localDb is disabled")
 	}
+
+	var psqlEgress *networkingv1.NetworkPolicy
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-psql-egress" {
+			psqlEgress = np
+			break
+		}
+	}
+	assert.NotNil(t, psqlEgress, "allow-psql-egress should still exist when localDb is disabled")
+	assert.Len(t, psqlEgress.Spec.Egress, 1)
+	assert.Nil(t, psqlEgress.Spec.Egress[0].To,
+		"psql egress should allow port 5432 to any destination when localDb is disabled")
 }
 
 func TestNetworkPolicyPodSelectors(t *testing.T) {

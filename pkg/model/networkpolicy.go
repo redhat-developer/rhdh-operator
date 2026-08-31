@@ -108,6 +108,15 @@ func (b *BackstageNetworkPolicy) setMetaInfo(backstage api.Backstage, scheme *ru
 			if isDbScoped(np) {
 				continue
 			}
+			for i := range np.Spec.Egress {
+				for j := range np.Spec.Egress[i].To {
+					if np.Spec.Egress[i].To[j].PodSelector != nil {
+						if val, ok := np.Spec.Egress[i].To[j].PodSelector.MatchLabels[BackstageAppLabel]; ok && strings.HasPrefix(val, dbLabelPrefix) {
+							np.Spec.Egress[i].To = nil
+						}
+					}
+				}
+			}
 			filtered = append(filtered, item)
 		}
 		b.networkPolicies.Items = filtered
