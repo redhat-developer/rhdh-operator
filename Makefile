@@ -165,7 +165,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: goimports ## Format the code using goimports
-	find . -not -path '*/\.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
+	find . -not -path '*/\.*' -not -name 'zz_generated.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
