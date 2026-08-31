@@ -438,6 +438,8 @@ data:
         - Egress
       egress:
         - to:
+            # When local DB is disabled (external DB), this 'to' selector is removed at runtime,
+            # allowing egress on port 5432 to any destination.
             - podSelector:
                 matchLabels:
                   rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
@@ -459,7 +461,29 @@ data:
         - from:
             - namespaceSelector:
                 matchLabels:
+                  # OpenShift platform monitoring
                   kubernetes.io/metadata.name: openshift-monitoring
+            - namespaceSelector:
+                matchLabels:
+                  # GKE Standard: Google Managed Prometheus
+                  kubernetes.io/metadata.name: gmp-system
+            - namespaceSelector:
+                matchLabels:
+                  # GKE Autopilot: Google Managed Prometheus
+                  kubernetes.io/metadata.name: gke-gmp-system
+            - namespaceSelector:
+                matchLabels:
+                  # kube-prometheus-stack convention
+                  kubernetes.io/metadata.name: monitoring
+            # AKS runs its monitoring agent in kube-system, but allowing all of kube-system
+            # is too broad; it contains many non-monitoring system components.
+            # AKS users should create an additive NetworkPolicy targeting kube-system if needed.
+            #- namespaceSelector:
+            #    matchLabels:
+            #      kubernetes.io/metadata.name: kube-system
+            # EKS (Amazon Managed Prometheus) has no fixed in-cluster collector namespace;
+            # users deploy their own collector (e.g. ADOT) and should create an additive
+            # NetworkPolicy targeting their collector namespace if needed.
           ports:
             - port: 9464
               protocol: TCP
@@ -481,6 +505,8 @@ data:
             - port: 7007
               protocol: TCP
     ---
+    # The following db-* policies are only created when the local DB is enabled in the CR.
+    # They are filtered out at runtime when spec.database.enableLocalDb is false.
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
