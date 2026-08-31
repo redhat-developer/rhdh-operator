@@ -4241,7 +4241,7 @@ spec:
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
         - name: RELATED_IMAGE_plugin_installer
-          value: 'quay.io/gazarenk/rhdh-plugin-installer:next'
+          value: 'quay.io/rhdh-community/rhdh-plugin-installer:next'
         - name: POD_NAME
           valueFrom:
             fieldRef:
