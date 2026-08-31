@@ -87,8 +87,12 @@ spec:
               kubernetes.io/metadata.name: openshift-monitoring
         - namespaceSelector:
             matchLabels:
-              # GKE: Google Managed Prometheus
+              # GKE Standard: Google Managed Prometheus
               kubernetes.io/metadata.name: gmp-system
+        - namespaceSelector:
+            matchLabels:
+              # GKE Autopilot: Google Managed Prometheus
+              kubernetes.io/metadata.name: gke-gmp-system
         - namespaceSelector:
             matchLabels:
               # kube-prometheus-stack convention
@@ -99,6 +103,9 @@ spec:
         #- namespaceSelector:
         #    matchLabels:
         #      kubernetes.io/metadata.name: kube-system
+        # EKS (Amazon Managed Prometheus) has no fixed in-cluster collector namespace;
+        # users deploy their own collector (e.g. ADOT) and should create an additive
+        # NetworkPolicy targeting their collector namespace if needed.
       ports:
         - port: 9464
           protocol: TCP

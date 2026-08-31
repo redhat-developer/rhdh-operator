@@ -87,6 +87,9 @@ spec:
               kubernetes.io/metadata.name: gmp-system
         - namespaceSelector:
             matchLabels:
+              kubernetes.io/metadata.name: gke-gmp-system
+        - namespaceSelector:
+            matchLabels:
               kubernetes.io/metadata.name: monitoring
       ports:
         - port: 9464
