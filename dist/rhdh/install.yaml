@@ -2603,58 +2603,6 @@ data:
     your own app-config ConfigMap\n    # and reference it in your CR.\n    # See https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.4/html/configuring/provisioning-and-using-your-custom-configuration#provisioning-your-custom-configuration\n
     \   # for more details.\n    ###########################################################################################################\n
     \   auth:\n      environment: development\n      providers:  \n        {}\n"
-  db-networkpolicy.yaml: |
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: default-deny
-    spec:
-      podSelector:
-        matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-psql-<cr-name>'
-      policyTypes:
-        - Ingress
-        - Egress
-    ---
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: allow-dns-egress
-    spec:
-      podSelector:
-        matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-psql-<cr-name>'
-      policyTypes:
-        - Egress
-      egress:
-        - ports:
-            - port: 53
-              protocol: UDP
-            - port: 53
-              protocol: TCP
-            - port: 5353
-              protocol: UDP
-            - port: 5353
-              protocol: TCP
-    ---
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: allow-backend-ingress
-    spec:
-      podSelector:
-        matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-psql-<cr-name>'
-      policyTypes:
-        - Ingress
-      ingress:
-        - from:
-            - podSelector:
-                matchLabels:
-                  rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
-          ports:
-            - port: 5432
-              protocol: TCP
   db-secret.yaml: |-
     apiVersion: v1
     kind: Secret
@@ -3028,7 +2976,7 @@ data:
     spec:
       podSelector:
         matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
       policyTypes:
         - Ingress
         - Egress
@@ -3040,7 +2988,7 @@ data:
     spec:
       podSelector:
         matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
       policyTypes:
         - Egress
       egress:
@@ -3061,7 +3009,7 @@ data:
     spec:
       podSelector:
         matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
       policyTypes:
         - Egress
       egress:
@@ -3078,14 +3026,14 @@ data:
     spec:
       podSelector:
         matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
       policyTypes:
         - Egress
       egress:
         - to:
             - podSelector:
                 matchLabels:
-                  rhdh.redhat.com/app: "" # placeholder for 'backstage-psql-<cr-name>'
+                  rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
           ports:
             - port: 5432
               protocol: TCP
@@ -3097,7 +3045,7 @@ data:
     spec:
       podSelector:
         matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
       policyTypes:
         - Ingress
       ingress:
@@ -3116,7 +3064,7 @@ data:
     spec:
       podSelector:
         matchLabels:
-          rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
       policyTypes:
         - Ingress
       ingress:
@@ -3124,6 +3072,58 @@ data:
             - namespaceSelector: {} # on OCP, replaced with policy-group.network.openshift.io/ingress selector
           ports:
             - port: 7007
+              protocol: TCP
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: db-default-deny
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+      policyTypes:
+        - Ingress
+        - Egress
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: db-allow-dns-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - port: 53
+              protocol: UDP
+            - port: 53
+              protocol: TCP
+            - port: 5353
+              protocol: UDP
+            - port: 5353
+              protocol: TCP
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: db-allow-backend-ingress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+          ports:
+            - port: 5432
               protocol: TCP
   route.yaml: |-
     apiVersion: route.openshift.io/v1
