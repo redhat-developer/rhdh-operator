@@ -49,6 +49,10 @@ func (b *BackstageNetworkPolicy) addToModel(model *BackstageModel, backstage api
 		b.networkPolicies = config.(*multiobject.MultiObject)
 	}
 
+	if b.networkPolicies != nil && !model.localDbEnabled {
+		b.filterForExternalDb()
+	}
+
 	model.setRuntimeObject(b)
 
 	if b.networkPolicies != nil && len(b.networkPolicies.Items) > 0 {
@@ -100,28 +104,28 @@ func replaceLabel(labels map[string]string, backstageName string) {
 	}
 }
 
-func (b *BackstageNetworkPolicy) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	if !b.model.localDbEnabled {
-		filtered := make([]client.Object, 0, len(b.networkPolicies.Items))
-		for _, item := range b.networkPolicies.Items {
-			np := item.(*networkingv1.NetworkPolicy)
-			if isDbScoped(np) {
-				continue
-			}
-			for i := range np.Spec.Egress {
-				for j := range np.Spec.Egress[i].To {
-					if np.Spec.Egress[i].To[j].PodSelector != nil {
-						if val, ok := np.Spec.Egress[i].To[j].PodSelector.MatchLabels[BackstageAppLabel]; ok && strings.HasPrefix(val, dbLabelPrefix) {
-							np.Spec.Egress[i].To = nil
-						}
+func (b *BackstageNetworkPolicy) filterForExternalDb() {
+	filtered := make([]client.Object, 0, len(b.networkPolicies.Items))
+	for _, item := range b.networkPolicies.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if isDbScoped(np) {
+			continue
+		}
+		for i := range np.Spec.Egress {
+			for j := range np.Spec.Egress[i].To {
+				if np.Spec.Egress[i].To[j].PodSelector != nil {
+					if val, ok := np.Spec.Egress[i].To[j].PodSelector.MatchLabels[BackstageAppLabel]; ok && strings.HasPrefix(val, dbLabelPrefix) {
+						np.Spec.Egress[i].To = nil
 					}
 				}
 			}
-			filtered = append(filtered, item)
 		}
-		b.networkPolicies.Items = filtered
+		filtered = append(filtered, item)
 	}
+	b.networkPolicies.Items = filtered
+}
 
+func (b *BackstageNetworkPolicy) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
 	for _, item := range b.networkPolicies.Items {
 		np := item.(*networkingv1.NetworkPolicy)
 
