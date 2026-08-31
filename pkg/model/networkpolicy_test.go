@@ -23,9 +23,9 @@ var networkPolicyTestBackstage = api.Backstage{
 
 func TestDefaultNetworkPolicies(t *testing.T) {
 	bs := *networkPolicyTestBackstage.DeepCopy()
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 	assert.NotNil(t, model)
 
@@ -33,27 +33,58 @@ func TestDefaultNetworkPolicies(t *testing.T) {
 	assert.NotNil(t, obj)
 
 	mo := obj.Object().(*multiobject.MultiObject)
-	assert.Equal(t, 6, len(mo.Items))
+	assert.Equal(t, 9, len(mo.Items), "expected 6 backend + 3 DB NPs")
 
 	backendLabel := utils.BackstageAppLabelValue(bs.Name)
+	dbLabel := utils.BackstageDbAppLabelValue(bs.Name)
+	var backendCount, dbCount int
 	for _, item := range mo.Items {
 		np := item.(*networkingv1.NetworkPolicy)
-		assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
 		assert.Equal(t, bs.Namespace, np.GetNamespace())
+		if np.Spec.PodSelector.MatchLabels[BackstageAppLabel] == dbLabel {
+			dbCount++
+		} else {
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+			backendCount++
+		}
+	}
+	assert.Equal(t, 6, backendCount, "expected 6 backend NPs")
+	assert.Equal(t, 3, dbCount, "expected 3 DB NPs")
+}
+
+func TestNetworkPoliciesWithoutLocalDb(t *testing.T) {
+	bs := *networkPolicyTestBackstage.DeepCopy()
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(false)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	obj := model.GetRuntimeObject(NetworkPolicyKey)
+	assert.NotNil(t, obj)
+
+	mo := obj.Object().(*multiobject.MultiObject)
+	assert.Equal(t, 6, len(mo.Items), "expected only 6 backend NPs when localDb is disabled")
+
+	backendLabel := utils.BackstageAppLabelValue(testObj.backstage.Name)
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel],
+			"all NPs should have backend label when localDb is disabled")
 	}
 }
 
 func TestNetworkPolicyPodSelectors(t *testing.T) {
 	bs := *networkPolicyTestBackstage.DeepCopy()
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
 	mo := model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject)
 	dbLabel := utils.BackstageDbAppLabelValue(bs.Name)
+	backendLabel := utils.BackstageAppLabelValue(bs.Name)
 
-	found := false
+	var foundEgressToDb, foundIngressFromBackend bool
 	for _, item := range mo.Items {
 		np := item.(*networkingv1.NetworkPolicy)
 		for _, egress := range np.Spec.Egress {
@@ -61,25 +92,48 @@ func TestNetworkPolicyPodSelectors(t *testing.T) {
 				if to.PodSelector != nil {
 					if val, ok := to.PodSelector.MatchLabels[BackstageAppLabel]; ok {
 						assert.Equal(t, dbLabel, val)
-						found = true
+						foundEgressToDb = true
+					}
+				}
+			}
+		}
+		for _, ingress := range np.Spec.Ingress {
+			for _, from := range ingress.From {
+				if from.PodSelector != nil {
+					if val, ok := from.PodSelector.MatchLabels[BackstageAppLabel]; ok {
+						assert.Equal(t, backendLabel, val)
+						foundIngressFromBackend = true
 					}
 				}
 			}
 		}
 	}
-	assert.True(t, found, "expected to find a psql egress rule targeting DB-labeled pods")
+	assert.True(t, foundEgressToDb, "expected to find a psql egress rule targeting DB-labeled pods")
+	assert.True(t, foundIngressFromBackend, "expected to find a backend ingress rule in DB policies")
 }
 
 func TestNetworkPolicyNaming(t *testing.T) {
 	bs := *networkPolicyTestBackstage.DeepCopy()
-	testObj := createBackstageTest(bs).withDefaultConfig(true)
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true)
 
-	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	assert.NoError(t, err)
 
 	mo := model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject)
-	assert.Equal(t, DefaultMultiObjectName("netpol", bs.Name, "default-deny"), mo.Items[0].GetName())
-	assert.Equal(t, "default-deny", mo.Items[0].GetAnnotations()[ConfiguredNameAnnotation])
+
+	var foundBackendNaming, foundDbNaming bool
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		ann := np.GetAnnotations()[ConfiguredNameAnnotation]
+		if ann == "default-deny" && np.GetName() == DefaultMultiObjectName("netpol", bs.Name, "default-deny") {
+			foundBackendNaming = true
+		}
+		if ann == "db-default-deny" && np.GetName() == DefaultMultiObjectName("db-netpol", bs.Name, "db-default-deny") {
+			foundDbNaming = true
+		}
+	}
+	assert.True(t, foundBackendNaming, "backend NP should use 'netpol' name prefix")
+	assert.True(t, foundDbNaming, "DB NP should use 'db-netpol' name prefix")
 }
 
 func TestNetworkPolicyRouterIngressOnOpenShift(t *testing.T) {
@@ -147,7 +201,7 @@ func TestNetworkPolicyFlavourMergePreservesNamespaceWidePodSelector(t *testing.T
 	assert.NotNil(t, obj)
 
 	mo := obj.Object().(*multiobject.MultiObject)
-	assert.Equal(t, 7, len(mo.Items), "expected 6 base + 1 flavour NP")
+	assert.Equal(t, 7, len(mo.Items), "expected 6 backend + 1 flavour NP (DB NPs filtered out)")
 
 	backendLabel := utils.BackstageAppLabelValue(testObj.backstage.Name)
 	var foundNamespaceWide bool

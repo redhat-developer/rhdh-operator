@@ -5,7 +5,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+      rhdh.redhat.com/app: backstage
   policyTypes:
     - Ingress
     - Egress
@@ -17,7 +17,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+      rhdh.redhat.com/app: backstage
   policyTypes:
     - Egress
   egress:
@@ -38,7 +38,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+      rhdh.redhat.com/app: backstage
   policyTypes:
     - Egress
   egress:
@@ -55,14 +55,14 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+      rhdh.redhat.com/app: backstage
   policyTypes:
     - Egress
   egress:
     - to:
         - podSelector:
             matchLabels:
-              rhdh.redhat.com/app: "" # placeholder for 'backstage-psql-<cr-name>'
+              rhdh.redhat.com/app: backstage-psql
       ports:
         - port: 5432
           protocol: TCP
@@ -74,7 +74,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+      rhdh.redhat.com/app: backstage
   policyTypes:
     - Ingress
   ingress:
@@ -93,12 +93,64 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      rhdh.redhat.com/app: "" # placeholder for 'backstage-<cr-name>'
+      rhdh.redhat.com/app: backstage
   policyTypes:
     - Ingress
   ingress:
     - from:
-        - namespaceSelector: {} # on OCP, replaced with policy-group.network.openshift.io/ingress selector
+        - namespaceSelector: {}
       ports:
         - port: 7007
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-default-deny
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage-psql
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-dns-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage-psql
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-backend-ingress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage-psql
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              rhdh.redhat.com/app: backstage
+      ports:
+        - port: 5432
           protocol: TCP

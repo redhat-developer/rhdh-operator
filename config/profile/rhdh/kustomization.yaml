@@ -47,7 +47,6 @@ configMapGenerator:
   - default-config/db-statefulset.yaml.k8s
   - default-config/service.yaml.k8s
   - default-config/secret-files.yaml
-  - default-config/db-networkpolicy.yaml
   - default-config/networkpolicy.yaml
   name: default-config
 - files:

@@ -1,15 +1,20 @@
 package model
 
 import (
+	"strings"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
+
+const dbLabelPrefix = "backstage-psql"
 
 type BackstageNetworkPolicyFactory struct{}
 
@@ -78,30 +83,67 @@ func (b *BackstageNetworkPolicy) updateAndValidate(_ api.Backstage, _ *runtime.S
 	return nil
 }
 
+func isDbScoped(np *networkingv1.NetworkPolicy) bool {
+	val, ok := np.Spec.PodSelector.MatchLabels[BackstageAppLabel]
+	return ok && strings.HasPrefix(val, dbLabelPrefix)
+}
+
+func replaceLabel(labels map[string]string, backstageName string) {
+	val, ok := labels[BackstageAppLabel]
+	if !ok {
+		return
+	}
+	if strings.HasPrefix(val, dbLabelPrefix) {
+		labels[BackstageAppLabel] = utils.BackstageDbAppLabelValue(backstageName)
+	} else {
+		labels[BackstageAppLabel] = utils.BackstageAppLabelValue(backstageName)
+	}
+}
+
 func (b *BackstageNetworkPolicy) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
-	backendLabel := utils.BackstageAppLabelValue(backstage.Name)
-	dbLabel := utils.BackstageDbAppLabelValue(backstage.Name)
+	if !b.model.localDbEnabled {
+		filtered := make([]client.Object, 0, len(b.networkPolicies.Items))
+		for _, item := range b.networkPolicies.Items {
+			np := item.(*networkingv1.NetworkPolicy)
+			if isDbScoped(np) {
+				continue
+			}
+			filtered = append(filtered, item)
+		}
+		b.networkPolicies.Items = filtered
+	}
 
 	for _, item := range b.networkPolicies.Items {
 		np := item.(*networkingv1.NetworkPolicy)
 
-		if _, ok := np.Spec.PodSelector.MatchLabels[BackstageAppLabel]; ok {
-			np.Spec.PodSelector.MatchLabels[BackstageAppLabel] = backendLabel
-		}
+		replaceLabel(np.Spec.PodSelector.MatchLabels, backstage.Name)
 
 		for i := range np.Spec.Egress {
 			for j := range np.Spec.Egress[i].To {
 				if np.Spec.Egress[i].To[j].PodSelector != nil {
-					if _, ok := np.Spec.Egress[i].To[j].PodSelector.MatchLabels[BackstageAppLabel]; ok {
-						np.Spec.Egress[i].To[j].PodSelector.MatchLabels[BackstageAppLabel] = dbLabel
-					}
+					replaceLabel(np.Spec.Egress[i].To[j].PodSelector.MatchLabels, backstage.Name)
 				}
 			}
 		}
 
-		utils.GenerateLabel(&np.Labels, BackstageAppLabel, backendLabel)
+		for i := range np.Spec.Ingress {
+			for j := range np.Spec.Ingress[i].From {
+				if np.Spec.Ingress[i].From[j].PodSelector != nil {
+					replaceLabel(np.Spec.Ingress[i].From[j].PodSelector.MatchLabels, backstage.Name)
+				}
+			}
+		}
+
+		namePrefix := "netpol"
+		objectLabel := utils.BackstageAppLabelValue(backstage.Name)
+		if isDbScoped(np) {
+			namePrefix = "db-netpol"
+			objectLabel = utils.BackstageDbAppLabelValue(backstage.Name)
+		}
+
+		utils.GenerateLabel(&np.Labels, BackstageAppLabel, objectLabel)
 		utils.AddAnnotation(item, ConfiguredNameAnnotation, item.GetName())
-		item.SetName(DefaultMultiObjectName("netpol", backstage.Name, item.GetName()))
+		item.SetName(DefaultMultiObjectName(namePrefix, backstage.Name, item.GetName()))
 		setMetaInfo(item, backstage, scheme)
 	}
 }
