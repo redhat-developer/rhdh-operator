@@ -3554,6 +3554,9 @@ data:
     # TODO(asoro): these Orchestrator policies use podSelector: {} (namespace-wide) and conflict with
     # the ADR's "default deny with selective allow" and "label-scoped policies" principles.
     # They weaken per-component ingress isolation for RHDH backend and DB pods in the same namespace.
+    # Even though only one Orchestrator-flavoured RHDH instance is supported per namespace (the
+    # SonataFlow Operator enforces one SonataFlowPlatform per namespace), a non-Orchestrator RHDH
+    # instance could coexist in the same namespace; these namespace-wide policies would affect it too.
     # Review and make stricter by scoping to SonataFlow-specific labels where possible.
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
