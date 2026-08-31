@@ -2058,7 +2058,7 @@ spec:
                 items:
                   description: |-
                     Flavour represents a pre-configured template that extends the default configuration.
-                    Flavours provide domain-specific customizations (e.g., Orchestrator, Lightspeed)
+                    Flavours provide domain-specific customizations (e.g., Orchestrator, Intelligent Assistant)
                     while falling back to base defaults for everything else.
                   properties:
                     enabled:
@@ -2070,7 +2070,7 @@ spec:
                       type: boolean
                     name:
                       description: Name of the flavour to enable (e.g., "orchestrator",
-                        "lightspeed")
+                        "intelligent-assistant")
                       type: string
                   required:
                   - name

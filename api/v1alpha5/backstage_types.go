@@ -366,10 +366,10 @@ type TLS struct {
 }
 
 // Flavour represents a pre-configured template that extends the default configuration.
-// Flavours provide domain-specific customizations (e.g., Orchestrator, Lightspeed)
+// Flavours provide domain-specific customizations (e.g., Orchestrator, Intelligent Assistant)
 // while falling back to base defaults for everything else.
 type Flavour struct {
-	// Name of the flavour to enable (e.g., "orchestrator", "lightspeed")
+	// Name of the flavour to enable (e.g., "orchestrator", "intelligent-assistant")
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
