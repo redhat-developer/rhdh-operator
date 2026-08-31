@@ -29,14 +29,14 @@ spec:
             - name: RELATED_IMAGE_plugin_installer
               value: "{{RELATED_IMAGE_plugin_installer}}"
           volumeMounts:
-            - mountPath: /default-config/flavours/lightspeed
-              name: flavour-lightspeed-config
+            - mountPath: /default-config/flavours/intelligent-assistant
+              name: flavour-intelligent-assistant-config
             - mountPath: /default-config/flavours/orchestrator
               name: flavour-orchestrator-config
       volumes:
-        - name: flavour-lightspeed-config
+        - name: flavour-intelligent-assistant-config
           configMap:
-            name: flavour-lightspeed-config
+            name: flavour-intelligent-assistant-config
         - name: flavour-orchestrator-config
           configMap:
             name: flavour-orchestrator-config

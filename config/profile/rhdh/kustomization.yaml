@@ -29,7 +29,7 @@ generatorOptions:
 
 # Base configuration
 
-# Lightspeed flavour configuration
+# Intelligent Assistant flavour configuration
 
 # Orchestrator flavour configuration
 
@@ -50,11 +50,11 @@ configMapGenerator:
   - default-config/secret-files.yaml
   name: default-config
 - files:
-  - default-config/flavours/lightspeed/metadata.yaml
-  - default-config/flavours/lightspeed/configmap-files.yaml
-  - default-config/flavours/lightspeed/deployment.yaml
-  - default-config/flavours/lightspeed/dynamic-plugins.yaml
-  name: flavour-lightspeed-config
+  - default-config/flavours/intelligent-assistant/metadata.yaml
+  - default-config/flavours/intelligent-assistant/configmap-files.yaml
+  - default-config/flavours/intelligent-assistant/deployment.yaml
+  - default-config/flavours/intelligent-assistant/dynamic-plugins.yaml
+  name: flavour-intelligent-assistant-config
 - files:
   - default-config/flavours/orchestrator/metadata.yaml
   - default-config/flavours/orchestrator/dynamic-plugins.yaml
