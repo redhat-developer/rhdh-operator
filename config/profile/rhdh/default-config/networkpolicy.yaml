@@ -26,6 +26,7 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+        # mDNS; used by some CNI plugins and node-local DNS caches (e.g. on OpenShift)
         - port: 5353
           protocol: UDP
         - port: 5353
@@ -45,6 +46,22 @@ spec:
     - ports:
         - port: 443
           protocol: TCP
+---
+# Kubernetes API server; needed by plugins that query the K8s API (e.g. Kubernetes, Topology).
+# Cannot be scoped to a specific destination because the API server runs outside the cluster
+# on managed platforms (GKE, EKS, AKS).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-api-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
         - port: 6443
           protocol: TCP
 ---
@@ -157,6 +174,7 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+        # mDNS; used by some CNI plugins and node-local DNS caches (e.g. on OpenShift)
         - port: 5353
           protocol: UDP
         - port: 5353

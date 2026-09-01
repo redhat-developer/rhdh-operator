@@ -33,7 +33,7 @@ func TestDefaultNetworkPolicies(t *testing.T) {
 	assert.NotNil(t, obj)
 
 	mo := obj.Object().(*multiobject.MultiObject)
-	assert.Equal(t, 9, len(mo.Items), "expected 6 backend + 3 DB NPs")
+	assert.Equal(t, 10, len(mo.Items), "expected 7 backend + 3 DB NPs")
 
 	backendLabel := utils.BackstageAppLabelValue(bs.Name)
 	dbLabel := utils.BackstageDbAppLabelValue(bs.Name)
@@ -48,7 +48,7 @@ func TestDefaultNetworkPolicies(t *testing.T) {
 			backendCount++
 		}
 	}
-	assert.Equal(t, 6, backendCount, "expected 6 backend NPs")
+	assert.Equal(t, 7, backendCount, "expected 7 backend NPs")
 	assert.Equal(t, 3, dbCount, "expected 3 DB NPs")
 }
 
@@ -63,7 +63,7 @@ func TestNetworkPoliciesWithoutLocalDb(t *testing.T) {
 	assert.NotNil(t, obj)
 
 	mo := obj.Object().(*multiobject.MultiObject)
-	assert.Equal(t, 6, len(mo.Items), "expected only 6 backend NPs when localDb is disabled")
+	assert.Equal(t, 7, len(mo.Items), "expected only 7 backend NPs when localDb is disabled")
 
 	backendLabel := utils.BackstageAppLabelValue(testObj.backstage.Name)
 	for _, item := range mo.Items {
@@ -214,7 +214,7 @@ func TestNetworkPolicyFlavourMergePreservesNamespaceWidePodSelector(t *testing.T
 	assert.NotNil(t, obj)
 
 	mo := obj.Object().(*multiobject.MultiObject)
-	assert.Equal(t, 7, len(mo.Items), "expected 6 backend + 1 flavour NP (DB NPs filtered out)")
+	assert.Equal(t, 8, len(mo.Items), "expected 7 backend + 1 flavour NP (DB NPs filtered out)")
 
 	backendLabel := utils.BackstageAppLabelValue(testObj.backstage.Name)
 	var foundNamespaceWide bool
