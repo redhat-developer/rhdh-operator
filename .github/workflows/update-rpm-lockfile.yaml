@@ -29,6 +29,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Require RHDH_BOT_TOKEN
+        env:
+          RHDH_BOT_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+        run: |
+          if [[ -z "${RHDH_BOT_TOKEN}" ]]; then
+            echo "::error::RHDH_BOT_TOKEN must be configured as a repo secret (rhdh-bot PAT). There is no GITHUB_TOKEN fallback."
+            exit 1
+          fi
+
       - name: Check if hermetic Dockerfile exists
         run: |
           if [ ! -f "${{ env.DOCKERFILE_PATH }}" ]; then
