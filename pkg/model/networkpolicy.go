@@ -12,7 +12,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
-
 type BackstageNetworkPolicyFactory struct{}
 
 func (f BackstageNetworkPolicyFactory) newBackstageObject() RuntimeObject {
@@ -58,6 +57,20 @@ func (b *BackstageNetworkPolicy) addToModel(model *BackstageModel, backstage api
 	return nil
 }
 
+func setOpenShiftIngressSelector(np *networkingv1.NetworkPolicy) {
+	for i := range np.Spec.Ingress {
+		for j := range np.Spec.Ingress[i].From {
+			if np.Spec.Ingress[i].From[j].NamespaceSelector != nil {
+				np.Spec.Ingress[i].From[j].NamespaceSelector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"policy-group.network.openshift.io/ingress": "",
+					},
+				}
+			}
+		}
+	}
+}
+
 func (b *BackstageNetworkPolicy) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
 	if b.networkPolicies == nil {
 		return nil
@@ -66,17 +79,7 @@ func (b *BackstageNetworkPolicy) updateAndValidate(backstage api.Backstage, _ *r
 		np := item.(*networkingv1.NetworkPolicy)
 		replaceRuleLabels(np, backstage.Name)
 		if b.model.isOpenshift && np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-router-ingress" {
-			for i := range np.Spec.Ingress {
-				for j := range np.Spec.Ingress[i].From {
-					if np.Spec.Ingress[i].From[j].NamespaceSelector != nil {
-						np.Spec.Ingress[i].From[j].NamespaceSelector = &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"policy-group.network.openshift.io/ingress": "",
-							},
-						}
-					}
-				}
-			}
+			setOpenShiftIngressSelector(np)
 		}
 	}
 	return nil
