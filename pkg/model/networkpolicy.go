@@ -26,6 +26,9 @@ type BackstageNetworkPolicy struct {
 	model           *BackstageModel
 }
 
+var _ RuntimeObject = (*BackstageNetworkPolicy)(nil)
+var _ ObjectFactory = BackstageNetworkPolicyFactory{}
+
 func init() {
 	registerConfig(NetworkPolicyKey, BackstageNetworkPolicyFactory{}, true, mergeMultiObjectConfigs)
 }
