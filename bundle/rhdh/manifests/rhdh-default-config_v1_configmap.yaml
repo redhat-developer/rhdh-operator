@@ -376,7 +376,7 @@ data:
         includes:
           - dynamic-plugins.default.yaml
   networkpolicy.yaml: |
-    # These policies cover the network requirements of all enabled-by-default RHDH plugins.
+    # These policies cover the network requirements of a base RHDH deployment with all enabled-by-default RHDH plugins.
     # See https://github.com/redhat-developer/rhdh-plugin-export-overlays/blob/main/default.packages.yaml
     # Disabled plugins (e.g. LDAP catalog, email notifications, scaffolder HTTP requests) may need
     # additional user-created additive NetworkPolicies for ports not covered here.
@@ -391,6 +391,7 @@ data:
       policyTypes:
         - Ingress
         - Egress
+
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
@@ -413,6 +414,7 @@ data:
               protocol: UDP
             - port: 5353
               protocol: TCP
+
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
@@ -428,6 +430,7 @@ data:
         - ports:
             - port: 443
               protocol: TCP
+
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
@@ -449,6 +452,7 @@ data:
           ports:
             - port: 5432
               protocol: TCP
+
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
@@ -490,6 +494,7 @@ data:
           ports:
             - port: 9464
               protocol: TCP
+
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
@@ -507,9 +512,12 @@ data:
           ports:
             - port: 7007
               protocol: TCP
+
     ---
     # The following db-* policies are only created when the local DB is enabled in the CR.
-    # They are filtered out at runtime when spec.database.enableLocalDb is false.
+    # They are filtered out at runtime when spec.database.enableLocalDb is false,
+    # based on the 'rhdh.redhat.com/app' podSelector matchLabel placeholder.
+
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
@@ -521,6 +529,7 @@ data:
       policyTypes:
         - Ingress
         - Egress
+
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
@@ -543,6 +552,7 @@ data:
               protocol: UDP
             - port: 5353
               protocol: TCP
+
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
