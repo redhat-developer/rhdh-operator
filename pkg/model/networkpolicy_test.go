@@ -86,6 +86,18 @@ func TestNetworkPoliciesWithoutLocalDb(t *testing.T) {
 		"psql egress should allow port 5432 to any destination when localDb is disabled")
 }
 
+func findPeerLabel(peers []networkingv1.NetworkPolicyPeer) (string, bool) {
+	for _, peer := range peers {
+		if peer.PodSelector == nil {
+			continue
+		}
+		if val, ok := peer.PodSelector.MatchLabels[BackstageAppLabel]; ok {
+			return val, true
+		}
+	}
+	return "", false
+}
+
 func TestNetworkPolicyPodSelectors(t *testing.T) {
 	bs := *networkPolicyTestBackstage.DeepCopy()
 	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true)
@@ -101,23 +113,15 @@ func TestNetworkPolicyPodSelectors(t *testing.T) {
 	for _, item := range mo.Items {
 		np := item.(*networkingv1.NetworkPolicy)
 		for _, egress := range np.Spec.Egress {
-			for _, to := range egress.To {
-				if to.PodSelector != nil {
-					if val, ok := to.PodSelector.MatchLabels[BackstageAppLabel]; ok {
-						assert.Equal(t, dbLabel, val)
-						foundEgressToDb = true
-					}
-				}
+			if val, ok := findPeerLabel(egress.To); ok {
+				assert.Equal(t, dbLabel, val)
+				foundEgressToDb = true
 			}
 		}
 		for _, ingress := range np.Spec.Ingress {
-			for _, from := range ingress.From {
-				if from.PodSelector != nil {
-					if val, ok := from.PodSelector.MatchLabels[BackstageAppLabel]; ok {
-						assert.Equal(t, backendLabel, val)
-						foundIngressFromBackend = true
-					}
-				}
+			if val, ok := findPeerLabel(ingress.From); ok {
+				assert.Equal(t, backendLabel, val)
+				foundIngressFromBackend = true
 			}
 		}
 	}

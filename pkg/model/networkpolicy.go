@@ -53,36 +53,34 @@ func (b *BackstageNetworkPolicy) addToModel(model *BackstageModel, backstage api
 		b.filterForExternalDb()
 	}
 
-	model.setRuntimeObject(b)
-
 	if b.networkPolicies != nil && len(b.networkPolicies.Items) > 0 {
 		b.setMetaInfo(backstage, scheme)
 	}
 
+	model.setRuntimeObject(b)
 	return nil
 }
 
-func (b *BackstageNetworkPolicy) updateAndValidate(_ api.Backstage, _ *runtime.Scheme) error {
-	if b.networkPolicies == nil || !b.model.isOpenshift {
+func (b *BackstageNetworkPolicy) updateAndValidate(backstage api.Backstage, _ *runtime.Scheme) error {
+	if b.networkPolicies == nil {
 		return nil
 	}
 	for _, item := range b.networkPolicies.Items {
 		np := item.(*networkingv1.NetworkPolicy)
-		if np.GetAnnotations()[ConfiguredNameAnnotation] != "allow-router-ingress" {
-			continue
-		}
-		for i := range np.Spec.Ingress {
-			for j := range np.Spec.Ingress[i].From {
-				if np.Spec.Ingress[i].From[j].NamespaceSelector != nil {
-					np.Spec.Ingress[i].From[j].NamespaceSelector = &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"policy-group.network.openshift.io/ingress": "",
-						},
+		replaceRuleLabels(np, backstage.Name)
+		if b.model.isOpenshift && np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-router-ingress" {
+			for i := range np.Spec.Ingress {
+				for j := range np.Spec.Ingress[i].From {
+					if np.Spec.Ingress[i].From[j].NamespaceSelector != nil {
+						np.Spec.Ingress[i].From[j].NamespaceSelector = &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"policy-group.network.openshift.io/ingress": "",
+							},
+						}
 					}
 				}
 			}
 		}
-		break
 	}
 	return nil
 }
@@ -104,6 +102,21 @@ func replaceLabel(labels map[string]string, backstageName string) {
 	}
 }
 
+func clearDbEgressTargets(np *networkingv1.NetworkPolicy) {
+	for i := range np.Spec.Egress {
+		for j := range np.Spec.Egress[i].To {
+			peer := &np.Spec.Egress[i].To[j]
+			if peer.PodSelector == nil {
+				continue
+			}
+			if val, ok := peer.PodSelector.MatchLabels[BackstageAppLabel]; ok && strings.HasPrefix(val, dbLabelPrefix) {
+				np.Spec.Egress[i].To = nil
+				return
+			}
+		}
+	}
+}
+
 func (b *BackstageNetworkPolicy) filterForExternalDb() {
 	filtered := make([]client.Object, 0, len(b.networkPolicies.Items))
 	for _, item := range b.networkPolicies.Items {
@@ -111,18 +124,27 @@ func (b *BackstageNetworkPolicy) filterForExternalDb() {
 		if isDbScoped(np) {
 			continue
 		}
-		for i := range np.Spec.Egress {
-			for j := range np.Spec.Egress[i].To {
-				if np.Spec.Egress[i].To[j].PodSelector != nil {
-					if val, ok := np.Spec.Egress[i].To[j].PodSelector.MatchLabels[BackstageAppLabel]; ok && strings.HasPrefix(val, dbLabelPrefix) {
-						np.Spec.Egress[i].To = nil
-					}
-				}
-			}
-		}
+		clearDbEgressTargets(np)
 		filtered = append(filtered, item)
 	}
 	b.networkPolicies.Items = filtered
+}
+
+func replacePeerLabels(peers []networkingv1.NetworkPolicyPeer, backstageName string) {
+	for i := range peers {
+		if peers[i].PodSelector != nil {
+			replaceLabel(peers[i].PodSelector.MatchLabels, backstageName)
+		}
+	}
+}
+
+func replaceRuleLabels(np *networkingv1.NetworkPolicy, backstageName string) {
+	for i := range np.Spec.Egress {
+		replacePeerLabels(np.Spec.Egress[i].To, backstageName)
+	}
+	for i := range np.Spec.Ingress {
+		replacePeerLabels(np.Spec.Ingress[i].From, backstageName)
+	}
 }
 
 func (b *BackstageNetworkPolicy) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
@@ -130,22 +152,6 @@ func (b *BackstageNetworkPolicy) setMetaInfo(backstage api.Backstage, scheme *ru
 		np := item.(*networkingv1.NetworkPolicy)
 
 		replaceLabel(np.Spec.PodSelector.MatchLabels, backstage.Name)
-
-		for i := range np.Spec.Egress {
-			for j := range np.Spec.Egress[i].To {
-				if np.Spec.Egress[i].To[j].PodSelector != nil {
-					replaceLabel(np.Spec.Egress[i].To[j].PodSelector.MatchLabels, backstage.Name)
-				}
-			}
-		}
-
-		for i := range np.Spec.Ingress {
-			for j := range np.Spec.Ingress[i].From {
-				if np.Spec.Ingress[i].From[j].PodSelector != nil {
-					replaceLabel(np.Spec.Ingress[i].From[j].PodSelector.MatchLabels, backstage.Name)
-				}
-			}
-		}
 
 		namePrefix := "netpol"
 		objectLabel := utils.BackstageAppLabelValue(backstage.Name)
