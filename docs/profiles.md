@@ -48,7 +48,7 @@ As of January 2025, there are three predefined profiles:
 For reference, this profile performs the following specific customizations:
 
 * Keeping the same major version as the Makefile `VERSION` so the community and RHDH operators stay aligned (for example, `2.0.0` remains `2.0.0`)
-* Switching the default image base from [`quay.io/rhdh-community/operator`](https://quay.io/rhdh-community/operator) to [`quay.io/rhdh/rhdh-rhel9-operator`](https://quay.io/rhdh/rhdh-rhel9-operator)
+* Switching the default image base from [`quay.io/rhdh-community/operator`](https://quay.io/rhdh-community/operator) to [`quay.io/rhdh/rhdh-rhel10-operator`](https://quay.io/rhdh/rhdh-rhel10-operator) on `main` (RHEL 10). Maintenance branches continue to use [`quay.io/rhdh/rhdh-rhel9-operator`](https://quay.io/rhdh/rhdh-rhel9-operator).
 * Removing the patch element from the image tag, i.e., from `x.y.z` to `x.y`, because that's how the downstream images on [`quay.io/rhdh`] are being tagged
 * Changing the bundle channels from `alpha` to `fast` and `fast-${CI_X_VERSION}.${CI_Y_VERSION}` (which will be ultimately replaced in the final downstream pipelines)
 * Changing the package name into `rhdh`
