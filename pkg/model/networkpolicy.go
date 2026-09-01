@@ -1,8 +1,6 @@
 package model
 
 import (
-	"strings"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	networkingv1 "k8s.io/api/networking/v1"
@@ -14,7 +12,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
-const dbLabelPrefix = "backstage-psql"
 
 type BackstageNetworkPolicyFactory struct{}
 
@@ -87,7 +84,7 @@ func (b *BackstageNetworkPolicy) updateAndValidate(backstage api.Backstage, _ *r
 
 func isDbScoped(np *networkingv1.NetworkPolicy) bool {
 	val, ok := np.Spec.PodSelector.MatchLabels[BackstageAppLabel]
-	return ok && strings.HasPrefix(val, dbLabelPrefix)
+	return ok && val == utils.BackstageDBAppName
 }
 
 func replaceLabel(labels map[string]string, backstageName string) {
@@ -95,9 +92,10 @@ func replaceLabel(labels map[string]string, backstageName string) {
 	if !ok {
 		return
 	}
-	if strings.HasPrefix(val, dbLabelPrefix) {
+	switch val {
+	case utils.BackstageDBAppName:
 		labels[BackstageAppLabel] = utils.BackstageDbAppLabelValue(backstageName)
-	} else {
+	case utils.BackstageAppName:
 		labels[BackstageAppLabel] = utils.BackstageAppLabelValue(backstageName)
 	}
 }
@@ -109,7 +107,7 @@ func clearDbEgressTargets(np *networkingv1.NetworkPolicy) {
 			if peer.PodSelector == nil {
 				continue
 			}
-			if val, ok := peer.PodSelector.MatchLabels[BackstageAppLabel]; ok && strings.HasPrefix(val, dbLabelPrefix) {
+			if val, ok := peer.PodSelector.MatchLabels[BackstageAppLabel]; ok && val == utils.BackstageDBAppName {
 				np.Spec.Egress[i].To = nil
 				return
 			}
@@ -151,14 +149,14 @@ func (b *BackstageNetworkPolicy) setMetaInfo(backstage api.Backstage, scheme *ru
 	for _, item := range b.networkPolicies.Items {
 		np := item.(*networkingv1.NetworkPolicy)
 
-		replaceLabel(np.Spec.PodSelector.MatchLabels, backstage.Name)
-
 		namePrefix := "netpol"
 		objectLabel := utils.BackstageAppLabelValue(backstage.Name)
 		if isDbScoped(np) {
 			namePrefix = "db-netpol"
 			objectLabel = utils.BackstageDbAppLabelValue(backstage.Name)
 		}
+
+		replaceLabel(np.Spec.PodSelector.MatchLabels, backstage.Name)
 
 		utils.GenerateLabel(&np.Labels, BackstageAppLabel, objectLabel)
 		utils.AddAnnotation(item, ConfiguredNameAnnotation, item.GetName())
