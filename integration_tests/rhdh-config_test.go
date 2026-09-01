@@ -212,7 +212,7 @@ var _ = When("create default rhdh", func() {
 			err = k8sClient.List(ctx, npList, client.InNamespace(ns),
 				client.MatchingLabels{model.BackstageAppLabel: utils.BackstageAppLabelValue(backstageName)})
 			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(len(npList.Items)).To(BeNumerically(">=", 7))
+			g.Expect(len(npList.Items)).To(BeNumerically(">=", 6))
 
 			By("creating NetworkPolicies for the local database")
 			dbNpList := &networkingv1.NetworkPolicyList{}

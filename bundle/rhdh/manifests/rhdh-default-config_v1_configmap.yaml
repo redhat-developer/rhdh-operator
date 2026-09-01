@@ -376,6 +376,10 @@ data:
         includes:
           - dynamic-plugins.default.yaml
   networkpolicy.yaml: |
+    # These policies cover the network requirements of all enabled-by-default RHDH plugins.
+    # See https://github.com/redhat-developer/rhdh-plugin-export-overlays/blob/main/default.packages.yaml
+    # Disabled plugins (e.g. LDAP catalog, email notifications, scaffolder HTTP requests) may need
+    # additional user-created additive NetworkPolicies for ports not covered here.
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
@@ -423,24 +427,6 @@ data:
       egress:
         - ports:
             - port: 443
-              protocol: TCP
-    ---
-    # Kubernetes API server; needed by plugins that query the K8s API (e.g. Kubernetes, Topology).
-    # Cannot be scoped to a specific destination because the API server runs outside the cluster
-    # on managed platforms (GKE, EKS, AKS).
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: allow-kube-api-egress
-    spec:
-      podSelector:
-        matchLabels:
-          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
-      policyTypes:
-        - Egress
-      egress:
-        - ports:
-            - port: 6443
               protocol: TCP
     ---
     apiVersion: networking.k8s.io/v1
