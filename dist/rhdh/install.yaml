@@ -3665,6 +3665,20 @@ data:
                 matchLabels:
                   # Allow openshift-user-workload-monitoring pods to access the workflow.
                   kubernetes.io/metadata.name: openshift-user-workload-monitoring
+    ---
+    # Allow all egress from all pods in the namespace.
+    # The Orchestrator backend plugin needs HTTP egress to reach SonataFlow and Data Index services;
+    # SonataFlow workflows may also need arbitrary outbound access.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-all-egress
+    spec:
+      podSelector: {}
+      policyTypes:
+        - Egress
+      egress:
+        - {}
 kind: ConfigMap
 metadata:
   name: rhdh-flavour-orchestrator-config
