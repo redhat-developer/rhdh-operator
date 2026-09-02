@@ -18,15 +18,15 @@ import (
 
 // Environment variables
 const (
-	InputFileEnvVar       = "INPUT_FILE"       // Package list file (default: /input/packages.txt)
-	OutputDirEnvVar       = "OUTPUT_DIR"       // Output directory (default: /dynamic-plugins-root)
-	DockerConfigEnvVar    = "DOCKER_CONFIG"    // Path to dockerconfigjson file
-	CAFileEnvVar          = "CA_FILE"          // Path to CA certificate file
-	InsecureEnvVar        = "INSECURE"         // Skip TLS verification (true/false)
-	ValidatePluginsEnvVar = "VALIDATE_PLUGINS" // Validate plugin artifacts (default: true)
-	ParallelEnvVar        = "PARALLEL"         // Number of parallel downloads (default: 4)
-	LockFileEnvVar        = "LOCK_FILE"        // Lock file path (default: OUTPUT_DIR/install-dynamic-plugins.lock)
-	TerminationLogEnvVar  = "TERMINATION_LOG"  // Kubernetes termination log
+	InputFileEnvVar            = "INPUT_FILE"             // Package list file (default: /input/packages.txt)
+	OutputDirEnvVar            = "OUTPUT_DIR"             // Output directory (default: /dynamic-plugins-root)
+	DockerConfigEnvVar         = "DOCKER_CONFIG"          // Path to dockerconfigjson file
+	CAFileEnvVar               = "CA_FILE"                // Path to CA certificate file
+	InsecureEnvVar             = "INSECURE"               // Skip TLS verification (true/false)
+	ValidateDPAnnotationEnvVar = "VALIDATE_DP_ANNOTATION" // Require io.backstage.dynamic-packages annotation on OCI images (default: true)
+	ParallelEnvVar             = "PARALLEL"               // Number of parallel downloads (default: 4)
+	LockFileEnvVar             = "LOCK_FILE"              // Lock file path (default: OUTPUT_DIR/install-dynamic-plugins.lock)
+	TerminationLogEnvVar       = "TERMINATION_LOG"        // Kubernetes termination log
 
 	// Catalog index for Extensions UI
 	CatalogIndexImageEnvVar         = "CATALOG_INDEX_IMAGE"          // OCI image containing catalog entities
@@ -46,13 +46,15 @@ type Package struct {
 }
 
 func main() {
+	startTime := time.Now()
+
 	// Read configuration from environment
 	inputFile := utils.StringEnvVar(InputFileEnvVar, "/input/packages.txt")
 	outputDir := utils.StringEnvVar(OutputDirEnvVar, "/dynamic-plugins-root")
 	dockerConfig := utils.StringEnvVar(DockerConfigEnvVar, "")
 	caFile := utils.StringEnvVar(CAFileEnvVar, "")
 	insecure := utils.BoolEnvVar(InsecureEnvVar, false)
-	validate := utils.BoolEnvVar(ValidatePluginsEnvVar, true)
+	validate := utils.BoolEnvVar(ValidateDPAnnotationEnvVar, true)
 	parallel := utils.IntEnvVar(ParallelEnvVar, 4)
 	lockFile := utils.StringEnvVar(LockFileEnvVar, filepath.Join(outputDir, "install-dynamic-plugins.lock"))
 	termLog := utils.StringEnvVar(TerminationLogEnvVar, "/dev/termination-log")
@@ -79,13 +81,13 @@ func main() {
 
 	// Ensure output directory exists (needed for lock file)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		fatal(termLog, "Failed to create output directory: %v", err)
+		fatal(termLog, startTime, "Failed to create output directory: %v", err)
 	}
 
 	// Acquire lock
 	lock := fetcher.NewFileLock(lockFile)
 	if err := lock.Acquire(5 * time.Minute); err != nil {
-		fatal(termLog, "Failed to acquire lock: %v", err)
+		fatal(termLog, startTime, "Failed to acquire lock: %v", err)
 	}
 	defer func() {
 		if err := lock.Release(); err != nil {
@@ -101,14 +103,14 @@ func main() {
 	if caFile != "" {
 		caCert, err := os.ReadFile(caFile)
 		if err != nil {
-			fatal(termLog, "Error reading CA file: %v", err)
+			fatal(termLog, startTime, "Error reading CA file: %v", err)
 		}
 		ociOpts = append(ociOpts, fetcher.WithCACert(caCert))
 	}
 	if dockerConfig != "" {
 		secret, err := os.ReadFile(dockerConfig)
 		if err != nil {
-			fatal(termLog, "Error reading docker config: %v", err)
+			fatal(termLog, startTime, "Error reading docker config: %v", err)
 		}
 		ociOpts = append(ociOpts, fetcher.WithDockerConfig(secret))
 	}
@@ -150,7 +152,7 @@ func main() {
 	// Read packages from input file
 	packages, err := readPackages(inputFile)
 	if err != nil {
-		fatal(termLog, "Error reading input file: %v", err)
+		fatal(termLog, startTime, "Error reading input file: %v", err)
 	}
 
 	if len(packages) == 0 {
@@ -162,11 +164,12 @@ func main() {
 
 	// Process packages in parallel
 	if err := processParallel(ctx, f, packages, outputDir, parallel); err != nil {
-		fatal(termLog, "Error installing plugins: %v", err)
+		fatal(termLog, startTime, "Error installing plugins: %v", err)
 	}
 
 	fmt.Printf("\n=== Complete ===\n")
 	fmt.Printf("Successfully installed %d plugins\n", len(packages))
+	fmt.Printf("Elapsed time: %ds\n", int(time.Since(startTime).Seconds()))
 }
 
 // extractCatalogEntities extracts catalog-entities from an OCI image
@@ -364,9 +367,10 @@ func writeTerminationLog(path, msg string) {
 	_ = os.WriteFile(path, []byte(msg), 0644)
 }
 
-func fatal(termLog, format string, args ...interface{}) {
+func fatal(termLog string, startTime time.Time, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	writeTerminationLog(termLog, msg)
 	fmt.Fprintln(os.Stderr, msg)
+	fmt.Fprintf(os.Stderr, "Elapsed time: %ds\n", int(time.Since(startTime).Seconds()))
 	os.Exit(1)
 }

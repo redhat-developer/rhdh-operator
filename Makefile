@@ -276,17 +276,14 @@ hermetic-build: ## Build operator image hermetically using Hermeto (local simula
 image-push: ## Push container image with the manager.
 	$(CONTAINER_TOOL) push $(IMG)
 
-.PHONY: install-dp-build
-install-dp-build: ## Build the plugin installer image (skopeo variant, single platform)
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
-
-.PHONY: install-dp-buildx
-install-dp-buildx: ## Build and push multiplatform plugin installer image (skopeo variant)
+.PHONY: dp-installer-buildx
+dp-installer-buildx: ## Build and push multiplatform plugin installer image (skopeo variant)
 	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
 
-.PHONY: install-dp-push
-install-dp-push: ## Push the plugin installer image
-	$(CONTAINER_TOOL) push $(INSTALL_DP_IMAGE)
+.PHONY: dp-installer-test
+dp-installer-test: ## Run plugin installer tests (unit + integration)
+	go test ./pkg/fetcher/... -v
+	go test ./cmd/plugin-fetch/... -v
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:

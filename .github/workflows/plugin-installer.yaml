@@ -7,12 +7,16 @@ on:
       - 'release-[2-9]+.[0-9]+'
     paths:
       - 'plugin-installer/**'
+      - 'pkg/fetcher/**'
+      - 'cmd/plugin-fetch/**'
       - '.github/workflows/plugin-installer.yaml'
   pull_request:
     branches:
       - main
     paths:
       - 'plugin-installer/**'
+      - 'pkg/fetcher/**'
+      - 'cmd/plugin-fetch/**'
       - '.github/workflows/plugin-installer.yaml'
 
 concurrency:
@@ -30,13 +34,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install skopeo
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
 
       - name: Run tests
-        run: RUN_INTEGRATION_TESTS=true ./plugin-installer/install_plugins_test.sh
+        run: make dp-installer-test
 
   build:
     name: Build image
@@ -48,10 +52,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Build image (PR validation)
-        if: github.event_name == 'pull_request'
-        run: make install-dp-build
 
       - name: Set up QEMU
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -71,4 +71,4 @@ jobs:
 
       - name: Build and push multiplatform image
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: make install-dp-buildx
+        run: make dp-installer-buildx

@@ -257,6 +257,22 @@ func BoolEnvVar(envvar string, def bool) bool {
 	return def
 }
 
+func IntEnvVar(envvar string, def int) int {
+	if envValue, ok := os.LookupEnv(envvar); ok {
+		if ret, err := strconv.Atoi(envValue); err == nil {
+			return ret
+		}
+	}
+	return def
+}
+
+func StringEnvVar(envvar string, def string) string {
+	if envValue, ok := os.LookupEnv(envvar); ok {
+		return envValue
+	}
+	return def
+}
+
 // ParseCommaSeparatedString parses a comma-separated string into a slice of strings.
 // It trims whitespace from each part and ignores empty parts.
 func ParseCommaSeparated(input string) []string {
