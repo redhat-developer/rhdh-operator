@@ -38,7 +38,7 @@ func (l *FileLock) Acquire(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
 		if time.Now().After(deadline) {
-			l.file.Close()
+			_ = l.file.Close()
 			l.file = nil
 			return fmt.Errorf("timeout waiting for lock %s", l.path)
 		}
@@ -59,7 +59,7 @@ func (l *FileLock) Release() error {
 	}
 
 	// Unlock and close
-	syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN)
+	_ = syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN)
 	err := l.file.Close()
 	l.file = nil
 	return err

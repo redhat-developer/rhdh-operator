@@ -228,6 +228,49 @@ DOCKER_CONFIG=/path/to/docker/config.json \
 plugin-fetch
 ```
 
+### Private OCI Registry with Custom CA
+
+For registries using self-signed or private CA certificates:
+
+```bash
+DOCKER_CONFIG=/path/to/config.json \
+CA_FILE=/path/to/ca.crt \
+plugin-fetch
+```
+
+**docker config.json format:**
+```json
+{
+  "auths": {
+    "registry.example.com": {
+      "auth": "dXNlcm5hbWU6cGFzc3dvcmQ="
+    }
+  }
+}
+```
+
+The `auth` field is base64-encoded `username:password`.
+
+**Kubernetes deployment example:**
+
+Mount secrets and set env vars in the init container:
+```yaml
+env:
+  - name: DOCKER_CONFIG
+    value: /run/secrets/registry/config.json
+  - name: CA_FILE
+    value: /run/secrets/registry-ca/ca.crt
+volumeMounts:
+  - name: registry-auth
+    mountPath: /run/secrets/registry
+    readOnly: true
+  - name: registry-ca
+    mountPath: /run/secrets/registry-ca
+    readOnly: true
+```
+
+See [Backstage CR configuration](../docs/configuration.md) for how to configure this via the operator.
+
 ### Container Usage
 
 ```bash

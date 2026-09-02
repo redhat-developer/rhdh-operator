@@ -56,6 +56,9 @@ func main() {
 	insecure := utils.BoolEnvVar(InsecureEnvVar, false)
 	validate := utils.BoolEnvVar(ValidateDPAnnotationEnvVar, true)
 	parallel := utils.IntEnvVar(ParallelEnvVar, 4)
+	if parallel <= 0 {
+		parallel = 4 // normalize invalid values to default
+	}
 	lockFile := utils.StringEnvVar(LockFileEnvVar, filepath.Join(outputDir, "install-dynamic-plugins.lock"))
 	termLog := utils.StringEnvVar(TerminationLogEnvVar, "/dev/termination-log")
 
@@ -181,7 +184,7 @@ func extractCatalogEntities(ctx context.Context, f *fetcher.Fetcher, image, dest
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Fetch and extract OCI image
 	if err := ociFetcher.Fetch(ctx, strings.TrimPrefix(image, "oci://"), tmpDir); err != nil {
@@ -205,7 +208,7 @@ func extractCatalogEntities(ctx context.Context, f *fetcher.Fetcher, image, dest
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return err
 	}
-	os.RemoveAll(entitiesDest) // Remove old if exists
+	_ = os.RemoveAll(entitiesDest) // Remove old if exists
 
 	if err := copyDir(entitiesSrc, entitiesDest); err != nil {
 		return fmt.Errorf("failed to copy catalog entities: %w", err)
@@ -213,7 +216,7 @@ func extractCatalogEntities(ctx context.Context, f *fetcher.Fetcher, image, dest
 
 	// Count YAML files
 	count := 0
-	filepath.Walk(entitiesDest, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(entitiesDest, func(path string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() && (strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
 			count++
 		}
@@ -254,7 +257,7 @@ func readPackages(path string) ([]Package, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var packages []Package
 	scanner := bufio.NewScanner(file)
@@ -295,8 +298,9 @@ func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package
 
 			name := pluginName(pkg.URL)
 			destDir := filepath.Join(outputDir, name)
+			tempDir := destDir + ".tmp"
 
-			// Skip if already exists
+			// Skip if already exists (completed extraction)
 			if info, err := os.Stat(destDir); err == nil && info.IsDir() {
 				entries, _ := os.ReadDir(destDir)
 				if len(entries) > 0 {
@@ -305,12 +309,28 @@ func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package
 				}
 			}
 
+			// Clean up any leftover temp directory from previous failed run
+			_ = os.RemoveAll(tempDir)
+
 			fmt.Printf("[DOWN] %s\n", pkg.URL)
 
-			if err := f.FetchWithIntegrity(ctx, pkg.URL, destDir, pkg.Integrity); err != nil {
+			// Extract to temp directory
+			if err := f.FetchWithIntegrity(ctx, pkg.URL, tempDir, pkg.Integrity); err != nil {
+				// Clean up temp directory on failure
+				_ = os.RemoveAll(tempDir)
 				fmt.Fprintf(os.Stderr, "[FAIL] %s: %v\n", name, err)
 				errOnce.Do(func() {
 					firstErr = fmt.Errorf("%s: %w", name, err)
+				})
+				return
+			}
+
+			// Atomic rename to final destination
+			if err := os.Rename(tempDir, destDir); err != nil {
+				_ = os.RemoveAll(tempDir)
+				fmt.Fprintf(os.Stderr, "[FAIL] %s: rename failed: %v\n", name, err)
+				errOnce.Do(func() {
+					firstErr = fmt.Errorf("%s: rename failed: %w", name, err)
 				})
 				return
 			}
@@ -332,21 +352,27 @@ func pluginName(url string) string {
 	url = strings.TrimPrefix(url, "file:")
 	url = strings.TrimPrefix(url, "@npm:")
 
-	// Remove digest/tag suffix
+	// Remove digest suffix (@sha256:...)
 	if idx := strings.Index(url, "@sha256:"); idx > 0 {
 		url = url[:idx]
 	}
+
+	// For npm packages like @backstage/plugin-foo@1.0.0
+	// Keep @backstage/plugin-foo, remove @1.0.0
 	if idx := strings.LastIndex(url, "@"); idx > 0 {
-		// For npm packages like @backstage/plugin-foo@1.0.0
-		// Keep @backstage/plugin-foo, remove @1.0.0
 		beforeAt := url[:idx]
 		if !strings.HasPrefix(beforeAt, "@") || strings.Contains(beforeAt[1:], "/") {
 			url = beforeAt
 		}
 	}
-	if idx := strings.LastIndex(url, ":"); idx > 0 {
-		// Remove tag like :latest or :v1.0.0
-		url = url[:idx]
+
+	// Remove tag (colon after final slash only, to avoid matching registry port)
+	lastSlash := strings.LastIndex(url, "/")
+	if lastSlash >= 0 {
+		afterSlash := url[lastSlash+1:]
+		if colonIdx := strings.LastIndex(afterSlash, ":"); colonIdx > 0 {
+			url = url[:lastSlash+1+colonIdx]
+		}
 	}
 
 	// Get the last path component

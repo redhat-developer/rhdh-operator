@@ -204,7 +204,7 @@ func TestFetcher_FileProtocol_RelativePath(t *testing.T) {
 	// Create source directory in current working directory
 	srcDir, err := os.MkdirTemp(".", "test-plugin-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(srcDir)
+	defer func() { _ = os.RemoveAll(srcDir) }()
 
 	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "package.json"), []byte(`{"name": "rel-plugin"}`), 0644))
 

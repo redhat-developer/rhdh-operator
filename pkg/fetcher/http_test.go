@@ -32,7 +32,7 @@ func TestHTTPFetcher_FetchTarGz(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/gzip")
-		w.Write(tarball)
+		_, _ = w.Write(tarball)
 	}))
 	defer server.Close()
 
@@ -48,12 +48,12 @@ func TestHTTPFetcher_FetchTarGz(t *testing.T) {
 	assert.Contains(t, string(data), "test-plugin")
 }
 
-func TestHTTPFetcher_FetchSingleFile(t *testing.T) {
+func TestHTTPFetcher_RejectsNonTarball(t *testing.T) {
 	content := []byte("console.log('hello');")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
-		w.Write(content)
+		_, _ = w.Write(content)
 	}))
 	defer server.Close()
 
@@ -61,12 +61,8 @@ func TestHTTPFetcher_FetchSingleFile(t *testing.T) {
 	destDir := t.TempDir()
 
 	err := f.Fetch(context.Background(), server.URL+"/script.js", destDir)
-	require.NoError(t, err)
-
-	// Verify file was saved
-	data, err := os.ReadFile(filepath.Join(destDir, "script.js"))
-	require.NoError(t, err)
-	assert.Equal(t, content, data)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not a tarball")
 }
 
 func TestHTTPFetcher_404Error(t *testing.T) {
@@ -84,13 +80,12 @@ func TestHTTPFetcher_404Error(t *testing.T) {
 }
 
 func TestHTTPFetcher_WithIntegrity(t *testing.T) {
-	content := []byte("test content for integrity check")
-	// SHA512 of content
-	integrity := "sha512-" + computeSHA512Base64(content)
+	tarball := createTestTarGz(t, map[string]string{"test.txt": "test content"})
+	integrity := "sha512-" + computeSHA512Base64(tarball)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write(content)
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(tarball)
 	}))
 	defer server.Close()
 
@@ -98,8 +93,9 @@ func TestHTTPFetcher_WithIntegrity(t *testing.T) {
 	destDir := t.TempDir()
 
 	// Should succeed with correct integrity
-	err := f.FetchWithIntegrity(context.Background(), server.URL+"/file.txt", destDir, integrity)
+	err := f.FetchWithIntegrity(context.Background(), server.URL+"/file.tar.gz", destDir, integrity)
 	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(destDir, "test.txt"))
 }
 
 func TestHTTPFetcher_IntegrityMismatch(t *testing.T) {
@@ -108,7 +104,7 @@ func TestHTTPFetcher_IntegrityMismatch(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/gzip")
-		w.Write(createTestTarGz(t, map[string]string{"test.txt": string(content)}))
+		_, _ = w.Write(createTestTarGz(t, map[string]string{"test.txt": string(content)}))
 	}))
 	defer server.Close()
 
@@ -122,11 +118,8 @@ func TestHTTPFetcher_IntegrityMismatch(t *testing.T) {
 
 func TestHTTPFetcher_ContextCancellation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Simulate slow response
-		select {
-		case <-r.Context().Done():
-			return
-		}
+		// Wait for context cancellation
+		<-r.Context().Done()
 	}))
 	defer server.Close()
 
@@ -174,6 +167,58 @@ func TestIsTarball(t *testing.T) {
 	}
 }
 
+func TestIsGzipped(t *testing.T) {
+	tests := []struct {
+		url         string
+		contentType string
+		expected    bool
+	}{
+		// Gzipped
+		{"/plugin.tar.gz", "", true},
+		{"/plugin.tgz", "", true},
+		{"/plugin", "application/gzip", true},
+		{"/plugin", "application/x-gzip", true},
+		{"/plugin", "application/x-compressed-tar", true},
+
+		// Not gzipped (uncompressed tar or other)
+		{"/plugin.tar", "", false},
+		{"/plugin", "application/x-tar", false},
+		{"/plugin.js", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url+":"+tt.contentType, func(t *testing.T) {
+			result := isGzipped(tt.url, tt.contentType)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestHTTPFetcher_FetchUncompressedTar(t *testing.T) {
+	// Create an uncompressed tar archive
+	tarball := createTestTar(t, map[string]string{
+		"package.json": `{"name": "uncompressed-plugin"}`,
+		"index.js":     "module.exports = {};",
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-tar")
+		_, _ = w.Write(tarball)
+	}))
+	defer server.Close()
+
+	f := NewHTTPFetcher()
+	destDir := t.TempDir()
+
+	err := f.Fetch(context.Background(), server.URL+"/plugin.tar", destDir)
+	require.NoError(t, err)
+
+	// Verify files were extracted
+	data, err := os.ReadFile(filepath.Join(destDir, "package.json"))
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "uncompressed-plugin")
+}
+
 // ============================================================================
 // Helper functions
 // ============================================================================
@@ -200,6 +245,28 @@ func createTestTarGz(t *testing.T, files map[string]string) []byte {
 	require.NoError(t, tw.Close())
 	require.NoError(t, gw.Close())
 
+	return buf.Bytes()
+}
+
+func createTestTar(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	for name, content := range files {
+		hdr := &tar.Header{
+			Name: name,
+			Mode: 0644,
+			Size: int64(len(content)),
+		}
+		err := tw.WriteHeader(hdr)
+		require.NoError(t, err)
+		_, err = tw.Write([]byte(content))
+		require.NoError(t, err)
+	}
+
+	require.NoError(t, tw.Close())
 	return buf.Bytes()
 }
 

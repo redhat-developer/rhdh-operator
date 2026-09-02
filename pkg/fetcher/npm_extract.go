@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	securejoin "github.com/cyphar/filepath-securejoin"
 )
 
 // extractTarGzWithStripPrefix extracts a gzipped tarball, stripping a path prefix from entries
@@ -18,7 +20,7 @@ func extractTarGzWithStripPrefix(data []byte, destDir, stripPrefix string) error
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
-	defer gzr.Close()
+	defer func() { _ = gzr.Close() }()
 
 	return extractTarWithStripPrefix(gzr, destDir, stripPrefix)
 }
@@ -51,16 +53,15 @@ func extractTarWithStripPrefix(r io.Reader, destDir, stripPrefix string) error {
 			continue
 		}
 
-		target := filepath.Join(destDir, name)
-
-		// Security: prevent path traversal
-		if !strings.HasPrefix(filepath.Clean(target), filepath.Clean(destDir)+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid tar path: %s", header.Name)
-		}
-
 		// Check header size before extraction (fail fast)
 		if header.Size > maxEntrySize {
 			return fmt.Errorf("entry %q exceeds maximum size: %d > %d", header.Name, header.Size, maxEntrySize)
+		}
+
+		// Construct safe path using securejoin to prevent path traversal attacks
+		target, err := securejoin.SecureJoin(destDir, name)
+		if err != nil {
+			return fmt.Errorf("invalid tar path %q: %w", header.Name, err)
 		}
 
 		switch header.Typeflag {
@@ -76,14 +77,8 @@ func extractTarWithStripPrefix(r io.Reader, destDir, stripPrefix string) error {
 				return err
 			}
 		case tar.TypeSymlink:
-			// Handle symlinks - validate they don't escape destDir
-			linkTarget := filepath.Join(filepath.Dir(target), header.Linkname)
-			if !strings.HasPrefix(filepath.Clean(linkTarget), filepath.Clean(destDir)) {
-				return fmt.Errorf("symlink escapes destination: %s -> %s", header.Name, header.Linkname)
-			}
-			if err := os.Symlink(header.Linkname, target); err != nil {
-				return err
-			}
+			// Skip symlinks - not needed for npm packages and avoids path traversal risks
+			continue
 		}
 	}
 	return nil

@@ -83,7 +83,7 @@ func parseNPMRC(path string) (registry, authToken string) {
 	if err != nil {
 		return "", ""
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -156,7 +156,7 @@ func (f *NPMFetcher) FetchWithIntegrity(ctx context.Context, pkg string, destDir
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", tarballURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("HTTP %d for %s", resp.StatusCode, tarballURL)
@@ -199,7 +199,7 @@ func (f *NPMFetcher) resolveLatestVersion(ctx context.Context, name string) (str
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch NPM metadata for %s: %w", name, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("NPM registry returned %d for %s", resp.StatusCode, name)
@@ -238,7 +238,7 @@ func (f *NPMFetcher) getVersionMetadata(ctx context.Context, name, version strin
 	if err != nil {
 		return "", "", fmt.Errorf("failed to fetch NPM version metadata for %s@%s: %w", name, version, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", "", fmt.Errorf("NPM registry returned %d for %s@%s", resp.StatusCode, name, version)

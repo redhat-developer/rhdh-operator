@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -36,7 +35,7 @@ func (f *HTTPFetcher) FetchWithIntegrity(ctx context.Context, url string, destDi
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("HTTP %d for %s", resp.StatusCode, url)
@@ -47,59 +46,58 @@ func (f *HTTPFetcher) FetchWithIntegrity(ctx context.Context, url string, destDi
 		return err
 	}
 
-	// Detect if it's a tarball and extract, or save directly
+	// Verify it's a tarball - plugins must be tarballs
 	contentType := resp.Header.Get("Content-Type")
-	if isTarball(url, contentType) {
-		// Read body into memory for integrity check
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("failed to read response: %w", err)
-		}
-
-		// Verify integrity if provided
-		if integrity != "" {
-			if err := verifyIntegrity(data, integrity); err != nil {
-				return fmt.Errorf("integrity verification failed: %w", err)
-			}
-		}
-
-		return extractTarGzBytes(data, destDir)
+	if !isTarball(url, contentType) {
+		return fmt.Errorf("HTTP response is not a tarball (Content-Type: %s, URL: %s)", contentType, url)
 	}
 
-	// Save as single file
-	filename := filepath.Base(url)
-	return saveFile(resp.Body, filepath.Join(destDir, filename))
+	// Read body into memory for integrity check
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Verify integrity if provided
+	if integrity != "" {
+		if err := verifyIntegrity(data, integrity); err != nil {
+			return fmt.Errorf("integrity verification failed: %w", err)
+		}
+	}
+
+	// Extract based on compression type
+	if isGzipped(url, contentType) {
+		return extractTarGzBytes(data, destDir)
+	}
+	return extractTarBytes(data, destDir)
 }
 
 // isTarball checks if the URL or content type indicates a tarball
 func isTarball(url, contentType string) bool {
-	// Check URL extension
+	return isGzipped(url, contentType) || isUncompressedTar(url, contentType)
+}
+
+// isGzipped checks if the URL or content type indicates gzip-compressed content
+func isGzipped(url, contentType string) bool {
 	lowerURL := strings.ToLower(url)
-	if strings.HasSuffix(lowerURL, ".tar.gz") ||
-		strings.HasSuffix(lowerURL, ".tgz") ||
-		strings.HasSuffix(lowerURL, ".tar") {
+	if strings.HasSuffix(lowerURL, ".tar.gz") || strings.HasSuffix(lowerURL, ".tgz") {
 		return true
 	}
-
-	// Check content type
 	if strings.Contains(contentType, "application/gzip") ||
 		strings.Contains(contentType, "application/x-gzip") ||
-		strings.Contains(contentType, "application/x-tar") ||
 		strings.Contains(contentType, "application/x-compressed-tar") {
 		return true
 	}
-
 	return false
 }
 
-// saveFile saves reader content to a file
-func saveFile(r io.Reader, path string) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
+// isUncompressedTar checks if the URL or content type indicates an uncompressed tar
+func isUncompressedTar(url, contentType string) bool {
+	if strings.HasSuffix(strings.ToLower(url), ".tar") {
+		return true
 	}
-	defer f.Close()
-
-	_, err = io.Copy(f, r)
-	return err
+	if strings.Contains(contentType, "application/x-tar") {
+		return true
+	}
+	return false
 }

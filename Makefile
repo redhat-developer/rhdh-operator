@@ -277,8 +277,8 @@ image-push: ## Push container image with the manager.
 	$(CONTAINER_TOOL) push $(IMG)
 
 .PHONY: dp-installer-buildx
-dp-installer-buildx: ## Build and push multiplatform plugin installer image (skopeo variant)
-	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile.skopeo .
+dp-installer-buildx: ## Build and push multiplatform plugin installer image
+	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(INSTALL_DP_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile .
 
 .PHONY: dp-installer-test
 dp-installer-test: ## Run plugin installer tests (unit + integration)
