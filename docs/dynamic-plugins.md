@@ -97,38 +97,9 @@ More details in [Catalog Entities Extraction](https://github.com/redhat-develope
 
 ## Plugin URL References
 
-The operator optionally supports special URL reference syntax in plugin package URLs, allowing users to reference plugins from the default configuration by name.
+For full documentation and examples, see [Plugin References](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#plugin-references).
 
-TODO: document Operator Dynamic Plugins processing mode
-
-**Operator behavior:**
-- The operator resolves all references during ConfigMap merge (before passing to the init container)
-- If a reference cannot be resolved, the operator returns an error and the Backstage CR will not reconcile
-- Both reference types use **name-based matching** - only the plugin name matters for lookup
-
-### Ref Reference (`ref://`)
-
-Look up a plugin by name and use its full package URL from the default configuration.
-
-```yaml
-plugins:
-  - package: "ref://backstage-plugin-catalog"
-    pluginConfig:
-      # your config overrides
-```
-
-### Inherit Reference (`:{{inherit}}`)
-
-Look up a plugin by name and use its full package URL from the default configuration. The registry/path in your URL is ignored - only the plugin name matters for matching.
-
-```yaml
-plugins:
-  # These all match the same base plugin (backstage-plugin-catalog):
-  - package: "oci://quay.io/rhdh/backstage-plugin-catalog:{{inherit}}"
-  - package: "oci://any-registry/path/backstage-plugin-catalog:{{inherit}}"
-```
-
-**Since v2.0.0:** Both `ref://` and `:{{inherit}}` use name-based matching (plugin name only, registry/path ignored). This behavior is slightly different from what is described in [OCI Package Version Inheritance](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#oci-package-version-inheritance) which documents the RHDH init-container behavior (full URL matching).
+**Operator-specific behavior:** The operator resolves all references during ConfigMap merge (before passing to the init container). If a reference cannot be resolved, the operator returns an error and the Backstage CR will not reconcile.
 
 ## Dynamic plugins dependency management
 
