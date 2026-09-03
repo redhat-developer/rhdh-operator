@@ -24,7 +24,7 @@ TMP_DIR=""
 usage() {
     cat <<'EOF'
 Usage:
-  ./hack/sync-lightspeed-configs.sh [--ref <branch-or-tag>]
+  ./hack/sync-lightspeed-configs.sh [--repo <repo>] [--ref <branch-or-tag>]
 EOF
 }
 
@@ -33,6 +33,10 @@ parse_args() {
         case "$1" in
             --ref)
                 REF="$2"
+                shift 2
+                ;;
+            --repo)
+                UPSTREAM_REPO="$2"
                 shift 2
                 ;;
             -h|--help)
