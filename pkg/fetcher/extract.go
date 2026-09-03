@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
 )
@@ -79,6 +80,10 @@ func extractTar(r io.Reader, destDir string) error {
 		target, err := securejoin.SecureJoin(destDir, header.Name)
 		if err != nil {
 			return fmt.Errorf("invalid tar path %q: %w", header.Name, err)
+		}
+		// Defense in depth: verify resolved path is within destDir
+		if !strings.HasPrefix(target, destDir+string(os.PathSeparator)) && target != destDir {
+			return fmt.Errorf("path traversal blocked: %q resolves outside destination", header.Name)
 		}
 
 		switch header.Typeflag {

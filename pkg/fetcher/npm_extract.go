@@ -30,9 +30,13 @@ func extractTarWithStripPrefix(r io.Reader, destDir, stripPrefix string) error {
 	tr := tar.NewReader(r)
 	maxEntrySize := getMaxEntrySize()
 
-	// Ensure destDir exists
+	// Ensure destDir exists and get absolute path for validation
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return err
+	}
+	destDir, err := filepath.Abs(destDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
 	for {
@@ -62,6 +66,10 @@ func extractTarWithStripPrefix(r io.Reader, destDir, stripPrefix string) error {
 		target, err := securejoin.SecureJoin(destDir, name)
 		if err != nil {
 			return fmt.Errorf("invalid tar path %q: %w", header.Name, err)
+		}
+		// Defense in depth: verify resolved path is within destDir
+		if !strings.HasPrefix(target, destDir+string(os.PathSeparator)) && target != destDir {
+			return fmt.Errorf("path traversal blocked: %q resolves outside destination", header.Name)
 		}
 
 		switch header.Typeflag {
