@@ -18,7 +18,7 @@ These plugins talk to **Lightspeed Core**, which the flavour deploys as a sideca
 
 To use Intelligent Assistant, you need:
 - Red Hat Developer Hub 2.1 or later
-- Access to any LLM of your choosing (which you set up in the Llama Stack config.yaml configuration)
+- Access to any LLM of your choosing (configured in a Lightspeed Core `lightspeed-stack.yaml` file)
 
 ### Enabling Intelligent Assistant
 
@@ -62,15 +62,41 @@ If you prefer to configure plugins manually without using the flavour, refer to 
 includes:
   - dynamic-plugins.default.yaml
 plugins:
-  - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant:{{inherit}}
+  - package: 'ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant'
     enabled: true
-  - package: oci://quay.io/rhdh/red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend:{{inherit}}
+  - package: 'ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend'
     enabled: true
 ```
 
 The plugins use the `intelligent-assistant:` app-config namespace (not `lightspeed:`) and the UI route `/intelligent-assistant`. For more information about configuring dynamic plugins, please refer to the [Configuration documentation](configuration.md).
 
 ### Configuration
+
+#### LLM Providers
+
+The flavour includes a default Lightspeed Core stack config in `lightspeed-stack.yaml`. The Operator manages the bundled copy, so do not edit it directly. To configure an LLM provider, create a user-managed ConfigMap with your own `lightspeed-stack.yaml`, uncomment the provider under `inference.providers`, and mount it over the bundled file in the `lightspeed-core` sidecar:
+
+```yaml
+spec:
+  application:
+    extraFiles:
+      configMaps:
+        - name: my-lightspeed-stack
+          key: lightspeed-stack.yaml
+          mountPath: /app-root
+          containers:
+            - lightspeed-core
+```
+
+The default config ships three inference providers commented out: `openai`, `vllm`, and `vertexai`. Set the matching environment variables for each provider you enable. Setting the Secret keys alone does not turn a provider on. The [`examples/intelligent-assistant.yaml`](../examples/intelligent-assistant.yaml) example includes a user-managed `my-lightspeed-stack` ConfigMap and lists the supported Secret keys.
+
+`KV_STORE_PATH`, `SQL_STORE_PATH`, `SQLITE_STORE_DIR`, and `OTEL_SDK_DISABLED` are set on the Lightspeed Core sidecar by default. Override them with `spec.application.extraEnvs.envs` (and `containers: [lightspeed-core]`) if you need different values.
+
+You can enable more than one of the bundled providers. You can also add further providers, as long as each provider `id` is unique.
+
+#### Question validation
+
+Question validation is opt-in. Set `ENABLE_VALIDATION` to `question_validity` on the Lightspeed Core sidecar (typically via the Intelligent Assistant Secret). Leave it unset to keep the shield disabled. You must also set `VALIDATION_PROVIDER` and `VALIDATION_MODEL_NAME` so they match a provider you uncommented under `inference.providers`.
 
 #### Backend Authentication
 
@@ -127,12 +153,11 @@ The Intelligent Assistant flavour vendors configuration files from the upstream 
 
 #### What Gets Synced
 
-The script fetches four files from the upstream repository and writes them into two local targets:
+The script fetches three files from the upstream repository and writes them into two local targets:
 
 | Upstream path | Local target | Content |
 |---|---|---|
-| `llama-stack-configs/config.yaml` | `config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml` | Llama Stack server configuration |
-| `lightspeed-core-configs/lightspeed-stack.yaml` | (same ConfigMap file, different YAML document) | Lightspeed Core stack configuration |
+| `lightspeed-core-configs/lightspeed-stack.yaml` | `config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml` | Lightspeed Core stack configuration |
 | `lightspeed-core-configs/rhdh-profile.py` | (same ConfigMap file, different YAML document) | RHDH prompt profile |
 | `env/default-values.env` | `examples/intelligent-assistant.yaml` | Secret key scaffolding |
 
