@@ -79,8 +79,8 @@ https://example.com/plugin.tgz sha512-K3mCHKQ9sVh8o2F...
 # NPM scoped package with integrity (overrides registry)
 @backstage/plugin-techdocs@1.8.0 sha512-abc123...
 
-# NPM unscoped package
-is-odd@3.0.1
+# NPM unscoped package (requires @npm: prefix)
+@npm:is-odd@3.0.1
 ```
 
 ## Supported URL Formats
@@ -116,14 +116,15 @@ Downloads from NPM registry (or private registry via .npmrc).
 @backstage/plugin-catalog
 @backstage/plugin-catalog@1.10.0
 
-# Unscoped packages
-lodash
-is-odd@3.0.1
+# Unscoped packages (require @npm: prefix)
+@npm:lodash
+@npm:is-odd@3.0.1
 ```
 
 **Features:**
 - Reads registry URL and auth token from `.npmrc`
-- Supports scoped and unscoped packages
+- Supports scoped packages directly (`@scope/package`)
+- Supports unscoped packages with `@npm:` prefix
 - Resolves `latest` version if not specified
 - Verifies integrity (from registry or user-provided)
 
