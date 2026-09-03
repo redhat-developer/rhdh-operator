@@ -91,7 +91,7 @@ jobs:
             git push origin "${BRANCH}"
 
             BODY=$(cat <<EOF
-          Automated nightly sync of Lightspeed Core config files from [redhat-ai-dev/lightspeed-configs @ ${TARGET_BRANCH}](https://github.com/redhat-ai-dev/lightspeed-configs/tree/${TARGET_BRANCH}).
+          Automated nightly sync of Lightspeed Core config files from [redhat-developer/rhdh-intelligent-assistant-configs @ ${TARGET_BRANCH}](https://github.com/redhat-developer/rhdh-intelligent-assistant-configs/tree/${TARGET_BRANCH}).
 
           ### Synced files
           - \`config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml\`
