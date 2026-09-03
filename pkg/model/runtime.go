@@ -161,6 +161,9 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		}
 	}
 
+	// Set template data for config file substitution ({{.Backstage.Name}}, {{.Backstage.Namespace}})
+	utils.SetTemplateData(backstage.Name, backstage.Namespace)
+
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
 
