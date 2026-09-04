@@ -53,6 +53,9 @@ configMapGenerator:
   - default-config/flavours/intelligent-assistant/configmap-files.yaml
   - default-config/flavours/intelligent-assistant/deployment.yaml
   - default-config/flavours/intelligent-assistant/dynamic-plugins.yaml
+  - default-config/flavours/intelligent-assistant/okp-deployment.yaml
+  - default-config/flavours/intelligent-assistant/okp-service.yaml
+  - default-config/flavours/intelligent-assistant/okp-route.yaml
   name: flavour-intelligent-assistant-config
 - files:
   - default-config/flavours/orchestrator/metadata.yaml

@@ -1,0 +1,19 @@
+# OKP (Offline Knowledge Portal) standalone ClusterIP Service.
+# name/labels/selector are set by the operator at runtime (per Backstage CR).
+apiVersion: v1
+kind: Service
+metadata:
+  name: lightspeed-okp
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: lightspeed-okp
+  ports:
+    - name: httpd
+      port: 8080
+      targetPort: httpd
+      protocol: TCP
+    - name: solr
+      port: 8983
+      targetPort: solr
+      protocol: TCP

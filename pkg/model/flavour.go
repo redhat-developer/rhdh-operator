@@ -115,6 +115,20 @@ func loadAllFlavours(flavoursDir string) (map[string]flavourInfo, error) {
 	return flavours, nil
 }
 
+// IsFlavourEnabled returns true if the named flavour is enabled for the given spec.
+func IsFlavourEnabled(spec api.BackstageSpec, name string) bool {
+	flavours, err := GetEnabledFlavours(spec)
+	if err != nil {
+		return false
+	}
+	for _, f := range flavours {
+		if f.name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // loadFlavourMetadata loads metadata.yaml from a flavour directory
 func loadFlavourMetadata(flavourPath string) (*FlavourMetadata, error) {
 	metadataPath := filepath.Join(flavourPath, "metadata.yaml")

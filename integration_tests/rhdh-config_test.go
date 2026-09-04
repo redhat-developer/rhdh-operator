@@ -292,11 +292,8 @@ var _ = When("create default rhdh", func() {
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).To(Not(HaveOccurred()))
 
-			// no default flavour
-			// g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
-
-			// with default intelligent-assistant flavour
-			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(2))
+			// OKP replaces the RAG init container, so only install-dynamic-plugins remains
+			g.Expect(len(deploy.PodSpec().InitContainers)).To(Equal(1))
 
 			initCont := deploy.PodSpec().InitContainers[0]
 			g.Expect(initCont.Name).To(Equal("install-dynamic-plugins"))
@@ -349,14 +346,6 @@ var _ = When("create default rhdh", func() {
 			}
 			g.Expect(foundLightspeedCore).To(BeTrue())
 
-			foundInitRagData := false
-			for _, c := range deploy.PodSpec().InitContainers {
-				if c.Name == "init-rag-data" {
-					foundInitRagData = true
-				}
-			}
-			g.Expect(foundInitRagData).To(BeTrue())
-
 		}, 20*time.Second, time.Second).Should(Succeed())
 
 		deleteNamespace(ctx, ns)
@@ -398,14 +387,6 @@ var _ = When("create default rhdh", func() {
 				}
 			}
 			g.Expect(foundLightspeedCore).To(BeFalse())
-
-			foundInitRagData := false
-			for _, c := range deploy.PodSpec().InitContainers {
-				if c.Name == "init-rag-data" {
-					foundInitRagData = true
-				}
-			}
-			g.Expect(foundInitRagData).To(BeFalse())
 
 		}, 20*time.Second, time.Second).Should(Succeed())
 
