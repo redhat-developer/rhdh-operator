@@ -123,7 +123,7 @@ For more information about the Flavour-based configuration system, see the [Conf
 > [!NOTE]
 > This syncing functionality is intended for use by maintainers of the Intelligent Assistant flavour for RHDH.
 
-The Intelligent Assistant flavour vendors configuration files from the upstream [`redhat-ai-dev/lightspeed-configs`](https://github.com/redhat-ai-dev/lightspeed-configs) repository. A sync script is provided to fetch the latest versions of these files and update the operator tree in place.
+The Intelligent Assistant flavour vendors configuration files from the upstream [`redhat-developer/rhdh-intelligent-assistant-configs`](https://github.com/redhat-developer/rhdh-intelligent-assistant-configs) repository. A sync script is provided to fetch the latest versions of these files and update the operator tree in place.
 
 #### What Gets Synced
 
