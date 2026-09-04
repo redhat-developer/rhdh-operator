@@ -3,6 +3,7 @@ package v1alpha5
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // DevHubPluginCatalogSpec defines the desired state of DevHubPluginCatalog
@@ -80,5 +81,8 @@ type DevHubPluginCatalogList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&DevHubPluginCatalog{}, &DevHubPluginCatalogList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &DevHubPluginCatalog{}, &DevHubPluginCatalogList{})
+		return nil
+	})
 }

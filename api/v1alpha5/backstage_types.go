@@ -3,6 +3,7 @@ package v1alpha5
 import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 )
 
@@ -409,5 +410,8 @@ func (s *BackstageSpec) IsMonitoringEnabled() bool {
 }
 
 func init() {
-	SchemeBuilder.Register(&Backstage{}, &BackstageList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &Backstage{}, &BackstageList{})
+		return nil
+	})
 }
