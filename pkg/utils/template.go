@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 )
 
@@ -32,10 +33,16 @@ func SetTemplateData(name, namespace string) {
 	}
 }
 
-// ApplyTemplate applies Go template substitution to content if templateData is set.
-// Returns content unchanged if no template data has been set.
+// ApplyTemplate applies Go template substitution to content if templateData is set
+// and the content contains our template variables ({{.Backstage.}}).
+// Returns content unchanged if no template data has been set or no template variables found.
 func ApplyTemplate(content []byte) ([]byte, error) {
 	if templateData == nil {
+		return content, nil
+	}
+	// Only parse as template if our specific variables are present
+	// This avoids parsing errors from other {{...}} patterns in config files
+	if !strings.Contains(string(content), "{{.Backstage.") {
 		return content, nil
 	}
 	tmpl, err := template.New("config").Parse(string(content))
