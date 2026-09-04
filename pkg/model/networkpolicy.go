@@ -44,8 +44,9 @@ func (b *BackstageNetworkPolicy) GetKey() string {
 	return NetworkPolicyKey
 }
 
-// addToModel loads the NP config and filters out DB-scoped policies when local DB is disabled.
-func (b *BackstageNetworkPolicy) addToModel(model *BackstageModel, _ api.Backstage, config runtime.Object, _ *runtime.Scheme) error {
+// addToModel loads the NP config, filters out DB-scoped policies when local DB is disabled,
+// sets metadata, replaces placeholder labels, and applies platform-specific adjustments.
+func (b *BackstageNetworkPolicy) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	b.model = model
 
 	if config != nil {
@@ -56,23 +57,22 @@ func (b *BackstageNetworkPolicy) addToModel(model *BackstageModel, _ api.Backsta
 		b.filterForExternalDb()
 	}
 
+	if b.networkPolicies != nil && len(b.networkPolicies.Items) > 0 {
+		b.setMetaInfo(backstage, scheme)
+		for _, item := range b.networkPolicies.Items {
+			np := item.(*networkingv1.NetworkPolicy)
+			replaceRuleLabels(np, backstage.Name)
+			if b.model.isOpenshift && np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-router-ingress" {
+				setOpenShiftIngressSelector(np)
+			}
+		}
+	}
+
 	model.setRuntimeObject(b)
 	return nil
 }
 
-// updateAndValidate sets metadata, replaces placeholder labels, and applies platform-specific adjustments.
-func (b *BackstageNetworkPolicy) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
-	if b.networkPolicies == nil || len(b.networkPolicies.Items) == 0 {
-		return nil
-	}
-	b.setMetaInfo(backstage, scheme)
-	for _, item := range b.networkPolicies.Items {
-		np := item.(*networkingv1.NetworkPolicy)
-		replaceRuleLabels(np, backstage.Name)
-		if b.model.isOpenshift && np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-router-ingress" {
-			setOpenShiftIngressSelector(np)
-		}
-	}
+func (b *BackstageNetworkPolicy) updateAndValidate(_ api.Backstage, _ *runtime.Scheme) error {
 	return nil
 }
 
