@@ -6,7 +6,6 @@
 set -euo pipefail
 
 UPSTREAM_REPO="redhat-ai-dev/lightspeed-configs"
-UPSTREAM_CONFIG_PATH="llama-stack-configs/config.yaml"
 UPSTREAM_STACK_PATH="lightspeed-core-configs/lightspeed-stack.yaml"
 UPSTREAM_PROFILE_PATH="lightspeed-core-configs/rhdh-profile.py"
 UPSTREAM_ENV_PATH="env/default-values.env"
@@ -60,11 +59,34 @@ indent_file() {
     sed 's/^/    /' "$1"
 }
 
+# Upstream env keys that are not user Secret fields.
+# Images stay hardcoded in deployment.yaml; storage, OTEL, and logging are sidecar defaults.
+SKIP_SECRET_KEYS=(
+    LIGHTSPEED_CORE_IMAGE
+    RAG_CONTENT_IMAGE
+    KV_STORE_PATH
+    SQL_STORE_PATH
+    SQLITE_STORE_DIR
+    OTEL_SDK_DISABLED
+    LLAMA_STACK_LOGGING
+    GOOGLE_APPLICATION_CREDENTIALS_HOST_PATH
+)
+
 render_secret_entries() {
-    awk -F= '
+    # Comma-separated: BSD awk (macOS) rejects newlines in -v values.
+    local skip
+    skip="$(IFS=,; printf '%s' "${SKIP_SECRET_KEYS[*]}")"
+
+    awk -F= -v skip="$skip" '
+        BEGIN {
+            n = split(skip, keys, ",")
+            for (i = 1; i <= n; i++) {
+                if (keys[i] != "") skipset[keys[i]] = 1
+            }
+        }
         { sub(/\r$/, "") }
         /^[[:space:]]*($|#)/ { next }
-        $1 == "LIGHTSPEED_CORE_IMAGE" || $1 == "RAG_CONTENT_IMAGE" || seen[$1]++ { next }
+        skipset[$1] || seen[$1]++ { next }
         { print "  " $1 ": \"\"" }
     ' "$1"
 }
@@ -147,26 +169,21 @@ main() {
     TMP_DIR="$(mktemp -d)"
     trap cleanup EXIT
 
-    local config_file="${TMP_DIR}/config.yaml"
     local stack_file="${TMP_DIR}/lightspeed-stack.yaml"
     local profile_file="${TMP_DIR}/rhdh-profile.py"
     local env_file="${TMP_DIR}/default-values.env"
-    local config_block="${TMP_DIR}/config-block.yaml"
     local stack_block="${TMP_DIR}/stack-block.yaml"
     local profile_block="${TMP_DIR}/profile-block.yaml"
     local secret_entries="${TMP_DIR}/secret-entries.yaml"
 
-    fetch_upstream_file "$UPSTREAM_CONFIG_PATH" "$config_file"
     fetch_upstream_file "$UPSTREAM_STACK_PATH" "$stack_file"
     fetch_upstream_file "$UPSTREAM_PROFILE_PATH" "$profile_file"
     fetch_upstream_file "$UPSTREAM_ENV_PATH" "$env_file"
 
-    indent_file "$config_file" > "$config_block"
     indent_file "$stack_file" > "$stack_block"
     indent_file "$profile_file" > "$profile_block"
     render_secret_entries "$env_file" > "$secret_entries"
 
-    replace_indented_block "$CONFIGMAP_FILE" "  config.yaml: |" 4 "$config_block"
     replace_indented_block "$CONFIGMAP_FILE" "  lightspeed-stack.yaml: |" 4 "$stack_block"
     replace_indented_block "$CONFIGMAP_FILE" "  rhdh-profile.py: |" 4 "$profile_block"
     replace_indented_block "$EXAMPLE_SECRET_FILE" "stringData:" 2 "$secret_entries"
