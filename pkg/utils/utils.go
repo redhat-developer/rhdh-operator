@@ -1,17 +1,12 @@
 package utils
 
 import (
-	//"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
-
-	//"io"
 	"os"
 	"path/filepath"
-
-	//"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -112,8 +107,14 @@ func ReadYamls(manifest []byte, platformPatch []byte, scheme runtime.Scheme) ([]
 			mergedDoc = m
 		}
 
+		// Apply template substitution after merging
+		mergedBytes, err := ApplyTemplate([]byte(mergedDoc))
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply template: %w", err)
+		}
+
 		u := &unstructured.Unstructured{}
-		if err := yaml.Unmarshal([]byte(mergedDoc), &u.Object); err != nil {
+		if err := yaml.Unmarshal(mergedBytes, &u.Object); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal YAML to unstructured: %w", err)
 		}
 
