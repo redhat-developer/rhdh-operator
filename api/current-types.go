@@ -45,6 +45,12 @@ type (
 
 	// Other types
 	TLS = bsv1.TLS
+
+	// DevHubPluginCatalog types
+	DevHubPluginCatalog     = bsv1.DevHubPluginCatalog
+	DevHubPluginCatalogSpec = bsv1.DevHubPluginCatalogSpec
+	DevHubPluginCatalogList = bsv1.DevHubPluginCatalogList
+	CatalogSource           = bsv1.CatalogSource
 )
 
 // Condition constants

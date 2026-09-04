@@ -11,11 +11,12 @@ resources:
 - ../../manager
 - namespace.yaml
 - plugin-rbac
+- default-config/catalog.yaml
 
 images:
 - name: controller
-  newName: quay.io/rhdh/rhdh-rhel9-operator
-  newTag: "2.0"
+  newName: quay.io/rhdh-community/operator
+  newTag: 2.0.0
 
 patches:
 - path: patches/deployment-patch.yaml

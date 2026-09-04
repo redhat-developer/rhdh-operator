@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
@@ -40,8 +41,9 @@ const (
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Platform platform.Platform
+	Scheme            *runtime.Scheme
+	Platform          platform.Platform
+	OperatorNamespace string
 }
 
 // +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
@@ -85,6 +87,13 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	if len(backstage.Status.Conditions) == 0 {
 		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Deployment process started")
+	}
+
+	// Check if plugin catalogs are ready before proceeding
+	if !r.areCatalogsReady(ctx) {
+		lg.Info("Waiting for plugin catalogs to be ready")
+		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Waiting for DevHubPluginCatalog resources to be ready")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	// 1. Preliminary read and prepare external config objects from the specs (configMaps, Secrets)
@@ -197,4 +206,49 @@ func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return b.Complete(r)
+}
+
+// areCatalogsReady checks if plugin catalogs are ready by checking DevHubPluginCatalog status.
+// Returns true if:
+// - Catalog controller is disabled (DISABLE_CATALOG_CONTROLLER=true)
+// - No DevHubPluginCatalog resources exist
+// - All DevHubPluginCatalog resources have Ready=True condition
+// Returns false if any catalog is not ready.
+func (r *BackstageReconciler) areCatalogsReady(ctx context.Context) bool {
+	if isCatalogControllerDisabled() {
+		return true
+	}
+
+	catalogList := &api.DevHubPluginCatalogList{}
+	if err := r.List(ctx, catalogList, client.InNamespace(r.OperatorNamespace)); err != nil {
+		// Can't list catalogs, assume not ready
+		return false
+	}
+
+	if len(catalogList.Items) == 0 {
+		// No catalogs defined, nothing to wait for
+		return true
+	}
+
+	// Check if all catalogs have Ready=True
+	for i := range catalogList.Items {
+		catalog := &catalogList.Items[i]
+		ready := false
+		for _, cond := range catalog.Status.Conditions {
+			if cond.Type == "Ready" && cond.Status == "True" {
+				ready = true
+				break
+			}
+		}
+		if !ready {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isCatalogControllerDisabled returns true if DISABLE_CATALOG_CONTROLLER env var is set to "true"
+func isCatalogControllerDisabled() bool {
+	return os.Getenv("DISABLE_CATALOG_CONTROLLER") == "true"
 }

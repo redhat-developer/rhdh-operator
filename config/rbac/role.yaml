@@ -93,10 +93,19 @@ rules:
   - rhdh.redhat.com
   resources:
   - backstages/status
+  - devhubplugincatalogs/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - rhdh.redhat.com
+  resources:
+  - devhubplugincatalogs
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - route.openshift.io
   resources:

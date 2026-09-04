@@ -23,13 +23,26 @@ metadata:
             },
             "name": "developer-hub"
           }
+        },
+        {
+          "apiVersion": "rhdh.redhat.com/v1alpha5",
+          "kind": "DevHubPluginCatalog",
+          "metadata": {
+            "name": "rhdh-primary-catalog",
+            "namespace": "rhdh-operator"
+          },
+          "spec": {
+            "source": {
+              "ref": "oci://quay.io/rhdh/plugin-catalog-index:2.0.0"
+            }
+          }
         }
       ]
     capabilities: Seamless Upgrades
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:2.0
-    createdAt: "2026-08-24T09:48:00Z"
+    createdAt: "2026-09-04T11:44:58Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -77,6 +90,9 @@ spec:
       displayName: Red Hat Developer Hub
       kind: Backstage
       name: backstages.rhdh.redhat.com
+      version: v1alpha5
+    - kind: DevHubPluginCatalog
+      name: devhubplugincatalogs.rhdh.redhat.com
       version: v1alpha5
   description: |
     Red Hat Developer Hub is an enterprise-grade platform for building developer portals, containing a supported and opinionated framework. It comes with pre-built plug-ins and configuration settings, supports use of an external database, and can help streamline the process of setting up a self-managed internal developer portal for adopters who are just starting out. By implementing a unified and open platform designed to maximize developer skills, ease onboarding, and increase development productivity, focus can be centered on what really matters: writing great code. Red Hat Developer Hub also offers Software Templates to simplify the development process, which can reduce friction and frustration for development teams, boosting their productivity and increasing an organization's competitive advantage.
@@ -191,10 +207,19 @@ spec:
           - rhdh.redhat.com
           resources:
           - backstages/status
+          - devhubplugincatalogs/status
           verbs:
           - get
           - patch
           - update
+        - apiGroups:
+          - rhdh.redhat.com
+          resources:
+          - devhubplugincatalogs
+          verbs:
+          - get
+          - list
+          - watch
         - apiGroups:
           - route.openshift.io
           resources:
@@ -314,17 +339,23 @@ spec:
                 env:
                 - name: OPERATOR_NAME
                   value: rhdh-operator
-                - name: POD_NAME
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.name
+                - name: OPERATOR_DP_PROCESSING
+                  value: "true"
                 - name: RELATED_IMAGE_postgresql
                   value: quay.io/fedora/postgresql-15:latest
                 - name: RELATED_IMAGE_backstage
                   value: quay.io/rhdh-community/rhdh:next
-                - name: INSTALL_DP_IMAGE
-                  value: quay.io/gazarenk/install-plugins:skopeo
-                image: quay.io/rhdh/rhdh-rhel9-operator:2.0
+                - name: RELATED_IMAGE_plugin_installer
+                  value: quay.io/rhdh-community/rhdh-plugin-installer:next
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                image: quay.io/rhdh-community/operator:2.0.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -366,6 +397,8 @@ spec:
                   name: default-config
                 - mountPath: /plugin-deps
                   name: plugin-deps
+                - mountPath: /tmp
+                  name: tmp
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: rhdh-controller-manager
@@ -384,6 +417,8 @@ spec:
                   name: rhdh-plugin-deps
                   optional: true
                 name: plugin-deps
+              - emptyDir: {}
+                name: tmp
       permissions:
       - rules:
         - apiGroups:
@@ -455,5 +490,7 @@ spec:
     name: postgresql
   - image: quay.io/rhdh-community/rhdh:next
     name: backstage
+  - image: quay.io/rhdh-community/rhdh-plugin-installer:next
+    name: plugin-installer
   replaces: rhdh-operator.v1.10.0
   version: 2.0.0

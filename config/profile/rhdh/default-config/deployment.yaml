@@ -52,7 +52,7 @@ spec:
             - ./install-dynamic-plugins.sh
             - /dynamic-plugins-root
           # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-          # image will be replaced with INSTALL_DP_IMAGE if OPERATOR_DP_PROCESSING==true
+          # image will be replaced with RELATED_IMAGE_plugin_installer if OPERATOR_DP_PROCESSING==true
           image: quay.io/rhdh-community/rhdh:next
           imagePullPolicy: IfNotPresent
           securityContext:

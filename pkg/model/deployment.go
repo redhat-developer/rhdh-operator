@@ -115,8 +115,9 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 
 		// if Operator dynamic plugins processing - put dedicated image
 		// Only apply if the deployment has the install-dynamic-plugins init container
-		if IsOperatorDPProcessing() && i >= 0 {
-			idpImage := os.Getenv(InstallDpImageEnvVar)
+		dpProcessing := IsOperatorDPProcessing()
+		idpImage := os.Getenv(InstallDpImageEnvVar)
+		if dpProcessing && i >= 0 {
 			if idpImage == "" {
 				return fmt.Errorf("%s environment variable is required when operator dynamic plugins processing is enabled", InstallDpImageEnvVar)
 			}
