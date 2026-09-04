@@ -18,15 +18,15 @@ import (
 
 // Environment variables
 const (
-	InputFileEnvVar            = "INPUT_FILE"             // Package list file (default: /input/packages.txt)
-	OutputDirEnvVar            = "OUTPUT_DIR"             // Output directory (default: /dynamic-plugins-root)
-	DockerConfigEnvVar         = "DOCKER_CONFIG"          // Path to dockerconfigjson file
-	CAFileEnvVar               = "CA_FILE"                // Path to CA certificate file
-	InsecureEnvVar             = "INSECURE"               // Skip TLS verification (true/false)
-	ValidateDPAnnotationEnvVar = "VALIDATE_DP_ANNOTATION" // Require io.backstage.dynamic-packages annotation on OCI images (default: true)
-	ParallelEnvVar             = "PARALLEL"               // Number of parallel downloads (default: 4)
-	LockFileEnvVar             = "LOCK_FILE"              // Lock file path (default: OUTPUT_DIR/install-dynamic-plugins.lock)
-	TerminationLogEnvVar       = "TERMINATION_LOG"        // Kubernetes termination log
+	InputFileEnvVar      = "INPUT_FILE"      // Package list file (default: /input/packages.txt)
+	OutputDirEnvVar      = "OUTPUT_DIR"      // Output directory (default: /dynamic-plugins-root)
+	DockerConfigEnvVar   = "DOCKER_CONFIG"   // Path to dockerconfigjson file
+	CAFileEnvVar         = "CA_FILE"         // Path to CA certificate file
+	InsecureEnvVar       = "INSECURE"        // Skip TLS verification (true/false)
+	PluginModeEnvVar     = "PLUGIN_MODE"     // Enable plugin mode: validate annotation and extract plugin subdirectory (default: true)
+	ParallelEnvVar       = "PARALLEL"        // Number of parallel downloads (default: 4)
+	LockFileEnvVar       = "LOCK_FILE"       // Lock file path (default: OUTPUT_DIR/install-dynamic-plugins.lock)
+	TerminationLogEnvVar = "TERMINATION_LOG" // Kubernetes termination log
 
 	// Catalog index for Extensions UI
 	CatalogIndexImageEnvVar         = "CATALOG_INDEX_IMAGE"          // OCI image containing catalog entities
@@ -54,7 +54,7 @@ func main() {
 	dockerConfig := utils.StringEnvVar(DockerConfigEnvVar, "")
 	caFile := utils.StringEnvVar(CAFileEnvVar, "")
 	insecure := utils.BoolEnvVar(InsecureEnvVar, false)
-	validate := utils.BoolEnvVar(ValidateDPAnnotationEnvVar, true)
+	pluginMode := utils.BoolEnvVar(PluginModeEnvVar, true)
 	parallel := utils.IntEnvVar(ParallelEnvVar, 4)
 	if parallel <= 0 {
 		parallel = 4 // normalize invalid values to default
@@ -98,27 +98,30 @@ func main() {
 		}
 	}()
 
-	// Build OCI options
-	var ociOpts []fetcher.OCIOption
+	// Build base OCI options (shared by plugins and catalog index)
+	var baseOciOpts []fetcher.OCIOption
 	if insecure {
-		ociOpts = append(ociOpts, fetcher.WithInsecure())
+		baseOciOpts = append(baseOciOpts, fetcher.WithInsecure())
 	}
 	if caFile != "" {
 		caCert, err := os.ReadFile(caFile)
 		if err != nil {
 			fatal(termLog, startTime, "Error reading CA file: %v", err)
 		}
-		ociOpts = append(ociOpts, fetcher.WithCACert(caCert))
+		baseOciOpts = append(baseOciOpts, fetcher.WithCACert(caCert))
 	}
 	if dockerConfig != "" {
 		secret, err := os.ReadFile(dockerConfig)
 		if err != nil {
 			fatal(termLog, startTime, "Error reading docker config: %v", err)
 		}
-		ociOpts = append(ociOpts, fetcher.WithDockerConfig(secret))
+		baseOciOpts = append(baseOciOpts, fetcher.WithDockerConfig(secret))
 	}
-	if validate {
-		ociOpts = append(ociOpts, fetcher.WithPluginValidation())
+
+	// Plugin OCI options add plugin mode (validation + subdirectory extraction)
+	ociOpts := append([]fetcher.OCIOption{}, baseOciOpts...)
+	if pluginMode {
+		ociOpts = append(ociOpts, fetcher.WithPluginMode())
 	}
 
 	// Build NPM options
@@ -142,16 +145,6 @@ func main() {
 		fetcher.WithNPMOptions(npmOpts...),
 	)
 
-	// Extract catalog entities from catalog index image (for Extensions UI)
-	if catalogIndexImage != "" {
-		fmt.Printf("=== Extracting catalog entities from %s ===\n", catalogIndexImage)
-		if err := extractCatalogEntities(ctx, f, catalogIndexImage, catalogEntitiesDir, ociOpts); err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING: Failed to extract catalog index: %v\n", err)
-		}
-	} else {
-		fmt.Println("=== CATALOG_INDEX_IMAGE not set, skipping catalog entities extraction")
-	}
-
 	// Read packages from input file
 	packages, err := readPackages(inputFile)
 	if err != nil {
@@ -160,19 +153,26 @@ func main() {
 
 	if len(packages) == 0 {
 		fmt.Println("No packages to install")
-		return
+	} else {
+		fmt.Printf("=== Downloading %d plugins to %s (%d parallel) ===\n\n", len(packages), outputDir, parallel)
+
+		// Process packages in parallel
+		if err := processParallel(ctx, f, packages, outputDir, parallel); err != nil {
+			fatal(termLog, startTime, "Error installing plugins: %v", err)
+		}
+
+		fmt.Printf("\n=== Plugins installed: %d ===\n", len(packages))
 	}
 
-	fmt.Printf("=== Downloading %d plugins to %s (%d parallel) ===\n\n", len(packages), outputDir, parallel)
-
-	// Process packages in parallel
-	if err := processParallel(ctx, f, packages, outputDir, parallel); err != nil {
-		fatal(termLog, startTime, "Error installing plugins: %v", err)
+	// Extract catalog entities for Extensions UI (optional)
+	if catalogIndexImage != "" {
+		fmt.Printf("\n=== Extracting catalog entities for Extensions UI from %s ===\n", catalogIndexImage)
+		if err := extractCatalogEntities(ctx, f, catalogIndexImage, catalogEntitiesDir, baseOciOpts); err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: Failed to extract catalog entities: %v\n", err)
+		}
 	}
 
-	fmt.Printf("\n=== Complete ===\n")
-	fmt.Printf("Successfully installed %d plugins\n", len(packages))
-	fmt.Printf("Elapsed time: %ds\n", int(time.Since(startTime).Seconds()))
+	fmt.Printf("\n=== Complete (elapsed: %ds) ===\n", int(time.Since(startTime).Seconds()))
 }
 
 // extractCatalogEntities extracts catalog-entities from an OCI image

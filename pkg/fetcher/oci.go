@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -21,9 +23,9 @@ const PluginAnnotation = "io.backstage.dynamic-packages"
 
 // OCIFetcher fetches artifacts from OCI registries
 type OCIFetcher struct {
-	transport      http.RoundTripper
-	keychain       authn.Keychain
-	validatePlugin bool // if true, validate io.backstage.dynamic-packages annotation
+	transport  http.RoundTripper
+	keychain   authn.Keychain
+	pluginMode bool // if true, validate io.backstage.dynamic-packages annotation
 }
 
 // NewOCIFetcher creates a new OCI fetcher
@@ -77,12 +79,14 @@ func WithDockerConfig(dockerConfig []byte) OCIOption {
 	}
 }
 
-// WithPluginValidation enables plugin artifact validation.
-// When enabled, Fetch will verify the io.backstage.dynamic-packages annotation exists.
+// WithPluginMode enables plugin artifact handling.
+// When enabled:
+// - Validates the io.backstage.dynamic-packages annotation exists
+// - Extracts the plugin subdirectory (not raw layer content)
 // Use this for plugin artifacts; skip for catalog index images.
-func WithPluginValidation() OCIOption {
+func WithPluginMode() OCIOption {
 	return func(c *OCIFetcher) {
-		c.validatePlugin = true
+		c.pluginMode = true
 	}
 }
 
@@ -92,6 +96,7 @@ func WithPluginValidation() OCIOption {
 
 // Fetch downloads an OCI artifact and extracts it to destDir.
 // Streams directly to extraction without buffering the entire layer in memory.
+// For plugin artifacts, extracts the plugin subdirectory content to destDir.
 func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) error {
 	// 1. Parse reference
 	imgRef, err := name.ParseReference(ref)
@@ -121,8 +126,8 @@ func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) erro
 	}
 
 	// 5. Validate plugin artifact (optional)
-	if c.validatePlugin {
-		if err := validatePluginArtifact(img); err != nil {
+	if c.pluginMode {
+		if err := pluginModeArtifact(img); err != nil {
 			return fmt.Errorf("validation failed for %q: %w", ref, err)
 		}
 	}
@@ -143,16 +148,35 @@ func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) erro
 	}
 	defer func() { _ = reader.Close() }()
 
-	return extractTar(reader, destDir)
+	// 8. For non-plugin artifacts (e.g., catalog index), extract directly
+	if !c.pluginMode {
+		return extractTar(reader, destDir)
+	}
+
+	// 9. For plugin artifacts, extract to temp first then move plugin subdirectory
+	// Use same filesystem as destDir for atomic rename
+	tmpDir, err := os.MkdirTemp(filepath.Dir(destDir), ".oci-extract-")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	if err := extractTar(reader, tmpDir); err != nil {
+		return err
+	}
+
+	// 10. Find and move the plugin subdirectory
+	// Plugin artifacts have content in a subdirectory named after the plugin
+	return movePluginContent(tmpDir, destDir)
 }
 
 // ----------------------------------------------------------------------------
 // Internal helpers
 // ----------------------------------------------------------------------------
 
-// validatePluginArtifact checks that the image has the required plugin annotation.
+// pluginModeArtifact checks that the image has the required plugin annotation.
 // Returns nil if valid, error if the annotation is missing.
-func validatePluginArtifact(img v1.Image) error {
+func pluginModeArtifact(img v1.Image) error {
 	manifest, err := img.Manifest()
 	if err != nil {
 		return fmt.Errorf("failed to get manifest: %w", err)
@@ -243,4 +267,38 @@ func authToAuthenticator(auth dockerAuthConfig) (authn.Authenticator, error) {
 	}
 
 	return authn.Anonymous, nil
+}
+
+// movePluginContent finds the plugin subdirectory in srcDir and moves its contents to destDir.
+// Plugin OCI artifacts contain files in a subdirectory named after the plugin.
+func movePluginContent(srcDir, destDir string) error {
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return fmt.Errorf("failed to read extracted content: %w", err)
+	}
+
+	// Find the first directory that looks like plugin content (has package.json)
+	var pluginDir string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		candidate := filepath.Join(srcDir, entry.Name())
+		if _, err := os.Stat(filepath.Join(candidate, "package.json")); err == nil {
+			pluginDir = candidate
+			break
+		}
+	}
+
+	// If no directory with package.json found, check if package.json is at root
+	if pluginDir == "" {
+		if _, err := os.Stat(filepath.Join(srcDir, "package.json")); err == nil {
+			// Content is already at root level, just rename
+			return os.Rename(srcDir, destDir)
+		}
+		return fmt.Errorf("no plugin content found (no package.json in any subdirectory)")
+	}
+
+	// Move the plugin directory to destination
+	return os.Rename(pluginDir, destDir)
 }

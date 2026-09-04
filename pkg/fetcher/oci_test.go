@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -18,7 +20,7 @@ func TestNewOCIFetcher(t *testing.T) {
 	assert.NotNil(t, fetcher)
 	assert.NotNil(t, fetcher.keychain)
 	assert.NotNil(t, fetcher.transport)
-	assert.False(t, fetcher.validatePlugin)
+	assert.False(t, fetcher.pluginMode)
 }
 
 func TestWithInsecure(t *testing.T) {
@@ -51,9 +53,9 @@ k5mN+kTl5kmYJsYLsL7Q3v5K5ng+q3lQiPqE/w==
 	assert.NotNil(t, transport.TLSClientConfig.RootCAs)
 }
 
-func TestWithPluginValidation(t *testing.T) {
-	fetcher := NewOCIFetcher(WithPluginValidation())
-	assert.True(t, fetcher.validatePlugin)
+func TestWithPluginMode(t *testing.T) {
+	fetcher := NewOCIFetcher(WithPluginMode())
+	assert.True(t, fetcher.pluginMode)
 }
 
 func TestWithDockerConfig(t *testing.T) {
@@ -189,11 +191,11 @@ k5mN+kTl5kmYJsYLsL7Q3v5K5ng+q3lQiPqE/w==
 	fetcher := NewOCIFetcher(
 		WithCACert(caCert),
 		WithDockerConfig(dockerConfig),
-		WithPluginValidation(),
+		WithPluginMode(),
 	)
 
 	// Verify all options were applied
-	assert.True(t, fetcher.validatePlugin)
+	assert.True(t, fetcher.pluginMode)
 
 	transport, ok := fetcher.transport.(*http.Transport)
 	require.True(t, ok)
@@ -279,4 +281,76 @@ func TestTransportIsConfigurable(t *testing.T) {
 	// Verify WithInsecure creates a new transport
 	fetcher2 := NewOCIFetcher(WithInsecure())
 	assert.NotEqual(t, customTransport, fetcher2.transport)
+}
+
+func TestMovePluginContent(t *testing.T) {
+	tests := []struct {
+		name        string
+		setup       func(t *testing.T, srcDir string)
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "plugin in subdirectory",
+			setup: func(t *testing.T, srcDir string) {
+				pluginDir := filepath.Join(srcDir, "my-plugin")
+				require.NoError(t, os.MkdirAll(pluginDir, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(pluginDir, "package.json"), []byte(`{"name":"my-plugin"}`), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(pluginDir, "index.js"), []byte(`module.exports = {}`), 0644))
+			},
+			expectError: false,
+		},
+		{
+			name: "plugin at root level",
+			setup: func(t *testing.T, srcDir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(srcDir, "package.json"), []byte(`{"name":"root-plugin"}`), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(srcDir, "index.js"), []byte(`module.exports = {}`), 0644))
+			},
+			expectError: false,
+		},
+		{
+			name: "no package.json anywhere",
+			setup: func(t *testing.T, srcDir string) {
+				subDir := filepath.Join(srcDir, "some-dir")
+				require.NoError(t, os.MkdirAll(subDir, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(subDir, "readme.txt"), []byte("no plugin here"), 0644))
+			},
+			expectError: true,
+			errorMsg:    "no plugin content found",
+		},
+		{
+			name: "multiple subdirs picks first with package.json",
+			setup: func(t *testing.T, srcDir string) {
+				// Create two subdirs, only second has package.json
+				dir1 := filepath.Join(srcDir, "aaa-no-plugin")
+				dir2 := filepath.Join(srcDir, "bbb-plugin")
+				require.NoError(t, os.MkdirAll(dir1, 0755))
+				require.NoError(t, os.MkdirAll(dir2, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(dir1, "readme.txt"), []byte("not a plugin"), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(dir2, "package.json"), []byte(`{"name":"bbb-plugin"}`), 0644))
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srcDir := t.TempDir()
+			destDir := filepath.Join(t.TempDir(), "dest")
+
+			tt.setup(t, srcDir)
+
+			err := movePluginContent(srcDir, destDir)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				require.NoError(t, err)
+				// Verify package.json exists at destination
+				_, err := os.Stat(filepath.Join(destDir, "package.json"))
+				assert.NoError(t, err, "package.json should exist in destination")
+			}
+		})
+	}
 }

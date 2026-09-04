@@ -55,7 +55,7 @@ All configuration is via environment variables.
 | `DOCKER_CONFIG` | | Path to docker config.json for OCI registry auth |
 | `CA_FILE` | | Path to CA certificate file for TLS |
 | `INSECURE` | `false` | Skip TLS verification |
-| `VALIDATE_DP_ANNOTATION` | `true` | Require `io.backstage.dynamic-packages` annotation on OCI images |
+| `PLUGIN_MODE` | `true` | Enable plugin mode: validate annotation and extract plugin subdirectory |
 | `CATALOG_INDEX_IMAGE` | | OCI image containing catalog-entities for Extensions UI |
 | `CATALOG_ENTITIES_EXTRACT_DIR` | `/tmp/extensions` | Directory for extracted catalog entities |
 
