@@ -1,12 +1,3 @@
-# Image pull secret for registry.redhat.io (temporary - replace with your credentials)
-apiVersion: v1
-kind: Secret
-metadata:
-  name: redhat-registry-pull-secret
-type: kubernetes.io/dockerconfigjson
-data:
-  .dockerconfigjson: <token>
----
 # OKP (Offline Knowledge Portal) standalone Deployment.
 # name/labels/selector are set by the operator at runtime (per Backstage CR); the values
 # below are placeholders. The image ref is intentionally declared here (not in Go source)
@@ -27,8 +18,6 @@ spec:
     spec:
       # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
       automountServiceAccountToken: false
-      imagePullSecrets:
-        - name: redhat-registry-pull-secret
       containers:
         - name: okp
           image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.10-1786628394
@@ -36,7 +25,6 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
-            runAsUser: 1001
             capabilities:
               drop:
                 - ALL

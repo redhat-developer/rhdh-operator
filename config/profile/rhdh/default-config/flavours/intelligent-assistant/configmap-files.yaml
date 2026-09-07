@@ -132,6 +132,8 @@ data:
                 Citing sources is not always required because citations are handled externally.
                 Never include any citation that is in the form '<| file-id |>'.
     inference:
+      default_model: gpt-3.5-turbo
+      default_provider: openai
       providers:
         - type: sentence_transformers
         # - type: vllm
@@ -143,9 +145,9 @@ data:
         #     network:
         #       tls:
         #         verify: ${env.VLLM_TLS_VERIFY:=true}
-        # - type: openai
-        #   id: openai
-        #   api_key_env: OPENAI_API_KEY
+        - type: openai
+          id: openai
+          api_key_env: OPENAI_API_KEY
         # - type: vertexai
         #   id: vertexai
         #   extra:
@@ -287,20 +289,22 @@ data:
                 When appropriate, cite sources at the end of sentences using doc_url and doc_title format. Citing sources is not always required because citations are handled externally. Never include any citation that is in the form '<| file-id |>'.
     
     inference:
+      default_model: gpt-3.5-turbo
+      default_provider: openai
       providers:
         - type: sentence_transformers
-          # - type: vllm
-          #   id: vllm
-          #   api_key_env: VLLM_API_KEY
-          #   extra:
-          #     base_url: ${env.VLLM_URL:=}
-          #     max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
-          #     network:
-          #       tls:
-          #         verify: ${env.VLLM_TLS_VERIFY:=true}
-          # - type: openai
-          #   id: openai
-          #   api_key_env: OPENAI_API_KEY
+        # - type: vllm
+        #   id: vllm
+        #   api_key_env: VLLM_API_KEY
+        #   extra:
+        #     base_url: ${env.VLLM_URL:=}
+        #     max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
+        #     network:
+        #       tls:
+        #         verify: ${env.VLLM_TLS_VERIFY:=true}
+        - type: openai
+          id: openai
+          api_key_env: OPENAI_API_KEY
           # - type: vertexai
           #   id: vertexai
           #   extra:

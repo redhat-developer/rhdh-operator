@@ -358,13 +358,54 @@ spec:
 
 #### Technical Details
 
-Flavours extend the default configuration system by organizing pre-configured settings in `/default-config/flavours/<flavour-name>/`. Each flavour includes a `metadata.yaml` file controlling default enablement behavior. When multiple flavours are specified, configurations merge additively in the order specified, with later entries overriding earlier ones when conflicts occur.
+##### Configuration Merging with Base
 
-Different file types use appropriate merge strategies:
-- Kubernetes objects use kyaml deep merge
-- Dynamic plugins merge by package name
-- App configs mount as multiple files for Backstage's internal merging
-- Extra configs maintain multiple ConfigMaps/Secrets
+Flavours extend the default configuration system by organizing pre-configured settings in `/default-config/flavours/<flavour-name>/`. Each flavour includes a `metadata.yaml` file controlling default enablement behavior.
+
+**Merge Order Guarantee:**
+- Base configuration is **always applied first**
+- Enabled flavours are applied in **the exact order specified** in `spec.flavours`
+- Each configuration merge is additive — later sources can override earlier ones per field
+- This order is deterministic and guaranteed across all reconciliation cycles
+
+##### Supported Objects and Merge Policies
+
+The following table shows which configuration objects support flavours and their merge behavior:
+
+| Configuration File | Kubernetes Kind | Flavour Support | Merge Strategy |
+|---|---|---|---|
+| **app-config.yaml** | ConfigMap | ✅ Yes | Multi-object |
+| **configmap-files.yaml** | ConfigMap | ✅ Yes | Multi-object |
+| **configmap-envs.yaml** | ConfigMap | ✅ Yes | Multi-object |
+| **dynamic-plugins.yaml** | ConfigMap | ✅ Yes | Package-based merge |
+| **deployment.yaml** | Deployment/StatefulSet | ✅ Yes | Deployment merge |
+| **secret-files.yaml** | Secret | ❌ No | Base only |
+| **secret-envs.yaml** | Secret | ❌ No | Base only |
+| **pvcs.yaml** | PersistentVolumeClaim | ❌ No | Base only |
+| **service.yaml** | Service | ❌ No | Base only |
+| **route.yaml** | Route (OpenShift) | ❌ No | Base only |
+| **db-statefulset.yaml** | StatefulSet | ❌ No | Base only |
+| **db-service.yaml** | Service | ❌ No | Base only |
+| **db-secret.yaml** | Secret | ❌ No | Base only |
+
+##### Merge Strategy Details
+
+**Multi-object Strategy (ConfigMaps/Secrets):**
+- Each configuration source creates its own Kubernetes object (base + each enabled flavour)
+- **If base and flavour use the same object name:** Kubernetes Server-Side Apply merges them field-by-field; for duplicate fields, last-applied-wins (last source in order wins)
+- **If base and flavour use different object names:** separate Kubernetes objects are created
+
+**Package-based Merge (Dynamic Plugins):**
+- Plugins from all sources are merged by their `package` field
+- For the same package name, later sources override earlier plugin configuration
+
+**Deployment Merge:**
+- Deployment/StatefulSet configurations from base and flavours are merged
+- Flavour patches are applied sequentially to the base deployment
+
+**Base Only:**
+- Only the base configuration from `/default-config/` is used
+- Flavour-specific versions of these files (if present) are ignored
 
 ## Deployment kind
 
