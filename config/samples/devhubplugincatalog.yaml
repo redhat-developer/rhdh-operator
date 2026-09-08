@@ -1,8 +1,7 @@
 # DevHubPluginCatalog defines a source for plugin catalogs fetched from OCI registries.
 # The operator fetches catalogs from all DevHubPluginCatalog resources, merges them,
 # and makes them available to Backstage instances.
-#
-# This is a cluster-scoped resource.
+
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: DevHubPluginCatalog
 metadata:

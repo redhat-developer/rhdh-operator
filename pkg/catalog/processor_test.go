@@ -227,5 +227,5 @@ func TestCatalogInput(t *testing.T) {
 }
 
 func TestConstants(t *testing.T) {
-	assert.Equal(t, "dynamic-plugins.default.yaml", CatalogFileName)
+	assert.Equal(t, "dynamic-plugins.default.yaml", DpdyFile)
 }

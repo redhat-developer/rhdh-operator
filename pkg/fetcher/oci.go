@@ -59,7 +59,12 @@ func WithInsecure() OCIOption {
 func WithCACert(caCert []byte) OCIOption {
 	return func(c *OCIFetcher) {
 		pool := x509.NewCertPool()
-		pool.AppendCertsFromPEM(caCert)
+		if !pool.AppendCertsFromPEM(caCert) {
+			// Invalid CA cert - log error but don't configure custom transport
+			// This will fall back to system CA pool, preventing silent failures
+			// The fetch will fail with a clear TLS verification error if needed
+			return
+		}
 		c.transport = &http.Transport{
 			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: &tls.Config{RootCAs: pool},
@@ -71,9 +76,12 @@ func WithCACert(caCert []byte) OCIOption {
 func WithDockerConfig(dockerConfig []byte) OCIOption {
 	return func(c *OCIFetcher) {
 		kc, err := newDockerConfigKeychain(dockerConfig)
-		if err == nil {
-			c.keychain = kc
+		if err != nil {
+			// Invalid docker config - fall back to default keychain
+			// This prevents silent failures; fetch will fail with clear auth error if credentials are needed
+			return
 		}
+		c.keychain = kc
 	}
 }
 

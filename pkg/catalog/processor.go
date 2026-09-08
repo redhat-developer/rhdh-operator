@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -15,8 +16,10 @@ import (
 )
 
 const (
-	// CatalogFileName is the expected file in OCI artifacts
-	CatalogFileName = "dynamic-plugins.default.yaml"
+	// DpdyFile is the expected file in OCI artifacts
+	DpdyFile = "dynamic-plugins.default.yaml"
+	// OCIFetchTimeout is the timeout for fetching OCI artifacts
+	OCIFetchTimeout = 2 * time.Minute
 )
 
 // Processor handles fetching, processing, and merging plugin catalogs
@@ -107,8 +110,12 @@ func (p *Processor) BuildPatch(plugins PluginMap) ([]byte, error) {
 	return json.Marshal(patchData)
 }
 
-// fetch downloads a single catalog
+// fetch downloads a single catalog with a timeout to prevent hanging on unresponsive registries
 func (p *Processor) fetch(ctx context.Context, cat CatalogInput) ([]byte, error) {
+	// Add timeout to prevent hanging on slow/unresponsive registries
+	fetchCtx, cancel := context.WithTimeout(ctx, OCIFetchTimeout)
+	defer cancel()
+
 	var opts []fetcher.OCIOption
 	if cat.SkipTLSVerify {
 		opts = append(opts, fetcher.WithInsecure())
@@ -129,12 +136,16 @@ func (p *Processor) fetch(ctx context.Context, cat CatalogInput) ([]byte, error)
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	ref := strings.TrimPrefix(cat.Ref, "oci://")
-	if err := ociFetcher.Fetch(ctx, ref, tempDir); err != nil {
+	if err := ociFetcher.Fetch(fetchCtx, ref, tempDir); err != nil {
 		return nil, fmt.Errorf("failed to fetch OCI artifact: %w", err)
 	}
 
-	content, err := os.ReadFile(filepath.Join(tempDir, CatalogFileName))
+	content, err := os.ReadFile(filepath.Join(tempDir, DpdyFile))
 	if err != nil {
+		if os.IsNotExist(err) {
+			// File doesn't exist - skip it, return empty content
+			return []byte{}, nil
+		}
 		return nil, fmt.Errorf("failed to read catalog file: %w", err)
 	}
 

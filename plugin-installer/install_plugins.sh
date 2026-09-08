@@ -635,9 +635,12 @@ download_plugin() {
     url=$(echo "${input_line}" | awk '{print $1}')
     integrity=$(echo "${input_line}" | awk '{print $2}')
 
-    # Extract plugin name from URL
+    # Extract plugin name from URL (strip protocol, tag, and digest)
+    # For OCI: oci://registry/path/name:tag@digest -> name
+    # For NPM: @scope/plugin-name@version -> plugin-name
+    # Order: remove digest, extract last path component, then remove version
     local plugin_name
-    plugin_name=$(echo "${url}" | sed 's|oci://||' | sed 's|https\?://||' | sed 's|file://||' | sed 's|file:||' | sed 's|@sha256:.*||' | sed 's|@.*||' | awk -F'/' '{print $NF}')
+    plugin_name=$(echo "${url}" | sed 's|oci://||' | sed 's|https\?://||' | sed 's|file://||' | sed 's|file:||' | sed 's|@sha256:.*||' | awk -F'/' '{print $NF}' | sed 's|@.*||' | sed 's|:.*||')
 
     local plugin_dir="${output_dir}/${plugin_name}"
 
