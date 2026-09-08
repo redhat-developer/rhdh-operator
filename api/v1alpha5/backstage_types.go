@@ -112,6 +112,8 @@ type Monitoring struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
+// Application defines configuration for the Backstage application.
+// +kubebuilder:validation:XValidation:rule="!(has(self.dynamicPlugins) && size(self.dynamicPlugins) > 0 && has(self.dynamicPluginsConfigMapName) && size(self.dynamicPluginsConfigMapName) > 0)",message="dynamicPlugins and dynamicPluginsConfigMapName are mutually exclusive"
 type Application struct {
 	// References to existing app-configs ConfigMap objects, that will be mounted as files in the specified mount path.
 	// Each element can be a reference to any ConfigMap or Secret,
@@ -127,8 +129,16 @@ type Application struct {
 	// Reference to an existing ConfigMap for Dynamic Plugins.
 	// A new one will be generated with the default config if not set.
 	// The ConfigMap object must have an existing key named: 'dynamic-plugins.yaml'.
+	// Mutually exclusive with DynamicPlugins field.
 	// +optional
 	DynamicPluginsConfigMapName string `json:"dynamicPluginsConfigMapName,omitempty"`
+
+	// Inline dynamic plugins configuration.
+	// Allows configuring dynamic plugins directly in the Backstage CR without requiring a separate ConfigMap.
+	// Each plugin can specify its package reference, enabled state, plugin-specific configuration, and integrity checksum.
+	// Mutually exclusive with DynamicPluginsConfigMapName field.
+	// +optional
+	DynamicPlugins []DynamicPluginConfig `json:"dynamicPlugins,omitempty"`
 
 	// References to existing Config objects to use as extra config files.
 	// They will be mounted as files in the specified mount path.
@@ -273,6 +283,36 @@ type Env struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:XValidation:rule="!(size(self) != 1 && self[0]==\"*\")",message="If '*' is specified, no other container names are allowed"
 	Containers []string `json:"containers,omitempty"`
+}
+
+// DynamicPluginConfig defines configuration for a single dynamic plugin.
+// Dynamic plugins can be configured inline within the Backstage CR instead of using a separate ConfigMap.
+type DynamicPluginConfig struct {
+	// Package reference for the plugin.
+	// Supported formats:
+	// - ref://plugin-name (references a plugin from the default catalog)
+	// - oci://registry/image@digest or oci://registry/image:tag
+	// - npm package name
+	// - ./relative/path or /absolute/path
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Package string `json:"package"`
+
+	// Enable or disable the plugin. Defaults to true if not specified.
+	// Takes precedence over the Disabled field if both are set.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Plugin-specific configuration as arbitrary YAML.
+	// This configuration will be merged into the app-config under the plugin's namespace.
+	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	PluginConfig *apiextensionsv1.JSON `json:"pluginConfig,omitempty"`
+
+	// Integrity checksum for the plugin package (e.g., sha256, sha512).
+	// Used to verify the integrity of the downloaded plugin.
+	// +optional
+	Integrity string `json:"integrity,omitempty"`
 }
 
 // BackstageStatus defines the observed state of Backstage

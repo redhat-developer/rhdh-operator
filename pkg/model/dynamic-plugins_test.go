@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -13,8 +14,10 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -737,4 +740,66 @@ func TestExternalConfigMapMetadataNotReused(t *testing.T) {
 
 	// Verify the name is set to the operator-managed name (not the external name)
 	assert.Equal(t, DynamicPluginsDefaultName(bs.Name), dp.ConfigMap.Name, "Name should be set to operator-managed name")
+}
+
+// TestConvertInlinePlugins tests the conversion of inline plugin configurations to YAML
+func TestConvertInlinePlugins(t *testing.T) {
+	t.Run("happy path - multiple plugins with different fields", func(t *testing.T) {
+		pluginConfigJSON, _ := json.Marshal(map[string]interface{}{
+			"github": map[string]interface{}{
+				"host":  "github.com",
+				"token": "${GITHUB_TOKEN}",
+			},
+		})
+
+		inlinePlugins := []v1alpha5.DynamicPluginConfig{
+			{
+				Package: "ref://backstage-plugin-basic",
+			},
+			{
+				Package: "ref://backstage-plugin-with-config",
+				Enabled: ptr.To(true),
+				PluginConfig: &apiextensionsv1.JSON{
+					Raw: pluginConfigJSON,
+				},
+			},
+			{
+				Package:   "oci://quay.io/rhdh/plugin-foo@sha256:abc123",
+				Enabled:   ptr.To(false),
+				Integrity: "sha256-abc123",
+			},
+		}
+
+		data, err := convertInlinePlugins(inlinePlugins)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, data)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(data), &config)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(config.Plugins))
+
+		// Verify basic plugin
+		assert.Equal(t, "ref://backstage-plugin-basic", config.Plugins[0].Package)
+		assert.Nil(t, config.Plugins[0].Enabled)
+
+		// Verify plugin with config
+		assert.Equal(t, "ref://backstage-plugin-with-config", config.Plugins[1].Package)
+		assert.NotNil(t, config.Plugins[1].Enabled)
+		assert.True(t, *config.Plugins[1].Enabled)
+		assert.NotNil(t, config.Plugins[1].PluginConfig)
+		assert.Contains(t, config.Plugins[1].PluginConfig, "github")
+
+		// Verify plugin with integrity and disabled
+		assert.Equal(t, "oci://quay.io/rhdh/plugin-foo@sha256:abc123", config.Plugins[2].Package)
+		assert.NotNil(t, config.Plugins[2].Enabled)
+		assert.False(t, *config.Plugins[2].Enabled)
+		assert.Equal(t, "sha256-abc123", config.Plugins[2].Integrity)
+	})
+
+	t.Run("empty list", func(t *testing.T) {
+		data, err := convertInlinePlugins([]v1alpha5.DynamicPluginConfig{})
+		assert.NoError(t, err)
+		assert.Empty(t, data)
+	})
 }
