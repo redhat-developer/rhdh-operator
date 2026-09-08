@@ -55,6 +55,7 @@ The Default Configuration defines the structure of all Backstage instances withi
 | secret-envs.yaml                         | []corev1.Secret                         | backstage-envs-<cr-name>            | No           | Yes   | >=0.2.x  | Backstage environment variables from Secret          |
 | [dynamic-plugins.yaml](#dynamic-plugins) | corev1.ConfigMap                        | backstage-dynamic-plugins-<cr-name> | No           | No    | >=0.2.x  | Dynamic plugins configuration                        |
 | pvcs.yaml                                | []corev1.PersistentVolumeClaim          | backstage-<cr-name>-<pvc-name>      | No           | Yes   | >=0.4.x  | List of PVC objects to be mounted to containers      |
+| networkpolicy.yaml                       | []networkingv1.NetworkPolicy            | backstage-netpol-<cr-name>-<np-name>, backstage-db-netpol-<cr-name>-<np-name>| No           | Yes   | >=2.0.x | NetworkPolicies for backend and PostgreSQL pods      |
 
 **Meanings of "Mandatory" Column:**
 - **Yes** - Must be configured; deployment will fail otherwise.
@@ -222,6 +223,13 @@ For example, Backstage CR named **mybackstage** will create K8s Deployment resou
     - `spec.template.metadata.labels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
 * db-service.yaml
     - `spec.selector[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
+* networkpolicy.yaml
+    - Backend policies: `spec.podSelector.matchLabels[rhdh.redhat.com/app] = backstage-<cr-name>`
+    - DB policies (when local DB is enabled): `spec.podSelector.matchLabels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
+    - The placeholder value in `podSelector.matchLabels` (`backstage` vs `backstage-psql`) determines whether a policy targets the backend or the database at runtime
+    - DB-scoped policies are filtered out when `spec.database.enableLocalDb` is `false`
+    - When local DB is disabled, the `allow-psql-egress` policy allows egress on port 5432 to any destination (for external databases)
+    - On OpenShift, the `allow-router-ingress` policy's `namespaceSelector` is set to `policy-group.network.openshift.io/ingress: ""`
 
 ### Multi objects
 
@@ -233,7 +241,8 @@ The following configuration files support multi-object definitions:
 - **configmap-envs.yaml** (since 0.10.0)
 - **secret-files.yaml** 
 - **secret-envs.yaml** 
-- **pvcs.yaml** 
+- **pvcs.yaml**
+- **networkpolicy.yaml** (since 2.0.0)
 
 For example, adding the following to **pvcs.yaml** will create 2 PVCs and mount them to the Backstage container:
 

@@ -11,6 +11,7 @@ func TestResolveInheritReference(t *testing.T) {
 		{Package: "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a-path"},
 		{Package: "oci://quay.io/rhdh/plugin-b@sha256:def456"},
 		{Package: "oci://registry.access.redhat.com/plugin-c@sha256:xyz789!rh-plugin"},
+		{Package: "./dynamic-plugins/dist/plugin-local"},
 	}
 
 	tests := []struct {
@@ -47,6 +48,11 @@ func TestResolveInheritReference(t *testing.T) {
 		{
 			name:        "inherit with no matching base - error",
 			packageURL:  "oci://quay.io/rhdh/unknown:{{inherit}}",
+			expectError: true,
+		},
+		{
+			name:        "inherit from local base plugin - error",
+			packageURL:  "oci://quay.io/rhdh/plugin-local:{{inherit}}",
 			expectError: true,
 		},
 	}
@@ -138,6 +144,13 @@ func TestResolveReferences(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "ref to local base plugin - error",
+			plugins: []DynaPlugin{
+				{Package: "ref://local-plugin"},
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -194,6 +207,8 @@ func TestResolveRefReference(t *testing.T) {
 	basePlugins := []DynaPlugin{
 		{Package: "oci://quay.io/rhdh/backstage-plugin-foo@sha256:abc123"},
 		{Package: "oci://quay.io/rhdh/backstage-plugin-bar@sha256:def456!plugin-path"},
+		{Package: "https://example.com/plugins/backstage-plugin-https-1.0.0.tgz"},
+		{Package: "./dynamic-plugins/dist/backstage-plugin-local"},
 	}
 
 	tests := []struct {
@@ -220,6 +235,16 @@ func TestResolveRefReference(t *testing.T) {
 		{
 			name:        "empty ref",
 			packageURL:  "ref://",
+			expectError: true,
+		},
+		{
+			name:        "ref to HTTPS base plugin - error",
+			packageURL:  "ref://backstage-plugin-https",
+			expectError: true,
+		},
+		{
+			name:        "ref to local base plugin - error",
+			packageURL:  "ref://backstage-plugin-local",
 			expectError: true,
 		},
 	}
