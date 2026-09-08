@@ -176,6 +176,7 @@ func TestPluginName(t *testing.T) {
 	}{
 		{"oci://quay.io/rhdh/plugin-foo:latest", "plugin-foo"},
 		{"oci://quay.io/rhdh/plugin-foo@sha256:abc123", "plugin-foo"},
+		{"oci://quay.io/rhdh/plugin-foo:v1.0.0@sha256:abc123", "plugin-foo"},
 		{"https://example.com/plugin.tar.gz", "plugin"},
 		{"@backstage/plugin-catalog@1.0.0", "plugin-catalog"},
 		{"@npm:@backstage/plugin-foo@1.0.0", "plugin-foo"},
