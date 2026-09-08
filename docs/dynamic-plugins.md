@@ -97,38 +97,66 @@ More details in [Catalog Entities Extraction](https://github.com/redhat-develope
 
 ## Plugin URL References
 
-The operator optionally supports special URL reference syntax in plugin package URLs, allowing users to reference plugins from the default configuration by name.
+The operator supports special URL reference syntax in plugin package URLs, allowing users to reference plugins from the default configuration by name instead of specifying a full OCI image reference. Both reference types only resolve to base plugins with `oci://` package URLs.
 
 TODO: document Operator Dynamic Plugins processing mode
 
 **Operator behavior:**
 - The operator resolves all references during ConfigMap merge (before passing to the init container)
 - If a reference cannot be resolved, the operator returns an error and the Backstage CR will not reconcile
-- Both reference types use **name-based matching** - only the plugin name matters for lookup
+
+### How name matching works
+
+Both `ref://` and `{{inherit}}` match against the **plugin name** extracted from the base plugin's OCI URL. The plugin name is the last path component of the OCI reference, stripped of any tag or digest. The registry and path are not part of the match.
+
+For example, given this base plugin in the default configuration:
+
+```
+oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
+      └─────┘ └──┘ └──────────────────────┘ └───────────┘
+      registry path       plugin name           digest
+```
+
+The **plugin name** is `backstage-plugin-catalog`: the last path component of the OCI reference, with any tag (`:v1.0`) or digest (`@sha256:...`) stripped. The registry (`quay.io`) and path (`rhdh`) are ignored entirely.
 
 ### Ref Reference (`ref://`)
 
-Look up a plugin by name and use its full package URL from the default configuration.
+Use `ref://` followed by the plugin name. The operator looks up the name in the default plugin list and substitutes the full OCI URL.
 
 ```yaml
+# Default configuration contains:
+#   oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
+
 plugins:
-  - package: "ref://backstage-plugin-catalog"
+  - package: ref://backstage-plugin-catalog
+    # → resolves to: oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
     pluginConfig:
       # your config overrides
 ```
 
-### Inherit Reference (`:{{inherit}}`)
+### Inherit Reference (`{{inherit}}`)
 
-Look up a plugin by name and use its full package URL from the default configuration. The registry/path in your URL is ignored - only the plugin name matters for matching.
+Write an `oci://` URL with `:{{inherit}}` in place of the tag or digest. The operator extracts the plugin name from your URL, looks it up in the default plugin list, and substitutes the full OCI URL from the match. The registry and path you write are ignored; only the plugin name (last path component) is used for lookup.
 
 ```yaml
+# Default configuration contains:
+#   oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
+
 plugins:
-  # These all match the same base plugin (backstage-plugin-catalog):
-  - package: "oci://quay.io/rhdh/backstage-plugin-catalog:{{inherit}}"
-  - package: "oci://any-registry/path/backstage-plugin-catalog:{{inherit}}"
+  # All three resolve to the same base plugin (matched by name "backstage-plugin-catalog"):
+  - package: oci://quay.io/rhdh/backstage-plugin-catalog:{{inherit}}
+  - package: oci://any-registry/different-path/backstage-plugin-catalog:{{inherit}}
+  - package: oci://localhost:5000/backstage-plugin-catalog:{{inherit}}
+  # → all resolve to: oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
 ```
 
-**Since v2.0.0:** Both `ref://` and `:{{inherit}}` use name-based matching (plugin name only, registry/path ignored). This behavior is slightly different from what is described in [OCI Package Version Inheritance](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#oci-package-version-inheritance) which documents the RHDH init-container behavior (full URL matching).
+### Choosing between `ref://` and `{{inherit}}`
+
+Both produce the same result. `ref://` is shorter. `{{inherit}}` is useful when you want to keep the `oci://` URL structure visible in your configuration.
+
+**`ref://` matching is consistent** between the operator and the init container: both use name-based matching (plugin name only, registry/path ignored).
+
+**`{{inherit}}` matching differs.** The operator uses name-based matching (same as `ref://`), but the init container uses full-URL key matching (image reference + plugin path). See [OCI Package Version Inheritance](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#oci-package-version-inheritance) for the init-container behavior.
 
 ## Dynamic plugins dependency management
 

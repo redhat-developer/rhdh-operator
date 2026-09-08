@@ -2375,6 +2375,18 @@ rules:
   - update
   - watch
 - apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - rhdh.redhat.com
   resources:
   - backstages
@@ -2424,18 +2436,6 @@ rules:
   resources:
   - sonataflowplatforms
   - sonataflows
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - networkpolicies
   verbs:
   - create
   - delete
@@ -2968,6 +2968,203 @@ data:
       dynamic-plugins.yaml: |
         includes:
           - dynamic-plugins.default.yaml
+  networkpolicy.yaml: |
+    # These policies cover the network requirements of a base RHDH deployment with all enabled-by-default RHDH plugins.
+    # See https://github.com/redhat-developer/rhdh-plugin-export-overlays/blob/main/default.packages.yaml
+    # Disabled plugins (e.g. LDAP catalog, email notifications, scaffolder HTTP requests) may need
+    # additional user-created additive NetworkPolicies for ports not covered here.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: default-deny
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Ingress
+        - Egress
+
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-dns-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - port: 53
+              protocol: UDP
+            - port: 53
+              protocol: TCP
+            # mDNS; used by some CNI plugins and node-local DNS caches (e.g. on OpenShift)
+            - port: 5353
+              protocol: UDP
+            - port: 5353
+              protocol: TCP
+
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-https-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - port: 443
+              protocol: TCP
+
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-psql-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        - to:
+            # When local DB is disabled (external DB), this 'to' selector is removed at runtime,
+            # allowing egress on port 5432 to any destination.
+            - podSelector:
+                matchLabels:
+                  rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+          ports:
+            - port: 5432
+              protocol: TCP
+
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-metrics-ingress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  # OpenShift platform monitoring
+                  kubernetes.io/metadata.name: openshift-monitoring
+            - namespaceSelector:
+                matchLabels:
+                  # GKE Standard: Google Managed Prometheus
+                  kubernetes.io/metadata.name: gmp-system
+            - namespaceSelector:
+                matchLabels:
+                  # GKE Autopilot: Google Managed Prometheus
+                  kubernetes.io/metadata.name: gke-gmp-system
+            - namespaceSelector:
+                matchLabels:
+                  # kube-prometheus-stack convention
+                  kubernetes.io/metadata.name: monitoring
+            # AKS runs its monitoring agent in kube-system, but allowing all of kube-system
+            # is too broad; it contains many non-monitoring system components.
+            # AKS users should create an additive NetworkPolicy targeting kube-system if needed.
+            #- namespaceSelector:
+            #    matchLabels:
+            #      kubernetes.io/metadata.name: kube-system
+            # EKS (Amazon Managed Prometheus) has no fixed in-cluster collector namespace;
+            # users deploy their own collector (e.g. ADOT) and should create an additive
+            # NetworkPolicy targeting their collector namespace if needed.
+          ports:
+            - port: 9464
+              protocol: TCP
+
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-router-ingress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - namespaceSelector: {} # on OCP, replaced with policy-group.network.openshift.io/ingress selector
+          ports:
+            - port: 7007
+              protocol: TCP
+
+    ---
+    # The following db-* policies are only created when the local DB is enabled in the CR.
+    # They are filtered out at runtime when spec.database.enableLocalDb is false,
+    # based on the 'rhdh.redhat.com/app' podSelector matchLabel placeholder.
+
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: db-default-deny
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+      policyTypes:
+        - Ingress
+        - Egress
+
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: db-allow-dns-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - port: 53
+              protocol: UDP
+            - port: 53
+              protocol: TCP
+            # mDNS; used by some CNI plugins and node-local DNS caches (e.g. on OpenShift)
+            - port: 5353
+              protocol: UDP
+            - port: 5353
+              protocol: TCP
+
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: db-allow-backend-ingress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+          ports:
+            - port: 5432
+              protocol: TCP
   route.yaml: |-
     apiVersion: route.openshift.io/v1
     kind: Route
@@ -3393,31 +3590,18 @@ data:
     # This flavour is disabled by default due to heavy infrastructure dependencies
     # (requires Tekton, ArgoCD, Serverless Workflow Operator)
     enabledByDefault: false
-kind: ConfigMap
-metadata:
-  name: rhdh-flavour-orchestrator-config
-  namespace: rhdh-operator
----
-apiVersion: v1
-data:
-  argocd.yaml: |-
-    ---
-    apiVersion: argoproj.io/v1alpha1
-    kind: AppProject
-    metadata:
-      name: argocd-app-project
-    spec:
-      destinations:
-      - name: '*'
-        namespace: '*'
-        server: '*'
-      sourceRepos:
-      - '*'
-  sonataflow.yaml: |
+  networkpolicy.yaml: |
+    # TODO(asoro): these Orchestrator policies use podSelector: {} (namespace-wide) and conflict with
+    # the ADR's "default deny with selective allow" and "label-scoped policies" principles.
+    # They weaken per-component ingress isolation for RHDH backend and DB pods in the same namespace.
+    # Even though only one Orchestrator-flavoured RHDH instance is supported per namespace (the
+    # SonataFlow Operator enforces one SonataFlowPlatform per namespace), a non-Orchestrator RHDH
+    # instance could coexist in the same namespace; these namespace-wide policies would affect it too.
+    # Review and make stricter by scoping to SonataFlow-specific labels where possible.
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-infra-ns-to-workflow-ns # hardcoded
+      name: allow-infra-ns-to-workflow-ns
     spec:
       podSelector: {}
       ingress:
@@ -3439,7 +3623,7 @@ data:
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-external-communication # hardcoded
+      name: allow-external-communication
     spec:
       podSelector: {}
       ingress:
@@ -3452,7 +3636,7 @@ data:
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-intra-network # hardcoded
+      name: allow-intra-network
     spec:
       # Apply this policy to all pods in the namespace
       podSelector: {}
@@ -3468,7 +3652,7 @@ data:
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-monitoring-to-sonataflow-and-workflows # hardcoded
+      name: allow-monitoring-to-sonataflow-and-workflows
     spec:
       # Apply this policy to all pods in the namespace
       podSelector: {}
@@ -3482,6 +3666,40 @@ data:
                   # Allow openshift-user-workload-monitoring pods to access the workflow.
                   kubernetes.io/metadata.name: openshift-user-workload-monitoring
     ---
+    # Allow all egress from all pods in the namespace.
+    # The Orchestrator backend plugin needs HTTP egress to reach SonataFlow and Data Index services;
+    # SonataFlow workflows may also need arbitrary outbound access.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-all-egress
+    spec:
+      podSelector: {}
+      policyTypes:
+        - Egress
+      egress:
+        - {}
+kind: ConfigMap
+metadata:
+  name: rhdh-flavour-orchestrator-config
+  namespace: rhdh-operator
+---
+apiVersion: v1
+data:
+  argocd.yaml: |-
+    ---
+    apiVersion: argoproj.io/v1alpha1
+    kind: AppProject
+    metadata:
+      name: argocd-app-project
+    spec:
+      destinations:
+      - name: '*'
+        namespace: '*'
+        server: '*'
+      sourceRepos:
+      - '*'
+  sonataflow.yaml: |
     apiVersion: batch/v1
     kind: Job
     metadata:

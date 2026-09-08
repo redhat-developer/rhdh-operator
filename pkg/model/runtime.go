@@ -46,6 +46,7 @@ const (
 	ConfigMapEnvsKey  = "configmap-envs.yaml"
 	ConfigMapFilesKey = "configmap-files.yaml"
 	PvcsKey           = "pvcs.yaml"
+	NetworkPolicyKey  = "networkpolicy.yaml"
 )
 
 // Backstage configuration scaffolding with empty BackstageObjects.

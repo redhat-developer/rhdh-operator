@@ -47,6 +47,7 @@ configMapGenerator:
   - default-config/db-statefulset.yaml.k8s
   - default-config/service.yaml.k8s
   - default-config/secret-files.yaml
+  - default-config/networkpolicy.yaml
   name: default-config
 - files:
   - default-config/flavours/intelligent-assistant/metadata.yaml
@@ -57,6 +58,7 @@ configMapGenerator:
 - files:
   - default-config/flavours/orchestrator/metadata.yaml
   - default-config/flavours/orchestrator/dynamic-plugins.yaml
+  - default-config/flavours/orchestrator/networkpolicy.yaml
   name: flavour-orchestrator-config
 - files:
   - plugin-deps/sonataflow.yaml
