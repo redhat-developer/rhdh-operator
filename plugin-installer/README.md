@@ -11,7 +11,7 @@ This script downloads and extracts dynamic plugins to a specified directory. It 
 ### Pre-built Image
 
 ```
-quay.io/rhdh-community/plugin-installer:next
+quay.io/rhdh-community/rhdh-plugin-installer:next
 ```
 
 The image is based on Red Hat UBI 9 Micro with skopeo for OCI registry downloads.
@@ -273,7 +273,7 @@ NPM_AUTH_TOKEN=secret123 \
 ```bash
 docker run -v $(pwd)/packages.txt:/input/packages.txt \
            -v $(pwd)/plugins:/dynamic-plugins-root \
-           quay.io/rhdh-community/plugin-installer:next
+           quay.io/rhdh-community/rhdh-plugin-installer:next
 ```
 
 ## Testing

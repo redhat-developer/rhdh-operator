@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-08-24T09:48:04Z"
+    createdAt: "2026-09-01T21:03:46Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -120,6 +120,18 @@ spec:
           - monitoring.coreos.com
           resources:
           - servicemonitors
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
           verbs:
           - create
           - delete

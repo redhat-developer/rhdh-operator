@@ -11,8 +11,7 @@ PROFILE ?= rhdh
 # Enable operator dynamic plugins processing (default: true)
 OPERATOR_DP_PROCESSING ?= true
 # Install dynamic plugins image (required when OPERATOR_DP_PROCESSING=true)
-# INSTALL_DP_IMAGE ?= quay.io/rhdh-community/plugin-installer:next
-INSTALL_DP_IMAGE ?= quay.io/gazarenk/rhdh-plugin-installer:next
+INSTALL_DP_IMAGE ?= quay.io/rhdh-community/rhdh-plugin-installer:next
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
@@ -166,7 +165,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: goimports ## Format the code using goimports
-	find . -not -path '*/\.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
+	find . -not -path '*/\.*' -not -name 'zz_generated.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
