@@ -32,6 +32,7 @@ const maxK8sResourceNameLength = 63
 const (
 	BackstageAppLabel      = "app.kubernetes.io/name"
 	BackstageAppName       = "backstage"
+	BackstageDBAppName     = "backstage-psql"
 	BackstageInstanceLabel = "app.kubernetes.io/instance"
 )
 
@@ -76,11 +77,11 @@ func GenerateVolumeNameFromCmOrSecret(cmOrSecretName string) string {
 }
 
 func BackstageAppLabelValue(backstageName string) string {
-	return fmt.Sprintf("backstage-%s", backstageName)
+	return fmt.Sprintf("%s-%s", BackstageAppName, backstageName)
 }
 
 func BackstageDbAppLabelValue(backstageName string) string {
-	return fmt.Sprintf("backstage-psql-%s", backstageName)
+	return fmt.Sprintf("%s-%s", BackstageDBAppName, backstageName)
 }
 
 // ReadYamls reads and unmarshalls yaml with potentially multiple objects of the same type
