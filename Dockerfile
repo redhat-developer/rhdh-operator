@@ -1,9 +1,9 @@
 # Unified Dockerfile for hermetic builds (Hermeto upstream, Cachi2/Konflux downstream)
 # and standard non-hermetic builds (make image-build)
 
-#@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
-# https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:9.8-1788409979@sha256:5e68f09a652ac6627a83c57655e42e24575efb278b54336039c9308607fc6b21 AS builder
+#@follow_tag(registry.redhat.io/rhel10/go-toolset:latest)
+# https://registry.access.redhat.com/ubi10/go-toolset
+FROM registry.access.redhat.com/ubi10/go-toolset:1.26.7-1788411200@sha256:be70aa468168f1ecd46e56d5f362e697243bcf9d3a2d98819597e43471a5d0e4 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # hadolint ignore=DL3002
@@ -32,21 +32,21 @@ COPY $EXTERNAL_SOURCE $CONTAINER_SOURCE
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Install openssl for FIPS support into an isolated rootfs
-#@follow_tag(registry.redhat.io/ubi9/ubi:latest)
-# https://registry.access.redhat.com/ubi9/ubi
-FROM registry.access.redhat.com/ubi9/ubi:9.8-1788245065@sha256:25a147defd01e19674714f55d17538c8dbe55d8c305fa157ecc3f9c8977b05b6 AS rpm-builder
+#@follow_tag(registry.redhat.io/ubi10/ubi:latest)
+# https://registry.access.redhat.com/ubi10/ubi
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1788923010@sha256:ebd8b377d07013420f7020578a2e19678c830e9901d7b1481ce5f7c18ca344f3 AS rpm-builder
 RUN mkdir -p /mnt/rootfs
 RUN dnf install --installroot /mnt/rootfs \
     openssl \
-    --releasever 9 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
+    --releasever 10 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
     dnf --installroot /mnt/rootfs clean all && \
     rm -rf /mnt/rootfs/var/cache/* /mnt/rootfs/var/log/* /mnt/rootfs/tmp/*
 RUN echo "backstage:x:1001:0:backstage user:/:/sbin/nologin" >> /mnt/rootfs/etc/passwd
 
 # Final minimal image using UBI micro
-#@follow_tag(registry.redhat.io/ubi9/ubi-micro:latest)
-# https://registry.access.redhat.com/ubi9/ubi-micro
-FROM registry.access.redhat.com/ubi9/ubi-micro:9.8-1787778798@sha256:f332c99eb8f798a8486821c91937f10ad64ee83d7e739303be2df051040918f6
+#@follow_tag(registry.redhat.io/ubi10/ubi-micro:latest)
+# https://registry.access.redhat.com/ubi10/ubi-micro
+FROM registry.access.redhat.com/ubi10/ubi-micro:10.2-1787684489@sha256:37fadb004c6bea628fcdd81376c8fb77bd8d9fd432d90503af4d9e76b1ff7191
 
 COPY --from=rpm-builder /mnt/rootfs /
 
