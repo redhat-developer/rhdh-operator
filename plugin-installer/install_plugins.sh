@@ -635,9 +635,12 @@ download_plugin() {
     url=$(echo "${input_line}" | awk '{print $1}')
     integrity=$(echo "${input_line}" | awk '{print $2}')
 
-    # Extract plugin name from URL
+    # Extract plugin name from URL (strip protocol, tag, and digest)
+    # For OCI: oci://registry/path/name:tag@digest -> name
+    # For NPM: @scope/plugin-name@version -> plugin-name
+    # Order: remove digest, extract last path component, then remove version
     local plugin_name
-    plugin_name=$(echo "${url}" | sed 's|oci://||' | sed 's|https\?://||' | sed 's|file://||' | sed 's|file:||' | sed 's|@sha256:.*||' | sed 's|@.*||' | awk -F'/' '{print $NF}')
+    plugin_name=$(echo "${url}" | sed 's|oci://||' | sed 's|https\?://||' | sed 's|file://||' | sed 's|file:||' | sed 's|@sha256:.*||' | awk -F'/' '{print $NF}' | sed 's|@.*||' | sed 's|:.*||')
 
     local plugin_dir="${output_dir}/${plugin_name}"
 
@@ -723,7 +726,14 @@ fi
 export -f download_plugin extract_oci_image validate_plugin_artifact download_oci download_http download_npm download_local download_file detect_oci_tool parse_npmrc url_encode verify_integrity record_failure
 export OUTPUT_DIR OCI_TOOL NPM_REGISTRY NPM_AUTH_TOKEN FAILURE_LOG
 
-total=$(grep -cv '^#\|^$' "${INPUT_FILE}")
+total=$(grep -cv '^#\|^$' "${INPUT_FILE}" 2>/dev/null || echo 0)
+
+# Exit successfully if no packages to download (all plugins are local paths)
+if [[ "${total}" -eq 0 ]]; then
+    echo "=== No remote plugins to download (all plugins are local paths) ==="
+    echo "=== Done in 0s ==="
+    exit 0
+fi
 
 echo "=== Downloading ${total} plugins to ${OUTPUT_DIR} (${PARALLEL_JOBS} parallel) ==="
 echo ""
