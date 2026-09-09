@@ -33,16 +33,25 @@ func TestWithInsecure(t *testing.T) {
 }
 
 func TestWithCACert(t *testing.T) {
-	// Create a test CA cert (self-signed, for testing)
+	// Valid self-signed CA cert for testing
 	caCert := []byte(`-----BEGIN CERTIFICATE-----
-MIIBkTCB+wIJAKHBfpegPjMCMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnRl
-c3RjYTAeFw0yMzAxMDEwMDAwMDBaFw0yNDAxMDEwMDAwMDBaMBExDzANBgNVBAMM
-BnRlc3RjYTBcMA0GCSqGSIb3DQEBAQUAA0sAMEgCQQC7o96FCFzP9GVMF/odlY0x
-fXH5XKPF6a9kKZl7e8V7H6KYQO7MYHl7aNQp7XZf0g/iYn/lFxVKcGFz/fQMt7oB
-AgMBAAGjUzBRMB0GA1UdDgQWBBQBJ7R4DTvnR0lf7FQ1A6f7M5l1kjAfBgNVHSME
-GDAWgBQBJ7R4DTvnR0lf7FQ1A6f7M5l1kjAPBgNVHRMBAf8EBTADAQH/MA0GCSqG
-SIb3DQEBCwUAA0EA0GXpF1JguGJ2I7m3pCnYdU3lfQEb7y0e6pZyfMz5EPuV1JJh
-k5mN+kTl5kmYJsYLsL7Q3v5K5ng+q3lQiPqE/w==
+MIIDAzCCAeugAwIBAgIUIzY7ufM5PVWGCBw22V3JZPNkhTwwDQYJKoZIhvcNAQEL
+BQAwETEPMA0GA1UEAwwGdGVzdGNhMB4XDTI2MDkwODA3NTczN1oXDTI3MDkwODA3
+NTczN1owETEPMA0GA1UEAwwGdGVzdGNhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEAysJqbjbazjOtfFGwyju4iL3GPpV7EiLHC+ylqssjtEOeOmH7x/nL
+lakUw8d5wNerMtsha6L6CXvrloKbNgGMmZ6XNrvXcgHzxAq8Lm62Gm+6jc/M3ASV
+uEuMLOAdwvuBrzZpeMwrpBSgBSETkKIcrLGiUbCW14wRjkM9xdtSKrzAwlvp0AIh
+mm0N2H+AI8wi23VBmqP/dlh6PxqIUxNftPqputee+dOPDyoRL41TrYhruTCTViU5
+p9Lw7fkCXeP5p7m5B4b6Fe/HZxqz3DLukXFlRjUtmX/9xwrLZFV15NZDRZ94LIpw
+EGzeZcSyqZKNSUnfoQtmFph5br505XiNfwIDAQABo1MwUTAdBgNVHQ4EFgQU9136
+wHKbv30UeC7Syauw58dlDRowHwYDVR0jBBgwFoAU9136wHKbv30UeC7Syauw58dl
+DRowDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEATSuRRn2bfs23
+Ixg9AOjdmrtNciWJ4lWZsbBmxkMSfhbvKgwatbvZUINdeF2MHxP0Ne/Omb9ToHpi
+4G3+BSHAB0V4gBIgti/vQI/R5OfW/f5xu1VgEeLZ/f5FTIMlxtcHr1ybbaxg2e8j
+UPls5wo0I4FlxCe2qLRWP2xiHSB/UwnjUjbw/UGEd6q2vKaDozuHWQctojRxDi1t
+grubJzad+j1FeXEDmJuM7ZN91U5oEbycHH1Nj7RYQGWjT6i2mXIijorvb5WjOKUp
+uSe02gSkNpStED1tN4YzA7z1S/tyLw8rQeAQL3CfAz9tMZHcv6cW0nkCMXpNNJc7
+xEeZn/ELwg==
 -----END CERTIFICATE-----`)
 
 	fetcher := NewOCIFetcher(WithCACert(caCert))
@@ -53,9 +62,21 @@ k5mN+kTl5kmYJsYLsL7Q3v5K5ng+q3lQiPqE/w==
 	assert.NotNil(t, transport.TLSClientConfig.RootCAs)
 }
 
-func TestWithPluginMode(t *testing.T) {
-	fetcher := NewOCIFetcher(WithPluginMode())
-	assert.True(t, fetcher.pluginMode)
+func TestWithCACert_Invalid(t *testing.T) {
+	// Invalid CA cert - should fall back to default transport
+	invalidCert := []byte(`-----BEGIN CERTIFICATE-----
+INVALID_CERTIFICATE_DATA
+-----END CERTIFICATE-----`)
+
+	fetcher := NewOCIFetcher(WithCACert(invalidCert))
+
+	// Should fall back to default transport (not set custom transport)
+	assert.Equal(t, http.DefaultTransport, fetcher.transport)
+}
+
+func TestWithPluginValidation(t *testing.T) {
+	fetcher := NewOCIFetcher(WithPluginValidation())
+	assert.True(t, fetcher.validatePlugin)
 }
 
 func TestWithDockerConfig(t *testing.T) {
@@ -173,14 +194,23 @@ func TestAuthToAuthenticator_MalformedAuthString(t *testing.T) {
 
 func TestMultipleOptions(t *testing.T) {
 	caCert := []byte(`-----BEGIN CERTIFICATE-----
-MIIBkTCB+wIJAKHBfpegPjMCMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnRl
-c3RjYTAeFw0yMzAxMDEwMDAwMDBaFw0yNDAxMDEwMDAwMDBaMBExDzANBgNVBAMM
-BnRlc3RjYTBcMA0GCSqGSIb3DQEBAQUAA0sAMEgCQQC7o96FCFzP9GVMF/odlY0x
-fXH5XKPF6a9kKZl7e8V7H6KYQO7MYHl7aNQp7XZf0g/iYn/lFxVKcGFz/fQMt7oB
-AgMBAAGjUzBRMB0GA1UdDgQWBBQBJ7R4DTvnR0lf7FQ1A6f7M5l1kjAfBgNVHSME
-GDAWgBQBJ7R4DTvnR0lf7FQ1A6f7M5l1kjAPBgNVHRMBAf8EBTADAQH/MA0GCSqG
-SIb3DQEBCwUAA0EA0GXpF1JguGJ2I7m3pCnYdU3lfQEb7y0e6pZyfMz5EPuV1JJh
-k5mN+kTl5kmYJsYLsL7Q3v5K5ng+q3lQiPqE/w==
+MIIDAzCCAeugAwIBAgIUIzY7ufM5PVWGCBw22V3JZPNkhTwwDQYJKoZIhvcNAQEL
+BQAwETEPMA0GA1UEAwwGdGVzdGNhMB4XDTI2MDkwODA3NTczN1oXDTI3MDkwODA3
+NTczN1owETEPMA0GA1UEAwwGdGVzdGNhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEAysJqbjbazjOtfFGwyju4iL3GPpV7EiLHC+ylqssjtEOeOmH7x/nL
+lakUw8d5wNerMtsha6L6CXvrloKbNgGMmZ6XNrvXcgHzxAq8Lm62Gm+6jc/M3ASV
+uEuMLOAdwvuBrzZpeMwrpBSgBSETkKIcrLGiUbCW14wRjkM9xdtSKrzAwlvp0AIh
+mm0N2H+AI8wi23VBmqP/dlh6PxqIUxNftPqputee+dOPDyoRL41TrYhruTCTViU5
+p9Lw7fkCXeP5p7m5B4b6Fe/HZxqz3DLukXFlRjUtmX/9xwrLZFV15NZDRZ94LIpw
+EGzeZcSyqZKNSUnfoQtmFph5br505XiNfwIDAQABo1MwUTAdBgNVHQ4EFgQU9136
+wHKbv30UeC7Syauw58dlDRowHwYDVR0jBBgwFoAU9136wHKbv30UeC7Syauw58dl
+DRowDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEATSuRRn2bfs23
+Ixg9AOjdmrtNciWJ4lWZsbBmxkMSfhbvKgwatbvZUINdeF2MHxP0Ne/Omb9ToHpi
+4G3+BSHAB0V4gBIgti/vQI/R5OfW/f5xu1VgEeLZ/f5FTIMlxtcHr1ybbaxg2e8j
+UPls5wo0I4FlxCe2qLRWP2xiHSB/UwnjUjbw/UGEd6q2vKaDozuHWQctojRxDi1t
+grubJzad+j1FeXEDmJuM7ZN91U5oEbycHH1Nj7RYQGWjT6i2mXIijorvb5WjOKUp
+uSe02gSkNpStED1tN4YzA7z1S/tyLw8rQeAQL3CfAz9tMZHcv6cW0nkCMXpNNJc7
+xEeZn/ELwg==
 -----END CERTIFICATE-----`)
 
 	dockerConfig := createDockerConfig(t, map[string]authEntry{
@@ -206,16 +236,35 @@ k5mN+kTl5kmYJsYLsL7Q3v5K5ng+q3lQiPqE/w==
 	assert.Len(t, kc.auths, 1)
 }
 
+func TestWithDockerConfig_Invalid(t *testing.T) {
+	// Invalid JSON - should fall back to default keychain
+	invalidConfig := []byte(`not valid json`)
+
+	fetcher := NewOCIFetcher(WithDockerConfig(invalidConfig))
+
+	// Should fall back to default keychain
+	assert.Equal(t, authn.DefaultKeychain, fetcher.keychain)
+}
+
 func TestInsecureOverridesCACert(t *testing.T) {
 	caCert := []byte(`-----BEGIN CERTIFICATE-----
-MIIBkTCB+wIJAKHBfpegPjMCMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnRl
-c3RjYTAeFw0yMzAxMDEwMDAwMDBaFw0yNDAxMDEwMDAwMDBaMBExDzANBgNVBAMM
-BnRlc3RjYTBcMA0GCSqGSIb3DQEBAQUAA0sAMEgCQQC7o96FCFzP9GVMF/odlY0x
-fXH5XKPF6a9kKZl7e8V7H6KYQO7MYHl7aNQp7XZf0g/iYn/lFxVKcGFz/fQMt7oB
-AgMBAAGjUzBRMB0GA1UdDgQWBBQBJ7R4DTvnR0lf7FQ1A6f7M5l1kjAfBgNVHSME
-GDAWgBQBJ7R4DTvnR0lf7FQ1A6f7M5l1kjAPBgNVHRMBAf8EBTADAQH/MA0GCSqG
-SIb3DQEBCwUAA0EA0GXpF1JguGJ2I7m3pCnYdU3lfQEb7y0e6pZyfMz5EPuV1JJh
-k5mN+kTl5kmYJsYLsL7Q3v5K5ng+q3lQiPqE/w==
+MIIDAzCCAeugAwIBAgIUIzY7ufM5PVWGCBw22V3JZPNkhTwwDQYJKoZIhvcNAQEL
+BQAwETEPMA0GA1UEAwwGdGVzdGNhMB4XDTI2MDkwODA3NTczN1oXDTI3MDkwODA3
+NTczN1owETEPMA0GA1UEAwwGdGVzdGNhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEAysJqbjbazjOtfFGwyju4iL3GPpV7EiLHC+ylqssjtEOeOmH7x/nL
+lakUw8d5wNerMtsha6L6CXvrloKbNgGMmZ6XNrvXcgHzxAq8Lm62Gm+6jc/M3ASV
+uEuMLOAdwvuBrzZpeMwrpBSgBSETkKIcrLGiUbCW14wRjkM9xdtSKrzAwlvp0AIh
+mm0N2H+AI8wi23VBmqP/dlh6PxqIUxNftPqputee+dOPDyoRL41TrYhruTCTViU5
+p9Lw7fkCXeP5p7m5B4b6Fe/HZxqz3DLukXFlRjUtmX/9xwrLZFV15NZDRZ94LIpw
+EGzeZcSyqZKNSUnfoQtmFph5br505XiNfwIDAQABo1MwUTAdBgNVHQ4EFgQU9136
+wHKbv30UeC7Syauw58dlDRowHwYDVR0jBBgwFoAU9136wHKbv30UeC7Syauw58dl
+DRowDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEATSuRRn2bfs23
+Ixg9AOjdmrtNciWJ4lWZsbBmxkMSfhbvKgwatbvZUINdeF2MHxP0Ne/Omb9ToHpi
+4G3+BSHAB0V4gBIgti/vQI/R5OfW/f5xu1VgEeLZ/f5FTIMlxtcHr1ybbaxg2e8j
+UPls5wo0I4FlxCe2qLRWP2xiHSB/UwnjUjbw/UGEd6q2vKaDozuHWQctojRxDi1t
+grubJzad+j1FeXEDmJuM7ZN91U5oEbycHH1Nj7RYQGWjT6i2mXIijorvb5WjOKUp
+uSe02gSkNpStED1tN4YzA7z1S/tyLw8rQeAQL3CfAz9tMZHcv6cW0nkCMXpNNJc7
+xEeZn/ELwg==
 -----END CERTIFICATE-----`)
 
 	// WithInsecure applied after WithCACert should override
