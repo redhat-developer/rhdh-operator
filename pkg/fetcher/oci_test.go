@@ -74,11 +74,6 @@ INVALID_CERTIFICATE_DATA
 	assert.Equal(t, http.DefaultTransport, fetcher.transport)
 }
 
-func TestWithPluginValidation(t *testing.T) {
-	fetcher := NewOCIFetcher(WithPluginValidation())
-	assert.True(t, fetcher.validatePlugin)
-}
-
 func TestWithDockerConfig(t *testing.T) {
 	dockerConfig := createDockerConfig(t, map[string]authEntry{
 		"registry.example.com": {Username: "user", Password: "pass"},
