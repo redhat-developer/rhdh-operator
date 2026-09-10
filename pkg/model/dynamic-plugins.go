@@ -162,7 +162,9 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 					continue
 				}
 				p.enabledPlugins = append(p.enabledPlugins, plugin)
-				packages = append(packages, plugin.Package)
+				// Build package entry: "url integrity"
+				// Integrity is respected for HTTP and npm packages, ignored for OCI
+				packages = append(packages, plugin.Package+" "+plugin.Integrity)
 			}
 		}
 

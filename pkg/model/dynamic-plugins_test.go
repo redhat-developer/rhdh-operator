@@ -926,3 +926,25 @@ func TestInlineDynamicPluginsEndToEnd(t *testing.T) {
 	// Verify the pluginConfig content is present (converted to YAML format)
 	assert.Contains(t, pluginConfigData, "testKey: testValue", "pluginConfig should be in app-config as YAML")
 }
+
+// TestPackagesIntegrity verifies integrity checksums are included in packages.txt
+func TestPackagesIntegrity(t *testing.T) {
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	bs.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{
+		{Package: "https://example.com/plugin.tgz", Integrity: "sha512-abc"},
+		{Package: "@scope/plugin@1.0.0", Integrity: "sha256-xyz"},
+	}
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
+	packagesData := dpObj.enabledPluginsCM.Data["packages.txt"]
+
+	assert.Contains(t, packagesData, "https://example.com/plugin.tgz sha512-abc")
+	assert.Contains(t, packagesData, "@scope/plugin@1.0.0 sha256-xyz")
+}
