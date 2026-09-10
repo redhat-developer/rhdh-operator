@@ -192,7 +192,8 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 
 	// Only proceed if there's a ConfigMap to mount or dynamic plugins config in spec
-	if p.ConfigMap == nil && (backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "") {
+	if p.ConfigMap == nil && (backstage.Spec.Application == nil ||
+		(backstage.Spec.Application.DynamicPluginsConfigMapName == "" && len(backstage.Spec.Application.DynamicPlugins) == 0)) {
 		// No dynamic plugins configuration, nothing to do
 		return nil
 	}
