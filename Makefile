@@ -239,7 +239,7 @@ crd-upgrade-check: crdify kustomize ## Check CRD upgrade safety against the base
 	mkdir -p "$$tmpdir/baseline"; \
 	git archive "$(CRD_BASELINE_REF)" config/crd | tar -x -C "$$tmpdir/baseline"; \
 	$(KUSTOMIZE) build "$$tmpdir/baseline/config/crd" > "$$tmpdir/baseline.yaml"; \
-	$(CRDIFY) "file://$$tmpdir/baseline.yaml" "file://$$tmpdir/current.yaml"
+	$(CRDIFY) --config crdify.yaml "file://$$tmpdir/baseline.yaml" "file://$$tmpdir/current.yaml"
 
 ##@ Build
 
