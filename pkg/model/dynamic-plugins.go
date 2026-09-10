@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/api/v1alpha5"
@@ -153,14 +153,12 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		if err != nil {
 			return err
 		}
-
 		packages := []string{}
 		for _, plugin := range pluginsData {
 			if !plugin.IsDisabled() {
 				// Skip local paths - they're built into the image and don't need downloading
 				// TODO temporary workaround to not to fail until wrappers removed
 				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
-					klog.Warningf("Skipping local path plugin %q (built into image)", plugin.Package)
 					continue
 				}
 				p.enabledPlugins = append(p.enabledPlugins, plugin)
@@ -405,10 +403,13 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 			}
 			if plugin.Enabled != nil {
 				existingPlugin.Enabled = plugin.Enabled
-				existingPlugin.Disabled = false
 			} else if plugin.Disabled {
 				existingPlugin.Disabled = true
 				existingPlugin.Enabled = nil
+			} else {
+				// User added this plugin to overlay without specifying enabled/disabled
+				// Default to enabled
+				existingPlugin.Enabled = ptr.To(true)
 			}
 			pluginMap[plugin.Package] = existingPlugin
 		} else {
