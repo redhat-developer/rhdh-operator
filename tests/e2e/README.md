@@ -33,6 +33,8 @@ The behavior is configurable using the following environment variables:
 | `BACKSTAGE_OPERATOR_TESTS_AIRGAP_MIRROR_REGISTRY`                                              | string | Existing mirror registry to use in the airgap scenario.<br>Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is `rhdh-airgap`.                                                                                                                                                                                                                                                                                                                       |                                                   | `my-registry.example.com`                               |
 | `BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS`                                                  | bool   | Whether to test access using an Ingress resource on K8s                                                                                                                                                                                                                                                                                                                                                                                       |                                                   | `true`                                                  |
 | `BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN`                                                  | string | Ingress domain. Relevant only if `BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS` is `true`.                                                                                                                                                                                                                                                                                                                                                     |                                                   | `$(minikube ip).nip.io`                                 |
+| `USE_EXISTING_CLUSTER`                                                                         | bool   | If set to `true`, skips tests that require specific cluster features (e.g., ephemeral volume controller). Use when running against existing clusters like OCP with OLM v1.                                                                                                                                                                                                                                                                     |                                                   | `true`                                                  |
+| `SKIP_RAW_RUNTIME_CONFIG_TEST`                                                                 | bool   | If set to `true`, forces skip of the raw-runtime-config test which requires ephemeral volume controller support. Automatically skipped when `USE_EXISTING_CLUSTER=true`.                                                                                                                                                                                                                                                                      |                                                   | `true`                                                  |
 
 ### Examples
 
@@ -145,4 +147,14 @@ $ make test-e2e BACKSTAGE_OPERATOR_TEST_MODE=rhdh-airgap
 $ make test-e2e \
     BACKSTAGE_OPERATOR_TEST_MODE=rhdh-airgap \
     BACKSTAGE_OPERATOR_TESTS_AIRGAP_MIRROR_REGISTRY=my-registry.example.com
+```
+
+#### Testing against an existing cluster with OLM v1
+
+Run E2E tests against an existing cluster with operator deployed via OLM v1. Some tests are skipped when `USE_EXISTING_CLUSTER=true` due to cluster-specific limitations (see RHIDP-14647).
+
+```shell
+$ make test-e2e \
+    USE_EXISTING_CLUSTER=true \
+    BACKSTAGE_OPERATOR_TEST_MODE=rhdh-latest
 ```

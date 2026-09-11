@@ -107,15 +107,6 @@ var _ = Describe("Backstage Operator E2E", func() {
 				name:       "raw-runtime-config",
 				crFilePath: filepath.Join("examples", "raw-runtime-config.yaml"),
 				crName:     "bs-raw-runtime-config",
-				// Known limitation: This test relies on ephemeral volumes for dynamic plugins.
-				// Ephemeral volumes require the Kubernetes ephemeral volume controller to create
-				// PVCs on-demand. On some clusters (e.g., OCP 4.22+ nightly with OLM v1), the
-				// ephemeral volume controller may fail to create the PVC with error:
-				// "waiting for ephemeral volume controller to create the persistentvolumeclaim
-				// 'backstage-bs-raw-runtime-config-*-dynamic-plugins-root'"
-				// This is a cluster infrastructure issue, not a test or operator bug.
-				// Other tests pass because they use enableLocalDb: true (default), which creates
-				// a StatefulSet with normal PVCs instead of relying solely on ephemeral volumes.
 			},
 		} {
 			When(fmt.Sprintf("applying %s (%s)", tt.name, tt.crFilePath), func() {
@@ -125,13 +116,9 @@ var _ = Describe("Backstage Operator E2E", func() {
 					if tt.isForOpenshift && !helper.IsOpenShift() {
 						Skip("Skipping OpenShift-only test on non OCP platform")
 					}
-					// Skip raw-runtime-config test when running against existing clusters where
-					// ephemeral volume controller may not be available (e.g., OCP 4.22+ with OLM v1).
-					// This allows the test to run in normal CI (Kind/K8s) but skip on known problematic clusters.
-					// Set SKIP_RAW_RUNTIME_CONFIG_TEST=true to force skip if needed.
 					if tt.name == "raw-runtime-config" {
 						if os.Getenv("USE_EXISTING_CLUSTER") == "true" || os.Getenv("SKIP_RAW_RUNTIME_CONFIG_TEST") == "true" {
-							Skip("Skipping raw-runtime-config test: requires ephemeral volume controller support which may not be available on all clusters (see test comments for details)")
+							Skip("Skipping raw-runtime-config: requires ephemeral volume controller support")
 						}
 					}
 					crPath = filepath.Join(projectDir, tt.crFilePath)
@@ -280,10 +267,6 @@ spec:
 								ensureRouteIsReachable(appReachabilityTimeout, ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
 							})
 						}
-						// Note: When route is disabled (enabled: false), the operator stops managing it
-						// but does not delete the existing route. This is intentional - disabling a resource
-						// means "don't create/update" not "delete". The route will be cleaned up when the
-						// Backstage CR is deleted via owner reference garbage collection.
 					}
 
 					By("deleting CR", func() {
