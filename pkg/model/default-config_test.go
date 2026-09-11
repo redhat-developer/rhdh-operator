@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -275,4 +276,67 @@ func TestGetEnabledFlavours(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTemplateSubstitution_DefaultConfig(t *testing.T) {
+	// Setup LOCALBIN
+	testDataDir, _ := filepath.Abs("testdata/testflavours")
+	t.Setenv("LOCALBIN", testDataDir)
+
+	// Set template data
+	utils.SetTemplateData("test-backstage", "test-ns")
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	// Read base configmap-envs (no flavours)
+	objs, err := ReadDefaultConfig(
+		ObjectConfig{Key: ConfigMapEnvsKey, MergeFunc: mergeMultiObjectConfigs},
+		[]enabledFlavour{},
+		*scheme, "",
+	)
+	require.NoError(t, err)
+	require.Len(t, objs, 1)
+
+	cm := objs[0].(*corev1.ConfigMap)
+	assert.Equal(t, "test-backstage", cm.Data["BACKSTAGE_NAME"])
+	assert.Equal(t, "https://test-backstage.test-ns.svc", cm.Data["SERVICE_URL"])
+}
+
+func TestTemplateSubstitution_Flavour(t *testing.T) {
+	// Setup LOCALBIN
+	testDataDir, _ := filepath.Abs("testdata/testflavours")
+	t.Setenv("LOCALBIN", testDataDir)
+
+	// Set template data
+	utils.SetTemplateData("my-instance", "my-ns")
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+
+	// Get flavor1 enabled
+	flavours, err := GetEnabledFlavours(api.BackstageSpec{
+		Flavours: &[]api.Flavour{{Name: "flavor1", Enabled: true}},
+	})
+	require.NoError(t, err)
+
+	// Read with flavour
+	objs, err := ReadDefaultConfig(
+		ObjectConfig{Key: ConfigMapEnvsKey, MergeFunc: mergeMultiObjectConfigs},
+		flavours,
+		*scheme, "",
+	)
+	require.NoError(t, err)
+
+	// Find flavor1 configmap
+	var flavor1CM *corev1.ConfigMap
+	for _, obj := range objs {
+		cm := obj.(*corev1.ConfigMap)
+		if cm.Name == "flavor1-configmap-envs" {
+			flavor1CM = cm
+			break
+		}
+	}
+	require.NotNil(t, flavor1CM, "flavor1 configmap should exist")
+	assert.Equal(t, "my-instance-flavor1", flavor1CM.Data["FLAVOR1_BACKSTAGE"])
 }

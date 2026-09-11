@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: okp-service
+  annotations:
+    rhdh.redhat.com/containers: "lightspeed-core"
+data:
+  OKP_SERVICE_URL: "http://lightspeed-okp-{{.Backstage.Name}}:8080"

@@ -5,3 +5,4 @@ metadata:
 data:
   FLAVOR1_ENV1: "flavor1 value 1"
   FLAVOR1_ENV2: "flavor1 value 2"
+  FLAVOR1_BACKSTAGE: "{{.Backstage.Name}}-flavor1"

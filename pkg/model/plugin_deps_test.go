@@ -5,15 +5,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/redhat-developer/rhdh-operator/api"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 func TestReadPluginDeps(t *testing.T) {
@@ -34,7 +34,7 @@ func TestReadPluginDeps(t *testing.T) {
 	err = os.WriteFile(file4, []byte("some unrelated content"), 0644)
 	assert.NoError(t, err)
 
-	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"})
+	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"}, "")
 	assert.NoError(t, err)
 	assert.Len(t, objects, 2)
 
@@ -60,7 +60,7 @@ metadata:
 
 	bsName := "test-name"
 	bsNamespace := "test-namespace"
-	objects, err := ReadPluginDeps(dir, bsName, bsNamespace, []string{"file1"})
+	objects, err := ReadPluginDeps(dir, bsName, bsNamespace, []string{"file1"}, "")
 	assert.NoError(t, err)
 	assert.Len(t, objects, 1)
 
@@ -126,7 +126,7 @@ plugins:
 	}
 	sc := runtime.NewScheme()
 	utilruntime.Must(api.AddToScheme(sc))
-	objects, err := GetPluginDeps(bs, dynaPlugins, sc)
+	objects, err := GetPluginDeps(bs, dynaPlugins, sc, "")
 	assert.NoError(t, err)
 	assert.Len(t, objects, 2)
 
@@ -148,7 +148,139 @@ func TestReadPluginDepsNoFiles(t *testing.T) {
 	dir := t.TempDir()
 
 	// Call ReadPluginDeps with an empty directory
-	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"})
+	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"}, "")
 	assert.NoError(t, err)
 	assert.Len(t, objects, 0)
+}
+
+func TestReadPluginDepsPlatformGating(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create files with different platform annotations
+	ocpOnly := filepath.Join(dir, "plugin-ocp.yaml")
+	k8sOnly := filepath.Join(dir, "plugin-k8s.yaml")
+	allPlatforms := filepath.Join(dir, "plugin-all.yaml")
+
+	// OCP-only resource
+	err := os.WriteFile(ocpOnly, []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocp-config
+  annotations:
+    rhdh.redhat.com/platform: ocp
+`), 0644)
+	assert.NoError(t, err)
+
+	// K8s-only resource
+	err = os.WriteFile(k8sOnly, []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-config
+  annotations:
+    rhdh.redhat.com/platform: k8s
+`), 0644)
+	assert.NoError(t, err)
+
+	// All platforms (no annotation)
+	err = os.WriteFile(allPlatforms, []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: all-config
+`), 0644)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		platformExt string
+		wantNames   []string
+	}{
+		{
+			name:        "ocp platform gets ocp and all",
+			platformExt: "ocp",
+			wantNames:   []string{"ocp-config", "all-config"},
+		},
+		{
+			name:        "k8s platform gets k8s and all",
+			platformExt: "k8s",
+			wantNames:   []string{"k8s-config", "all-config"},
+		},
+		{
+			name:        "empty platform gets all resources",
+			platformExt: "",
+			wantNames:   []string{"ocp-config", "k8s-config", "all-config"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objects, err := ReadPluginDeps(dir, "", "", []string{"plugin"}, tt.platformExt)
+			assert.NoError(t, err)
+
+			var gotNames []string
+			for _, obj := range objects {
+				gotNames = append(gotNames, obj.GetName())
+			}
+			assert.ElementsMatch(t, tt.wantNames, gotNames)
+		})
+	}
+}
+
+func TestMatchesPlatform(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		platformExt string
+		want        bool
+	}{
+		{
+			name:        "no annotations - matches all",
+			annotations: nil,
+			platformExt: "ocp",
+			want:        true,
+		},
+		{
+			name:        "no platform annotation - matches all",
+			annotations: map[string]string{"other": "value"},
+			platformExt: "ocp",
+			want:        true,
+		},
+		{
+			name:        "ocp annotation matches ocp platform",
+			annotations: map[string]string{PlatformAnnotation: "ocp"},
+			platformExt: "ocp",
+			want:        true,
+		},
+		{
+			name:        "k8s annotation matches k8s platform",
+			annotations: map[string]string{PlatformAnnotation: "k8s"},
+			platformExt: "k8s",
+			want:        true,
+		},
+		{
+			name:        "ocp annotation does not match k8s platform",
+			annotations: map[string]string{PlatformAnnotation: "ocp"},
+			platformExt: "k8s",
+			want:        false,
+		},
+		{
+			name:        "k8s annotation does not match ocp platform",
+			annotations: map[string]string{PlatformAnnotation: "k8s"},
+			platformExt: "ocp",
+			want:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{}
+			if tt.annotations != nil {
+				obj.SetAnnotations(tt.annotations)
+			}
+			got := matchesPlatform(obj, tt.platformExt)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

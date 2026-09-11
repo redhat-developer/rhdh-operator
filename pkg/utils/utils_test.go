@@ -146,6 +146,47 @@ func TestPlatformPatchMerge(t *testing.T) {
 
 }
 
+func TestReadYamlsWithTemplateSubstitution(t *testing.T) {
+	// Set template data
+	SetTemplateData("my-backstage", "my-namespace")
+	defer func() { templateData = nil }()
+
+	// Read YAML with template variables
+	obj, err := ReadYamlFiles("testdata/configmap-template.yaml", *util_test_scheme, "")
+	assert.NoError(t, err)
+	assert.Len(t, obj, 1)
+
+	cm, ok := obj[0].(*corev1.ConfigMap)
+	assert.True(t, ok)
+	assert.Equal(t, "config-my-backstage", cm.Name)
+	assert.Equal(t, "my-namespace", cm.Namespace)
+	assert.Equal(t, "https://my-backstage.my-namespace.svc", cm.Data["SERVICE_URL"])
+}
+
+func TestApplyTemplateSkipsNonBackstagePatterns(t *testing.T) {
+	// Set template data
+	SetTemplateData("my-backstage", "my-namespace")
+	defer func() { templateData = nil }()
+
+	// Content with other {{...}} patterns that are NOT our Backstage variables
+	// These should NOT be parsed as templates
+	content := []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config
+data:
+  prompt: |
+    Question: {{message}}
+    Response: {{allowed}}
+`)
+
+	result, err := ApplyTemplate(content)
+	assert.NoError(t, err)
+	// Content should be unchanged since it doesn't contain {{.Backstage.
+	assert.Equal(t, content, result)
+}
+
 func TestGetObjectKind(t *testing.T) {
 
 	objk := GetObjectKind(&corev1.PersistentVolumeClaim{}, util_test_scheme)
