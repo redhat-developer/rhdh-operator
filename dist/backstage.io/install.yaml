@@ -1749,11 +1749,52 @@ spec:
                           the ConfigMapRefs field
                         type: string
                     type: object
+                  dynamicPlugins:
+                    description: |-
+                      Inline dynamic plugins configuration.
+                      Allows configuring dynamic plugins directly in the Backstage CR without requiring a separate ConfigMap.
+                      Each plugin can specify its package reference, enabled state, plugin-specific configuration, and integrity checksum.
+                      Mutually exclusive with DynamicPluginsConfigMapName field.
+                    items:
+                      description: |-
+                        DynamicPluginConfig defines configuration for a single dynamic plugin.
+                        Dynamic plugins can be configured inline within the Backstage CR instead of using a separate ConfigMap.
+                      properties:
+                        enabled:
+                          description: |-
+                            Enable or disable the plugin. Defaults to true if not specified.
+                            Takes precedence over the Disabled field if both are set.
+                          type: boolean
+                        integrity:
+                          description: |-
+                            Integrity checksum for the plugin package (e.g., sha256, sha512).
+                            Used to verify the integrity of the downloaded plugin.
+                          type: string
+                        package:
+                          description: |-
+                            Package reference for the plugin.
+                            Supported formats:
+                            - ref://plugin-name (references a plugin from the default catalog)
+                            - oci://registry/image@digest or oci://registry/image:tag
+                            - npm package name
+                            - ./relative/path or /absolute/path
+                          minLength: 1
+                          type: string
+                        pluginConfig:
+                          description: |-
+                            Plugin-specific configuration as arbitrary YAML.
+                            This configuration will be merged into the app-config under the plugin's namespace.
+                          x-kubernetes-preserve-unknown-fields: true
+                      required:
+                      - package
+                      type: object
+                    type: array
                   dynamicPluginsConfigMapName:
                     description: |-
                       Reference to an existing ConfigMap for Dynamic Plugins.
                       A new one will be generated with the default config if not set.
                       The ConfigMap object must have an existing key named: 'dynamic-plugins.yaml'.
+                      Mutually exclusive with DynamicPlugins field.
                     type: string
                   extraEnvs:
                     description: Extra environment variables
@@ -2015,6 +2056,12 @@ spec:
                         type: object
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: dynamicPlugins and dynamicPluginsConfigMapName are mutually
+                    exclusive
+                  rule: '!(has(self.dynamicPlugins) && size(self.dynamicPlugins) >
+                    0 && has(self.dynamicPluginsConfigMapName) && size(self.dynamicPluginsConfigMapName)
+                    > 0)'
               database:
                 description: Configuration for database access. Optional.
                 properties:

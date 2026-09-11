@@ -713,10 +713,53 @@ MY_VAR = my-value - to install-dynamic-plugins container only
 
 #### Dynamic Plugins
 
-The Operator can configure [Dynamic Plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
+The Operator can configure [Dynamic Plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/deployment.yaml)).
+
+**Plugin Configuration Fields:**
+
+Each plugin can be configured with the following fields:
+- `package` (required): Plugin package reference. Supported formats:
+  - `ref://plugin-name` - Reference from the default catalog
+  - `oci://registry/image@digest` or `oci://registry/image:tag` - OCI image
+  - `@scope/package-name` - npm package
+  - `https://example.com/plugin.tgz` - HTTP/HTTPS URL
+  - `file://path/to/plugin` - File path
+- `enabled` (optional): Enable/disable the plugin. Defaults to `true` if not specified.
+- `pluginConfig` (optional): Plugin-specific configuration as arbitrary YAML.
+- `integrity` (optional): Integrity checksum for the plugin package.
+
+There are two ways to configure Dynamic Plugins:
+
+##### Option 1: Inline Configuration (Recommended)
+
+Configure plugins directly in the Backstage CR without requiring a separate ConfigMap:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    dynamicPlugins:
+      - package: 'ref://backstage-community-plugin-catalog-backend-module-keycloak-dynamic'
+      - package: 'ref://backstage-plugin-github-actions'
+        pluginConfig:
+          github:
+            host: github.com
+            token: ${GITHUB_TOKEN}
+```
+
+**Note:** The inline `dynamicPlugins` field is mutually exclusive with `dynamicPluginsConfigMapName`.
+
+See [examples/inline-dynamic-plugins.yaml](../examples/inline-dynamic-plugins.yaml) for a complete example.
+
+##### Option 2: ConfigMap Reference
+
+Reference an external ConfigMap containing the Dynamic Plugins configuration.
 
 For example, the **dynamic-plugins-config** ConfigMap contains a simple Dynamic Plugins configuration, which includes predefined default plugins in **dynamic-plugins.default.yaml** and the GitHub plugin provided in the package located at `./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic`.
-  
+
 ```yaml
 kind: ConfigMap
 apiVersion: v1
@@ -740,7 +783,7 @@ data:
                   initialDelay: { seconds: 100 }
 ```
 
-To configure it with the Backstage CR, the following spec should be included:
+To configure it with the Backstage CR:
 
 ```yaml
 spec:

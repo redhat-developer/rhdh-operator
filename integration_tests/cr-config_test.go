@@ -19,7 +19,6 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
 	"github.com/redhat-developer/rhdh-operator/api"
-
 	"k8s.io/apimachinery/pkg/types"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -354,5 +353,4 @@ spec:
 		}, 20*time.Second, time.Second).Should(Succeed())
 
 	})
-
 })

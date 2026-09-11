@@ -1,0 +1,8 @@
+# crdify configuration
+# Allow description changes and unhandled XValidations for alpha APIs (v1alpha4, v1alpha5)
+
+validations:
+  - name: description
+    enforcement: None
+
+unhandledEnforcement: None

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -8,9 +9,10 @@ import (
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -107,29 +109,39 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		}
 	}
 
-	if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
-		specPlugins := &p.model.ExternalConfig.DynamicPlugins
+	// Determine source of user-defined plugins (CR inline or external ConfigMap)
+	// CEL validation ensures these are mutually exclusive
+	var userPluginsData string
 
-		// if the ConfigMap is set but does not have the data or expected key
+	if backstage.Spec.Application != nil && len(backstage.Spec.Application.DynamicPlugins) > 0 {
+		// Get plugins from CR inline configuration
+		data, err := convertInlinePlugins(backstage.Spec.Application.DynamicPlugins)
+		if err != nil {
+			return fmt.Errorf("failed to convert inline plugins: %w", err)
+		}
+		userPluginsData = data
+	} else if backstage.Spec.Application != nil && backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+		// Get plugins from external ConfigMap
+		specPlugins := &p.model.ExternalConfig.DynamicPlugins
 		if specPlugins.Data == nil || specPlugins.Data[DynamicPluginsFile] == "" {
 			return fmt.Errorf("dynamic plugin configMap expects '%s' Data key", DynamicPluginsFile)
 		}
+		userPluginsData = specPlugins.Data[DynamicPluginsFile]
+	}
 
+	// Process user plugins if present
+	if userPluginsData != "" {
 		if p.ConfigMap != nil {
-			// Merge user's config with default config
-			//mergedData, err := p.mergeWith(specPlugins.Data[DynamicPluginsFile])
-			mergedData, err := MergePluginsData(p.ConfigMap.Data[DynamicPluginsFile], specPlugins.Data[DynamicPluginsFile])
+			// Merge user plugins with default config
+			mergedData, err := MergePluginsData(p.ConfigMap.Data[DynamicPluginsFile], userPluginsData)
 			if err != nil {
 				return fmt.Errorf("failed to merge dynamic plugins config: %w", err)
 			}
 			p.ConfigMap.Data[DynamicPluginsFile] = mergedData
 		} else {
-			// No default config - create a fresh ConfigMap copying only Data/BinaryData.
-			// We must NOT reuse the external ConfigMap's ObjectMeta (resourceVersion, uid,
-			// managedFields, etc.) as it would cause SSA apply to fail on create.
+			// No default config - create a fresh ConfigMap with user plugins
 			p.ConfigMap = &corev1.ConfigMap{
-				Data:       specPlugins.Data,
-				BinaryData: specPlugins.BinaryData,
+				Data: map[string]string{DynamicPluginsFile: userPluginsData},
 			}
 		}
 	}
@@ -141,18 +153,18 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		if err != nil {
 			return err
 		}
-
 		packages := []string{}
 		for _, plugin := range pluginsData {
 			if !plugin.IsDisabled() {
 				// Skip local paths - they're built into the image and don't need downloading
 				// TODO temporary workaround to not to fail until wrappers removed
 				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
-					klog.Warningf("Skipping local path plugin %q (built into image)", plugin.Package)
 					continue
 				}
 				p.enabledPlugins = append(p.enabledPlugins, plugin)
-				packages = append(packages, plugin.Package)
+				// Build package entry: "url integrity"
+				// Integrity is respected for HTTP and npm packages, ignored for OCI
+				packages = append(packages, plugin.Package+" "+plugin.Integrity)
 			}
 		}
 
@@ -182,7 +194,8 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 func (p *DynamicPlugins) updateAndValidate(backstage api.Backstage, scheme *runtime.Scheme) error {
 
 	// Only proceed if there's a ConfigMap to mount or dynamic plugins config in spec
-	if p.ConfigMap == nil && (backstage.Spec.Application == nil || backstage.Spec.Application.DynamicPluginsConfigMapName == "") {
+	if p.ConfigMap == nil && (backstage.Spec.Application == nil ||
+		(backstage.Spec.Application.DynamicPluginsConfigMapName == "" && len(backstage.Spec.Application.DynamicPlugins) == 0)) {
 		// No dynamic plugins configuration, nothing to do
 		return nil
 	}
@@ -300,6 +313,46 @@ func DynamicPluginsInitContainer(initContainers []corev1.Container) (int, *corev
 	return -1, nil
 }
 
+// convertInlinePlugins converts API v1alpha5 DynamicPluginConfig to internal DynaPlugin format
+// and marshals it to YAML string suitable for merging
+func convertInlinePlugins(inlinePlugins []v1alpha5.DynamicPluginConfig) (string, error) {
+	if len(inlinePlugins) == 0 {
+		return "", nil
+	}
+
+	dynaPlugins := make([]DynaPlugin, 0, len(inlinePlugins))
+
+	for _, p := range inlinePlugins {
+		dynaPlugin := DynaPlugin{
+			Package:   p.Package,
+			Enabled:   p.Enabled,
+			Integrity: p.Integrity,
+		}
+
+		// Convert PluginConfig from JSON to map[string]interface{}
+		if p.PluginConfig != nil && len(p.PluginConfig.Raw) > 0 {
+			var pluginConfig map[string]interface{}
+			if err := json.Unmarshal(p.PluginConfig.Raw, &pluginConfig); err != nil {
+				return "", fmt.Errorf("failed to unmarshal pluginConfig for package %s: %w", p.Package, err)
+			}
+			dynaPlugin.PluginConfig = pluginConfig
+		}
+
+		dynaPlugins = append(dynaPlugins, dynaPlugin)
+	}
+
+	config := DynaPluginsConfig{
+		Plugins: dynaPlugins,
+	}
+
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal inline plugins: %w", err)
+	}
+
+	return string(data), nil
+}
+
 func MergePluginsData(firstData, secondData string) (string, error) {
 
 	if firstData == "" {
@@ -353,10 +406,13 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 			}
 			if plugin.Enabled != nil {
 				existingPlugin.Enabled = plugin.Enabled
-				existingPlugin.Disabled = false
 			} else if plugin.Disabled {
 				existingPlugin.Disabled = true
 				existingPlugin.Enabled = nil
+			} else {
+				// User added this plugin to overlay without specifying enabled/disabled
+				// Default to enabled
+				existingPlugin.Enabled = ptr.To(true)
 			}
 			pluginMap[plugin.Package] = existingPlugin
 		} else {

@@ -1,0 +1,18 @@
+# This shows how to configure plugins directly in the Backstage CR
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: backstage-inline-plugins
+spec:
+  application:
+    dynamicPlugins:
+      - package: 'ref://backstage-plugin-kubernetes'
+        enabled: true
+      - package: 'ref://backstage-plugin-scaffolder-backend-module-github'
+      - package: 'ref://red-hat-developer-hub-backstage-plugin-extensions'
+        enabled: false
+#      - package: 'ref://backstage-plugin-auth-backend-module-github-provider'
+#        pluginConfig:
+#          github:
+#            host: github.com
+#            token: ${GITHUB_TOKEN}

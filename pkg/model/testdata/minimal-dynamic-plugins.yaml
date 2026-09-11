@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minimal-dynamic-plugins
+data:
+  dynamic-plugins.yaml: |
+    plugins:
+      # Minimal catalog for testing ref:// resolution
+      - package: oci://quay.io/backstage/backstage-plugin-kubernetes@sha256:test123
+        disabled: false
+      - package: oci://quay.io/backstage/backstage-plugin-scaffolder-backend-module-github@sha256:test456
+        disabled: false
+      - package: oci://quay.io/backstage/backstage-plugin-techdocs@sha256:test789
+        enabled: true
