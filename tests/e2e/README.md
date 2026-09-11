@@ -151,7 +151,7 @@ $ make test-e2e \
 
 #### Testing against an existing cluster with OLM v1
 
-Run E2E tests against an existing cluster with operator deployed via OLM v1. Some tests are skipped when `USE_EXISTING_CLUSTER=true` due to cluster-specific limitations (see RHIDP-14647).
+In this scenario, you want to run E2E tests against an existing OpenShift cluster with the operator already deployed via OLM v1 (ClusterExtension).
 
 ```shell
 $ make test-e2e \
