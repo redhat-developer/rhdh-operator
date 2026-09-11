@@ -196,3 +196,44 @@ func TestPluginName(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessParallel_FailFast(t *testing.T) {
+	ctx := context.Background()
+	f := fetcher.New()
+	outputDir := t.TempDir()
+
+	// Create a list with one bad package that fails immediately (404),
+	// followed by many valid packages. Use parallel=2 so only 2 start initially.
+	packages := []Package{
+		{URL: "@npm:this-package-does-not-exist-at-all-12345@999.999.999"}, // Will fail fast with 404
+		{URL: "@npm:is-odd@3.0.1"},    // May complete (in-flight)
+		{URL: "@npm:is-even@1.0.0"},   // Should be cancelled (queued)
+		{URL: "@npm:lodash@4.17.21"},  // Should be cancelled (queued)
+		{URL: "@npm:commander@9.0.0"}, // Should be cancelled (queued)
+		{URL: "@npm:chalk@4.1.2"},     // Should be cancelled (queued)
+	}
+
+	start := time.Now()
+	err := processParallel(ctx, f, packages, outputDir, 2) // Only 2 parallel to ensure some are queued
+	elapsed := time.Since(start)
+
+	// Should get an error from the failing package
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "this-package-does-not-exist")
+
+	// Should fail quickly (within a few seconds) rather than waiting for all downloads
+	// If it didn't cancel, it would take 15+ seconds to download all 5 valid packages
+	assert.Less(t, elapsed, 5*time.Second, "should fail fast without downloading all packages")
+
+	// Verify that most packages were NOT downloaded
+	entries, _ := os.ReadDir(outputDir)
+	successCount := 0
+	for _, e := range entries {
+		if e.IsDir() && e.Name() != "this-package-does-not-exist-at-all-12345" {
+			successCount++
+		}
+	}
+	// With parallel=2, at most the first 2 packages could have started and completed
+	// Most of the 6 packages should not be downloaded
+	assert.LessOrEqual(t, successCount, 2, "at most 2 packages should complete (those in-flight when cancelled)")
+}

@@ -210,7 +210,7 @@ func extractCatalogEntities(ctx context.Context, f *fetcher.Fetcher, image, dest
 	}
 	_ = os.RemoveAll(entitiesDest) // Remove old if exists
 
-	if err := copyDir(entitiesSrc, entitiesDest); err != nil {
+	if err := fetcher.CopyDir(entitiesSrc, entitiesDest); err != nil {
 		return fmt.Errorf("failed to copy catalog entities: %w", err)
 	}
 
@@ -225,31 +225,6 @@ func extractCatalogEntities(ctx context.Context, f *fetcher.Fetcher, image, dest
 
 	fmt.Printf("Catalog entities extracted to %s (%d files)\n", entitiesDest, count)
 	return nil
-}
-
-// copyDir recursively copies a directory
-func copyDir(src, dst string) error {
-	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		relPath, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		dstPath := filepath.Join(dst, relPath)
-
-		if info.IsDir() {
-			return os.MkdirAll(dstPath, 0755)
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(dstPath, data, info.Mode())
-	})
 }
 
 func readPackages(path string) ([]Package, error) {
@@ -279,6 +254,10 @@ func readPackages(path string) ([]Package, error) {
 }
 
 func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package, outputDir string, parallel int) error {
+	// Create a cancellable context to abort on first error
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	sem := make(chan struct{}, parallel)
 	var wg sync.WaitGroup
 	var firstErr error
@@ -287,7 +266,8 @@ func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package
 	for _, pkg := range packages {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			wg.Wait() // Wait for in-flight downloads to finish
+			return firstErr
 		case sem <- struct{}{}:
 		}
 
@@ -295,6 +275,13 @@ func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package
 		go func(pkg Package) {
 			defer wg.Done()
 			defer func() { <-sem }()
+
+			// Check if context was cancelled before starting
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 
 			name := pluginName(pkg.URL)
 			destDir := filepath.Join(outputDir, name)
@@ -321,6 +308,7 @@ func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package
 				fmt.Fprintf(os.Stderr, "[FAIL] %s: %v\n", name, err)
 				errOnce.Do(func() {
 					firstErr = fmt.Errorf("%s: %w", name, err)
+					cancel() // Cancel context to abort remaining downloads
 				})
 				return
 			}
@@ -331,6 +319,7 @@ func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package
 				fmt.Fprintf(os.Stderr, "[FAIL] %s: rename failed: %v\n", name, err)
 				errOnce.Do(func() {
 					firstErr = fmt.Errorf("%s: rename failed: %w", name, err)
+					cancel() // Cancel context to abort remaining downloads
 				})
 				return
 			}

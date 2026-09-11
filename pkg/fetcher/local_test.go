@@ -129,14 +129,14 @@ func TestCopyFile_LargeFile(t *testing.T) {
 }
 
 // ============================================================================
-// Tests: copyDir()
+// Tests: CopyDir()
 // ============================================================================
 
 func TestCopyDir_Empty(t *testing.T) {
 	srcDir := t.TempDir()
 	destDir := t.TempDir()
 
-	err := copyDir(srcDir, destDir)
+	err := CopyDir(srcDir, destDir)
 	require.NoError(t, err)
 
 	// Destination should exist but be empty
@@ -154,7 +154,7 @@ func TestCopyDir_DeepNesting(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(deepPath, "deep.txt"), []byte("deep"), 0644))
 
 	destDir := t.TempDir()
-	err := copyDir(srcDir, destDir)
+	err := CopyDir(srcDir, destDir)
 	require.NoError(t, err)
 
 	// Verify deep file was copied

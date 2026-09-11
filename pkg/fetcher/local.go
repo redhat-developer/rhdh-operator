@@ -19,13 +19,13 @@ func copyLocal(src string, destDir string) error {
 	}
 
 	if info.IsDir() {
-		return copyDir(src, destDir)
+		return CopyDir(src, destDir)
 	}
 	return copyFile(src, filepath.Join(destDir, filepath.Base(src)))
 }
 
-// copyDir recursively copies a directory
-func copyDir(src, dest string) error {
+// CopyDir recursively copies a directory
+func CopyDir(src, dest string) error {
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
@@ -39,7 +39,7 @@ func copyDir(src, dest string) error {
 			if err := os.MkdirAll(destPath, 0755); err != nil {
 				return err
 			}
-			if err := copyDir(srcPath, destPath); err != nil {
+			if err := CopyDir(srcPath, destPath); err != nil {
 				return err
 			}
 		} else {
