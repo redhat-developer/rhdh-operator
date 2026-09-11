@@ -20,16 +20,14 @@ spec:
           env:
             - name: OPERATOR_NAME
               value: rhdh-operator
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+            - name: OPERATOR_DP_PROCESSING
+              value: "{{OPERATOR_DP_PROCESSING}}"
             - name: RELATED_IMAGE_postgresql
               value: quay.io/fedora/postgresql-15:latest
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh-community/rhdh:next
-            - name: INSTALL_DP_IMAGE
-              value: quay.io/gazarenk/install-plugins:skopeo
+            - name: RELATED_IMAGE_plugin_installer
+              value: "{{RELATED_IMAGE_plugin_installer}}"
           volumeMounts:
             - mountPath: /default-config/flavours/intelligent-assistant
               name: flavour-intelligent-assistant-config

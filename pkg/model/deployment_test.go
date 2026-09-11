@@ -68,7 +68,7 @@ func TestOverrideBackstageImage(t *testing.T) {
 	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.Equal(t, 2, len(deployment.podSpec().Containers))
 	assert.Equal(t, "dummy", deployment.container().Image)
-	// With OPERATOR_DP_PROCESSING=true, init container uses INSTALL_DP_IMAGE (set in model_tests.go)
+	// With OPERATOR_DP_PROCESSING=true, init container uses RELATED_IMAGE_plugin_installer (set in model_tests.go)
 	// With OPERATOR_DP_PROCESSING=false, init container uses RELATED_IMAGE_backstage
 	if IsOperatorDPProcessing() {
 		assert.Equal(t, "test-install-dp-image", deployment.podSpec().InitContainers[0].Image)

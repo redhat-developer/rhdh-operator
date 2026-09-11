@@ -35,7 +35,7 @@ make install-dp-build
 make install-dp-push
 
 # Or build with custom image name
-make install-dp-build INSTALL_DP_IMAGE=myregistry/my-plugin-installer:v1
+make install-dp-build RELATED_IMAGE_plugin_installer=myregistry/my-plugin-installer:v1
 
 # Build oras variant manually
 docker build -f plugin-installer/Dockerfile.oras -t myregistry/plugin-installer:oras .

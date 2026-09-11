@@ -94,6 +94,8 @@ make [PROFILE=<configuration-profile>] [install] run
 
 You can use it for manual and automated ([such as](../integration_tests/README.md) `USE_EXISTING_CLUSTER=true make integration-test`) tests efficiently, but, note, RBAC is not working with this kind of deployment.
 
+**Note:** The DevHubPluginCatalog controller is disabled by default for local development (`DISABLE_CATALOG_CONTROLLER=true`) to avoid conflicts with an already deployed operator's catalog ConfigMap.
+
 ### Deploy operator to the real cluster
 
 #### Configuration Profiles
