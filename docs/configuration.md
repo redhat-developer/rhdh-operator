@@ -810,7 +810,7 @@ data:
 Mount the credentials and set environment variables for the `install-dynamic-plugins` init container:
 
 ```yaml
-apiVersion: rhdh.redhat.com/v1alpha3
+apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
   name: my-backstage
