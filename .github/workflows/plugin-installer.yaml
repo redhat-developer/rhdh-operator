@@ -42,6 +42,9 @@ jobs:
       - name: Run tests
         run: make dp-installer-test
 
+      - name: Build image (verify Dockerfile)
+        run: docker build -f plugin-installer/Dockerfile .
+
   build:
     name: Build image
     runs-on: ubuntu-latest
