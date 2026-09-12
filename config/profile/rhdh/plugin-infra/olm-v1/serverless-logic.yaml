@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-serverless-logic
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: logic-operator-installer
+  namespace: openshift-serverless-logic
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: logic-operator-installer-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: plugin-infra-olm-v1-installer-role
+subjects:
+  - kind: ServiceAccount
+    name: logic-operator-installer
+    namespace: openshift-serverless-logic
+---
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterExtension
+metadata:
+  name: logic-operator
+spec:
+  namespace: openshift-serverless-logic
+  serviceAccount:
+    name: logic-operator-installer
+  source:
+    sourceType: Catalog
+    catalog:
+      packageName: logic-operator
+      channels:
+        - stable
+      selector:
+        matchLabels:
+          olm.operatorframework.io/metadata.name: openshift-redhat-operators
+  install:
+    preflight:
+      crdUpgradeSafety:
+        enforcement: None

@@ -13,6 +13,22 @@ There are three methods to install GitOps/Pipelines Operator
 Refer to the `RHDH helper script` section in [orchestrator guide](orchestrator.md) and set the `--with-cicd` flag to
 true when running the script.
 
+On OpenShift clusters with OLM v1, the script auto-detects the OLM version and installs GitOps and Pipelines via
+`ClusterExtension` manifests under `config/profile/rhdh/plugin-infra/olm-v1/`. Verify installation with:
+
+```bash
+oc get clusterextension serverless-operator logic-operator openshift-gitops-operator openshift-pipelines-operator
+```
+
+On OLM v0 clusters, verify Subscriptions instead:
+
+```bash
+oc get subscription -A | egrep 'serverless|logic|gitops|pipelines'
+```
+
+Note: OLM v1 Pipelines `ClusterExtension` uses channel `pipelines-1.21` because newer bundle channels fail OLM v1
+bundle validation (duplicate CRD). The OLM v0 Subscription path is unchanged.
+
 ### Method 2: Install the Operators from Demo Charts
 
 You can use the Janus IDP Demo repository to install the `Red Hat OpenShift Pipelines` and `Red Hat OpenShift GitOps`

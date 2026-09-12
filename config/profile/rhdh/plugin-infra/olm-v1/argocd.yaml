@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-gitops-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitops-operator-installer
+  namespace: openshift-gitops-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gitops-operator-installer-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: plugin-infra-olm-v1-installer-role
+subjects:
+  - kind: ServiceAccount
+    name: gitops-operator-installer
+    namespace: openshift-gitops-operator
+---
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterExtension
+metadata:
+  name: openshift-gitops-operator
+spec:
+  namespace: openshift-gitops-operator
+  serviceAccount:
+    name: gitops-operator-installer
+  source:
+    sourceType: Catalog
+    catalog:
+      packageName: openshift-gitops-operator
+      channels:
+        - latest
+      selector:
+        matchLabels:
+          olm.operatorframework.io/metadata.name: openshift-redhat-operators
+  install:
+    preflight:
+      crdUpgradeSafety:
+        enforcement: None
