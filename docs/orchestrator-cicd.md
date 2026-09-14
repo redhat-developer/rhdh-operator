@@ -37,7 +37,7 @@ this [discussion](https://github.com/argoproj/argo-cd/discussions/8674#discussio
 3. Install the OpenShift Pipelines operator:
 
     ```bash
-    helm upgrade --install orchestrator-pipelines pipelines-operator/ -f pipelines-operator/values.yaml -n orchestrator-gitops --create-namespace --set operator.channel=pipelines-1.17
+    helm upgrade --install orchestrator-pipelines pipelines-operator/ -f pipelines-operator/values.yaml -n orchestrator-gitops --create-namespace --set operator.channel=pipelines-1.21
     ```
 
 #### Install OpenShift GitOps Operator
