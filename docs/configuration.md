@@ -229,6 +229,8 @@ For example, Backstage CR named **mybackstage** will create K8s Deployment resou
     - The placeholder value in `podSelector.matchLabels` (`backstage` vs `backstage-psql`) determines whether a policy targets the backend or the database at runtime
     - DB-scoped policies are filtered out when `spec.database.enableLocalDb` is `false`
     - When local DB is disabled, the `allow-psql-egress` policy allows egress on port 5432 to any destination (for external databases)
+    - The `allow-redis-egress` policy allows egress on port 6379 TCP to any destination (Redis is not deployed by the operator; users bring their own)
+    - The `allow-metrics-ingress` policy allows ingress on port 9464 from `openshift-monitoring`, `openshift-user-workload-monitoring`, GKE GMP namespaces (`gmp-system`, `gke-gmp-system`), and `monitoring` (kube-prometheus-stack convention)
     - On OpenShift, the `allow-router-ingress` policy's `namespaceSelector` is set to `policy-group.network.openshift.io/ingress: ""`
 
 ### Multi objects
