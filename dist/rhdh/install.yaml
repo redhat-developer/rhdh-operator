@@ -3214,6 +3214,27 @@ data:
               protocol: TCP
 
     ---
+    # Redis is part of the recommended checklist for production deployments
+    # (see https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.10/html/setting_up_and_configuring_your_first_red_hat_developer_hub_instance/checklist-to-run-your-first-rhdh-instance-in-production_setting-up-and-configuring-your-first-red-hat-developer-hub-instance).
+    # RHDH does not deploy Redis OOTB; users bring their own, which could be in the same
+    # namespace, a different namespace, or an external managed service. The rule therefore
+    # has no pod or namespace selector.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-redis-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - port: 6379
+              protocol: TCP
+
+    ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
@@ -3252,6 +3273,10 @@ data:
                 matchLabels:
                   # OpenShift platform monitoring
                   kubernetes.io/metadata.name: openshift-monitoring
+            - namespaceSelector:
+                matchLabels:
+                  # OpenShift user workload monitoring (scrapes user-deployed ServiceMonitors)
+                  kubernetes.io/metadata.name: openshift-user-workload-monitoring
             - namespaceSelector:
                 matchLabels:
                   # GKE Standard: Google Managed Prometheus
