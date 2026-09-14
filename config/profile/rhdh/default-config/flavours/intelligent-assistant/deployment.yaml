@@ -24,8 +24,11 @@ spec:
       containers:
         # Lightspeed Core Backend
         - name: lightspeed-core
-          image: quay.io/lightspeed-core/lightspeed-stack:0.5.3
+          image: quay.io/lightspeed-core/lightspeed-stack:dev-20260824-cbd182b # TODO: Update to 0.7.x release tag when available (by FF)
           imagePullPolicy: Always
+          args:
+            - --synthesized-config-output
+            - /tmp/.generated/run.yaml
           ports:
             - containerPort: 8080
               name: lcs-backend
@@ -37,6 +40,15 @@ spec:
             limits:
               cpu: 1000m
               memory: 2Gi
+          env:
+            - name: KV_STORE_PATH
+              value: /tmp/kvstore.db
+            - name: SQL_STORE_PATH
+              value: /tmp/sql_store.db
+            - name: SQLITE_STORE_DIR
+              value: /tmp/llama-stack-files
+            - name: OTEL_SDK_DISABLED
+              value: "true"
           volumeMounts:
             - mountPath: /tmp/data/feedback
               name: shared-storage
