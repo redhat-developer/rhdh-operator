@@ -67,8 +67,6 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: lightspeed-okp-{{backstage-name}}
-  annotations:
-    rhdh.redhat.com/platform: "ocp"
 spec:
   to:
     kind: Service
