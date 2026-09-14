@@ -132,8 +132,6 @@ data:
                 Citing sources is not always required because citations are handled externally.
                 Never include any citation that is in the form '<| file-id |>'.
     inference:
-      default_model: gpt-3.5-turbo
-      default_provider: openai
       providers:
         - type: sentence_transformers
         # - type: vllm
@@ -246,13 +244,15 @@ data:
         url: 'http://localhost:7007/api/mcp-actions/v1'
         authorization_headers:
           Authorization: 'client'
-#    rag:
-#      tool:
-#        - okp
-#    okp:
-#      rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'
-#      offline: true
-#      chunk_filter_query: 'product:*developer_hub*'
+    {{- if eq .Rhdh.Runtime.Platform "ocp"}}
+    rag:
+      tool:
+        - okp
+    okp:
+      rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'
+      offline: true
+      chunk_filter_query: 'product:*developer_hub*'
+    {{- end}}
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -395,7 +395,7 @@ data:
     Use the previous chat history to interact and help the user.
     """
     
-    # ${{message}} is f-string-escaped so the profile runtime value is ${message}
+    # ${{ "{{" }}message{{ "}}" }} is f-string-escaped so the profile runtime value is ${message}
     # (LCORE QuestionValidity Template). Sync rewrites it to ${message} in YAML.
     QUESTION_VALIDATOR_PROMPT_TEMPLATE = f"""
     Instructions:
@@ -445,11 +445,11 @@ data:
     Response: {SUBJECT_ALLOWED}
     
     Question:
-    ${{message}}
+    ${{ "{{" }}message{{ "}}" }}
     Response:
     """
     
-    # {{query}} is escaped because it will be replaced as a parameter at time of use
+    # {{ "{{" }}query{{ "}}" }} is escaped because it will be replaced as a parameter at time of use
     TOPIC_SUMMARY_PROMPT_TEMPLATE = """
     Instructions:
     - You are a topic summarizer

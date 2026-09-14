@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/redhat-developer/rhdh-operator/api"
-	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+	"github.com/redhat-developer/rhdh-operator/pkg/template"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -284,7 +284,11 @@ func TestTemplateSubstitution_DefaultConfig(t *testing.T) {
 	t.Setenv("LOCALBIN", testDataDir)
 
 	// Set template data
-	utils.SetTemplateData("test-backstage", "test-ns")
+	template.SetTemplateData(
+		&template.MockBackstageCR{Name: "test-backstage", Namespace: "test-ns"},
+		&template.MockPlatform{Extension: "kubernetes"},
+		&template.MockExternalConfig{IngressDomain: ""},
+	)
 
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))
@@ -309,7 +313,11 @@ func TestTemplateSubstitution_Flavour(t *testing.T) {
 	t.Setenv("LOCALBIN", testDataDir)
 
 	// Set template data
-	utils.SetTemplateData("my-instance", "my-ns")
+	template.SetTemplateData(
+		&template.MockBackstageCR{Name: "my-instance", Namespace: "my-ns"},
+		&template.MockPlatform{Extension: "kubernetes"},
+		&template.MockExternalConfig{IngressDomain: ""},
+	)
 
 	scheme := runtime.NewScheme()
 	require.NoError(t, corev1.AddToScheme(scheme))

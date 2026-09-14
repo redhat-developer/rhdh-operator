@@ -108,14 +108,8 @@ func ReadYamls(manifest []byte, platformPatch []byte, scheme runtime.Scheme) ([]
 			mergedDoc = m
 		}
 
-		// Apply template substitution after merging
-		mergedBytes, err := ApplyTemplate([]byte(mergedDoc))
-		if err != nil {
-			return nil, fmt.Errorf("failed to apply template: %w", err)
-		}
-
 		u := &unstructured.Unstructured{}
-		if err := yaml.Unmarshal(mergedBytes, &u.Object); err != nil {
+		if err := yaml.Unmarshal([]byte(mergedDoc), &u.Object); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal YAML to unstructured: %w", err)
 		}
 
@@ -144,24 +138,6 @@ func ReadYamls(manifest []byte, platformPatch []byte, scheme runtime.Scheme) ([]
 	}
 
 	return objects, nil
-}
-
-func ReadYamlFiles(path string, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
-	fpath := filepath.Clean(path)
-	if _, err := os.Stat(fpath); err != nil {
-		return nil, err
-	}
-	conf, err := os.ReadFile(fpath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read YAML file: %w", err)
-	}
-
-	// Read platform patch if exists
-	pp, err := ReadPlatformPatch(fpath, platformExt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read platform patch: %w", err)
-	}
-	return ReadYamls(conf, pp, scheme)
 }
 
 // ReadPlatformPatch reads the platform-specific patch file if it exists

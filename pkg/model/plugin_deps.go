@@ -91,8 +91,8 @@ func ReadPluginDeps(rootDir, bsName, bsNamespace string, enabled []string, platf
 
 		// Perform substitutions
 		// DEPRECATED: {{backstage-name}} and {{backstage-ns}} syntax will be replaced with
-		// Go template syntax {{.Backstage.Name}} and {{.Backstage.Namespace}} in a future release.
-		// See utils.ApplyTemplate() for the new implementation.
+		// Go template syntax {{.Rhdh.Name}} and {{.Rhdh.Namespace}} in a future release.
+		// See template.ApplyTemplate() for the new implementation.
 		modifiedContent := strings.ReplaceAll(string(content), "{{backstage-name}}", bsName)
 		modifiedContent = strings.ReplaceAll(modifiedContent, "{{backstage-ns}}", bsNamespace)
 
