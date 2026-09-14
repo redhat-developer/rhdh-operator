@@ -431,6 +431,73 @@ test_termination_msg_on_missing_input() {
 }
 
 # ============================================================================
+# Tests: plugin name extraction
+# ============================================================================
+
+extract_plugin_name() {
+    local url="$1"
+    # Extract plugin name from URL (same logic as in install_plugins.sh line 643)
+    # Order: remove digest, extract last path component, then remove version
+    echo "${url}" | sed 's|oci://||' | sed 's|https\?://||' | sed 's|file://||' | sed 's|file:||' | sed 's|@sha256:.*||' | awk -F'/' '{print $NF}' | sed 's|@.*||' | sed 's|:.*||'
+}
+
+test_plugin_name_oci_with_tag_and_digest() {
+    local url="oci://ghcr.io/org/repo/backstage-plugin-foo:v1.0.0@sha256:abc123def456"
+    local result
+    result=$(extract_plugin_name "${url}")
+    assert_equals "backstage-plugin-foo" "${result}" "OCI URL with tag and digest"
+}
+
+test_plugin_name_oci_with_tag_only() {
+    local url="oci://ghcr.io/org/repo/backstage-plugin-bar:latest"
+    local result
+    result=$(extract_plugin_name "${url}")
+    assert_equals "backstage-plugin-bar" "${result}" "OCI URL with tag only"
+}
+
+test_plugin_name_oci_with_digest_only() {
+    local url="oci://ghcr.io/org/repo/backstage-plugin-baz@sha256:abc123def456"
+    local result
+    result=$(extract_plugin_name "${url}")
+    assert_equals "backstage-plugin-baz" "${result}" "OCI URL with digest only"
+}
+
+test_plugin_name_oci_no_tag_or_digest() {
+    local url="oci://ghcr.io/org/repo/backstage-plugin-qux"
+    local result
+    result=$(extract_plugin_name "${url}")
+    assert_equals "backstage-plugin-qux" "${result}" "OCI URL with no tag or digest"
+}
+
+test_plugin_name_oci_with_port() {
+    local url="oci://registry.example.com:5000/path/to/my-plugin:v2.0.0@sha256:123abc"
+    local result
+    result=$(extract_plugin_name "${url}")
+    assert_equals "my-plugin" "${result}" "OCI URL with registry port"
+}
+
+test_plugin_name_http_url() {
+    local url="https://example.com/path/to/plugin-archive.tgz"
+    local result
+    result=$(extract_plugin_name "${url}")
+    assert_equals "plugin-archive.tgz" "${result}" "HTTP URL"
+}
+
+test_plugin_name_npm_scoped_with_version() {
+    local url="@backstage/plugin-catalog@1.2.3"
+    local result
+    result=$(extract_plugin_name "${url}")
+    assert_equals "plugin-catalog" "${result}" "NPM scoped package with version"
+}
+
+test_plugin_name_npm_unscoped_with_version() {
+    local url="my-plugin@2.0.0"
+    local result
+    result=$(extract_plugin_name "${url}")
+    assert_equals "my-plugin" "${result}" "NPM unscoped package with version"
+}
+
+# ============================================================================
 # Tests: validate_plugin_artifact()
 # ============================================================================
 
@@ -571,6 +638,18 @@ main() {
     run_test "record failure creates file" test_record_failure_creates_file
     run_test "record only first failure" test_record_failure_only_first
     run_test "termination msg on missing input" test_termination_msg_on_missing_input
+    echo ""
+
+    # plugin name extraction tests
+    echo "--- plugin name extraction tests ---"
+    run_test "OCI with tag and digest" test_plugin_name_oci_with_tag_and_digest
+    run_test "OCI with tag only" test_plugin_name_oci_with_tag_only
+    run_test "OCI with digest only" test_plugin_name_oci_with_digest_only
+    run_test "OCI no tag or digest" test_plugin_name_oci_no_tag_or_digest
+    run_test "OCI with registry port" test_plugin_name_oci_with_port
+    run_test "HTTP URL" test_plugin_name_http_url
+    run_test "NPM scoped with version" test_plugin_name_npm_scoped_with_version
+    run_test "NPM unscoped with version" test_plugin_name_npm_unscoped_with_version
     echo ""
 
     # validate_plugin_artifact tests

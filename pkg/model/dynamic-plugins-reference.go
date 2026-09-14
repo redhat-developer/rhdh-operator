@@ -103,6 +103,9 @@ func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (strin
 			continue
 		}
 		if plugin.Name() == pluginName {
+			if !strings.HasPrefix(plugin.Package, ociPrefix) {
+				return "", fmt.Errorf("cannot resolve {{inherit}} reference: plugin %q has non-OCI package URL %q; {{inherit}} only supports OCI references", pluginName, plugin.Package)
+			}
 			fullURL := plugin.Package
 
 			// If user specified !plugin-path, use it; otherwise use full default URL
@@ -139,6 +142,9 @@ func resolveRefReference(packageURL string, basePlugins []DynaPlugin) (string, e
 			continue
 		}
 		if plugin.Name() == refName {
+			if !strings.HasPrefix(plugin.Package, ociPrefix) {
+				return "", fmt.Errorf("cannot resolve ref:// reference: plugin %q has non-OCI package URL %q; ref:// only supports OCI references", refName, plugin.Package)
+			}
 			return plugin.Package, nil
 		}
 	}

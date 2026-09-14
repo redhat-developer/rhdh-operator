@@ -100,7 +100,7 @@ func TestIfEmptyObjectIsValid(t *testing.T) {
 		t.Logf("DbService wrapper exists, service: %v, Object(): %v", dbSvc.(*DbService).service, dbSvc.Object())
 	}
 
-	assert.Equal(t, 2, len(objs), "Should have 2 objects to apply (deployment + service)")
+	assert.Equal(t, 3, len(objs), "Should have 3 objects to apply (deployment + networkpolicy + service)")
 
 }
 
@@ -125,7 +125,7 @@ func TestAddToModel(t *testing.T) {
 	assert.NotNil(t, model.GetRuntimeObjects())
 
 	// With the new map-based API, only objects to be applied are in the map
-	assert.Equal(t, 2, len(model.GetRuntimeObjects()), "Should have 2 objects to apply (deployment + service)")
+	assert.Equal(t, 3, len(model.GetRuntimeObjects()), "Should have 3 objects to apply (deployment + networkpolicy + service)")
 
 	// Verify deployment is in the map
 	deployment := model.GetRuntimeObject(DeploymentKey)

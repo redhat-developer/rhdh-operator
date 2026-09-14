@@ -37,6 +37,7 @@ const maxK8sResourceNameLength = 63
 const (
 	BackstageAppLabel      = "app.kubernetes.io/name"
 	BackstageAppName       = "backstage"
+	BackstageDBAppName     = "backstage-psql"
 	BackstageInstanceLabel = "app.kubernetes.io/instance"
 )
 
@@ -81,11 +82,11 @@ func GenerateVolumeNameFromCmOrSecret(cmOrSecretName string) string {
 }
 
 func BackstageAppLabelValue(backstageName string) string {
-	return fmt.Sprintf("backstage-%s", backstageName)
+	return fmt.Sprintf("%s-%s", BackstageAppName, backstageName)
 }
 
 func BackstageDbAppLabelValue(backstageName string) string {
-	return fmt.Sprintf("backstage-psql-%s", backstageName)
+	return fmt.Sprintf("%s-%s", BackstageDBAppName, backstageName)
 }
 
 // ReadYamls reads and unmarshalls yaml with potentially multiple objects of the same type
@@ -253,6 +254,22 @@ func BoolEnvVar(envvar string, def bool) bool {
 		if ret, err := strconv.ParseBool(envValue); err == nil {
 			return ret
 		}
+	}
+	return def
+}
+
+func IntEnvVar(envvar string, def int) int {
+	if envValue, ok := os.LookupEnv(envvar); ok {
+		if ret, err := strconv.Atoi(envValue); err == nil {
+			return ret
+		}
+	}
+	return def
+}
+
+func StringEnvVar(envvar string, def string) string {
+	if envValue, ok := os.LookupEnv(envvar); ok {
+		return envValue
 	}
 	return def
 }

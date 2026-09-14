@@ -3,6 +3,7 @@ package v1alpha5
 import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 )
 
@@ -366,10 +367,10 @@ type TLS struct {
 }
 
 // Flavour represents a pre-configured template that extends the default configuration.
-// Flavours provide domain-specific customizations (e.g., Orchestrator, Lightspeed)
+// Flavours provide domain-specific customizations (e.g., Orchestrator, Intelligent Assistant)
 // while falling back to base defaults for everything else.
 type Flavour struct {
-	// Name of the flavour to enable (e.g., "orchestrator", "lightspeed")
+	// Name of the flavour to enable (e.g., "orchestrator", "intelligent-assistant")
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
@@ -379,10 +380,6 @@ type Flavour struct {
 	// +optional
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Backstage{}, &BackstageList{})
 }
 
 // IsLocalDbEnabled returns true if Local database is configured and enabled
@@ -410,4 +407,11 @@ func (s *BackstageSpec) IsAuthSecretSpecified() bool {
 // Returns true only when spec.monitoring.enabled is set to true in the CR
 func (s *BackstageSpec) IsMonitoringEnabled() bool {
 	return s.Monitoring.Enabled
+}
+
+func init() {
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &Backstage{}, &BackstageList{})
+		return nil
+	})
 }

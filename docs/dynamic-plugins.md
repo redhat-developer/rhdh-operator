@@ -43,46 +43,143 @@ spec:
 
 TODO: Dynamic plugins can be configured to use container registries for authentication and image pulling. This section should cover the configuration options available for container registry integration with dynamic plugins.
 
-## Catalog Index Configuration
+## Plugin Catalog Configuration
 
-The operator supports loading default plugin configurations from an OCI container image (catalog index). For general information about how the catalog index works, see [Using a Catalog Index Image for Default Plugin Configurations](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-a-catalog-index-image-for-default-plugin-configurations).
+The operator supports loading default plugin configurations from OCI container images (plugin catalogs). For general information about how the catalog index works, see [Using a Catalog Index Image for Default Plugin Configurations](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-a-catalog-index-image-for-default-plugin-configurations).
 
-By default, the `rhdh` profile of operator [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable in the RHDH `install-dynamic-plugins` init container.
-To use a different catalog index image, such as a newer version or a mirrored image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for a complete example.
+### DevHubPluginCatalog Resources
 
-### Extra catalog index images
+**Available from operator version 2.0**
 
-In addition to the primary catalog index image, you can configure extra catalog index images using the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. This allows loading plugin configurations from multiple catalog index images. See [Using extra catalog index images](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-extra-catalog-index-images) for more details on how RHDH handles this environment variables.
+Plugin catalogs are defined using `DevHubPluginCatalog` resources in the operator namespace. The operator fetches catalogs from OCI registries, merges them, and makes the configuration available to Backstage instances.
 
-The value is a comma-separated list of entries. Each entry supports two forms:
-- **`name=image_ref`**: Assigns an explicit name to the catalog index image, which controls the extraction subdirectory under `/extensions/extra/<name>/`.
-- **`image_ref`**: A direct image reference without a name; the extraction directory is auto-generated from the image reference.
+**Default Catalog**: The operator automatically includes the default RHDH plugin catalog (`quay.io/rhdh/plugin-catalog-index:<version>`).
 
-To configure extra catalog index images, use the `extraEnvs` field in your Backstage CR:
+#### Basic Example
 
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha5
-kind: Backstage
+kind: DevHubPluginCatalog
 metadata:
-  name: my-backstage
+  name: my-catalog
+  namespace: rhdh-operator  # Must be in operator namespace
 spec:
-  application:
-    extraEnvs:
-      envs:
-        - name: EXTRA_CATALOG_INDEX_IMAGES
-          value: "rhdh-community=quay.io/rhdh-community/plugin-catalog-index:1.10,registry.example.com/rhdh-catalog:latest"
-          containers:
-            - install-dynamic-plugins
+  source:
+    ref: oci://quay.io/my-org/plugin-catalog:v1.0
+```
+
+#### Adding Multiple Catalogs
+
+Create additional `DevHubPluginCatalog` resources to add more plugin sources. The operator merges all catalogs automatically.
+
+**Merge Strategy**:
+- Plugin entries are **appended** in catalog processing order (alphabetical by resource name)
+- Plugin objects are **not recursively merged** - each plugin entry is treated as a complete unit
+- **Duplicate plugin names fail reconciliation** - if the same plugin name appears in multiple catalogs, the operator reports an error rather than silently overriding
+
+This means you cannot override a plugin's configuration by defining it in a second catalog. To customize a plugin from the default catalog, exclude it and provide your own complete plugin entry.
+
+#### Private Registry Authentication
+
+For private registries, create a Secret with registry credentials in the operator namespace:
+
+```bash
+kubectl create secret docker-registry private-registry-creds \
+  --namespace=rhdh-operator \
+  --docker-server=registry.example.com \
+  --docker-username=YOUR_USERNAME \
+  --docker-password=YOUR_PASSWORD
+```
+
+Then reference it in the DevHubPluginCatalog:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: private-catalog
+  namespace: rhdh-operator
+spec:
+  source:
+    ref: oci://registry.example.com/rhdh/plugin-catalog:v1.0
+    pullSecret:
+      name: private-registry-creds
+```
+
+The Secret must be of type `kubernetes.io/dockerconfigjson` and exist in the operator namespace.
+
+#### Custom CA Certificate
+
+For registries using self-signed certificates or internal CAs, create a ConfigMap with the CA certificate in the operator namespace:
+
+```bash
+kubectl create configmap internal-ca \
+  --namespace=rhdh-operator \
+  --from-file=ca.crt=/path/to/ca-certificate.pem
+```
+
+Then reference it in the DevHubPluginCatalog:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: internal-catalog
+  namespace: rhdh-operator
+spec:
+  source:
+    ref: oci://internal-registry.corp.example.com/rhdh/plugin-catalog:latest
+    certificateAuthority:
+      name: internal-ca
+      key: ca.crt          # Optional, defaults to "ca.crt"
+```
+
+#### Skip TLS Verification (Development Only)
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: dev-catalog
+  namespace: rhdh-operator
+spec:
+  source:
+    ref: oci://dev-registry.local:5000/rhdh/plugin-catalog:dev
+    skipTLSVerify: true
+```
+
+#### Proxy Settings
+
+The operator respects standard proxy environment variables when fetching catalogs:
+
+- `HTTP_PROXY` / `http_proxy` - proxy for HTTP requests
+- `HTTPS_PROXY` / `https_proxy` - proxy for HTTPS requests
+- `NO_PROXY` / `no_proxy` - comma-separated list of hosts to bypass proxy
+
+These variables should be set on the operator deployment. For environments with HTTPS-inspecting proxies that use a corporate CA, combine proxy settings with `certificateAuthority` configuration.
+
+#### Manual Refresh
+
+To manually trigger a catalog refresh (e.g., after pushing a new image with the same tag):
+
+```bash
+kubectl annotate devhubplugincatalog my-catalog rhdh.redhat.com/refresh=$(date +%s) --overwrite
 ```
 
 ### Extensions Catalog Entities
 
-Starting from version 1.9, the `rhdh` profile of the operator instructs the RHDH `install-dynamic-plugins` init container to extract catalog entities from the catalog index image to a new `/extensions` volume mount by default.
+Starting from version 1.9, the `rhdh` profile of the operator extracts catalog entities from the catalog index image to a new `/extensions` volume mount by default.
 This allows the extensions backend providers to automatically discover plugin metadata for display in the RHDH Extensions UI.
 
-The extraction directory can be configured via the `CATALOG_ENTITIES_EXTRACT_DIR` environment variable in the `install-dynamic-plugins` init container.
-
 More details in [Catalog Entities Extraction](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#catalog-entities-extraction).
+
+### Init-container processing Mode
+
+When `OPERATOR_DP_PROCESSING=false`, the RHDH `install-dynamic-plugins` init container handles catalog fetching using environment variables.
+
+By default, the `rhdh` profile [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable. To use a different catalog index image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for an example.
+
+For multiple catalog sources in this mode, use the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. See [Using extra catalog index images](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-extra-catalog-index-images) for details.
 
 ## Supported Package URL Formats
 
@@ -97,38 +194,64 @@ More details in [Catalog Entities Extraction](https://github.com/redhat-develope
 
 ## Plugin URL References
 
-The operator optionally supports special URL reference syntax in plugin package URLs, allowing users to reference plugins from the default configuration by name.
-
-TODO: document Operator Dynamic Plugins processing mode
+The operator supports special URL reference syntax in plugin package URLs, allowing users to reference plugins from the default configuration by name instead of specifying a full OCI image reference. Both reference types only resolve to base plugins with `oci://` package URLs.
 
 **Operator behavior:**
 - The operator resolves all references during ConfigMap merge (before passing to the init container)
 - If a reference cannot be resolved, the operator returns an error and the Backstage CR will not reconcile
-- Both reference types use **name-based matching** - only the plugin name matters for lookup
+
+### How name matching works
+
+Both `ref://` and `{{inherit}}` match against the **plugin name** extracted from the base plugin's OCI URL. The plugin name is the last path component of the OCI reference, stripped of any tag or digest. The registry and path are not part of the match.
+
+For example, given this base plugin in the default configuration:
+
+```
+oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
+      └─────┘ └──┘ └──────────────────────┘ └───────────┘
+      registry path       plugin name           digest
+```
+
+The **plugin name** is `backstage-plugin-catalog`: the last path component of the OCI reference, with any tag (`:v1.0`) or digest (`@sha256:...`) stripped. The registry (`quay.io`) and path (`rhdh`) are ignored entirely.
 
 ### Ref Reference (`ref://`)
 
-Look up a plugin by name and use its full package URL from the default configuration.
+Use `ref://` followed by the plugin name. The operator looks up the name in the default plugin list and substitutes the full OCI URL.
 
 ```yaml
+# Default configuration contains:
+#   oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
+
 plugins:
-  - package: "ref://backstage-plugin-catalog"
+  - package: ref://backstage-plugin-catalog
+    # → resolves to: oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
     pluginConfig:
       # your config overrides
 ```
 
-### Inherit Reference (`:{{inherit}}`)
+### Inherit Reference (`{{inherit}}`)
 
-Look up a plugin by name and use its full package URL from the default configuration. The registry/path in your URL is ignored - only the plugin name matters for matching.
+Write an `oci://` URL with `:{{inherit}}` in place of the tag or digest. The operator extracts the plugin name from your URL, looks it up in the default plugin list, and substitutes the full OCI URL from the match. The registry and path you write are ignored; only the plugin name (last path component) is used for lookup.
 
 ```yaml
+# Default configuration contains:
+#   oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
+
 plugins:
-  # These all match the same base plugin (backstage-plugin-catalog):
-  - package: "oci://quay.io/rhdh/backstage-plugin-catalog:{{inherit}}"
-  - package: "oci://any-registry/path/backstage-plugin-catalog:{{inherit}}"
+  # All three resolve to the same base plugin (matched by name "backstage-plugin-catalog"):
+  - package: oci://quay.io/rhdh/backstage-plugin-catalog:{{inherit}}
+  - package: oci://any-registry/different-path/backstage-plugin-catalog:{{inherit}}
+  - package: oci://localhost:5000/backstage-plugin-catalog:{{inherit}}
+  # → all resolve to: oci://quay.io/rhdh/backstage-plugin-catalog@sha256:abc123
 ```
 
-**Since v2.0.0:** Both `ref://` and `:{{inherit}}` use name-based matching (plugin name only, registry/path ignored). This behavior is slightly different from what is described in [OCI Package Version Inheritance](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#oci-package-version-inheritance) which documents the RHDH init-container behavior (full URL matching).
+### Choosing between `ref://` and `{{inherit}}`
+
+Both produce the same result. `ref://` is shorter. `{{inherit}}` is useful when you want to keep the `oci://` URL structure visible in your configuration.
+
+**`ref://` matching is consistent** between the operator and the init container: both use name-based matching (plugin name only, registry/path ignored).
+
+**`{{inherit}}` matching differs.** The operator uses name-based matching (same as `ref://`), but the init container uses full-URL key matching (image reference + plugin path). See [OCI Package Version Inheritance](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#oci-package-version-inheritance) for the init-container behavior.
 
 ## Dynamic plugins dependency management
 

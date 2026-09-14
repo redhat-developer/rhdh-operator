@@ -132,7 +132,7 @@ func mergeDynamicPlugins(sources []configSource, scheme runtime.Scheme, _ string
 // mergeMultiObjectConfigs handles data files that become separate ConfigMaps/Secrets.
 // Each flavour creates its own object with a unique name.
 // Base config objects keep their original names.
-// Flavour config objects are prefixed with the flavour name (e.g., "lightspeed-app-config").
+// Flavour config objects are prefixed with the flavour name (e.g., "intelligent-assistant-app-config").
 func mergeMultiObjectConfigs(sources []configSource, scheme runtime.Scheme, _ string) ([]client.Object, error) {
 	if len(sources) == 0 {
 		return []client.Object{}, nil

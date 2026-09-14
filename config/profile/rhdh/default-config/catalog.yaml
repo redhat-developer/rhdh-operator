@@ -1,0 +1,8 @@
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: DevHubPluginCatalog
+metadata:
+  name: primary-catalog
+spec:
+  source:
+    # Default value, patched with CATALOG_INDEX_IMAGE from Makefile at build time
+    ref: oci://quay.io/rhdh/plugin-catalog-index:next

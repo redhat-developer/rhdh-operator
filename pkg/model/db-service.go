@@ -27,7 +27,7 @@ func init() {
 }
 
 func DbServiceName(backstageName string) string {
-	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql")
+	return utils.GenerateRuntimeObjectName(backstageName, utils.BackstageDBAppName)
 }
 
 func (b *DbService) Object() runtime.Object {

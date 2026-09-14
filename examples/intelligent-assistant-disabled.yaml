@@ -1,8 +1,8 @@
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: Backstage
 metadata:
-  name: lightspeed-disabled
+  name: intelligent-assistant-disabled
 spec:
   flavours:
-    - name: lightspeed
+    - name: intelligent-assistant
       enabled: false

@@ -14,6 +14,7 @@
 # Global rule:
 *            @redhat-developer/rhdh-install
 
-# Lightspeed:
-/config/profile/rhdh/default-config/flavours/lightspeed @redhat-developer/rhdh-ai
-/examples/lightspeed*.yaml @redhat-developer/rhdh-ai
+# Intelligent Assistant:
+/config/profile/rhdh/default-config/flavours/intelligent-assistant @redhat-developer/rhdh-ai
+/examples/intelligent-assistant*.yaml @redhat-developer/rhdh-ai
+/docs/intelligent-assistant.md @redhat-developer/rhdh-ai

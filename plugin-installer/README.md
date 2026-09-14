@@ -11,7 +11,7 @@ This script downloads and extracts dynamic plugins to a specified directory. It 
 ### Pre-built Image
 
 ```
-quay.io/rhdh-community/plugin-installer:next
+quay.io/rhdh-community/rhdh-plugin-installer:next
 ```
 
 The image is based on Red Hat UBI 9 Micro with skopeo for OCI registry downloads.
@@ -35,7 +35,7 @@ make install-dp-build
 make install-dp-push
 
 # Or build with custom image name
-make install-dp-build INSTALL_DP_IMAGE=myregistry/my-plugin-installer:v1
+make install-dp-build RELATED_IMAGE_plugin_installer=myregistry/my-plugin-installer:v1
 
 # Build oras variant manually
 docker build -f plugin-installer/Dockerfile.oras -t myregistry/plugin-installer:oras .
@@ -273,7 +273,7 @@ NPM_AUTH_TOKEN=secret123 \
 ```bash
 docker run -v $(pwd)/packages.txt:/input/packages.txt \
            -v $(pwd)/plugins:/dynamic-plugins-root \
-           quay.io/rhdh-community/plugin-installer:next
+           quay.io/rhdh-community/rhdh-plugin-installer:next
 ```
 
 ## Testing
