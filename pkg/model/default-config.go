@@ -7,6 +7,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/api"
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/template"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,30 +15,30 @@ import (
 )
 
 // ReadDefaultConfig reads default configuration files, merging flavour configs as needed.
-// This is the main entry point that replaces utils.ReadYamlFiles(utils.DefFile(key), scheme, platformExt).
 //
 // It performs the following steps:
 // 1. Collect config file paths from enabled flavours and base
-// 2. Merge configs using the object's MergeFunc if provided
-// 3. Fall back to base default-config if no merge function or no flavours
+// 2. Apply templates to all sources
+// 3. Merge configs using the object's MergeFunc
 func ReadDefaultConfig(conf ObjectConfig, flavours []enabledFlavour, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
 
 	basePath := utils.DefFile(conf.Key)
 
-	// Step 1: Handle no merge function - use base config only (no flavour support)
-	if conf.MergeFunc == nil {
-		if _, err := os.Stat(basePath); os.IsNotExist(err) {
-			return []client.Object{}, nil
-		}
-		return utils.ReadYamlFiles(basePath, scheme, platformExt)
-	}
-
-	// Step 2: Collect config sources from flavours and base
+	// Step 1: Collect config sources from flavours and base
 	configSources := collectConfigSources(conf.Key, basePath, flavours)
 
-	// Step 3: If no configs found, return empty array (config file is optional)
+	// Step 2: If no configs found, return empty array (config file is optional)
 	if len(configSources) == 0 {
 		return []client.Object{}, nil
+	}
+
+	// Step 3: Apply templates to all sources before merging
+	for i := range configSources {
+		templated, err := template.ApplyTemplate(configSources[i].content)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply template to %s: %w", configSources[i].path, err)
+		}
+		configSources[i].content = templated
 	}
 
 	// Step 4: Merge configs using the provided merge function
@@ -82,6 +83,23 @@ func collectConfigSources(key string, basePath string, flavours []enabledFlavour
 	}
 
 	return sources
+}
+
+// noMerge is the default merge function that just uses base config without flavour support
+func noMerge(sources []configSource, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+	// Only use first source (base config), ignore flavours
+	if len(sources) == 0 {
+		return []client.Object{}, nil
+	}
+
+	// Read platform patch if exists
+	basePath := sources[0].path
+	pp, err := utils.ReadPlatformPatch(basePath, platformExt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read platform patch: %w", err)
+	}
+
+	return utils.ReadYamls(sources[0].content, pp, scheme)
 }
 
 // mergeDynamicPlugins merges dynamic-plugins.yaml files by package name

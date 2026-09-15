@@ -23,7 +23,7 @@ type BackstageService struct {
 }
 
 func init() {
-	registerConfig(ServiceKey, BackstageServiceFactory{}, false, nil)
+	registerConfig(ServiceKey, BackstageServiceFactory{}, false, noMerge)
 }
 
 func ServiceName(backstageName string) string {

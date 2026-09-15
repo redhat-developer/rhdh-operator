@@ -54,3 +54,8 @@ func NewDataObjectKeys(stringData map[string]string, binaryData map[string][]byt
 func (k DataObjectKeys) All() []string {
 	return append(k.StringDataKey, k.BinaryDataKey...)
 }
+
+// GetIngressDomain returns the OpenShift ingress domain (empty on k8s or if unavailable)
+func (e ExternalConfig) GetIngressDomain() string {
+	return e.OpenShiftIngressDomain
+}
