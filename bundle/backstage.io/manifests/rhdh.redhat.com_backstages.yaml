@@ -2044,12 +2044,6 @@ spec:
                         type: object
                     type: object
                 type: object
-                x-kubernetes-validations:
-                - message: dynamicPlugins and dynamicPluginsConfigMapName are mutually
-                    exclusive
-                  rule: '!(has(self.dynamicPlugins) && size(self.dynamicPlugins) >
-                    0 && has(self.dynamicPluginsConfigMapName) && size(self.dynamicPluginsConfigMapName)
-                    > 0)'
               database:
                 description: Configuration for database access. Optional.
                 properties:
