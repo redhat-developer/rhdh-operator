@@ -117,6 +117,8 @@ When monitoring is disabled, the operator will automatically clean up any existi
 
 To enable metrics monitoring on OpenShift, ensure you have enabled [monitoring for user-defined projects](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/monitoring/configuring-user-workload-monitoring#preparing-to-configure-the-monitoring-stack-uwm) for the metrics to be ingested by the built-in Prometheus instances.
 
+**NetworkPolicy note:** When monitoring is enabled, the default `allow-metrics-ingress` NetworkPolicy allows Prometheus in `openshift-user-workload-monitoring` to scrape `/metrics` on port 9464. Platform Prometheus in `openshift-monitoring` does not scrape user-deployed ServiceMonitors.
+
 #### Complete Example
 
 Here's a complete example of a Backstage Custom Resource with monitoring enabled:
@@ -268,6 +270,10 @@ If the ServiceMonitor is not being created automatically:
    ```bash
    $ oc get crd servicemonitors.monitoring.coreos.com
    ```
+
+### Scrapes fail after enabling monitoring on OpenShift
+
+If scrapes fail after enabling `spec.monitoring.enabled: true`, confirm the `allow-metrics-ingress` NetworkPolicy includes `kubernetes.io/metadata.name: openshift-user-workload-monitoring` in its namespace selectors. The default policy already includes this, but if you have overridden it via raw configuration, the user-workload-monitoring namespace must be present for Prometheus to reach port 9464.
 
 ### Metrics Not Appearing in Prometheus
 

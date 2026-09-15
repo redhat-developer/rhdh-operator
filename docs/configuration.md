@@ -229,6 +229,8 @@ For example, Backstage CR named **mybackstage** will create K8s Deployment resou
     - The placeholder value in `podSelector.matchLabels` (`backstage` vs `backstage-psql`) determines whether a policy targets the backend or the database at runtime
     - DB-scoped policies are filtered out when `spec.database.enableLocalDb` is `false`
     - When local DB is disabled, the `allow-psql-egress` policy allows egress on port 5432 to any destination (for external databases)
+    - The `allow-redis-egress` policy allows egress on port 6379 TCP to any destination (Redis is not deployed by the operator; users bring their own)
+    - The `allow-metrics-ingress` policy allows ingress on port 9464 from `openshift-monitoring`, `openshift-user-workload-monitoring`, GKE GMP namespaces (`gmp-system`, `gke-gmp-system`), and `monitoring` (kube-prometheus-stack convention)
     - On OpenShift, the `allow-router-ingress` policy's `namespaceSelector` is set to `policy-group.network.openshift.io/ingress: ""`
 
 ### Multi objects
@@ -804,6 +806,95 @@ Before version **0.8.0**, the Operator overrode the default Dynamic Plugins conf
 From version **0.8.0**, the Operator merges the default Dynamic Plugins configuration with the one specified in the Custom Resource. This allows users to override only the parts they want to change, while still keeping the default plugins. Note, merging is performed on plugins top-level fields only, so the complex fields like 'pluginConfig' or 'dependencies' are not merged deeply and will be replaced by the ones specified in the Custom Resource.
 
 Starting from version **0.7.0**, the Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
+
+##### Private Plugin Registry Authentication
+
+To install plugins from private OCI registries, you need to provide authentication credentials and optionally custom CA certificates to the `install-dynamic-plugins` init container.
+
+**1. Create a Secret with registry credentials:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: plugin-registry-auth
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: <base64-encoded-docker-config>
+```
+
+The docker config.json format:
+```json
+{
+  "auths": {
+    "registry.example.com": {
+      "auth": "dXNlcm5hbWU6cGFzc3dvcmQ="
+    }
+  }
+}
+```
+
+**2. (Optional) Create a ConfigMap with CA certificate:**
+
+For registries using self-signed or private CA certificates:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: plugin-registry-ca
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+```
+
+**3. Configure the Backstage CR:**
+
+Mount the credentials and set environment variables for the `install-dynamic-plugins` init container:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    # Mount credentials and CA cert
+    extraFiles:
+      secrets:
+        - name: plugin-registry-auth
+          key: .dockerconfigjson
+          mountPath: /run/secrets/plugin-registry
+          containers:
+            - install-dynamic-plugins
+      configMaps:
+        - name: plugin-registry-ca
+          key: ca.crt
+          mountPath: /run/secrets/plugin-registry-ca
+          containers:
+            - install-dynamic-plugins
+    # Set environment variables pointing to mounted files
+    extraEnvs:
+      envs:
+        - name: DOCKER_CONFIG
+          value: /run/secrets/plugin-registry
+          containers:
+            - install-dynamic-plugins
+        - name: CA_FILE
+          value: /run/secrets/plugin-registry-ca/ca.crt
+          containers:
+            - install-dynamic-plugins
+```
+
+**Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `DOCKER_CONFIG` | Path to directory containing docker config.json (or auth.json) |
+| `CA_FILE` | Path to CA certificate file for TLS verification |
+| `INSECURE` | Set to `true` to skip TLS verification (not recommended for production) |
 
 #### Route
 
