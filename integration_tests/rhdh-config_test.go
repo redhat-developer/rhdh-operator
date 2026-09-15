@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 
@@ -426,4 +430,97 @@ var _ = When("create default rhdh", func() {
 
 		deleteNamespace(ctx, ns)
 	})
+
+	It("creates Backstage with inline dynamic plugins", func() {
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
+		}
+
+		ctx := context.Background()
+		ns := createNamespace(ctx)
+
+		pluginConfigJSON, _ := yaml.YAMLToJSON([]byte(`
+app:
+  analytics:
+    segment:
+      writeKey: ${TEST_SEGMENT_KEY}
+`))
+
+		bs := api.BackstageSpec{
+			Application: &api.Application{
+				DynamicPlugins: []v1alpha5.DynamicPluginConfig{
+					{
+						Package: "ref://backstage-community-plugin-analytics-provider-segment",
+						Enabled: ptr.To(true),
+						PluginConfig: &apiextensionsv1.JSON{
+							Raw: pluginConfigJSON,
+						},
+					},
+					{
+						Package: "ref://backstage-plugin-kubernetes",
+						Enabled: ptr.To(false),
+					},
+				},
+			},
+		}
+
+		backstageName := createAndReconcileBackstage(ctx, ns, bs, "")
+
+		Eventually(func(g Gomega) {
+			By("verifying ConfigMap was generated")
+			cm := &corev1.ConfigMap{}
+			cmName := model.DynamicPluginsDefaultName(backstageName)
+			err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: cmName}, cm)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			By("verifying ConfigMap contains our inline plugins")
+			if model.IsOperatorDPProcessing() {
+				// When OPERATOR_DP_PROCESSING=true, ConfigMap contains packages.txt with enabled plugins only
+				packagesData, ok := cm.Data["packages.txt"]
+				g.Expect(ok).To(BeTrue())
+				g.Expect(packagesData).NotTo(BeEmpty())
+				g.Expect(packagesData).To(ContainSubstring("backstage-community-plugin-analytics-provider-segment"))
+				// Only enabled plugins in packages.txt, so kubernetes frontend plugin (enabled: false) should NOT be present
+				g.Expect(packagesData).NotTo(ContainSubstring("backstage-plugin-kubernetes@"))
+			} else {
+				// When OPERATOR_DP_PROCESSING=false, ConfigMap contains full dynamic-plugins.yaml
+				configData, ok := cm.Data[model.DynamicPluginsFile]
+				g.Expect(ok).To(BeTrue())
+				g.Expect(configData).NotTo(BeEmpty())
+				g.Expect(configData).To(ContainSubstring("backstage-community-plugin-analytics-provider-segment"))
+				g.Expect(configData).To(ContainSubstring("backstage-plugin-kubernetes"))
+				g.Expect(configData).To(ContainSubstring("TEST_SEGMENT_KEY"))
+			}
+
+			By("verifying deployment has correct volume mount")
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			podSpec := deploy.PodSpec()
+			g.Expect(utils.GenerateVolumeNameFromCmOrSecret(cmName)).To(BeAddedAsVolumeToPodSpec(*podSpec))
+
+			// Verify init container has the volume mount
+			var initContainer *corev1.Container
+			for i := range podSpec.InitContainers {
+				if podSpec.InitContainers[i].Name == "install-dynamic-plugins" {
+					initContainer = &podSpec.InitContainers[i]
+					break
+				}
+			}
+			g.Expect(initContainer).NotTo(BeNil())
+
+			foundMount := false
+			for _, vm := range initContainer.VolumeMounts {
+				if vm.Name == utils.GenerateVolumeNameFromCmOrSecret(cmName) {
+					foundMount = true
+					break
+				}
+			}
+			g.Expect(foundMount).To(BeTrue(), "init container should have volume mount for generated ConfigMap")
+
+		}, time.Minute, time.Second).Should(Succeed(), controllerMessage())
+
+		deleteNamespace(ctx, ns)
+	})
+
 })
