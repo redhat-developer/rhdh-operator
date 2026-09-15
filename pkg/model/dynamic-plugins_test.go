@@ -589,7 +589,7 @@ plugins:
 
 		plugin := findPluginByPackage(config.Plugins, "./plugin-a")
 		assert.NotNil(t, plugin)
-		assert.True(t, !plugin.IsDisabled(), "enabled by default")
+		assert.False(t, plugin.IsDisabled(), "enabled by default")
 		assert.Equal(t, "sha256-overridden", plugin.Integrity)
 	})
 
@@ -947,4 +947,32 @@ func TestPackagesIntegrity(t *testing.T) {
 
 	assert.Contains(t, packagesData, "https://example.com/plugin.tgz sha512-abc")
 	assert.Contains(t, packagesData, "@scope/plugin@1.0.0 sha256-xyz")
+}
+
+func TestDynamicPluginsMutualExclusivity(t *testing.T) {
+	// Both specified - invalid
+	bs3 := testDynamicPluginsBackstage.DeepCopy()
+	bs3.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{{Package: "plugin1"}}
+	bs3.Spec.Application.DynamicPluginsConfigMapName = "my-config"
+	testObj3 := createBackstageTest(*bs3).withDefaultConfig(true)
+	_, err := InitObjects(context.TODO(), *bs3, testObj3.externalConfig, platform.Default, testObj3.scheme)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestNoDynamicPluginsSpec(t *testing.T) {
+	// Spec nil - valid, no plugins
+	bs1 := testDynamicPluginsBackstage.DeepCopy()
+	bs1.Spec.Application = nil
+	testObj1 := createBackstageTest(*bs1).withDefaultConfig(true)
+	m, err := InitObjects(context.TODO(), *bs1, testObj1.externalConfig, platform.Default, testObj1.scheme)
+	assert.NoError(t, err)
+	assert.Nil(t, m.GetEnabledPlugins())
+
+	// Spec empty - valid, no plugins
+	bs2 := testDynamicPluginsBackstage.DeepCopy()
+	testObj2 := createBackstageTest(*bs2).withDefaultConfig(true)
+	m, err = InitObjects(context.TODO(), *bs2, testObj2.externalConfig, platform.Default, testObj2.scheme)
+	assert.NoError(t, err)
+	assert.Nil(t, m.GetEnabledPlugins())
 }

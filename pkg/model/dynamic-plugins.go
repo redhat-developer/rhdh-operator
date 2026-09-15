@@ -101,6 +101,14 @@ func (p *DynamicPlugins) GetKey() string {
 
 func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backstage, config runtime.Object, scheme *runtime.Scheme) error {
 	p.model = model
+
+	// Validate mutual exclusivity between dynamicPlugins and dynamicPluginsConfigMapName
+	if backstage.Spec.Application != nil &&
+		len(backstage.Spec.Application.DynamicPlugins) > 0 &&
+		backstage.Spec.Application.DynamicPluginsConfigMapName != "" {
+		return fmt.Errorf("dynamicPlugins and dynamicPluginsConfigMapName are mutually exclusive")
+	}
+
 	if config != nil {
 		p.ConfigMap = config.(*corev1.ConfigMap)
 		// Validate the ConfigMap has required data
@@ -110,7 +118,6 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 	}
 
 	// Determine source of user-defined plugins (CR inline or external ConfigMap)
-	// CEL validation ensures these are mutually exclusive
 	var userPluginsData string
 
 	if backstage.Spec.Application != nil && len(backstage.Spec.Application.DynamicPlugins) > 0 {

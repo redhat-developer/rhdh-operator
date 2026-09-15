@@ -113,7 +113,6 @@ type Monitoring struct {
 }
 
 // Application defines configuration for the Backstage application.
-// +kubebuilder:validation:XValidation:rule="!(has(self.dynamicPlugins) && size(self.dynamicPlugins) > 0 && has(self.dynamicPluginsConfigMapName) && size(self.dynamicPluginsConfigMapName) > 0)",message="dynamicPlugins and dynamicPluginsConfigMapName are mutually exclusive"
 type Application struct {
 	// References to existing app-configs ConfigMap objects, that will be mounted as files in the specified mount path.
 	// Each element can be a reference to any ConfigMap or Secret,

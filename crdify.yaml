@@ -5,4 +5,4 @@ validations:
   - name: description
     enforcement: None
 
-unhandledEnforcement: None
+unhandledEnforcement: Warn
