@@ -3789,8 +3789,8 @@ data:
             dependencies:
               - ref: okp
             {{- end}}
-    #      - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-auth-backend-module-guest-provider:next__0.2.20
-    #        enabled: true
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-auth-backend-module-guest-provider:next__0.2.20
+            enabled: true
 
   metadata.yaml: |
     # Intelligent Assistant flavour metadata
