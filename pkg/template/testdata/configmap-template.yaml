@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-{{.Rhdh.Name}}
+  namespace: {{.Rhdh.Namespace}}
+data:
+  SERVICE_URL: "https://{{.Rhdh.Name}}.{{.Rhdh.Namespace}}.svc"
