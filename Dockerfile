@@ -34,7 +34,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Install openssl for FIPS support into an isolated rootfs
 #@follow_tag(registry.redhat.io/ubi10/ubi:latest)
 # https://registry.access.redhat.com/ubi10/ubi
-FROM registry.access.redhat.com/ubi10/ubi:10.2-1789350826@sha256:7c51a894033b58059cfd171b8a9a2c064cddf8b6082a2d19ff9d8c7aa5b543c9 AS rpm-builder
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1789459392@sha256:6e3f045f5380e8d8dffaea7e01bf926d2db44aff751048697e780d1253687843 AS rpm-builder
 RUN mkdir -p /mnt/rootfs
 RUN dnf install --installroot /mnt/rootfs \
     openssl \
