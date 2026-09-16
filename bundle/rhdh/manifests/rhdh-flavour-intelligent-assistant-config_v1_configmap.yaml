@@ -55,7 +55,7 @@ data:
     vllm\n        #   api_key_env: VLLM_API_KEY\n        #   extra:\n        #     base_url:
     ${env.VLLM_URL:=}\n        #     max_tokens: ${env.VLLM_MAX_TOKENS:=4096}\n        #
     \    network:\n        #       tls:\n        #         verify: ${env.VLLM_TLS_VERIFY:=true}\n
-    \       - type: openai\n          id: openai\n          api_key_env: OPENAI_API_KEY\n
+    \       # - type: openai\n        #  id: openai\n        #  api_key_env: OPENAI_API_KEY\n
     \       # - type: vertexai\n        #   id: vertexai\n        #   extra:\n        #
     \    project: ${env.VERTEX_AI_PROJECT:=}\n        #     location: ${env.VERTEX_AI_LOCATION:=global}\n
     \   vector_store:\n      default_provider: notebooks\n      providers:\n        -
@@ -351,6 +351,27 @@ data:
     # Intelligent Assistant flavour metadata
     # This flavour is enabled by default and provides Developer Hub Intelligent Assistant functionality
     enabledByDefault: true
+  networkpolicy.yaml: |
+    # NetworkPolicy to allow Backstage pod to access OKP service for Intelligent Assistant flavour
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-okp-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        # Allow HTTP egress on port 80 (for OKP external route through OpenShift router)
+        - ports:
+            - protocol: TCP
+              port: 80
+        # Allow HTTP egress on port 8080 (for OKP internal service or external route if using :8080)
+        - ports:
+            - protocol: TCP
+              port: 8080
 kind: ConfigMap
 metadata:
   name: rhdh-flavour-intelligent-assistant-config

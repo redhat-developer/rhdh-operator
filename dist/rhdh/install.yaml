@@ -3500,7 +3500,7 @@ data:
     vllm\n        #   api_key_env: VLLM_API_KEY\n        #   extra:\n        #     base_url:
     ${env.VLLM_URL:=}\n        #     max_tokens: ${env.VLLM_MAX_TOKENS:=4096}\n        #
     \    network:\n        #       tls:\n        #         verify: ${env.VLLM_TLS_VERIFY:=true}\n
-    \       - type: openai\n          id: openai\n          api_key_env: OPENAI_API_KEY\n
+    \       # - type: openai\n        #  id: openai\n        #  api_key_env: OPENAI_API_KEY\n
     \       # - type: vertexai\n        #   id: vertexai\n        #   extra:\n        #
     \    project: ${env.VERTEX_AI_PROJECT:=}\n        #     location: ${env.VERTEX_AI_LOCATION:=global}\n
     \   vector_store:\n      default_provider: notebooks\n      providers:\n        -
@@ -3796,6 +3796,27 @@ data:
     # Intelligent Assistant flavour metadata
     # This flavour is enabled by default and provides Developer Hub Intelligent Assistant functionality
     enabledByDefault: true
+  networkpolicy.yaml: |
+    # NetworkPolicy to allow Backstage pod to access OKP service for Intelligent Assistant flavour
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-okp-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        # Allow HTTP egress on port 80 (for OKP external route through OpenShift router)
+        - ports:
+            - protocol: TCP
+              port: 80
+        # Allow HTTP egress on port 8080 (for OKP internal service or external route if using :8080)
+        - ports:
+            - protocol: TCP
+              port: 8080
 kind: ConfigMap
 metadata:
   name: rhdh-flavour-intelligent-assistant-config
@@ -3935,6 +3956,105 @@ data:
         server: '*'
       sourceRepos:
       - '*'
+  okp.yaml: |
+    # OKP (Offline Knowledge Portal) standalone Deployment.
+    # name/labels/selector are set by the operator at runtime (per Backstage CR); the values
+    # below are placeholders. The image ref is intentionally declared here (not in Go source)
+    # so midstream digest-pinning can resolve it in the generated bundle ConfigMap.
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: lightspeed-okp-{{backstage-name}}
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+        spec:
+          # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
+          automountServiceAccountToken: false
+          containers:
+            - name: okp
+              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.12-1788274041
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+              ports:
+                - name: httpd
+                  containerPort: 8080
+                  protocol: TCP
+                - name: solr
+                  containerPort: 8983
+                  protocol: TCP
+              env:
+                - name: SOLR_JAVA_MEM
+                  value: "-Xms1g -Xmx1g"
+                - name: SOLR_HOST_BIND
+                  value: "0.0.0.0"
+                # The OKP image's httpd config reads these exact names
+                # (config/httpd conf.d: ServerName ${MIMIR_HTTPD_SERVER_NAME},
+                # Define compressed_${COMPRESSED}_encrypt_${ENCRYPT}); the
+                # HTTPD_-prefixed names are ignored. Matches rhdh-chart.
+                - name: MIMIR_HTTPD_SERVER_NAME
+                  value: "localhost"
+                - name: COMPRESSED
+                  value: "true"
+                - name: ENCRYPT
+                  value: "false"
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 2Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+    ---
+    # OKP (Offline Knowledge Portal) standalone OpenShift Route.
+    # name/labels and spec.to.name are set by the operator at runtime (per Backstage CR).
+    # Applied on OpenShift only.
+    apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name: lightspeed-okp-{{backstage-name}}
+    spec:
+      to:
+        kind: Service
+        name: lightspeed-okp-{{backstage-name}}
+      port:
+        targetPort: httpd
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Allow
+    ---
+    # OKP (Offline Knowledge Portal) standalone ClusterIP Service.
+    # name/labels/selector are set by the operator at runtime (per Backstage CR).
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: lightspeed-okp-{{backstage-name}}
+    spec:
+      type: ClusterIP
+      selector:
+        app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+      ports:
+        - name: httpd
+          port: 8080
+          targetPort: httpd
+          protocol: TCP
+        - name: solr
+          port: 8983
+          targetPort: solr
+          protocol: TCP
   sonataflow.yaml: |
     apiVersion: batch/v1
     kind: Job
