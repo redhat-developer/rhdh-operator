@@ -715,10 +715,59 @@ MY_VAR = my-value - to install-dynamic-plugins container only
 
 #### Dynamic Plugins
 
-The Operator can configure [Dynamic Plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
+The Operator can configure [Dynamic Plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/deployment.yaml)).
+
+**Plugin Configuration Fields:**
+
+Each plugin can be configured with the following fields:
+- `package` (required): Plugin package reference. Supported formats:
+  - `ref://plugin-name` - Reference from the default catalog
+  - `oci://registry/image@digest` or `oci://registry/image:tag` - OCI image
+  - `@scope/package-name` - npm package
+  - `https://example.com/plugin.tgz` - HTTP/HTTPS URL
+  - `file://path/to/plugin` - File path
+- `enabled` (optional): Enable/disable the plugin. Defaults to `true` if not specified.
+- `pluginConfig` (optional): Plugin-specific configuration as arbitrary YAML.
+- `integrity` (optional): Integrity checksum for the plugin package.
+- `includes` (optional, ConfigMap only): Array of local dynamic plugin files to include (e.g., `dynamic-plugins.default.yaml`). Only supported in init container processing mode. Not supported when using operator-processed dynamic plugins (`OPERATOR_DP_PROCESSING=true`).
+
+**Configuration Options:**
+
+There are two mutually exclusive ways to configure Dynamic Plugins in the Backstage CR:
+
+1. **Inline Configuration** (`spec.application.dynamicPlugins`) - Configure plugins directly in the CR
+2. **ConfigMap Reference** (`spec.application.dynamicPluginsConfigMapName`) - Reference an external ConfigMap
+
+You must choose one approach - using both fields simultaneously is not supported.
+
+##### Option 1: Inline Configuration
+
+Configure plugins directly in the Backstage CR:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    dynamicPlugins:
+      - package: 'ref://backstage-community-plugin-catalog-backend-module-keycloak-dynamic'
+      - package: 'oci://quay.io/rhdh/backstage-plugin-github-actions:1.0.0'
+        pluginConfig:
+        ...
+```
+
+**Note:** The inline `dynamicPlugins` field is mutually exclusive with `dynamicPluginsConfigMapName`.
+
+See [examples/inline-dynamic-plugins.yaml](../examples/inline-dynamic-plugins.yaml) for a complete example.
+
+##### Option 2: ConfigMap Reference
+
+Reference an external ConfigMap containing the Dynamic Plugins configuration.
 
 For example, the **dynamic-plugins-config** ConfigMap contains a simple Dynamic Plugins configuration, which includes predefined default plugins in **dynamic-plugins.default.yaml** and the GitHub plugin provided in the package located at `./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic`.
-  
+
 ```yaml
 kind: ConfigMap
 apiVersion: v1
@@ -729,20 +778,13 @@ data:
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
+      - package: 'oci://quay.io/rhdh/backstage-plugin-catalog-backend-module-github:1.0.0'
         enabled: true
         pluginConfig:
-          catalog:
-            providers:
-              github:
-                organization: "${GITHUB_ORG}"
-                schedule:
-                  frequency: { minutes: 1 }
-                  timeout: { minutes: 1 }
-                  initialDelay: { seconds: 100 }
+        ... 
 ```
 
-To configure it with the Backstage CR, the following spec should be included:
+To configure it with the Backstage CR:
 
 ```yaml
 spec:
@@ -750,19 +792,30 @@ spec:
     dynamicPluginsConfigMapName: "dynamic-plugins-config"
 ```
 
-In order to configure plugins without defaults, initialize **includes** with empty array:
-```yaml
-...
-data:
-  dynamic-plugins.yaml: |
-    includes: []
-```
+##### Default Plugin Configuration
 
-**NOTE:**
-Before version **0.8.0**, the Operator overrode the default Dynamic Plugins configuration with the one specified in Custom Resource. This meant that the user had to specify all the default plugins in the Custom Resource.
-From version **0.8.0**, the Operator merges the default Dynamic Plugins configuration with the one specified in the Custom Resource. This allows users to override only the parts they want to change, while still keeping the default plugins. Note, merging is performed on plugins top-level fields only, so the complex fields like 'pluginConfig' or 'dependencies' are not merged deeply and will be replaced by the ones specified in the Custom Resource.
+The Operator provides default plugins that are automatically merged with your configuration. The source of these defaults depends on the plugin processing mode:
 
-Starting from version **0.7.0**, the Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
+**Init Container Processing (Default Mode):**
+- Defaults are read from `config/profile/rhdh/default-config/dynamic-plugins.yaml`
+- The `includes` field is respected and processed by the init container
+
+**Operator Processing Mode (`OPERATOR_DP_PROCESSING=true`):**
+- **Production**: Defaults come from `DevHubPluginCatalog` Custom Resources (overrides `default-config/dynamic-plugins.yaml`)
+- **Testing**: Defaults come from `config/profile/rhdh/local-test/dynamic-plugins.yaml`
+
+##### Configuring Plugins Without Defaults (testing only)
+
+To disable default plugins:
+
+**Init Container Processing:**
+- Set `includes: []` in your ConfigMap's `dynamic-plugins.yaml`
+
+**Operator Processing Mode:**
+- **Testing**: Remove or empty the `config/profile/rhdh/local-test/dynamic-plugins.yaml` file
+- **Production (not recommended)**: Delete all `DevHubPluginCatalog` CRs: `kubectl delete devhubplugincatalog --all -n rhdh-operator`
+
+The Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
 
 ##### Private Plugin Registry Authentication
 
