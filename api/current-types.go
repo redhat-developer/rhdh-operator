@@ -30,6 +30,7 @@ type (
 	Application         = bsv1.Application
 	Database            = bsv1.Database
 	AppConfig           = bsv1.AppConfig
+	DynamicPluginConfig = bsv1.DynamicPluginConfig
 	ExtraEnvs           = bsv1.ExtraEnvs
 	ExtraFiles          = bsv1.ExtraFiles
 	Route               = bsv1.Route

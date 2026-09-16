@@ -34,25 +34,14 @@ if [[ "${OPERATOR_DP_PROCESSING:-false}" == "true" && "${PROFILE}" == "rhdh" ]];
     LOCAL_TEST_DIR="config/profile/${PROFILE}/local-test"
     DYNAMIC_PLUGINS_FILE="${LOCAL_TEST_DIR}/dynamic-plugins.yaml"
 
-    if [[ ! -d "${LOCAL_TEST_DIR}" ]]; then
-        echo "Error: local-test directory not found at ${LOCAL_TEST_DIR}" >&2
-        echo "" >&2
-        echo "Run 'make local-dynamic-plugins' to generate it first." >&2
-        echo "" >&2
-        echo "This extracts dynamic-plugins.default.yaml from the catalog-index image" >&2
-        echo "and creates a local configuration for testing." >&2
-        exit 1
+    if [[ -f "${DYNAMIC_PLUGINS_FILE}" ]]; then
+        cp "${DYNAMIC_PLUGINS_FILE}" "${DEFAULT_CONFIG_TARGET}/"
+        echo "Using local-test dynamic-plugins.yaml (OPERATOR_DP_PROCESSING=true)"
+    else
+        echo "Warning: ${DYNAMIC_PLUGINS_FILE} not found - no default dynamic plugins will be used" >&2
+        echo "Run 'make local-dynamic-plugins' to generate it if needed" >&2
+        echo "Using default-config dynamic-plugins.yaml (fallback)"
     fi
-
-    if [[ ! -f "${DYNAMIC_PLUGINS_FILE}" ]]; then
-        echo "Error: dynamic-plugins.yaml not found at ${DYNAMIC_PLUGINS_FILE}" >&2
-        echo "" >&2
-        echo "Run 'make local-dynamic-plugins' to regenerate the local-test directory." >&2
-        exit 1
-    fi
-
-    cp "${DYNAMIC_PLUGINS_FILE}" "${DEFAULT_CONFIG_TARGET}/"
-    echo "Using local-test dynamic-plugins.yaml (OPERATOR_DP_PROCESSING=true)"
 else
     echo "Using default-config dynamic-plugins.yaml (OPERATOR_DP_PROCESSING=${OPERATOR_DP_PROCESSING:-false})"
 fi
