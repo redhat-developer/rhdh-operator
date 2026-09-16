@@ -1,177 +1,154 @@
-name: Build PR Images (Slash Command)
+name: PR Container Build
 
 on:
-  issue_comment:
-    types: [created]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - 'release-[0-9]+.[0-9]+'
 
 permissions:
   contents: read
-  pull-requests: write
-  statuses: write
 
 concurrency:
-  group: build-images-${{ github.event.issue.number }}
-  # Must be false: the issue_comment trigger fires on ALL comments (not just /build-images),
-  # but the /build-images filter is only at the job level. With cancel-in-progress: true,
-  # any unrelated comment (e.g. from SonarQube, Renovate) on the same PR would cancel a
-  # running build, then skip the job because the comment doesn't match /build-images.
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.event.number }}
+  cancel-in-progress: true
 
 env:
-  REGISTRY: ${{ vars.REGISTRY }}
+  REGISTRY: ${{ vars.REGISTRY || 'quay.io' }}
+  REGISTRY_ORG: ${{ vars.REGISTRY_ORG || 'rhdh-community' }}
+  OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
 
 jobs:
-  build-images:
-    if: |
-      github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/build-images') &&
-      (github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'COLLABORATOR')
-
-    name: Build and Push PR Images
+  pr-build:
+    name: Build PR Container Images
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
 
     steps:
-      - name: React to comment
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          script: |
-            await github.rest.reactions.createForIssueComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: context.payload.comment.id,
-              content: 'rocket'
-            });
-
-      - name: Get PR details
-        id: pr
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        with:
-          script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            
-            core.setOutput('sha', pr.data.head.sha);
-            core.setOutput('repo', pr.data.head.repo.full_name);
-            core.setOutput('number', context.issue.number);
-
-      - name: Checkout PR code
+      - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          repository: ${{ steps.pr.outputs.repo }}
-          ref: ${{ steps.pr.outputs.sha }}
-          # 2. PRIVILEGE PROTECTION: Do not persist credentials to disk
           persist-credentials: false
 
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        with:
+          files: |
+            .github/workflows/pr-container-build.yaml
+            .github/workflows/pr-container-push.yaml
+            .github/actions/docker-build/**
+            Makefile
+            **/*.go
+            bundle/**
+            config/**
+            go.mod
+            go.sum
+            LICENSE
+            **/Dockerfile
+            **/Containerfile
+            **/*.Dockerfile
+            **/.dockerignore
+            rpms.in.yaml
+            rpms.lock.yaml
+            scripts/**
+          files_ignore: |
+            **/*.md
+            **/*.adoc
+            .rhdh/**
+            tests/**
+
       - name: Setup Go
+        if: steps.changed-files.outputs.any_changed == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: 'go.mod'
 
-      - name: Get version and SHA
-        # 3. ANTI-INJECTION: Map context to env vars before processing
+      - name: Prepare build variables
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: prep
         env:
-          PR_SHA: ${{ steps.pr.outputs.sha }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          SHORT_SHA=$(git rev-parse --short "$PR_SHA")
-          echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
+          set -euo pipefail
+          SHORT_SHA="${PR_HEAD_SHA:0:7}"
           BASE_VERSION=$(grep -E "^VERSION \?=" Makefile | sed -r -e "s/.+= //")
-          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
+          VERSION="${BASE_VERSION}-pr-${PR_NUM}-${SHORT_SHA}"
 
-      - name: Login to registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ vars.QUAY_USERNAME }}
-          password: ${{ secrets.QUAY_TOKEN }}
+          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Build operator image (hermetic)
+        if: steps.changed-files.outputs.any_changed == 'true'
         uses: ./.github/actions/docker-build
         with:
-          imageName: ${{ env.REGISTRY }}/${{ vars.REGISTRY_ORG }}/${{ vars.OPERATOR_IMAGE_NAME }}
-          imageTags: type=raw,value=${{ env.BASE_VERSION }}-pr-${{ steps.pr.outputs.number }}-${{ env.SHORT_SHA }}
+          imageName: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/${{ env.OPERATOR_IMAGE_NAME }}
+          imageTags: type=raw,value=${{ steps.prep.outputs.VERSION }}
+          imageLabels: quay.expires-after=7d
           platform: linux/amd64
           skipArtifactUpload: 'true'
 
-      - name: Build bundle and catalog images, then push all
-        # We explicitly do NOT pass GH_TOKEN or RHDH_BOT_TOKEN here.
+      - name: Build bundle image
+        if: steps.changed-files.outputs.any_changed == 'true'
         env:
-          REGISTRY_ORG: ${{ vars.REGISTRY_ORG }}
-          OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME }}
           CONTAINER_TOOL: podman
-          VERSION: ${{ env.BASE_VERSION }}-pr-${{ steps.pr.outputs.number }}-${{ env.SHORT_SHA }}
+          VERSION: ${{ steps.prep.outputs.VERSION }}
+          IMAGE_TAG_BASE: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/${{ env.OPERATOR_IMAGE_NAME }}
         run: |
-          sudo apt-get -y update; sudo apt-get -y install skopeo podman
-
-          export REGISTRY_WITH_ORG=${REGISTRY}/${REGISTRY_ORG}
-          export IMAGE_TAG_BASE=${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}
-
-          set -ex
-
-          # Build bundle and catalog (operator was built hermetically above)
           make bundle bundle-build
 
-          # Push operator and bundle images before catalog-build — opm render
-          # needs to pull the bundle image from the registry
-          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle; do
-            podman push -q ${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION}
-          done
-
-          BUNDLE_IMGS="${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}" make -o bundle-push catalog-build
-
-          # Push catalog image and create PR-number tags for all images
-          podman push -q ${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${VERSION} docker://${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${VERSION}
-          for image in ${OPERATOR_IMAGE_NAME} ${OPERATOR_IMAGE_NAME}-bundle ${OPERATOR_IMAGE_NAME}-catalog; do
-            skopeo --insecure-policy copy --all docker://${REGISTRY_WITH_ORG}/${image}:${VERSION} docker://${REGISTRY_WITH_ORG}/${image}:${VERSION%-*}
-          done
-
-      - name: Comment image links in PR
-        if: success()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-        # 5. SCRIPT HARDENING: Pass data as environment variables
+      - name: Save images to tarballs
+        if: steps.changed-files.outputs.any_changed == 'true'
         env:
-          BASE_VERSION: ${{ env.BASE_VERSION }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-          SHORT_SHA: ${{ env.SHORT_SHA }}
-          USER_LOGIN: ${{ github.event.comment.user.login }}
-        with:
-          script: |
-            const { BASE_VERSION, PR_NUMBER, SHORT_SHA, USER_LOGIN } = process.env;
-            
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `✅ **PR images built successfully!**
+          VERSION: ${{ steps.prep.outputs.VERSION }}
+        run: |
+          set -euo pipefail
+          OPERATOR_IMG="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}:${VERSION}"
+          BUNDLE_IMG="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}"
 
-            Images are available for testing:
+          podman save "${OPERATOR_IMG}" | gzip > operator-image.tar.gz
+          podman save "${BUNDLE_IMG}" | gzip > bundle-image.tar.gz
 
-            1. **Operator:** \`quay.io/rhdh-community/operator:${BASE_VERSION}-pr-${PR_NUMBER}-${SHORT_SHA}\`
-            2. **Bundle:** \`quay.io/rhdh-community/operator-bundle:${BASE_VERSION}-pr-${PR_NUMBER}-${SHORT_SHA}\`
-            3. **Catalog:** \`quay.io/rhdh-community/operator-catalog:${BASE_VERSION}-pr-${PR_NUMBER}-${SHORT_SHA}\`
-
-            Also available with PR number tag:
-            - \`quay.io/rhdh-community/operator:${BASE_VERSION}-pr-${PR_NUMBER}\`
-            - \`quay.io/rhdh-community/operator-bundle:${BASE_VERSION}-pr-${PR_NUMBER}\`
-            - \`quay.io/rhdh-community/operator-catalog:${BASE_VERSION}-pr-${PR_NUMBER}\`
-
-            <sub>Triggered by @${USER_LOGIN}</sub>`
-            });
-
-      - name: Comment on failure
-        if: failure()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+      - name: Create metadata
+        if: steps.changed-files.outputs.any_changed == 'true'
         env:
-          USER_LOGIN: ${{ github.event.comment.user.login }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_VERSION: ${{ steps.prep.outputs.BASE_VERSION }}
+          SHORT_SHA: ${{ steps.prep.outputs.SHORT_SHA }}
+        run: |
+          jq -n \
+            --argjson pr "$PR_NUMBER" \
+            --arg bv "$BASE_VERSION" \
+            --arg ss "$SHORT_SHA" \
+            '{pr_number: $pr, base_version: $bv, short_sha: $ss}' > metadata.json
+
+      - name: Upload image artifact
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          script: |
-            const { USER_LOGIN } = process.env;
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `❌ **Image build failed**\n\nSee workflow run for details: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\nTriggered by @${USER_LOGIN}`
-            });
+          name: pr-images
+          path: |
+            operator-image.tar.gz
+            bundle-image.tar.gz
+            metadata.json
+          retention-days: 1
+
+      - name: Summary
+        if: steps.changed-files.outputs.any_changed == 'true'
+        env:
+          VERSION: ${{ steps.prep.outputs.VERSION }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+        run: |
+          echo "### Build Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Version**: ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **PR Number**: ${PR_NUM}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Status**: Built and saved as artifact" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The images will be pushed by the PR Container Push workflow." >> "$GITHUB_STEP_SUMMARY"
