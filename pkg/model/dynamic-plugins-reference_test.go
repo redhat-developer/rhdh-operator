@@ -280,6 +280,11 @@ func TestName(t *testing.T) {
 			expected: "backstage-plugin-bar",
 		},
 		{
+			name:     "OCI with tag and digest",
+			package_: "oci://quay.io/rhdh/backstage-plugin-baz:v1.0.0@sha256:abc123",
+			expected: "backstage-plugin-baz",
+		},
+		{
 			name:     "OCI with registry port and no tag",
 			package_: "oci://localhost:5000/path/my-plugin",
 			expected: "my-plugin",
