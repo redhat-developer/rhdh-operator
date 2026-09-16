@@ -143,9 +143,9 @@ data:
         #     network:
         #       tls:
         #         verify: ${env.VLLM_TLS_VERIFY:=true}
-        - type: openai
-          id: openai
-          api_key_env: OPENAI_API_KEY
+        # - type: openai
+        #  id: openai
+        #  api_key_env: OPENAI_API_KEY
         # - type: vertexai
         #   id: vertexai
         #   extra:
