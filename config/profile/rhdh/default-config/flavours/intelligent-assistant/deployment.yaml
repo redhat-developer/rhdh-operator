@@ -38,7 +38,7 @@ spec:
               value: "true"
             {{- if eq .Rhdh.Runtime.Platform "ocp"}}
             - name: OKP_SERVICE_URL
-              value: "http://lightspeed-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
+              value: "https://lightspeed-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
             {{- end}}
           volumeMounts:
             - mountPath: /tmp
