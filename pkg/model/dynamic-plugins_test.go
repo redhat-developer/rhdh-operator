@@ -927,6 +927,52 @@ func TestInlineDynamicPluginsEndToEnd(t *testing.T) {
 	assert.Contains(t, pluginConfigData, "testKey: testValue", "pluginConfig should be in app-config as YAML")
 }
 
+// TestOperatorModeWithoutDefaultPlugins verifies that operator DP processing mode
+// works correctly when no dynamic-plugins.yaml is provided in default config.
+// This simulates testing mode where config/profile/rhdh/local-test/dynamic-plugins.yaml
+// doesn't exist - only plugins specified in the CR should be used.
+func TestOperatorModeWithoutDefaultPlugins(t *testing.T) {
+	// Enable operator DP processing for this test
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	// Specify only inline plugins in CR - no defaults
+	bs.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{
+		{
+			Package: "oci://quay.io/custom/my-plugin:1.0.0",
+		},
+		{
+			Package: "https://example.com/another-plugin.tgz",
+		},
+	}
+
+	// Create test WITHOUT adding dynamic-plugins.yaml to default config
+	// This simulates the case where local-test/dynamic-plugins.yaml doesn't exist
+	// Note: deployment.yaml is needed to provide the init container definition
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	// Should succeed without errors
+	assert.NoError(t, err, "should successfully initialize with no default dynamic-plugins.yaml")
+	assert.NotNil(t, model)
+
+	// Verify the packages.txt contains only CR-specified plugins
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
+	assert.NotNil(t, dpObj)
+	assert.NotNil(t, dpObj.enabledPluginsCM, "enabledPluginsCM should be created")
+
+	packagesData, ok := dpObj.enabledPluginsCM.Data["packages.txt"]
+	assert.True(t, ok, "packages.txt should exist")
+	assert.NotEmpty(t, packagesData, "packages.txt should not be empty")
+
+	// Verify only CR-specified plugins are present
+	assert.Contains(t, packagesData, "my-plugin", "CR-specified OCI plugin should be in packages.txt")
+	assert.Contains(t, packagesData, "another-plugin", "CR-specified URL plugin should be in packages.txt")
+}
+
 // TestPackagesIntegrity verifies integrity checksums are included in packages.txt
 func TestPackagesIntegrity(t *testing.T) {
 	t.Setenv(OperatorDPProcessingEnvVar, "true")
