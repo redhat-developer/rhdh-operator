@@ -66,4 +66,5 @@ configMapGenerator:
   - plugin-deps/sonataflow.yaml
   - plugin-deps/argocd.yaml
   - plugin-deps/tekton.yaml
+  - plugin-deps/okp.yaml
   name: plugin-deps

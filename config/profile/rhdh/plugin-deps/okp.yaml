@@ -5,7 +5,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: lightspeed-okp
+  name: lightspeed-okp-{{backstage-name}}
 spec:
   replicas: 1
   selector:
@@ -20,7 +20,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: okp
-          image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.10-1786628394
+          image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.12-1788274041
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
