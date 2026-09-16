@@ -116,11 +116,6 @@ var _ = Describe("Backstage Operator E2E", func() {
 					if tt.isForOpenshift && !helper.IsOpenShift() {
 						Skip("Skipping OpenShift-only test on non OCP platform")
 					}
-					if tt.name == "raw-runtime-config" {
-						if os.Getenv("USE_EXISTING_CLUSTER") == "true" || os.Getenv("SKIP_RAW_RUNTIME_CONFIG_TEST") == "true" {
-							Skip("Skipping raw-runtime-config: requires ephemeral volume controller support")
-						}
-					}
 					crPath = filepath.Join(projectDir, tt.crFilePath)
 					cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", crPath, "-n", ns)
 					_, err := helper.Run(cmd)
@@ -245,7 +240,9 @@ spec:
 					}
 
 					var isRouteEnabledNow bool
+					var routeExisted bool
 					if helper.IsOpenShift() {
+						routeExisted = !tt.isRouteDisabled
 						By("updating route spec in CR", func() {
 							// enables route that was previously disabled, and disables route that was previously enabled.
 							isRouteEnabledNow = tt.isRouteDisabled
@@ -263,10 +260,13 @@ spec:
 							Expect(err).ShouldNot(HaveOccurred())
 						})
 						if isRouteEnabledNow {
+							routeExisted = true
 							By("ensuring the route is reachable", func() {
 								ensureRouteIsReachable(appReachabilityTimeout, ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
 							})
 						}
+						// When route is disabled (enabled: false), the operator stops managing it but does not
+						// delete the existing route. Cleanup happens via owner reference GC when the CR is deleted.
 					}
 
 					By("deleting CR", func() {
@@ -275,8 +275,8 @@ spec:
 						Expect(err).ShouldNot(HaveOccurred())
 					})
 
-					if helper.IsOpenShift() && isRouteEnabledNow {
-						By("ensuring application is no longer reachable", func() {
+					if helper.IsOpenShift() && routeExisted {
+						By("ensuring route no longer exists after CR deletion", func() {
 							Eventually(func(g Gomega, crName string) {
 								exists, err := helper.DoesBackstageRouteExist(ns, tt.crName)
 								g.Expect(err).ShouldNot(HaveOccurred())
