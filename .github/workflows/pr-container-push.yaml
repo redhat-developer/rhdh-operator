@@ -211,7 +211,7 @@ jobs:
         if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          curl -sSLo /usr/local/bin/opm \
+          curl -sSLo /usr/local/bin/opm --proto =https \
             "https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/linux-amd64-opm"
           chmod +x /usr/local/bin/opm
           opm version
