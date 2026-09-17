@@ -17,6 +17,10 @@ env:
   DEFAULT_CHANNEL: fast
   PROFILE_SHORT: rhdh
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
 jobs:
   pr-push:
     name: Push PR Container Images
@@ -117,6 +121,7 @@ jobs:
         id: meta
         env:
           EXPECTED_PR: ${{ steps.pr-number.outputs.number }}
+          TRUSTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
 
@@ -149,20 +154,21 @@ jobs:
             exit 1
           fi
 
-          # 3. Validate short_sha (hex, 7-12 chars)
-          SHORT_SHA=$(jq -r '.short_sha // ""' metadata.json)
-          if ! echo "$SHORT_SHA" | grep -qE '^[a-f0-9]{7,12}$'; then
-            echo "::error::Invalid short_sha: ${SHORT_SHA}"
+          # 3. Validate short_sha against the trusted workflow_run head SHA
+          TRUSTED_SHORT_SHA="${TRUSTED_HEAD_SHA:0:7}"
+          ARTIFACT_SHORT_SHA=$(jq -r '.short_sha // ""' metadata.json)
+          if [ "$ARTIFACT_SHORT_SHA" != "$TRUSTED_SHORT_SHA" ]; then
+            echo "::error::Security alert: mismatched short_sha (expected ${TRUSTED_SHORT_SHA}, got ${ARTIFACT_SHORT_SHA}). Possible artifact poisoning."
             exit 1
           fi
 
           # 4. Derive trusted tags from validated fields
-          FULL_TAG="${BASE_VERSION}-pr-${EXPECTED_PR}-${SHORT_SHA}"
+          FULL_TAG="${BASE_VERSION}-pr-${EXPECTED_PR}-${TRUSTED_SHORT_SHA}"
           ALIAS_TAG="${BASE_VERSION}-pr-${EXPECTED_PR}"
 
           echo "SAFE_PR_NUMBER=${EXPECTED_PR}" >> "$GITHUB_ENV"
           echo "SAFE_BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_ENV"
-          echo "SAFE_SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "SAFE_SHORT_SHA=${TRUSTED_SHORT_SHA}" >> "$GITHUB_ENV"
           echo "SAFE_FULL_TAG=${FULL_TAG}" >> "$GITHUB_ENV"
           echo "SAFE_ALIAS_TAG=${ALIAS_TAG}" >> "$GITHUB_ENV"
           echo "EXPIRATION_TIMESTAMP=$(date -u -d '+7 days' +%s)" >> "$GITHUB_ENV"
