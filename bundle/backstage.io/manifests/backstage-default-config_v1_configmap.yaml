@@ -48,7 +48,7 @@ data:
       clusterIP: None
       ports:
         - port: 5432
-  db-statefulset.yaml: |-
+  db-statefulset.yaml: |
     apiVersion: apps/v1
     kind: StatefulSet
     metadata:
@@ -84,7 +84,7 @@ data:
                   value: /var/lib/pgsql/data
                 - name: PGDATA
                   value: /var/lib/pgsql/data/userdata
-              image: quay.io/fedora/postgresql-15:latest # will be replaced with the actual image
+              image: quay.io/fedora/postgresql-18:latest # will be replaced with the actual image
               imagePullPolicy: IfNotPresent
               securityContext:
                 # runAsUser:26 does not work for Openshift but looks work for AKS/EKS
