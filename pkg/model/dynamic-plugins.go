@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -168,6 +169,12 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
 					continue
 				}
+				// Warn if package name contains deprecated "!plugin-path" syntax and strip the package
+				if idx := strings.LastIndex(plugin.Package, "!"); idx != -1 {
+					klog.Warningf("package %q contains deprecated '!plugin-path' syntax", plugin.Package)
+					plugin.Package = plugin.Package[:idx]
+				}
+
 				p.enabledPlugins = append(p.enabledPlugins, plugin)
 				// Build package entry: "url integrity"
 				// Integrity is respected for HTTP and npm packages, ignored for OCI
