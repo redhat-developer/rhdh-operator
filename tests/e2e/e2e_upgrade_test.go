@@ -88,21 +88,6 @@ metadata:
 				Should(Succeed())
 		})
 
-		AfterEach(func() {
-			for _, m := range []string{"FROM", "TO"} {
-				if manifest := os.Getenv(m + "_OPERATOR_MANIFEST"); manifest != "" {
-					cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", manifest, "--ignore-not-found=true")
-					_, _ = helper.Run(cmd)
-				}
-			}
-			uninstallOperator()
-
-			if fromDeploymentManifest != "" {
-				cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", fromDeploymentManifest, "--ignore-not-found=true")
-				_, _ = helper.Run(cmd)
-			}
-		})
-
 		It("should successfully reconcile existing CR when upgrading the operator", func() {
 			var postgresqlUpgrade *postgresqlUpgradeState
 			if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE") {
