@@ -48,6 +48,15 @@ func installRhdhOperatorManifest(operatorManifest string) {
 
 	cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
 	_, err := helper.Run(cmd)
+	if err != nil {
+		GinkgoWriter.Printf("Initial manifest apply failed; waiting for CRDs before retrying: %v\n", err)
+		cmd = exec.Command(helper.GetPlatformTool(), "wait", "--for=condition=Established", "crd", "--all", "--timeout=2m")
+		_, waitErr := helper.Run(cmd)
+		Expect(waitErr).ShouldNot(HaveOccurred())
+
+		cmd = exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
+		_, err = helper.Run(cmd)
+	}
 	Expect(err).ShouldNot(HaveOccurred())
 }
 
