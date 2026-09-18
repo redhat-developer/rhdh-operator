@@ -46,7 +46,7 @@ jobs:
 
       - name: Resolve source operator image
         run: |
-          FROM_OPERATOR_IMAGE=$(curl -fsSL "$FROM_OPERATOR_MANIFEST" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          FROM_OPERATOR_IMAGE=$(curl --proto '=https' --proto-redir '=https' -fsSL "$FROM_OPERATOR_MANIFEST" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           test -n "$FROM_OPERATOR_IMAGE"
           skopeo inspect "docker://$FROM_OPERATOR_IMAGE" > /dev/null
           echo "FROM_OPERATOR_IMAGE=$FROM_OPERATOR_IMAGE" >> "$GITHUB_ENV"
