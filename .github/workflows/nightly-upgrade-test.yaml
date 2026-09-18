@@ -79,12 +79,12 @@ jobs:
 
           FROM_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${{ matrix.from_branch }}/${distLocation}"
           echo "FROM_OPERATOR_MANIFEST=${FROM_OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          FROM_OPERATOR_IMAGE=$(curl -s "${FROM_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          FROM_OPERATOR_IMAGE=$(curl --proto '=https' --proto-redir '=https' -fsSL "${FROM_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "FROM_OPERATOR_IMAGE=${FROM_OPERATOR_IMAGE}" >> $GITHUB_ENV
 
           TO_OPERATOR_MANIFEST="https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${{ matrix.to_branch }}/${distLocation}"
           echo "TO_OPERATOR_MANIFEST=${TO_OPERATOR_MANIFEST}" >> $GITHUB_ENV
-          TO_OPERATOR_IMAGE=$(curl -s "${TO_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          TO_OPERATOR_IMAGE=$(curl --proto '=https' --proto-redir '=https' -fsSL "${TO_OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
           echo "TO_OPERATOR_IMAGE=${TO_OPERATOR_IMAGE}" >> $GITHUB_ENV
 
       - name: Check if operator images exist in remote registry
@@ -158,4 +158,5 @@ jobs:
           TO_OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
           OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
           IMG: ${{ env.TO_OPERATOR_IMAGE }}
+          BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE: ${{ matrix.to_branch == 'main' }}
         run: make test-e2e-upgrade

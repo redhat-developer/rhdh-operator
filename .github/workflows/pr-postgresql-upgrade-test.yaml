@@ -1,0 +1,119 @@
+name: PR PostgreSQL Upgrade Test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/pr-postgresql-upgrade-test.yaml'
+      - '.github/workflows/nightly-upgrade-test.yaml'
+      - '**/*.go'
+      - 'config/**'
+      - 'dist/rhdh/install.yaml'
+      - 'Dockerfile'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  postgresql-upgrade:
+    name: E2E PostgreSQL 15 to 18
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      CONTAINER_ENGINE: docker
+      FROM_OPERATOR_MANIFEST: https://raw.githubusercontent.com/redhat-developer/rhdh-operator/refs/heads/release-1.10/dist/rhdh/install.yaml
+      TO_OPERATOR_MANIFEST: ${{ github.workspace }}/dist/rhdh/install.yaml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Resolve source operator image
+        run: |
+          FROM_OPERATOR_IMAGE=$(curl --proto '=https' --proto-redir '=https' -fsSL "$FROM_OPERATOR_MANIFEST" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          test -n "$FROM_OPERATOR_IMAGE"
+          skopeo inspect "docker://$FROM_OPERATOR_IMAGE" > /dev/null
+          echo "FROM_OPERATOR_IMAGE=$FROM_OPERATOR_IMAGE" >> "$GITHUB_ENV"
+
+      - name: Remove unnecessary files to free up disk space
+        uses: endersonmenezes/free-disk-space@2a22f8c59cae9cddae7194b33e6b92d023b2b4b8 # v4
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          rm_cmd: "rmz"
+
+      - name: Build target operator image and manifest
+        env:
+          TO_OPERATOR_IMAGE: localhost/rhdh-operator:pr-${{ github.event.pull_request.head.sha }}
+        run: |
+          make image-build build-installer PROFILE=rhdh IMG="$TO_OPERATOR_IMAGE"
+          MANIFEST_IMAGE=$(yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image' "$TO_OPERATOR_MANIFEST")
+          test "$MANIFEST_IMAGE" = "$TO_OPERATOR_IMAGE"
+          echo "TO_OPERATOR_IMAGE=$TO_OPERATOR_IMAGE" >> "$GITHUB_ENV"
+
+      - name: Generate Kind config
+        run: |
+          cat <<EOF > "$RUNNER_TEMP/kind-config.yaml"
+          apiVersion: kind.x-k8s.io/v1alpha4
+          kind: Cluster
+          nodes:
+            - role: control-plane
+              extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+                - containerPort: 443
+                  hostPort: 443
+                  protocol: TCP
+              kubeadmConfigPatches:
+                - |
+                  apiVersion: kubelet.config.k8s.io/v1beta1
+                  kind: KubeletConfiguration
+                  imageGCHighThresholdPercent: 70
+                  imageGCLowThresholdPercent: 50
+                  imageMinimumGCAge: 2m
+          EOF
+
+      - name: Create Kind cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: test-cluster
+          config: ${{ runner.temp }}/kind-config.yaml
+          ignore_failed_clean: true
+
+      - name: Load target operator image
+        run: kind load docker-image --name test-cluster "$TO_OPERATOR_IMAGE"
+
+      - name: Install Ingress Controller
+        run: |
+          kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=90s
+
+      - name: Run PostgreSQL upgrade E2E test
+        env:
+          BACKSTAGE_OPERATOR_TESTS_PLATFORM: kind
+          BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE: 'true'
+          PROFILE: 'rhdh'
+          OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
+          IMG: ${{ env.TO_OPERATOR_IMAGE }}
+        run: make test-e2e-upgrade

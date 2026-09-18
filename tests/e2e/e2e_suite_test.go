@@ -48,6 +48,15 @@ func installRhdhOperatorManifest(operatorManifest string) {
 
 	cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
 	_, err := helper.Run(cmd)
+	if err != nil {
+		GinkgoWriter.Printf("Initial manifest apply failed; waiting for CRDs before retrying: %v\n", err)
+		cmd = exec.Command(helper.GetPlatformTool(), "wait", "--for=condition=Established", "crd", "--all", "--timeout=2m")
+		_, waitErr := helper.Run(cmd)
+		Expect(waitErr).ShouldNot(HaveOccurred())
+
+		cmd = exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
+		_, err = helper.Run(cmd)
+	}
 	Expect(err).ShouldNot(HaveOccurred())
 }
 
@@ -211,8 +220,14 @@ var _ = SynchronizedAfterSuite(func() {
 },
 	// the function below *only* on process #1
 	func() {
-		defer uninstallOperator()
-		fmt.Println(fetchOperatorLogs(managerPodLabel, false)())
+		fmt.Println(captureOperatorLogsBeforeCleanup(
+			fetchOperatorLogs(managerPodLabel, false),
+			func() {
+				uninstallOperator()
+				deleteOperatorManifest(os.Getenv("FROM_OPERATOR_MANIFEST"))
+				deleteOperatorManifest(os.Getenv("TO_OPERATOR_MANIFEST"))
+			},
+		))
 	},
 )
 
@@ -287,6 +302,12 @@ func fetchOperatorLogs(managerPodLabel string, raw bool) func() string {
 	}
 }
 
+func captureOperatorLogsBeforeCleanup(fetchLogs func() string, cleanup func()) string {
+	logs := fetchLogs()
+	cleanup()
+	return logs
+}
+
 func fetchOperandLogs(ns string, crLabel string, raw bool) func() string {
 	return func() string {
 		logs := getPodLogs(ns, "", crLabel)
@@ -322,6 +343,14 @@ func uninstallOperator() {
 		}
 		helper.DeleteNamespace(_namespace, true)
 	}
+}
+
+func deleteOperatorManifest(operatorManifest string) {
+	if operatorManifest == "" {
+		return
+	}
+	cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", operatorManifest, "--ignore-not-found=true")
+	_, _ = helper.Run(cmd)
 }
 
 func uninstallRhdhOperator(withAirgap bool) {
