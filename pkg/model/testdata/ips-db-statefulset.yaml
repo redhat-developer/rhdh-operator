@@ -20,3 +20,4 @@ spec:
       containers:
         - image: quay.io/fedora/postgresql-18:latest
           name: postgres
+
