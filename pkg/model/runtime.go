@@ -20,6 +20,7 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/api"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/template"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
@@ -161,6 +162,9 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 			lg.Info("found enabled flavour", "flavour:", flavour.name)
 		}
 	}
+
+	// Set template data for config file substitution ({{.Rhdh.Name}}, {{.Rhdh.Namespace}}, etc.)
+	template.SetTemplateData(&backstage, &platform, &externalConfig)
 
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {

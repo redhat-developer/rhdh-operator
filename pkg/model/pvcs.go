@@ -19,7 +19,7 @@ func (f BackstagePvcsFactory) newBackstageObject() RuntimeObject {
 }
 
 func init() {
-	registerConfig(PvcsKey, BackstagePvcsFactory{}, true, nil)
+	registerConfig(PvcsKey, BackstagePvcsFactory{}, true, noMerge)
 }
 
 type BackstagePvcs struct {

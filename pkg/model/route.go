@@ -75,7 +75,7 @@ func (b *BackstageRoute) setRoute(specified *api.Route) {
 }
 
 func init() {
-	registerConfig(RouteKey, BackstageRouteFactory{}, false, nil)
+	registerConfig(RouteKey, BackstageRouteFactory{}, false, noMerge)
 }
 
 func (b *BackstageRoute) Object() runtime.Object {
