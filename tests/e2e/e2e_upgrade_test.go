@@ -88,6 +88,12 @@ metadata:
 				Should(Succeed())
 		})
 
+		JustAfterEach(func() {
+			if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE") && CurrentSpecReport().Failed() {
+				GinkgoWriter.Println(postgresqlUpgradeDiagnostics(ns, crName))
+			}
+		})
+
 		It("should successfully reconcile existing CR when upgrading the operator", func() {
 			var postgresqlUpgrade *postgresqlUpgradeState
 			if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE") {

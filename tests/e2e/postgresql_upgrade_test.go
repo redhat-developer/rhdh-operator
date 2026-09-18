@@ -34,6 +34,40 @@ type postgresqlUpgradeState struct {
 	databaseNames   []string
 }
 
+func postgresqlUpgradeCheckpoint(name string, fields ...string) string {
+	checkpoint := "postgresql-upgrade: " + name
+	if len(fields) > 0 {
+		checkpoint += " " + strings.Join(fields, " ")
+	}
+	return checkpoint
+}
+
+func logPostgresqlUpgradeCheckpoint(name string, fields ...string) {
+	fmt.Println(postgresqlUpgradeCheckpoint(name, fields...))
+}
+
+func formatPostgresqlUpgradeDiagnostics(operatorAndOperandLogs, postgresqlLogs, postgresqlDescription string) string {
+	return fmt.Sprintf(
+		"=== PostgreSQL upgrade diagnostics ===\n"+
+			"=== Operator and operand logs ===\n%s"+
+			"=== PostgreSQL logs ===\n%s"+
+			"=== PostgreSQL description ===\n%s",
+		operatorAndOperandLogs,
+		postgresqlLogs,
+		postgresqlDescription,
+	)
+}
+
+func postgresqlUpgradeDiagnostics(namespace, crName string) string {
+	crLabel := fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName)
+	postgresqlLabel := fmt.Sprintf("rhdh.redhat.com/app=%s", postgresqlStatefulSetName(crName))
+	return formatPostgresqlUpgradeDiagnostics(
+		fetchOperatorAndOperandLogs(managerPodLabel, namespace, crLabel),
+		getPodLogs(namespace, "", postgresqlLabel),
+		describePod(namespace, postgresqlLabel),
+	)
+}
+
 func preparePostgresqlUpgrade(namespace, crName string) *postgresqlUpgradeState {
 	state := &postgresqlUpgradeState{}
 	postgresPod := waitForPostgresql(namespace, crName, postgresqlSourceImage, postgresqlSourceVersion)
@@ -51,6 +85,17 @@ INSERT INTO public.rhdh_postgresql_upgrade_test VALUES ('`+postgresqlProofValue+
 	state.pvcUID = resourceUID(namespace, "pvc", postgresqlPVCName(crName))
 	state.secretUID = resourceUID(namespace, "secret", postgresqlSecretName(crName))
 	state.backstagePodUID = readyPodUID(namespace, fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName))
+	logPostgresqlUpgradeCheckpoint("source-ready",
+		fmt.Sprintf("pod=%s", postgresPod),
+		fmt.Sprintf("podUID=%s", state.postgresPodUID),
+		fmt.Sprintf("pvcUID=%s", state.pvcUID),
+		fmt.Sprintf("secretUID=%s", state.secretUID),
+		fmt.Sprintf("backstagePodUID=%s", state.backstagePodUID),
+		fmt.Sprintf("databases=%d", len(state.databaseNames)),
+		fmt.Sprintf("imageContains=%s", postgresqlSourceImage),
+		fmt.Sprintf("versionPrefix=%s", postgresqlSourceVersion),
+		fmt.Sprintf("proofDatabase=%s", postgresqlProofDatabase),
+	)
 
 	By("stopping Backstage before taking the PostgreSQL dump")
 	setBackstageReplicas(namespace, crName, 0)
@@ -100,15 +145,35 @@ func completePostgresqlUpgrade(namespace, crName string, state *postgresqlUpgrad
 		WithArguments(managerPodLabel).Should(Succeed())
 
 	postgresPod := waitForPostgresql(namespace, crName, postgresqlTargetImage, postgresqlTargetVersion)
-	Expect(resourceUID(namespace, "pod", postgresPod)).NotTo(Equal(state.postgresPodUID))
-	Expect(resourceUID(namespace, "pvc", postgresqlPVCName(crName))).NotTo(Equal(state.pvcUID))
-	Expect(resourceUID(namespace, "secret", postgresqlSecretName(crName))).To(Equal(state.secretUID))
+	targetPostgresPodUID := resourceUID(namespace, "pod", postgresPod)
+	targetPVCUID := resourceUID(namespace, "pvc", postgresqlPVCName(crName))
+	targetSecretUID := resourceUID(namespace, "secret", postgresqlSecretName(crName))
+	Expect(targetPostgresPodUID).NotTo(Equal(state.postgresPodUID))
+	Expect(targetPVCUID).NotTo(Equal(state.pvcUID))
+	Expect(targetSecretUID).To(Equal(state.secretUID))
+	logPostgresqlUpgradeCheckpoint("target-ready",
+		fmt.Sprintf("pod=%s", postgresPod),
+		fmt.Sprintf("previousPodUID=%s", state.postgresPodUID),
+		fmt.Sprintf("podUID=%s", targetPostgresPodUID),
+		fmt.Sprintf("previousPVCUID=%s", state.pvcUID),
+		fmt.Sprintf("pvcUID=%s", targetPVCUID),
+		fmt.Sprintf("secretUID=%s", targetSecretUID),
+		"secretPreserved=true",
+		fmt.Sprintf("imageContains=%s", postgresqlTargetImage),
+		fmt.Sprintf("versionPrefix=%s", postgresqlTargetVersion),
+	)
 
 	By("restoring the PostgreSQL 15 dump into PostgreSQL 18")
 	restorePostgresql(namespace, postgresPod, state.dumpPath)
-	Expect(postgresqlDatabaseNames(namespace, postgresPod)).To(Equal(state.databaseNames))
+	restoredDatabaseNames := postgresqlDatabaseNames(namespace, postgresPod)
+	Expect(restoredDatabaseNames).To(Equal(state.databaseNames))
 	refreshPostgresqlCollations(namespace, postgresPod)
 	Expect(queryPostgresqlUpgradeProof(namespace, postgresPod)).To(Equal(postgresqlProofValue))
+	logPostgresqlUpgradeCheckpoint("restore-verified",
+		fmt.Sprintf("databases=%d", len(restoredDatabaseNames)),
+		fmt.Sprintf("proofDatabase=%s", postgresqlProofDatabase),
+		fmt.Sprintf("proofValue=%s", postgresqlProofValue),
+	)
 
 	By("starting Backstage against the restored PostgreSQL 18 database")
 	setBackstageReplicas(namespace, crName, 1)
@@ -196,6 +261,7 @@ func dumpPostgresql(namespace, podName string) string {
 	info, err := os.Stat(dumpPath)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(info.Size()).To(BeNumerically(">", 0))
+	logPostgresqlUpgradeCheckpoint("dump-created", fmt.Sprintf("bytes=%d", info.Size()))
 	return dumpPath
 }
 
@@ -248,10 +314,12 @@ func refreshPostgresqlCollations(namespace, podName string) {
 		"SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION;', datname) FROM pg_database WHERE datallowconn AND datname <> 'template0' ORDER BY datname;"))
 	Expect(err).NotTo(HaveOccurred())
 
-	for _, statement := range helper.GetNonEmptyLines(string(out)) {
+	statements := helper.GetNonEmptyLines(string(out))
+	for _, statement := range statements {
 		_, err = runPostgresqlSQL(namespace, podName, "postgres", statement)
 		Expect(err).NotTo(HaveOccurred())
 	}
+	logPostgresqlUpgradeCheckpoint("collations-refreshed", fmt.Sprintf("databases=%d", len(statements)))
 }
 
 func runCommand(cmd *exec.Cmd, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -327,6 +395,7 @@ func readyPodUID(namespace, label string) string {
 
 func waitForBackstagePodReplacement(namespace, crName, previousUID string) {
 	label := fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName)
+	var replacementUID string
 	Eventually(func(g Gomega) {
 		out, err := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "get", "pods", "-l", label,
 			"-o", `jsonpath={range .items[*]}{.metadata.uid}{" "}{.status.phase}{" "}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}`))
@@ -339,7 +408,12 @@ func waitForBackstagePodReplacement(namespace, crName, previousUID string) {
 		g.Expect(fields[0]).NotTo(Equal(previousUID))
 		g.Expect(fields[1]).To(Equal("Running"))
 		g.Expect(fields[2]).To(Equal("True"))
+		replacementUID = fields[0]
 	}, 15*time.Minute, 10*time.Second).Should(Succeed())
+	logPostgresqlUpgradeCheckpoint("backstage-ready",
+		fmt.Sprintf("previousPodUID=%s", previousUID),
+		fmt.Sprintf("podUID=%s", replacementUID),
+	)
 }
 
 func postgresqlStatefulSetName(crName string) string {

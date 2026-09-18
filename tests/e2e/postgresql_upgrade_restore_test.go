@@ -7,6 +7,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPostgresqlUpgradeCheckpoint(t *testing.T) {
+	assert.Equal(t,
+		"postgresql-upgrade: dump-created bytes=42",
+		postgresqlUpgradeCheckpoint("dump-created", "bytes=42"),
+	)
+}
+
+func TestFormatPostgresqlUpgradeDiagnostics(t *testing.T) {
+	assert.Equal(t,
+		"=== PostgreSQL upgrade diagnostics ===\n"+
+			"=== Operator and operand logs ===\noperator and operand\n"+
+			"=== PostgreSQL logs ===\npostgresql\n"+
+			"=== PostgreSQL description ===\npostgresql description\n",
+		formatPostgresqlUpgradeDiagnostics(
+			"operator and operand\n",
+			"postgresql\n",
+			"postgresql description\n",
+		),
+	)
+}
+
 func TestPostgresqlSQLCommandUsesRequestedDatabase(t *testing.T) {
 	cmd := postgresqlSQLCommand("test-namespace", "postgres-0", "backstage_plugin_catalog", "-c", "SELECT 1")
 
