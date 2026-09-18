@@ -33,6 +33,7 @@ The behavior is configurable using the following environment variables:
 | `BACKSTAGE_OPERATOR_TESTS_AIRGAP_MIRROR_REGISTRY`                                              | string | Existing mirror registry to use in the airgap scenario.<br>Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is `rhdh-airgap`.                                                                                                                                                                                                                                                                                                                       |                                                   | `my-registry.example.com`                               |
 | `BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS`                                                  | bool   | Whether to test access using an Ingress resource on K8s                                                                                                                                                                                                                                                                                                                                                                                       |                                                   | `true`                                                  |
 | `BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN`                                                  | string | Ingress domain. Relevant only if `BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS` is `true`.                                                                                                                                                                                                                                                                                                                                                     |                                                   | `$(minikube ip).nip.io`                                 |
+| `BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT`                                            | string | Timeout for waiting on operand pods to become ready and for route/application reachability checks (Go duration, e.g. `15m`). Increase on clusters where generic ephemeral volume PVC provisioning is slow.                                                                                                                                                                                                                                      | `5m`                                              | `15m`                                                   |
 
 ### Examples
 
@@ -145,4 +146,16 @@ $ make test-e2e BACKSTAGE_OPERATOR_TEST_MODE=rhdh-airgap
 $ make test-e2e \
     BACKSTAGE_OPERATOR_TEST_MODE=rhdh-airgap \
     BACKSTAGE_OPERATOR_TESTS_AIRGAP_MIRROR_REGISTRY=my-registry.example.com
+```
+
+#### Testing against an existing cluster with OLM v1
+
+In this scenario, you want to run E2E tests against an existing OpenShift cluster with OLM v1 (ClusterExtension). The install script auto-detects OLM v1 and deploys via `ClusterCatalog` + `ClusterExtension`.
+
+On clusters with `WaitForFirstConsumer` storage classes, the `raw-runtime-config` test may need a longer reachability timeout while generic ephemeral volume PVCs are provisioned:
+
+```shell
+$ make test-e2e \
+    BACKSTAGE_OPERATOR_TEST_MODE=rhdh-latest \
+    BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT=15m
 ```
