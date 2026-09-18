@@ -3,8 +3,28 @@ package e2e
 import (
 	"testing"
 
+	"github.com/redhat-developer/rhdh-operator/tests/helper"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestPostgresqlSQLCommandUsesRequestedDatabase(t *testing.T) {
+	cmd := postgresqlSQLCommand("test-namespace", "postgres-0", "backstage_plugin_catalog", "-c", "SELECT 1")
+
+	assert.Equal(t, helper.GetPlatformTool(), cmd.Args[0])
+	assert.Equal(t, []string{
+		"-n", "test-namespace", "exec", "postgres-0", "--",
+		"psql", "-X", "-U", "postgres", "-d", "backstage_plugin_catalog", "-c", "SELECT 1",
+	}, cmd.Args[1:])
+}
+
+func TestPostgresqlSQLCommandWithStdinEnablesInteractiveExec(t *testing.T) {
+	cmd := postgresqlSQLCommandWithStdin("test-namespace", "postgres-0", "postgres", "--quiet")
+
+	assert.Equal(t, []string{
+		"-n", "test-namespace", "exec", "-i", "postgres-0", "--",
+		"psql", "-X", "-U", "postgres", "-d", "postgres", "--quiet",
+	}, cmd.Args[1:])
+}
 
 func TestValidatePostgresqlRestoreErrors(t *testing.T) {
 	tests := []struct {

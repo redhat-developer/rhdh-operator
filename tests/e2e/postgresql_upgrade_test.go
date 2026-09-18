@@ -21,6 +21,7 @@ const (
 	postgresqlSourceVersion = "15."
 	postgresqlTargetImage   = "postgresql-18"
 	postgresqlTargetVersion = "18."
+	postgresqlProofDatabase = "backstage_plugin_catalog"
 	postgresqlProofValue    = "postgresql-15-to-18"
 )
 
@@ -36,9 +37,11 @@ type postgresqlUpgradeState struct {
 func preparePostgresqlUpgrade(namespace, crName string) *postgresqlUpgradeState {
 	state := &postgresqlUpgradeState{}
 	postgresPod := waitForPostgresql(namespace, crName, postgresqlSourceImage, postgresqlSourceVersion)
+	state.databaseNames = postgresqlDatabaseNames(namespace, postgresPod)
+	Expect(state.databaseNames).To(ContainElement(postgresqlProofDatabase))
 
 	By("seeding data that must survive the PostgreSQL upgrade")
-	_, err := runPostgresqlSQL(namespace, postgresPod, `
+	_, err := runPostgresqlSQL(namespace, postgresPod, postgresqlProofDatabase, `
 CREATE TABLE public.rhdh_postgresql_upgrade_test (marker text PRIMARY KEY);
 INSERT INTO public.rhdh_postgresql_upgrade_test VALUES ('`+postgresqlProofValue+`');`)
 	Expect(err).NotTo(HaveOccurred())
@@ -48,7 +51,6 @@ INSERT INTO public.rhdh_postgresql_upgrade_test VALUES ('`+postgresqlProofValue+
 	state.pvcUID = resourceUID(namespace, "pvc", postgresqlPVCName(crName))
 	state.secretUID = resourceUID(namespace, "secret", postgresqlSecretName(crName))
 	state.backstagePodUID = readyPodUID(namespace, fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName))
-	state.databaseNames = postgresqlDatabaseNames(namespace, postgresPod)
 
 	By("stopping Backstage before taking the PostgreSQL dump")
 	setBackstageReplicas(namespace, crName, 0)
@@ -135,8 +137,7 @@ func waitForPostgresql(namespace, crName, imageSubstring, versionPrefix string) 
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(strings.TrimSpace(string(out))).To(ContainSubstring(imageSubstring))
 
-		out, err = helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "exec", podName, "--",
-			"psql", "-X", "-U", "postgres", "-d", "postgres", "-tA", "-c", "SHOW server_version;"))
+		out, err = helper.Run(postgresqlSQLCommand(namespace, podName, "postgres", "-tA", "-c", "SHOW server_version;"))
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(strings.TrimSpace(string(out))).To(HavePrefix(versionPrefix))
 	}, 10*time.Minute, 10*time.Second).Should(Succeed())
@@ -144,15 +145,35 @@ func waitForPostgresql(namespace, crName, imageSubstring, versionPrefix string) 
 	return podName
 }
 
-func runPostgresqlSQL(namespace, podName, sql string) ([]byte, error) {
-	return helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "exec", podName, "--",
-		"psql", "-X", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", sql))
+func postgresqlSQLCommand(namespace, podName, database string, args ...string) *exec.Cmd {
+	return buildPostgresqlSQLCommand(namespace, podName, database, false, args...)
+}
+
+func postgresqlSQLCommandWithStdin(namespace, podName, database string, args ...string) *exec.Cmd {
+	return buildPostgresqlSQLCommand(namespace, podName, database, true, args...)
+}
+
+func buildPostgresqlSQLCommand(namespace, podName, database string, withStdin bool, args ...string) *exec.Cmd {
+	commandArgs := []string{"-n", namespace, "exec"}
+	if withStdin {
+		commandArgs = append(commandArgs, "-i")
+	}
+	commandArgs = append(commandArgs,
+		podName, "--",
+		"psql", "-X", "-U", "postgres", "-d", database,
+	)
+	commandArgs = append(commandArgs, args...)
+	return exec.Command(helper.GetPlatformTool(), commandArgs...)
+}
+
+func runPostgresqlSQL(namespace, podName, database, sql string) ([]byte, error) {
+	return helper.Run(postgresqlSQLCommand(namespace, podName, database,
+		"-v", "ON_ERROR_STOP=1", "-c", sql))
 }
 
 func queryPostgresqlUpgradeProof(namespace, podName string) string {
-	out, err := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "exec", podName, "--",
-		"psql", "-X", "-U", "postgres", "-d", "postgres", "-tA", "-v", "ON_ERROR_STOP=1", "-c",
-		"SELECT marker FROM public.rhdh_postgresql_upgrade_test;"))
+	out, err := helper.Run(postgresqlSQLCommand(namespace, podName, postgresqlProofDatabase,
+		"-tA", "-v", "ON_ERROR_STOP=1", "-c", "SELECT marker FROM public.rhdh_postgresql_upgrade_test;"))
 	Expect(err).NotTo(HaveOccurred())
 	return strings.TrimSpace(string(out))
 }
@@ -186,8 +207,7 @@ func restorePostgresql(namespace, podName, dumpPath string) {
 	}()
 
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command(helper.GetPlatformTool(), "-n", namespace, "exec", "-i", podName, "--",
-		"psql", "-X", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=0", "--quiet")
+	cmd := postgresqlSQLCommandWithStdin(namespace, podName, "postgres", "-v", "ON_ERROR_STOP=0", "--quiet")
 	err = runCommand(cmd, dumpFile, io.MultiWriter(GinkgoWriter, &stdout), io.MultiWriter(GinkgoWriter, &stderr))
 	Expect(err).NotTo(HaveOccurred(), stderr.String())
 
@@ -215,21 +235,21 @@ func validatePostgresqlRestoreErrors(stderr string) error {
 }
 
 func postgresqlDatabaseNames(namespace, podName string) []string {
-	out, err := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "exec", podName, "--",
-		"psql", "-X", "-U", "postgres", "-d", "postgres", "-tA", "-v", "ON_ERROR_STOP=1", "-c",
+	out, err := helper.Run(postgresqlSQLCommand(namespace, podName, "postgres",
+		"-tA", "-v", "ON_ERROR_STOP=1", "-c",
 		"SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;"))
 	Expect(err).NotTo(HaveOccurred())
 	return helper.GetNonEmptyLines(strings.TrimSpace(string(out)))
 }
 
 func refreshPostgresqlCollations(namespace, podName string) {
-	out, err := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "exec", podName, "--",
-		"psql", "-X", "-U", "postgres", "-d", "postgres", "-tA", "-v", "ON_ERROR_STOP=1", "-c",
+	out, err := helper.Run(postgresqlSQLCommand(namespace, podName, "postgres",
+		"-tA", "-v", "ON_ERROR_STOP=1", "-c",
 		"SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION;', datname) FROM pg_database WHERE datallowconn AND datname <> 'template0' ORDER BY datname;"))
 	Expect(err).NotTo(HaveOccurred())
 
 	for _, statement := range helper.GetNonEmptyLines(string(out)) {
-		_, err = runPostgresqlSQL(namespace, podName, statement)
+		_, err = runPostgresqlSQL(namespace, podName, "postgres", statement)
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
@@ -250,8 +270,7 @@ func runCommand(cmd *exec.Cmd, stdin io.Reader, stdout, stderr io.Writer) error 
 
 func setBackstageReplicas(namespace, crName string, replicas int) {
 	patch := fmt.Sprintf(`{"spec":{"deployment":{"patch":{"spec":{"replicas":%d}}}}}`, replicas)
-	_, err := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "patch", "backstage", crName,
-		"--type=merge", "--patch", patch))
+	err := helper.PatchBackstageCR(namespace, crName, patch, "merge")
 	Expect(err).NotTo(HaveOccurred())
 }
 
