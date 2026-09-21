@@ -12,6 +12,8 @@ env:
   OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
   # renovate: datasource=github-releases depName=operator-framework/operator-registry
   OPM_VERSION: v1.72.0
+  # Update this checksum when OPM_VERSION changes (sha256 of linux-amd64-opm from checksums.txt)
+  OPM_SHA256: b81b337baf851698a96b70fc5d419b6f239a8856c4f598df65b225d56c39fff6
   # OLM catalog constants (must match the rhdh profile in the Makefile)
   BUNDLE_METADATA_PACKAGE_NAME: rhdh
   DEFAULT_CHANNEL: fast
@@ -177,11 +179,13 @@ jobs:
       - name: Load operator image
         if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
         run: |
+          set -euo pipefail
           gunzip -c operator-image.tar.gz | podman load
 
       - name: Load bundle image
         if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
         run: |
+          set -euo pipefail
           gunzip -c bundle-image.tar.gz | podman load
 
       - name: Login to registry (${{ vars.REGISTRY || 'quay.io' }})
@@ -218,9 +222,11 @@ jobs:
         if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          curl -sSLo /usr/local/bin/opm --proto =https \
+          curl -sSLo /tmp/opm --proto =https \
             "https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/linux-amd64-opm"
-          chmod +x /usr/local/bin/opm
+          echo "${OPM_SHA256}  /tmp/opm" | sha256sum --check --strict
+          install -m 0755 /tmp/opm /usr/local/bin/opm
+          rm -f /tmp/opm
           opm version
 
       - name: Build catalog image
@@ -275,6 +281,9 @@ jobs:
         env:
           API_TOKEN: ${{ secrets.QUAY_OAUTH_TOKEN || secrets.QUAY_TOKEN }}
         run: |
+          set -euo pipefail
+          : "${API_TOKEN:?API_TOKEN is required to set image expiration}"
+
           set_tag_expiration() {
             local image="$1"
             local tag="$2"
@@ -333,6 +342,7 @@ jobs:
       - name: Summary
         if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
         run: |
+          set -euo pipefail
           BASE="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}"
           echo "### Push Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
@@ -350,6 +360,7 @@ jobs:
       - name: Summary (skipped — no artifact)
         if: steps.check-artifact.outputs.exists != 'true'
         run: |
+          set -euo pipefail
           echo "### Push Skipped" >> "$GITHUB_STEP_SUMMARY"
           echo "No \`pr-images\` artifact was produced by the PR Container Build workflow." >> "$GITHUB_STEP_SUMMARY"
           echo "This is expected when the PR changes don't affect the container image (e.g., docs-only changes)." >> "$GITHUB_STEP_SUMMARY"
