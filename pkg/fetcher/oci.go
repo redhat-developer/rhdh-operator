@@ -26,6 +26,7 @@ type OCIFetcher struct {
 	transport  http.RoundTripper
 	keychain   authn.Keychain
 	pluginMode bool // if true, validate io.backstage.dynamic-packages annotation
+	insecure   bool // if true, use HTTP protocol and skip TLS verification
 }
 
 // NewOCIFetcher creates a new OCI fetcher
@@ -47,9 +48,14 @@ func NewOCIFetcher(opts ...OCIOption) *OCIFetcher {
 // OCIOption configures the OCIFetcher
 type OCIOption func(*OCIFetcher)
 
-// WithInsecure disables TLS certificate verification
+// WithInsecure enables plain HTTP protocol and disables TLS certificate verification.
+// This applies to ALL registries accessed by this fetcher.
+// When enabled:
+// - Uses HTTP protocol instead of HTTPS
+// - Skips TLS certificate verification for HTTPS connections
 func WithInsecure() OCIOption {
 	return func(c *OCIFetcher) {
+		c.insecure = true
 		c.transport = &http.Transport{
 			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
@@ -107,7 +113,14 @@ func WithPluginMode() OCIOption {
 // For plugin artifacts, extracts the plugin subdirectory content to destDir.
 func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) error {
 	// 1. Parse reference
-	imgRef, err := name.ParseReference(ref)
+	var imgRef name.Reference
+	var err error
+	if c.insecure {
+		// Use HTTP protocol and allow insecure registries
+		imgRef, err = name.ParseReference(ref, name.Insecure)
+	} else {
+		imgRef, err = name.ParseReference(ref)
+	}
 	if err != nil {
 		return fmt.Errorf("invalid OCI reference %q: %w", ref, err)
 	}
