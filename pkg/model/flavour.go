@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"sigs.k8s.io/yaml"
 
@@ -45,7 +46,10 @@ func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
 		return nil, err
 	}
 
-	// Step 2: Override enabled status from spec
+	// Step 2: Override enabled status from spec and preserve the order in which
+	// explicitly configured flavours were declared.
+	var explicitOrder []string
+	explicitNames := make(map[string]struct{})
 	if spec.Flavours != nil {
 		flavours := *spec.Flavours
 
@@ -56,17 +60,37 @@ func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
 			}
 			flavour.enabled = f.Enabled
 			allFlavours[f.Name] = flavour
+			if _, seen := explicitNames[f.Name]; !seen {
+				explicitOrder = append(explicitOrder, f.Name)
+				explicitNames[f.Name] = struct{}{}
+			}
 		}
 	}
 
-	// Step 3: Collect enabled flavours
-	var result []enabledFlavour
+	// Step 3: Apply unmentioned defaults first in stable order, then explicitly
+	// configured flavours in CR declaration order. Flavour order affects merge
+	// precedence and mount order, so it must not depend on map iteration or names.
+	var defaultNames []string
 	for name, flavour := range allFlavours {
-		if flavour.enabled {
-			result = append(result, enabledFlavour{
-				name:     name,
-				basePath: flavour.basePath,
-			})
+		if _, explicit := explicitNames[name]; !explicit && flavour.enabled {
+			defaultNames = append(defaultNames, name)
+		}
+	}
+	sort.Strings(defaultNames)
+
+	var result []enabledFlavour
+	appendFlavour := func(name string) {
+		result = append(result, enabledFlavour{
+			name:     name,
+			basePath: allFlavours[name].basePath,
+		})
+	}
+	for _, name := range defaultNames {
+		appendFlavour(name)
+	}
+	for _, name := range explicitOrder {
+		if allFlavours[name].enabled {
+			appendFlavour(name)
 		}
 	}
 

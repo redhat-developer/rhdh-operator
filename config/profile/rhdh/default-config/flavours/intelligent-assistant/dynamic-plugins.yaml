@@ -41,10 +41,5 @@ data:
 
       - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend
         enabled: true
-        {{- if eq .Rhdh.Runtime.Platform "ocp"}}
-        dependencies:
-          - ref: okp
-        {{- end}}
       - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-auth-backend-module-guest-provider:next__0.2.20
         enabled: true
-

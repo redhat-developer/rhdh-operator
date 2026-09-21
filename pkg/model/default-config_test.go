@@ -187,8 +187,8 @@ func TestGetEnabledFlavours(t *testing.T) {
 					{Name: "flavor2", Enabled: true},
 				},
 			},
-			// flavor2 (explicit) + defaults (flavor1, flavor3)
-			wantFlavours: []string{"flavor2", "flavor1", "flavor3"},
+			// Unmentioned defaults first, then explicit flavours in CR order.
+			wantFlavours: []string{"flavor1", "flavor3", "flavor2"},
 			wantErr:      false,
 		},
 		{
@@ -209,8 +209,8 @@ func TestGetEnabledFlavours(t *testing.T) {
 					{Name: "flavor2", Enabled: true},
 				},
 			},
-			// flavor2 (explicit enabled) + defaults (flavor1, flavor3)
-			wantFlavours: []string{"flavor2", "flavor1", "flavor3"},
+			// Unmentioned defaults first, then explicit flavours in CR order.
+			wantFlavours: []string{"flavor1", "flavor3", "flavor2"},
 			wantErr:      false,
 		},
 		{
@@ -222,7 +222,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 					{Name: "flavor3", Enabled: true},  // default=true, spec=enabled
 				},
 			},
-			// flavor2 (explicit), flavor3 (explicit), no flavor1 (disabled)
+			// Explicit flavours preserve CR order; disabled flavor1 is omitted.
 			wantFlavours: []string{"flavor2", "flavor3"},
 			wantErr:      false,
 		},
@@ -269,7 +269,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 					gotNames[i] = f.name
 				}
 
-				if !assert.ElementsMatch(t, tt.wantFlavours, gotNames) {
+				if !assert.Equal(t, tt.wantFlavours, gotNames) {
 					t.Logf("Expected flavours: %v", tt.wantFlavours)
 					t.Logf("Got flavours: %v", gotNames)
 				}

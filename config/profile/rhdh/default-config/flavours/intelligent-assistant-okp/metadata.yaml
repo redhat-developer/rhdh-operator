@@ -1,0 +1,3 @@
+# Intelligent Assistant OKP add-on flavour metadata
+# OKP is opt-in on both OpenShift and Kubernetes.
+enabledByDefault: false
