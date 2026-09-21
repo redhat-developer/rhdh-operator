@@ -19,6 +19,7 @@ type ExternalConfig struct {
 	ExtraPvcKeys           []string
 
 	OpenShiftIngressDomain string
+	Mirrors                *ImageDigestMirrors
 
 	WatchingHash string
 }

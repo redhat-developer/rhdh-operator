@@ -153,6 +153,12 @@ func (r *BackstageReconciler) preprocessSpec(ctx context.Context, backstage api.
 		result.DynamicPlugins = *cm
 	}
 
+	// Get mirror configuration from mounted file
+	result.Mirrors, err = model.GetMirrorConfig()
+	if err != nil {
+		return result, fmt.Errorf("failed to read mirror configuration: %w", err)
+	}
+
 	hash := sha256.New()
 	hash.Write(hashingData)
 	result.WatchingHash = fmt.Sprintf("%x", hash.Sum(nil))

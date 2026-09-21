@@ -72,6 +72,90 @@ you will need to configure your cluster or network to allow these images to be p
 For the list of related images deployed by the Operator, see the `RELATED_IMAGE_*` env vars or `relatedImages` section of the [CSV](../bundle/manifests/backstage-operator.clusterserviceversion.yaml).
 See also https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html
 
+#### Plugin Registry Mirroring
+
+In air-gapped environments, Backstage dynamic plugins distributed as OCI artifacts need to be mirrored to internal registries. The Backstage Operator supports optional plugin registry mirroring that automatically transforms plugin package URLs to use your internal mirror registries.
+
+The mirror configuration uses the same format and matching rules as OpenShift's [ImageDigestMirrorSet (IDMS)](https://docs.openshift.com/container-platform/4.14/openshift_images/image-configuration.html#images-configuration-registry-mirror_image-configuration), making it familiar to OpenShift administrators and allowing direct reuse of existing IDMS configurations.
+
+**How it works:**
+
+- The operator reads mirror configuration from an optional ConfigMap mounted at `/plugins-mirror/mirrors.yaml`
+- Plugin package URLs with `oci://` prefix are transformed using IDMS-style matching rules before being written to the init container's package list
+- Only OCI URLs are transformed - npm packages, HTTP URLs, and file paths remain unchanged
+- The transformed URLs are visible in the Backstage CR status under `status.plugins`
+
+**Configuration:**
+
+1. Create a ConfigMap named `plugin-registry-mirror` in the operator's namespace (usually `backstage-system` or `rhdh-operator`):
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: plugin-registry-mirror
+  namespace: rhdh-operator  # Must be in operator namespace
+data:
+  mirrors.yaml: |
+    # Same structure as OpenShift ImageDigestMirrorSet
+    imageDigestMirrors:
+    # Mirror quay.io to internal registry
+    - source: quay.io
+      mirrors:
+      - my-registry.example.com/quay-mirror
+
+    # Mirror Red Hat registry
+    - source: registry.redhat.io
+      mirrors:
+      - my-registry.example.com/redhat-mirror
+
+    # Multiple mirrors (first is used, others ignored)
+    - source: ghcr.io
+      mirrors:
+      - primary-mirror.example.com/ghcr
+      - backup-mirror.example.com/ghcr
+```
+
+2. Restart the operator pod to load the configuration:
+
+```bash
+kubectl rollout restart deployment rhdh-operator -n rhdh-operator
+```
+
+3. Verify the transformed URLs in your Backstage CR status:
+
+```bash
+kubectl get backstage my-backstage -o jsonpath='{.status.plugins}' | jq
+```
+
+**Mirroring rules (same as IDMS):**
+
+- **Most specific namespace match**: When multiple sources match a plugin URL, the longest/most specific source wins. For example, if you have both `quay.io` and `quay.io/rhdh` configured, a plugin from `oci://quay.io/rhdh/plugin:1.0` will use the `quay.io/rhdh` mirror configuration.
+- **Only OCI URLs are mirrored**: Plugins specified as `oci://registry.example.com/plugin:tag` are transformed. npm packages (`@scope/package`), HTTP URLs (`https://...`), and file paths are not affected.
+- **First mirror is used**: If multiple mirrors are specified for a source, only the first one is used (fallback support may be added in future versions).
+
+**For OpenShift users with existing IDMS:**
+
+You can directly copy your existing ImageDigestMirrorSet configuration to the ConfigMap format:
+
+```bash
+# Extract IDMS config
+kubectl get imagedigestmirrorset rhdh-plugins -o jsonpath='{.spec.imageDigestMirrors}' | \
+  yq -P 'imageDigestMirrors: .' > mirrors.yaml
+
+# Create ConfigMap from extracted config
+kubectl create configmap plugin-registry-mirror \
+  --from-file=mirrors.yaml \
+  -n rhdh-operator
+```
+
+**Important notes:**
+
+- The ConfigMap must be created **before** the operator starts, or the operator must be restarted after creating/updating the ConfigMap
+- Configuration changes require operator pod restart (acceptable for air-gap scenarios where mirrors rarely change)
+- If the ConfigMap doesn't exist, no mirroring is applied (default behavior)
+- The operator deployment already includes the volume mount configuration with `optional: true`, so the operator will start successfully whether or not the ConfigMap exists
+
 
 ### Installing Operator on Openshift cluster
 https://docs.openshift.com/container-platform/4.15/operators/admin/olm-adding-operators-to-cluster.html 
