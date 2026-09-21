@@ -246,12 +246,14 @@ data:
           Authorization: 'client'
     {{- if eq .Rhdh.Runtime.Platform "ocp"}}
     rag:
-      tool:
-        - okp
-    okp:
-      rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'
-      offline: true
-      chunk_filter_query: 'product:*developer_hub*'
+      okp:
+        rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'
+        offline: true
+        chunk_filter_query: 'product:*developer_hub*'
+      retrieval:
+        tool:
+          sources:
+            - okp
     {{- end}}
 ---
 kind: ConfigMap
