@@ -35,10 +35,6 @@ metadata:
   labels:
     rhdh.redhat.com/managed-by: plugin-infra
 spec:
-  install:
-    preflight:
-      crdUpgradeSafety:
-        enforcement: None
   namespace: openshift-serverless
   serviceAccount:
     name: serverless-operator-installer

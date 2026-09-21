@@ -58,11 +58,12 @@ kubectl_get() {
 }
 
 resource_exists() {
-  local err
-  if kubectl_get "$@" >/dev/null; then
+  local err exit_code
+  err="$(kubectl_get "$@" 2>&1)"
+  exit_code=$?
+  if [[ ${exit_code} -eq 0 ]]; then
     return 0
   fi
-  err="$(kubectl_get "$@" || true)"
   if grep -qiE '(not found|NotFound)' <<<"${err}"; then
     return 1
   fi
@@ -145,6 +146,22 @@ detect_olm_v0_operatorgroup_crd() {
   crd_exists "operatorgroups.operators.coreos.com"
 }
 
+has_v0_operators_installed() {
+  if ! detect_olm_v0_subscription_crd; then
+    return 1
+  fi
+
+  if resource_exists "subscription/${SERVERLESS_OPERATOR_NAME}" -n openshift-serverless 2>/dev/null; then
+    return 0
+  fi
+
+  if resource_exists "subscription/${LOGIC_OPERATOR_NAME}" -n openshift-serverless-logic 2>/dev/null; then
+    return 0
+  fi
+
+  return 1
+}
+
 redhat_operators_catalog_exists() {
   local catalogs err exit_code
 
@@ -212,8 +229,15 @@ resolve_olm_version() {
 
   if detect_olm_v1_crd && detect_olm_v1_clustercatalog_crd; then
     if redhat_operators_catalog_exists; then
-      resolved_olm_version="v1"
-      echo "Auto-detected OLM v1 (ClusterExtension and ClusterCatalog CRDs found)"
+      # Check if operators are already installed via v0
+      if has_v0_operators_installed; then
+        resolved_olm_version="v0"
+        echo "Auto-detected OLM v0 (operators already installed via v0 Subscriptions)"
+        echo "  Note: To migrate to OLM v1, first run 'plugin-infra.sh delete' to remove v0 installations"
+      else
+        resolved_olm_version="v1"
+        echo "Auto-detected OLM v1 (ClusterExtension and ClusterCatalog CRDs found)"
+      fi
     else
       resolved_olm_version="v0"
       echo "Auto-detected OLM v0 (openshift-redhat-operators ClusterCatalog not found)"
@@ -295,21 +319,17 @@ wait_for_clusterextension_if_relevant() {
 wait_for_clusterextension_deleted() {
   local name="$1"
   local timeout="${2:-300}"
-  local elapsed=0
 
   if ! detect_olm_v1_crd; then
     return 0
   fi
 
+  if ! resource_exists "clusterextension/${name}"; then
+    return 0
+  fi
+
   echo "Waiting for ClusterExtension/${name} to be removed..."
-  while resource_exists "clusterextension/${name}"; do
-    if (( elapsed >= timeout )); then
-      echo "Timed out waiting for ClusterExtension/${name} deletion"
-      exit 1
-    fi
-    sleep 5
-    elapsed=$((elapsed + 5))
-  done
+  kubectl wait --for=delete "clusterextension/${name}" --timeout="${timeout}s"
 }
 
 delete_plugin_infra_v1_operator() {
