@@ -1,41 +1,36 @@
-name: PR PostgreSQL Upgrade Test
+name: Nightly PostgreSQL Upgrade Test
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches:
-      - 'main'
-    paths:
-      - '.github/workflows/pr-postgresql-upgrade-test.yaml'
-      - '.github/workflows/nightly-upgrade-test.yaml'
-      - '**/*.go'
-      - 'config/**'
-      - 'dist/rhdh/install.yaml'
-      - 'Dockerfile'
-      - 'go.mod'
-      - 'go.sum'
-      - 'Makefile'
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.number }}
-  cancel-in-progress: true
+  workflow_dispatch:
+  schedule:
+    - cron: "25 0 * * *"
 
 jobs:
   postgresql-upgrade:
-    name: E2E PostgreSQL 15 to 18
+    name: E2E PostgreSQL ${{ matrix.from_branch }} to ${{ matrix.to_branch }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.from_branch }}-${{ matrix.to_branch }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - from_branch: release-1.10
+            to_branch: main
     permissions:
       contents: read
     env:
       CONTAINER_ENGINE: docker
-      FROM_OPERATOR_MANIFEST: https://raw.githubusercontent.com/redhat-developer/rhdh-operator/refs/heads/release-1.10/dist/rhdh/install.yaml
+      FROM_OPERATOR_MANIFEST: https://raw.githubusercontent.com/${{ github.repository }}/refs/heads/${{ matrix.from_branch }}/dist/rhdh/install.yaml
       TO_OPERATOR_MANIFEST: ${{ github.workspace }}/dist/rhdh/install.yaml
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ matrix.to_branch }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -61,7 +56,7 @@ jobs:
 
       - name: Build target operator image and manifest
         env:
-          TO_OPERATOR_IMAGE: localhost/rhdh-operator:pr-${{ github.event.pull_request.head.sha }}
+          TO_OPERATOR_IMAGE: localhost/rhdh-operator:nightly-${{ matrix.from_branch }}-to-${{ matrix.to_branch }}-${{ github.run_id }}
         run: |
           make image-build build-installer PROFILE=rhdh IMG="$TO_OPERATOR_IMAGE"
           MANIFEST_IMAGE=$(yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image' "$TO_OPERATOR_MANIFEST")

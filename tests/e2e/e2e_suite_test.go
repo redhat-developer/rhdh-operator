@@ -220,14 +220,12 @@ var _ = SynchronizedAfterSuite(func() {
 },
 	// the function below *only* on process #1
 	func() {
-		fmt.Println(captureOperatorLogsBeforeCleanup(
-			fetchOperatorLogs(managerPodLabel, false),
-			func() {
-				uninstallOperator()
-				deleteOperatorManifest(os.Getenv("FROM_OPERATOR_MANIFEST"))
-				deleteOperatorManifest(os.Getenv("TO_OPERATOR_MANIFEST"))
-			},
-		))
+		defer func() {
+			uninstallOperator()
+			deleteOperatorManifest(os.Getenv("FROM_OPERATOR_MANIFEST"))
+			deleteOperatorManifest(os.Getenv("TO_OPERATOR_MANIFEST"))
+		}()
+		fmt.Println(fetchOperatorLogs(managerPodLabel, false)())
 	},
 )
 
@@ -300,12 +298,6 @@ func fetchOperatorLogs(managerPodLabel string, raw bool) func() string {
 		}
 		return fmt.Sprintf("=== Operator logs ===\n%s\n", logs)
 	}
-}
-
-func captureOperatorLogsBeforeCleanup(fetchLogs func() string, cleanup func()) string {
-	logs := fetchLogs()
-	cleanup()
-	return logs
 }
 
 func fetchOperandLogs(ns string, crLabel string, raw bool) func() string {

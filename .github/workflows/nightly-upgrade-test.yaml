@@ -158,5 +158,4 @@ jobs:
           TO_OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
           OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
           IMG: ${{ env.TO_OPERATOR_IMAGE }}
-          BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE: ${{ matrix.to_branch == 'main' }}
         run: make test-e2e-upgrade

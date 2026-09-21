@@ -34,34 +34,22 @@ type postgresqlUpgradeState struct {
 	databaseNames   []string
 }
 
-func postgresqlUpgradeCheckpoint(name string, fields ...string) string {
+func logPostgresqlUpgradeCheckpoint(name string, fields ...string) {
 	checkpoint := "postgresql-upgrade: " + name
 	if len(fields) > 0 {
 		checkpoint += " " + strings.Join(fields, " ")
 	}
-	return checkpoint
-}
-
-func logPostgresqlUpgradeCheckpoint(name string, fields ...string) {
-	fmt.Println(postgresqlUpgradeCheckpoint(name, fields...))
-}
-
-func formatPostgresqlUpgradeDiagnostics(operatorAndOperandLogs, postgresqlLogs, postgresqlDescription string) string {
-	return fmt.Sprintf(
-		"=== PostgreSQL upgrade diagnostics ===\n"+
-			"=== Operator and operand logs ===\n%s"+
-			"=== PostgreSQL logs ===\n%s"+
-			"=== PostgreSQL description ===\n%s",
-		operatorAndOperandLogs,
-		postgresqlLogs,
-		postgresqlDescription,
-	)
+	fmt.Println(checkpoint)
 }
 
 func postgresqlUpgradeDiagnostics(namespace, crName string) string {
 	crLabel := fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName)
 	postgresqlLabel := fmt.Sprintf("rhdh.redhat.com/app=%s", postgresqlStatefulSetName(crName))
-	return formatPostgresqlUpgradeDiagnostics(
+	return fmt.Sprintf(
+		"=== PostgreSQL upgrade diagnostics ===\n"+
+			"=== Operator and operand logs ===\n%s"+
+			"=== PostgreSQL logs ===\n%s"+
+			"=== PostgreSQL description ===\n%s",
 		fetchOperatorAndOperandLogs(managerPodLabel, namespace, crLabel),
 		getPodLogs(namespace, "", postgresqlLabel),
 		describePod(namespace, postgresqlLabel),
@@ -92,9 +80,8 @@ INSERT INTO public.rhdh_postgresql_upgrade_test VALUES ('`+postgresqlProofValue+
 		fmt.Sprintf("secretUID=%s", state.secretUID),
 		fmt.Sprintf("backstagePodUID=%s", state.backstagePodUID),
 		fmt.Sprintf("databases=%d", len(state.databaseNames)),
-		fmt.Sprintf("imageContains=%s", postgresqlSourceImage),
-		fmt.Sprintf("versionPrefix=%s", postgresqlSourceVersion),
 		fmt.Sprintf("proofDatabase=%s", postgresqlProofDatabase),
+		fmt.Sprintf("proofValue=%s", postgresqlProofValue),
 	)
 
 	By("stopping Backstage before taking the PostgreSQL dump")
@@ -159,8 +146,6 @@ func completePostgresqlUpgrade(namespace, crName string, state *postgresqlUpgrad
 		fmt.Sprintf("pvcUID=%s", targetPVCUID),
 		fmt.Sprintf("secretUID=%s", targetSecretUID),
 		"secretPreserved=true",
-		fmt.Sprintf("imageContains=%s", postgresqlTargetImage),
-		fmt.Sprintf("versionPrefix=%s", postgresqlTargetVersion),
 	)
 
 	By("restoring the PostgreSQL 15 dump into PostgreSQL 18")
