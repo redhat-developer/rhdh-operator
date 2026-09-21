@@ -5,7 +5,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: lightspeed-okp-{{backstage-name}}
+  name: intelligent-assistant-okp-{{backstage-name}}
 spec:
   replicas: 1
   selector:
