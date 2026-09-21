@@ -109,14 +109,15 @@ data:
     \     paths:\n        - /app-root/skills\n    mcp_servers:\n      - name: mcp-integration-tools\n
     \       provider_id: 'model-context-protocol'\n        url: 'http://localhost:7007/api/mcp-actions/v1'\n
     \       authorization_headers:\n          Authorization: 'client'\n    {{- if
-    eq .Rhdh.Runtime.Platform \"ocp\"}}\n    rag:\n      tool:\n        - okp\n    okp:\n
-    \     rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'\n      offline:
-    true\n      chunk_filter_query: 'product:*developer_hub*'\n    {{- end}}\n---\nkind:
-    ConfigMap\napiVersion: v1\nmetadata:\n  name: rhdh-profile\n  annotations:\n    rhdh.redhat.com/containers:
-    \"lightspeed-core\"\n    rhdh.redhat.com/mount-path: \"/app-root\"\n    rhdh.redhat.com/sub-path:
-    \"*\"\ndata:\n  rhdh-profile.py: |\n    # There is no need for enforcing line
-    length in this file,\n    # as these are mostly special purpose constants.\n    #
-    ruff: noqa: E501\n    \"\"\"Prompt templates/constants.\"\"\"\n    \n    SUBJECT_REJECTED
+    eq .Rhdh.Runtime.Platform \"ocp\"}}\n    rag:\n      okp:\n        rhokp_url:
+    '${env.OKP_SERVICE_URL:=http://localhost:8080}'\n        offline: true\n        chunk_filter_query:
+    'product:*developer_hub*'\n      retrieval:\n        tool:\n          sources:\n
+    \           - okp\n    {{- end}}\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n
+    \ name: rhdh-profile\n  annotations:\n    rhdh.redhat.com/containers: \"lightspeed-core\"\n
+    \   rhdh.redhat.com/mount-path: \"/app-root\"\n    rhdh.redhat.com/sub-path: \"*\"\ndata:\n
+    \ rhdh-profile.py: |\n    # There is no need for enforcing line length in this
+    file,\n    # as these are mostly special purpose constants.\n    # ruff: noqa:
+    E501\n    \"\"\"Prompt templates/constants.\"\"\"\n    \n    SUBJECT_REJECTED
     = \"REJECTED\"\n    SUBJECT_ALLOWED = \"ALLOWED\"\n    \n    # Default responses\n
     \   INVALID_QUERY_RESP = \"\"\"\n    Hi, I'm the Red Hat Developer Hub (RHDH)
     Intelligent Assistant.\n    I can help with questions related to software development,
@@ -255,7 +256,7 @@ data:
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:dev-20260811-0da4b12
+              image: quay.io/lightspeed-core/lightspeed-stack:dev-20260824-cbd182b # TODO: Update to 0.7.x release tag when available (by FF)
               imagePullPolicy: Always
               securityContext:
                 allowPrivilegeEscalation: false
