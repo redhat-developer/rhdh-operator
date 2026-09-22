@@ -21,7 +21,7 @@ type ObjectConfig struct {
 	// Single or multiple object
 	Multiple bool
 	// MergeFunc defines how configs from multiple flavours are merged
-	// nil means no flavour merging (base config only)
+	// Use noMerge for objects that don't support flavour merging (base config only)
 	MergeFunc MergeConfigFunc
 }
 

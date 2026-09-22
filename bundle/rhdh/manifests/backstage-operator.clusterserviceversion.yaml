@@ -342,7 +342,7 @@ spec:
                 - name: OPERATOR_DP_PROCESSING
                   value: "true"
                 - name: RELATED_IMAGE_postgresql
-                  value: quay.io/fedora/postgresql-15:latest
+                  value: quay.io/fedora/postgresql-18:latest
                 - name: RELATED_IMAGE_backstage
                   value: quay.io/rhdh-community/rhdh:next
                 - name: RELATED_IMAGE_plugin_installer
@@ -493,7 +493,7 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   relatedImages:
-  - image: quay.io/fedora/postgresql-15:latest
+  - image: quay.io/fedora/postgresql-18:latest
     name: postgresql
   - image: quay.io/rhdh-community/rhdh:next
     name: backstage

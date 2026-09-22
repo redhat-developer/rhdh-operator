@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -41,6 +40,7 @@ func TestDefault(t *testing.T) {
 	dbStatefulSet := model.GetRuntimeObject(DbStatefulSetKey).(*DbStatefulSet)
 	assert.Equal(t, dbService.service.Name, dbStatefulSet.statefulSet.Spec.ServiceName)
 	assert.Equal(t, corev1.ClusterIPNone, dbService.service.Spec.ClusterIP)
+	assert.Equal(t, "quay.io/fedora/postgresql-18:latest", dbStatefulSet.statefulSet.Spec.Template.Spec.Containers[0].Image)
 }
 
 // It tests the overriding image feature
@@ -52,7 +52,7 @@ func TestOverrideDbImage(t *testing.T) {
 	testObj := createBackstageTest(bs).withDefaultConfig(true).
 		addToDefaultConfig("db-statefulset.yaml", "rhdh-db-statefulset.yaml").withLocalDb(true)
 
-	_ = os.Setenv(LocalDbImageEnvVar, "dummy")
+	t.Setenv(LocalDbImageEnvVar, "dummy")
 
 	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
 	assert.NoError(t, err)
