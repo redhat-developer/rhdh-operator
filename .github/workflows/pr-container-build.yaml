@@ -41,7 +41,6 @@ jobs:
           files: |
             .github/workflows/pr-container-build.yaml
             .github/workflows/pr-container-push.yaml
-            .github/actions/docker-build/**
             Makefile
             **/*.go
             bundle/**
@@ -84,15 +83,16 @@ jobs:
           echo "BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Build operator image (hermetic)
+      - name: Build operator image
         if: steps.changed-files.outputs.any_changed == 'true'
-        uses: ./.github/actions/docker-build
-        with:
-          imageName: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/${{ env.OPERATOR_IMAGE_NAME }}
-          imageTags: type=raw,value=${{ steps.prep.outputs.VERSION }}
-          imageLabels: quay.expires-after=7d
-          platform: linux/amd64
-          skipArtifactUpload: 'true'
+        env:
+          CONTAINER_TOOL: podman
+          VERSION: ${{ steps.prep.outputs.VERSION }}
+          IMAGE_TAG_BASE: ${{ env.REGISTRY }}/${{ env.REGISTRY_ORG }}/${{ env.OPERATOR_IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+          sudo apt-get -y update; sudo apt-get -y install podman
+          make image-build PLATFORM=linux/amd64 LABEL=quay.expires-after=7d
 
       - name: Build bundle image
         if: steps.changed-files.outputs.any_changed == 'true'
