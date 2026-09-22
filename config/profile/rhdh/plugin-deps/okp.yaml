@@ -10,11 +10,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+      app.kubernetes.io/name: intelligent-assistant-okp-{{backstage-name}}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+        app.kubernetes.io/name: intelligent-assistant-okp-{{backstage-name}}
     spec:
       # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
       automountServiceAccountToken: false
@@ -66,13 +66,13 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: lightspeed-okp-{{backstage-name}}
+  name: intelligent-assistant-okp-{{backstage-name}}
   annotations:
     rhdh.redhat.com/platform: ocp
 spec:
   to:
     kind: Service
-    name: lightspeed-okp-{{backstage-name}}
+    name: intelligent-assistant-okp-{{backstage-name}}
   port:
     targetPort: httpd
   tls:
@@ -84,11 +84,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: lightspeed-okp-{{backstage-name}}
+  name: intelligent-assistant-okp-{{backstage-name}}
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+    app.kubernetes.io/name: intelligent-assistant-okp-{{backstage-name}}
   ports:
     - name: httpd
       port: 8080

@@ -73,7 +73,7 @@ The example lists both flavours explicitly. Because Intelligent Assistant is ena
 
 The first installation can take significantly longer while the large OKP image is downloaded.
 
-On OpenShift, the Operator creates an OKP Deployment, Service, and Route and configures Lightspeed Core to use the HTTP Route automatically. For optional HTTPS configuration on a cluster with a private router CA, see [Using HTTPS for OKP on OpenShift](intelligent-assistant-okp-openshift-https.md).
+On OpenShift, the Operator creates an OKP Deployment, Service, and Route and configures Lightspeed Core to use the HTTP Route automatically. For OpenShift configuration and optional HTTPS on a cluster with a private router CA, see [Enabling OKP on OpenShift](intelligent-assistant-okp-openshift.md).
 
 On Kubernetes, the Operator creates the OKP Deployment and Service but does not manage Ingress. Registry authentication, networking, and the public `OKP_SERVICE_URL` must be configured by the user. See [Enabling OKP on Kubernetes](intelligent-assistant-okp-kubernetes.md).
 

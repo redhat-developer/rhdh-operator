@@ -434,7 +434,7 @@ var _ = When("create default rhdh", func() {
 			okpService := &corev1.Service{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
 				Namespace: ns,
-				Name:      "lightspeed-okp-" + backstageName,
+				Name:      "intelligent-assistant-okp-" + backstageName,
 			}, okpService)
 			g.Expect(err).ShouldNot(HaveOccurred())
 

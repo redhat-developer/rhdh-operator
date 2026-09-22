@@ -184,7 +184,7 @@ data:
               {{- if eq .Rhdh.Runtime.Platform "ocp"}}
               env:
                 - name: OKP_SERVICE_URL
-                  value: "http://lightspeed-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
+                  value: "http://intelligent-assistant-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
               {{- end}}
   dynamic-plugins.yaml: |
     apiVersion: v1

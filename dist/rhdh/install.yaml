@@ -3051,7 +3051,7 @@ data:
                 - name: MAX_ENTRY_SIZE
                   value: "40000000"
                 - name: CATALOG_INDEX_IMAGE
-                  value: "quay.io/rhdh/plugin-catalog-index:2.0.0"
+                  value: "quay.io/rhdh/plugin-catalog-index:2.1.0"
                 - name: CATALOG_ENTITIES_EXTRACT_DIR
                   value: '/extensions'
                 - name: INPUT_FILE
@@ -3738,7 +3738,7 @@ data:
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:dev-20260824-cbd182b # TODO: Update to 0.7.x release tag when available (by FF)
+              image: quay.io/lightspeed-core/lightspeed-stack:0.7.0rc3 # TODO: Update to 0.7.x release tag when available (by FF)
               imagePullPolicy: Always
               securityContext:
                 allowPrivilegeEscalation: false
@@ -4016,7 +4016,7 @@ data:
               {{- if eq .Rhdh.Runtime.Platform "ocp"}}
               env:
                 - name: OKP_SERVICE_URL
-                  value: "http://lightspeed-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
+                  value: "http://intelligent-assistant-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
               {{- end}}
   dynamic-plugins.yaml: |
     apiVersion: v1
@@ -4207,11 +4207,11 @@ data:
       replicas: 1
       selector:
         matchLabels:
-          app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+          app.kubernetes.io/name: intelligent-assistant-okp-{{backstage-name}}
       template:
         metadata:
           labels:
-            app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+            app.kubernetes.io/name: intelligent-assistant-okp-{{backstage-name}}
         spec:
           # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
           automountServiceAccountToken: false
@@ -4263,13 +4263,13 @@ data:
     apiVersion: route.openshift.io/v1
     kind: Route
     metadata:
-      name: lightspeed-okp-{{backstage-name}}
+      name: intelligent-assistant-okp-{{backstage-name}}
       annotations:
         rhdh.redhat.com/platform: ocp
     spec:
       to:
         kind: Service
-        name: lightspeed-okp-{{backstage-name}}
+        name: intelligent-assistant-okp-{{backstage-name}}
       port:
         targetPort: httpd
       tls:
@@ -4281,11 +4281,11 @@ data:
     apiVersion: v1
     kind: Service
     metadata:
-      name: lightspeed-okp-{{backstage-name}}
+      name: intelligent-assistant-okp-{{backstage-name}}
     spec:
       type: ClusterIP
       selector:
-        app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+        app.kubernetes.io/name: intelligent-assistant-okp-{{backstage-name}}
       ports:
         - name: httpd
           port: 8080
@@ -4875,7 +4875,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/rhdh-community/operator:2.0.0
+        image: quay.io/rhdh-community/operator:2.1.0
         livenessProbe:
           httpGet:
             path: /healthz
@@ -4952,4 +4952,4 @@ metadata:
   namespace: rhdh-operator
 spec:
   source:
-    ref: oci://quay.io/rhdh/plugin-catalog-index:2.0.0
+    ref: oci://quay.io/rhdh/plugin-catalog-index:2.1.0

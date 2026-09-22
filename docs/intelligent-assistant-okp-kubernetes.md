@@ -84,7 +84,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: lightspeed-okp-developer-hub
+                name: intelligent-assistant-okp-developer-hub
                 port:
                   number: 8080
 ```
