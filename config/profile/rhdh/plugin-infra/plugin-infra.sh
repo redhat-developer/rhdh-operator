@@ -11,7 +11,6 @@ cicd=false   # Default CICD mode
 olm_version="auto" # Default OLM version (v0, v1, or auto-detect)
 resolved_olm_version=""
 
-PLUGIN_INFRA_LABEL_KEY="rhdh.redhat.com/managed-by"
 PLUGIN_INFRA_LABEL_VALUE="plugin-infra"
 REDHAT_OPERATORS_CATALOG_LABEL="olm.operatorframework.io/metadata.name=openshift-redhat-operators"
 SERVERLESS_OPERATOR_NAME="serverless-operator"
