@@ -26,15 +26,11 @@ type RuntimeInfo struct {
 	IngressDomain string // OpenShift ingress domain (empty on k8s or if unavailable)
 }
 
-// templateData holds the current template data for YAML processing.
-var templateData *TemplateData
-
-// SetTemplateData sets the template data for YAML file processing.
-// Call this once before reading config files.
+// NewTemplateData constructs template data for YAML file processing.
 // Accepts structured objects for extensibility - new template fields can be added
 // by reading additional data from these objects without changing the signature.
-func SetTemplateData(backstage BackstageCR, platform Platform, externalConfig ExternalConfig) {
-	templateData = &TemplateData{
+func NewTemplateData(backstage BackstageCR, platform Platform, externalConfig ExternalConfig) *TemplateData {
+	return &TemplateData{
 		Rhdh: RhdhData{
 			Name:      backstage.GetName(),
 			Namespace: backstage.GetNamespace(),
@@ -63,8 +59,8 @@ type ExternalConfig interface {
 // ApplyTemplate applies Go template substitution to content if templateData is set
 // and the content contains our template variables ({{.Rhdh.}}).
 // Returns content unchanged if no template data has been set or no template variables found.
-func ApplyTemplate(content []byte) ([]byte, error) {
-	if templateData == nil {
+func ApplyTemplate(data *TemplateData, content []byte) ([]byte, error) {
+	if data == nil {
 		return content, nil
 	}
 	// Only parse as template if our specific variables are present
@@ -89,7 +85,7 @@ func ApplyTemplate(content []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse template: %w", err)
 	}
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, templateData); err != nil {
+	if err := tmpl.Execute(&buf, data); err != nil {
 		return nil, fmt.Errorf("failed to execute template: %w", err)
 	}
 	return buf.Bytes(), nil

@@ -9,20 +9,19 @@ import (
 )
 
 func TestApplyTemplate(t *testing.T) {
-	// Set template data
-	SetTemplateData(
+	// Create template data
+	templateData := NewTemplateData(
 		&MockBackstageCR{Name: "my-backstage", Namespace: "my-namespace"},
 		&MockPlatform{Extension: "openshift"},
 		&MockExternalConfig{IngressDomain: "apps.example.com"},
 	)
-	defer func() { templateData = nil }()
 
 	// Read YAML with template variables
 	conf, err := os.ReadFile("testdata/configmap-template.yaml")
 	require.NoError(t, err)
 
 	// Apply templates
-	templated, err := ApplyTemplate(conf)
+	templated, err := ApplyTemplate(templateData, conf)
 	require.NoError(t, err)
 
 	expected := `apiVersion: v1
@@ -37,13 +36,12 @@ data:
 }
 
 func TestApplyTemplateSkipsNonRhdhPatterns(t *testing.T) {
-	// Set template data
-	SetTemplateData(
+	// Create template data
+	templateData := NewTemplateData(
 		&MockBackstageCR{Name: "my-backstage", Namespace: "my-namespace"},
 		&MockPlatform{Extension: "kubernetes"},
 		&MockExternalConfig{IngressDomain: ""},
 	)
-	defer func() { templateData = nil }()
 
 	tests := []struct {
 		name    string
@@ -90,7 +88,7 @@ data:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			content := []byte(tt.content)
-			result, err := ApplyTemplate(content)
+			result, err := ApplyTemplate(templateData, content)
 			assert.NoError(t, err)
 			// Content should be unchanged since it doesn't contain .Rhdh. references
 			assert.Equal(t, content, result)
@@ -99,11 +97,9 @@ data:
 }
 
 func TestApplyTemplateWithNoDataSet(t *testing.T) {
-	// Don't set template data
-	templateData = nil
-
+	// Pass nil template data
 	content := []byte(`name: {{.Rhdh.Name}}`)
-	result, err := ApplyTemplate(content)
+	result, err := ApplyTemplate(nil, content)
 
 	assert.NoError(t, err)
 	// Should return unchanged
@@ -111,18 +107,17 @@ func TestApplyTemplateWithNoDataSet(t *testing.T) {
 }
 
 func TestApplyTemplateWithRuntimeInfo(t *testing.T) {
-	SetTemplateData(
+	templateData := NewTemplateData(
 		&MockBackstageCR{Name: "test-app", Namespace: "test-ns"},
 		&MockPlatform{Extension: "openshift"},
 		&MockExternalConfig{IngressDomain: "apps.example.com"},
 	)
-	defer func() { templateData = nil }()
 
 	content := []byte(`platform: {{.Rhdh.Runtime.Platform}}
 domain: {{.Rhdh.Runtime.IngressDomain}}
 url: https://{{.Rhdh.Name}}.{{.Rhdh.Runtime.IngressDomain}}`)
 
-	result, err := ApplyTemplate(content)
+	result, err := ApplyTemplate(templateData, content)
 	require.NoError(t, err)
 
 	expected := `platform: openshift
@@ -239,14 +234,13 @@ data:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			SetTemplateData(
+			templateData := NewTemplateData(
 				&MockBackstageCR{Name: "test-app", Namespace: "test-ns"},
 				&MockPlatform{Extension: tt.platform},
 				&MockExternalConfig{IngressDomain: tt.ingressDomain},
 			)
-			defer func() { templateData = nil }()
 
-			result, err := ApplyTemplate([]byte(tt.content))
+			result, err := ApplyTemplate(templateData, []byte(tt.content))
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.expectedContent, string(result))
@@ -255,12 +249,11 @@ data:
 }
 
 func TestApplyTemplateWithEscapedBraces(t *testing.T) {
-	SetTemplateData(
+	templateData := NewTemplateData(
 		&MockBackstageCR{Name: "test-app", Namespace: "test-ns"},
 		&MockPlatform{Extension: "k8s"},
 		&MockExternalConfig{IngressDomain: ""},
 	)
-	defer func() { templateData = nil }()
 
 	// Simulates configmap-files.yaml with both .Rhdh. conditionals and escaped {{message}}
 	content := `apiVersion: v1
@@ -279,7 +272,7 @@ data:
     """
 `
 
-	result, err := ApplyTemplate([]byte(content))
+	result, err := ApplyTemplate(templateData, []byte(content))
 	require.NoError(t, err)
 
 	expected := `apiVersion: v1

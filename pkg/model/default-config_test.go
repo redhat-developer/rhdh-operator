@@ -283,8 +283,8 @@ func TestTemplateSubstitution_DefaultConfig(t *testing.T) {
 	testDataDir, _ := filepath.Abs("testdata/testflavours")
 	t.Setenv("LOCALBIN", testDataDir)
 
-	// Set template data
-	template.SetTemplateData(
+	// Create template data
+	templateData := template.NewTemplateData(
 		&template.MockBackstageCR{Name: "test-backstage", Namespace: "test-ns"},
 		&template.MockPlatform{Extension: "kubernetes"},
 		&template.MockExternalConfig{IngressDomain: ""},
@@ -298,6 +298,7 @@ func TestTemplateSubstitution_DefaultConfig(t *testing.T) {
 		ObjectConfig{Key: ConfigMapEnvsKey, MergeFunc: mergeMultiObjectConfigs},
 		[]enabledFlavour{},
 		*scheme, "",
+		templateData,
 	)
 	require.NoError(t, err)
 	require.Len(t, objs, 1)
@@ -312,8 +313,8 @@ func TestTemplateSubstitution_Flavour(t *testing.T) {
 	testDataDir, _ := filepath.Abs("testdata/testflavours")
 	t.Setenv("LOCALBIN", testDataDir)
 
-	// Set template data
-	template.SetTemplateData(
+	// Create template data
+	templateData := template.NewTemplateData(
 		&template.MockBackstageCR{Name: "my-instance", Namespace: "my-ns"},
 		&template.MockPlatform{Extension: "kubernetes"},
 		&template.MockExternalConfig{IngressDomain: ""},
@@ -333,6 +334,7 @@ func TestTemplateSubstitution_Flavour(t *testing.T) {
 		ObjectConfig{Key: ConfigMapEnvsKey, MergeFunc: mergeMultiObjectConfigs},
 		flavours,
 		*scheme, "",
+		templateData,
 	)
 	require.NoError(t, err)
 

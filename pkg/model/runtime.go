@@ -163,8 +163,9 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		}
 	}
 
-	// Set template data for config file substitution ({{.Rhdh.Name}}, {{.Rhdh.Namespace}}, etc.)
-	template.SetTemplateData(&backstage, &platform, &externalConfig)
+	// Create template data for config file substitution ({{.Rhdh.Name}}, {{.Rhdh.Namespace}}, etc.)
+	// Each reconciliation gets its own isolated instance to avoid race conditions
+	templateData := template.NewTemplateData(&backstage, &platform, &externalConfig)
 
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
@@ -193,7 +194,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 
 		// If no overlay, use default config
 		if chosenConfig == nil {
-			if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
+			if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension, templateData); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
 					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %w", conf.Key, err)
 				}

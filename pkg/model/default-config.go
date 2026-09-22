@@ -20,7 +20,7 @@ import (
 // 1. Collect config file paths from enabled flavours and base
 // 2. Apply templates to all sources
 // 3. Merge configs using the object's MergeFunc
-func ReadDefaultConfig(conf ObjectConfig, flavours []enabledFlavour, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
+func ReadDefaultConfig(conf ObjectConfig, flavours []enabledFlavour, scheme runtime.Scheme, platformExt string, templateData *template.TemplateData) ([]client.Object, error) {
 
 	basePath := utils.DefFile(conf.Key)
 
@@ -34,7 +34,7 @@ func ReadDefaultConfig(conf ObjectConfig, flavours []enabledFlavour, scheme runt
 
 	// Step 3: Apply templates to all sources before merging
 	for i := range configSources {
-		templated, err := template.ApplyTemplate(configSources[i].content)
+		templated, err := template.ApplyTemplate(templateData, configSources[i].content)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply template to %s: %w", configSources[i].path, err)
 		}
