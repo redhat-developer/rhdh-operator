@@ -1,0 +1,20 @@
+# NetworkPolicy to allow Backstage pod to access OKP service for Intelligent Assistant flavour
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-okp-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Egress
+  egress:
+    # Allow HTTP egress on port 80 (for OKP external route through OpenShift router)
+    - ports:
+        - protocol: TCP
+          port: 80
+    # Allow HTTP egress on port 8080 (for OKP internal service or external route if using :8080)
+    - ports:
+        - protocol: TCP
+          port: 8080
