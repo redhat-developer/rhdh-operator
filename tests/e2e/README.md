@@ -165,3 +165,15 @@ $ make test-e2e \
     BACKSTAGE_OPERATOR_TEST_MODE=rhdh-airgap \
     BACKSTAGE_OPERATOR_TESTS_AIRGAP_MIRROR_REGISTRY=my-registry.example.com
 ```
+
+#### Testing against an existing cluster with OLM v1
+
+In this scenario, you want to run E2E tests against an existing OpenShift cluster with OLM v1 (ClusterExtension). The install script auto-detects OLM v1 and deploys via `ClusterCatalog` + `ClusterExtension`.
+
+On clusters with `WaitForFirstConsumer` storage classes, the `raw-runtime-config` test may need a longer reachability timeout while generic ephemeral volume PVCs are provisioned:
+
+```shell
+$ make test-e2e \
+    BACKSTAGE_OPERATOR_TEST_MODE=rhdh-latest \
+    BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT=15m
+```
