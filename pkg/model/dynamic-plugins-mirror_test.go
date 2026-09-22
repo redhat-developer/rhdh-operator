@@ -121,6 +121,77 @@ func TestApplyMirror(t *testing.T) {
 			},
 			expected: "oci://internal-mirror.example.com/redhat/rhdh/plugin:1.0",
 		},
+		// Boundary tests - prevent incorrect prefix matches
+		{
+			name: "registry substring does not match different domain",
+			ref:  "oci://quay.io.malicious.com/plugin:1.0",
+			mirrors: &ImageDigestMirrors{
+				ImageDigestMirrors: []ImageDigestMirror{
+					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
+				},
+			},
+			expected: "oci://quay.io.malicious.com/plugin:1.0", // NOT mirrored
+		},
+		{
+			name: "namespace substring does not match different namespace",
+			ref:  "oci://quay.io/foobar/plugin:1.0",
+			mirrors: &ImageDigestMirrors{
+				ImageDigestMirrors: []ImageDigestMirror{
+					{Source: "quay.io/foo", Mirrors: []string{"mirror.example.com/foo"}},
+				},
+			},
+			expected: "oci://quay.io/foobar/plugin:1.0", // NOT mirrored
+		},
+		{
+			name: "plugin name substring does not match sibling plugin",
+			ref:  "oci://quay.io/rhdh/backstage-plugin-orchestrator-backend:1.0",
+			mirrors: &ImageDigestMirrors{
+				ImageDigestMirrors: []ImageDigestMirror{
+					{Source: "quay.io/rhdh/backstage-plugin-orchestrator", Mirrors: []string{"mirror.example.com/orchestrator"}},
+				},
+			},
+			expected: "oci://quay.io/rhdh/backstage-plugin-orchestrator-backend:1.0", // NOT mirrored
+		},
+		{
+			name: "exact repository match with tag",
+			ref:  "oci://quay.io/rhdh/backstage-plugin-orchestrator:1.0",
+			mirrors: &ImageDigestMirrors{
+				ImageDigestMirrors: []ImageDigestMirror{
+					{Source: "quay.io/rhdh/backstage-plugin-orchestrator", Mirrors: []string{"mirror.example.com/orchestrator"}},
+				},
+			},
+			expected: "oci://mirror.example.com/orchestrator:1.0", // Mirrored - exact match followed by :
+		},
+		{
+			name: "exact repository match with digest",
+			ref:  "oci://quay.io/rhdh/backstage-plugin-orchestrator@sha256:abc123",
+			mirrors: &ImageDigestMirrors{
+				ImageDigestMirrors: []ImageDigestMirror{
+					{Source: "quay.io/rhdh/backstage-plugin-orchestrator", Mirrors: []string{"mirror.example.com/orchestrator"}},
+				},
+			},
+			expected: "oci://mirror.example.com/orchestrator@sha256:abc123", // Mirrored - exact match followed by @
+		},
+		{
+			name: "registry with port does not match registry without port",
+			ref:  "oci://localhost:5000/plugin:1.0",
+			mirrors: &ImageDigestMirrors{
+				ImageDigestMirrors: []ImageDigestMirror{
+					{Source: "localhost", Mirrors: []string{"mirror.example.com/local"}},
+				},
+			},
+			expected: "oci://localhost:5000/plugin:1.0", // NOT mirrored - "localhost" != "localhost:5000"
+		},
+		{
+			name: "registry with port matches exactly",
+			ref:  "oci://localhost:5000/plugin:1.0",
+			mirrors: &ImageDigestMirrors{
+				ImageDigestMirrors: []ImageDigestMirror{
+					{Source: "localhost:5000", Mirrors: []string{"mirror.example.com/local"}},
+				},
+			},
+			expected: "oci://mirror.example.com/local/plugin:1.0", // Mirrored - exact match followed by /
+		},
 	}
 
 	for _, tt := range tests {
@@ -264,4 +335,90 @@ func TestGetMirrorConfig(t *testing.T) {
 	assert.NoError(t, err, "should not error when default config file doesn't exist")
 	// mirrors will be nil in test env where /plugins-mirror/mirrors.yaml doesn't exist
 	// In production with ConfigMap mounted, it would return the config
+}
+
+func TestIsOCIMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		ref      string
+		source   string
+		expected bool
+	}{
+		// Valid matches - followed by OCI delimiters
+		{
+			name:     "exact match",
+			ref:      "quay.io/rhdh",
+			source:   "quay.io/rhdh",
+			expected: true,
+		},
+		{
+			name:     "followed by slash",
+			ref:      "quay.io/rhdh/plugin",
+			source:   "quay.io/rhdh",
+			expected: true,
+		},
+		{
+			name:     "followed by colon (tag)",
+			ref:      "quay.io/rhdh/plugin:1.0",
+			source:   "quay.io/rhdh/plugin",
+			expected: true,
+		},
+		{
+			name:     "followed by at (digest)",
+			ref:      "quay.io/rhdh/plugin@sha256:abc",
+			source:   "quay.io/rhdh/plugin",
+			expected: true,
+		},
+		{
+			name:     "registry followed by slash",
+			ref:      "quay.io/rhdh",
+			source:   "quay.io",
+			expected: true,
+		},
+		{
+			name:     "registry with port followed by slash",
+			ref:      "localhost:5000/plugin",
+			source:   "localhost:5000",
+			expected: true,
+		},
+		// Invalid matches - not at boundary
+		{
+			name:     "substring in domain",
+			ref:      "quay.io.malicious.com/plugin",
+			source:   "quay.io",
+			expected: false,
+		},
+		{
+			name:     "substring in namespace",
+			ref:      "quay.io/foobar/plugin",
+			source:   "quay.io/foo",
+			expected: false,
+		},
+		{
+			name:     "substring in plugin name",
+			ref:      "quay.io/rhdh/backstage-plugin-orchestrator-backend",
+			source:   "quay.io/rhdh/backstage-plugin-orchestrator",
+			expected: false,
+		},
+		{
+			name:     "registry without port vs with port",
+			ref:      "localhost:5000/plugin",
+			source:   "localhost",
+			expected: false,
+		},
+		{
+			name:     "no prefix match at all",
+			ref:      "ghcr.io/example/plugin",
+			source:   "quay.io",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isOCIMatch(tt.ref, tt.source)
+			assert.Equal(t, tt.expected, result,
+				"isOCIMatch(%q, %q) = %v, expected %v", tt.ref, tt.source, result, tt.expected)
+		})
+	}
 }

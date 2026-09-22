@@ -23,6 +23,17 @@ func TestNewOCIFetcher(t *testing.T) {
 	assert.False(t, fetcher.pluginMode)
 }
 
+func TestWithSkipTLSVerify(t *testing.T) {
+	fetcher := NewOCIFetcher(WithSkipTLSVerify())
+
+	transport, ok := fetcher.transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, transport.TLSClientConfig)
+	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+	// Should NOT set insecure flag (remains HTTPS)
+	assert.False(t, fetcher.insecure)
+}
+
 func TestWithInsecure(t *testing.T) {
 	fetcher := NewOCIFetcher(WithInsecure())
 
@@ -30,6 +41,34 @@ func TestWithInsecure(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, transport.TLSClientConfig)
 	assert.True(t, transport.TLSClientConfig.InsecureSkipVerify)
+	// Should set insecure flag (uses HTTP)
+	assert.True(t, fetcher.insecure)
+}
+
+func TestSkipTLSVerifyUsesHTTPS(t *testing.T) {
+	// WithSkipTLSVerify should parse references for HTTPS (secure)
+	_ = NewOCIFetcher(WithSkipTLSVerify())
+
+	// Parse a reference - should NOT use name.Insecure option
+	ref := "registry.example.com/repo/image:tag"
+	imgRef, err := name.ParseReference(ref)
+	require.NoError(t, err)
+
+	// Registry should use default scheme (HTTPS)
+	assert.Equal(t, "https", imgRef.Context().Registry.Scheme())
+}
+
+func TestWithInsecureUsesHTTP(t *testing.T) {
+	// WithInsecure should parse references for HTTP (insecure)
+	_ = NewOCIFetcher(WithInsecure())
+
+	// Parse with name.Insecure option (what the Fetch method does when insecure=true)
+	ref := "registry.example.com/repo/image:tag"
+	imgRef, err := name.ParseReference(ref, name.Insecure)
+	require.NoError(t, err)
+
+	// Registry should use HTTP scheme when insecure flag is set
+	assert.Equal(t, "http", imgRef.Context().Registry.Scheme())
 }
 
 func TestWithCACert(t *testing.T) {

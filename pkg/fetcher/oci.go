@@ -48,11 +48,25 @@ func NewOCIFetcher(opts ...OCIOption) *OCIFetcher {
 // OCIOption configures the OCIFetcher
 type OCIOption func(*OCIFetcher)
 
+// WithSkipTLSVerify skips TLS certificate verification while keeping HTTPS protocol.
+// Use this for HTTPS registries with self-signed or untrusted certificates.
+// The connection remains encrypted (HTTPS), only certificate validation is skipped.
+// Not recommended for production use.
+func WithSkipTLSVerify() OCIOption {
+	return func(c *OCIFetcher) {
+		c.transport = &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		}
+	}
+}
+
 // WithInsecure enables plain HTTP protocol and disables TLS certificate verification.
 // This applies to ALL registries accessed by this fetcher.
+// WARNING: Exposes credentials over plain text. Use only for HTTP-only registries.
 // When enabled:
 // - Uses HTTP protocol instead of HTTPS
-// - Skips TLS certificate verification for HTTPS connections
+// - Skips TLS certificate verification for any HTTPS fallback
 func WithInsecure() OCIOption {
 	return func(c *OCIFetcher) {
 		c.insecure = true

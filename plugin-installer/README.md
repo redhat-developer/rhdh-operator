@@ -54,7 +54,8 @@ All configuration is via environment variables.
 | `SKIP_INTEGRITY_CHECK` | `false` | Skip integrity verification |
 | `DOCKER_CONFIG` | | Path to docker config.json for OCI registry auth |
 | `CA_FILE` | | Path to CA certificate file for TLS |
-| `INSECURE` | `false` | Skip TLS verification |
+| `INSECURE` | `false` | Enable plain HTTP protocol for registries. WARNING: Exposes credentials in plain text. |
+| `SKIP_TLS_VERIFY` | `false` | Skip TLS certificate verification for HTTPS registries (connection remains encrypted) |
 | `PLUGIN_MODE` | `true` | Enable plugin mode: validate annotation and extract plugin subdirectory |
 | `CATALOG_INDEX_IMAGE` | | OCI image containing catalog-entities for Extensions UI |
 | `CATALOG_ENTITIES_EXTRACT_DIR` | `/tmp/extensions` | Directory for extracted catalog entities |
@@ -327,7 +328,18 @@ The downloaded file doesn't match the expected hash. Verify the integrity string
 
 ### "x509: certificate signed by unknown authority"
 
-For private registries with custom CA, set `CA_FILE` to the CA certificate path, or set `INSECURE=true` (not recommended for production).
+For private OCI registries with self-signed certificates:
+- **Recommended**: Set `CA_FILE` to the CA certificate path
+- **Alternative**: Set `SKIP_TLS_VERIFY=true` to skip certificate verification (not recommended for production)
+  - Connection remains encrypted (HTTPS)
+  - Only certificate validation is skipped
+
+### Plain HTTP Registry Support
+
+For registries that only support plain HTTP (not HTTPS):
+- Set `INSECURE=true` to enable plain HTTP protocol
+- **WARNING**: Credentials are transmitted in plain text
+- Only use for trusted internal networks or development environments
 
 ### Lock file issues
 

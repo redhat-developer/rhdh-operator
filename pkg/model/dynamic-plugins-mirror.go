@@ -43,7 +43,7 @@ func ApplyMirror(ref string, mirrors *ImageDigestMirrors) string {
 
 	for i := range mirrors.ImageDigestMirrors {
 		m := &mirrors.ImageDigestMirrors[i]
-		if strings.HasPrefix(ociRef, m.Source) {
+		if isOCIMatch(ociRef, m.Source) {
 			// Most specific match = longest source string
 			if len(m.Source) > bestMatchLen {
 				bestMatch = m
@@ -59,6 +59,38 @@ func ApplyMirror(ref string, mirrors *ImageDigestMirrors) string {
 	}
 
 	return ref
+}
+
+// isOCIMatch checks if source matches the beginning of ref at an OCI boundary.
+// Valid matches require source to be followed by: /, :, @, or end of string.
+// This prevents "quay.io/foo" from matching "quay.io/foobar" and
+// "quay.io" from matching "quay.io.example.com".
+func isOCIMatch(ref, source string) bool {
+	if !strings.HasPrefix(ref, source) {
+		return false
+	}
+
+	// Exact match
+	if len(ref) == len(source) {
+		return true
+	}
+
+	// Check boundary - must be followed by valid OCI delimiter
+	nextChar := ref[len(source)]
+
+	// '/' and '@' are always valid delimiters
+	if nextChar == '/' || nextChar == '@' {
+		return true
+	}
+
+	// ':' is only valid for tags, not registry ports.
+	// If source contains '/', it's a repository path and ':' indicates a tag.
+	// If source has no '/', it's just a registry and ':' could be a port.
+	if nextChar == ':' && strings.Contains(source, "/") {
+		return true
+	}
+
+	return false
 }
 
 // GetMirrorConfig reads mirror configuration from mounted file

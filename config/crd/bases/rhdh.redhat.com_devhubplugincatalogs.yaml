@@ -102,8 +102,11 @@ spec:
                     type: string
                   skipTLSVerify:
                     default: false
-                    description: SkipTLSVerify skips TLS certificate verification
-                      (not recommended for production)
+                    description: |-
+                      SkipTLSVerify skips TLS certificate verification for HTTPS connections.
+                      The connection remains encrypted (HTTPS), only certificate validation is skipped.
+                      Use for registries with self-signed certificates.
+                      Not recommended for production use.
                     type: boolean
                 required:
                 - ref

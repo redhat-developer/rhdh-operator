@@ -125,6 +125,10 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 			b.podSpec().InitContainers[i].Command = []string{}
 			b.container().Args = []string{}
 
+			// Remove imagePullPolicy to let Kubernetes apply its defaults:
+			// - :latest tag → Always (ensures fresh images in dev)
+			// - @sha256:... digest → IfNotPresent (efficient in prod)
+			b.podSpec().InitContainers[i].ImagePullPolicy = ""
 		}
 
 		if err := b.setDeployment(backstage); err != nil {
