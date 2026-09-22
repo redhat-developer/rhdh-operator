@@ -1,0 +1,434 @@
+name: PR Container Push
+
+on:
+  workflow_run:
+    workflows: ["PR Container Build"]
+    types:
+      - completed
+
+env:
+  REGISTRY: ${{ vars.REGISTRY || 'quay.io' }}
+  REGISTRY_ORG: ${{ vars.REGISTRY_ORG || 'rhdh-community' }}
+  OPERATOR_IMAGE_NAME: ${{ vars.OPERATOR_IMAGE_NAME || 'operator' }}
+  # renovate: datasource=github-releases depName=operator-framework/operator-registry
+  OPM_VERSION: v1.72.0
+  # Update this checksum when OPM_VERSION changes (sha256 of linux-amd64-opm from checksums.txt)
+  OPM_SHA256: b81b337baf851698a96b70fc5d419b6f239a8856c4f598df65b225d56c39fff6
+  # OLM catalog constants (must match the rhdh profile in the Makefile)
+  BUNDLE_METADATA_PACKAGE_NAME: rhdh
+  DEFAULT_CHANNEL: fast
+  PROFILE_SHORT: rhdh
+
+concurrency:
+  group: >-
+    ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  pr-push:
+    name: Push PR Container Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: Get the PR number from the workflow run
+        id: pr-number
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const sha = context.payload.workflow_run.head_sha;
+            const branch = context.payload.workflow_run.head_branch;
+            const headRepoOwner = context.payload.workflow_run.head_repository?.owner?.login;
+            const isFork = headRepoOwner && headRepoOwner !== context.repo.owner;
+
+            console.log(`Commit SHA: ${sha}`);
+            console.log(`Branch: ${branch}`);
+            console.log(`Head repo owner: ${headRepoOwner}`);
+            console.log(`Is fork: ${isFork}`);
+
+            // Method 1: Try to get PR from workflow_run.pull_requests (works for non-fork PRs)
+            const workflowPRs = context.payload.workflow_run.pull_requests || [];
+            if (workflowPRs.length > 0) {
+              console.log(`Found PR #${workflowPRs[0].number} from workflow_run.pull_requests`);
+              core.setOutput("number", workflowPRs[0].number);
+              return;
+            }
+            console.log("No PRs in workflow_run.pull_requests, trying API lookup...");
+
+            // Method 2: Try listPullRequestsAssociatedWithCommit
+            const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha,
+            });
+
+            console.log(`Found ${pulls.length} PR(s) via listPullRequestsAssociatedWithCommit`);
+            pulls.forEach(p => console.log(`  - PR #${p.number}: state=${p.state}`));
+
+            let pr = pulls.find(p => p.state === "open");
+
+            // Method 3: If no results and this is a fork, try searching by branch
+            if (!pr && isFork) {
+              console.log(`Trying branch-based lookup for fork: ${headRepoOwner}:${branch}`);
+              const { data: branchPulls } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "open",
+                head: `${headRepoOwner}:${branch}`,
+              });
+              console.log(`Found ${branchPulls.length} PR(s) via branch lookup`);
+              pr = branchPulls[0];
+            }
+
+            if (!pr) {
+              core.setFailed(`No open PR found for commit ${sha}`);
+              return;
+            }
+
+            console.log(`Using PR #${pr.number}`);
+            core.setOutput("number", pr.number);
+
+      - name: Check if build artifact exists
+        id: check-artifact
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const runId = context.payload.workflow_run.id;
+            const { data: { artifacts } } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+            const found = artifacts.some(a => a.name === 'pr-images');
+            console.log(`Artifact 'pr-images' for run ${runId}: ${found ? 'found' : 'not found'}`);
+            core.setOutput('exists', found);
+
+      - name: Download artifact from build workflow
+        if: steps.check-artifact.outputs.exists == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: pr-images
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Load and validate metadata
+        if: steps.check-artifact.outputs.exists == 'true'
+        id: meta
+        env:
+          EXPECTED_PR: ${{ steps.pr-number.outputs.number }}
+          TRUSTED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f metadata.json ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+          if ! jq -e . metadata.json >/dev/null 2>&1; then
+            echo "::error::Invalid JSON in metadata.json"
+            exit 1
+          fi
+
+          # 1. Validate PR number (integer, must match expected)
+          PR_NUM=$(jq -r '.pr_number | select(type == "number")' metadata.json)
+          if [[ -z "$PR_NUM" ]]; then
+            echo "::error::Invalid or missing pr_number"
+            exit 1
+          fi
+          if [ "$EXPECTED_PR" != "$PR_NUM" ]; then
+            echo "::error::Security alert: mismatched PR context (expected ${EXPECTED_PR}, got ${PR_NUM}). Possible artifact poisoning."
+            exit 1
+          fi
+
+          # 2. Validate base_version (strict semver major.minor.patch)
+          BASE_VERSION=$(jq -r '.base_version // ""' metadata.json)
+          if ! echo "$BASE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid base_version: ${BASE_VERSION}"
+            exit 1
+          fi
+
+          # 3. Validate short_sha against the trusted workflow_run head SHA
+          TRUSTED_SHORT_SHA="${TRUSTED_HEAD_SHA:0:7}"
+          ARTIFACT_SHORT_SHA=$(jq -r '.short_sha // ""' metadata.json)
+          if [ "$ARTIFACT_SHORT_SHA" != "$TRUSTED_SHORT_SHA" ]; then
+            echo "::error::Security alert: mismatched short_sha (expected ${TRUSTED_SHORT_SHA}, got ${ARTIFACT_SHORT_SHA}). Possible artifact poisoning."
+            exit 1
+          fi
+
+          # 4. Derive trusted tags from validated fields
+          FULL_TAG="${BASE_VERSION}-pr-${EXPECTED_PR}-${TRUSTED_SHORT_SHA}"
+          ALIAS_TAG="${BASE_VERSION}-pr-${EXPECTED_PR}"
+
+          echo "SAFE_PR_NUMBER=${EXPECTED_PR}" >> "$GITHUB_ENV"
+          echo "SAFE_BASE_VERSION=${BASE_VERSION}" >> "$GITHUB_ENV"
+          echo "SAFE_SHORT_SHA=${TRUSTED_SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "SAFE_FULL_TAG=${FULL_TAG}" >> "$GITHUB_ENV"
+          echo "SAFE_ALIAS_TAG=${ALIAS_TAG}" >> "$GITHUB_ENV"
+          echo "EXPIRATION_TIMESTAMP=$(date -u -d '+7 days' +%s)" >> "$GITHUB_ENV"
+
+      - name: Load operator image
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          gunzip -c operator-image.tar.gz | podman load
+
+      - name: Load bundle image
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          gunzip -c bundle-image.tar.gz | podman load
+
+      - name: Login to registry (${{ vars.REGISTRY || 'quay.io' }})
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ vars.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Tag and push operator image
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          OPERATOR_REF="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}:${SAFE_FULL_TAG}"
+          OPERATOR_ALIAS="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}:${SAFE_ALIAS_TAG}"
+
+          podman push "${OPERATOR_REF}"
+          podman tag "${OPERATOR_REF}" "${OPERATOR_ALIAS}"
+          podman push "${OPERATOR_ALIAS}"
+
+      - name: Tag and push bundle image
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          BUNDLE_REF="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${SAFE_FULL_TAG}"
+          BUNDLE_ALIAS="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${SAFE_ALIAS_TAG}"
+
+          podman push "${BUNDLE_REF}"
+          podman tag "${BUNDLE_REF}" "${BUNDLE_ALIAS}"
+          podman push "${BUNDLE_ALIAS}"
+
+      - name: Download OPM
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          curl -sSLo /tmp/opm --proto =https \
+            "https://github.com/operator-framework/operator-registry/releases/download/${OPM_VERSION}/linux-amd64-opm"
+          echo "${OPM_SHA256}  /tmp/opm" | sha256sum --check --strict
+          install -m 0755 /tmp/opm /usr/local/bin/opm
+          rm -f /tmp/opm
+          opm version
+
+      - name: Build catalog image
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          BUNDLE_REF="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${SAFE_FULL_TAG}"
+          CATALOG_REF="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${SAFE_FULL_TAG}"
+
+          mkdir -p catalog-fbc
+
+          opm init "${BUNDLE_METADATA_PACKAGE_NAME}" \
+            --default-channel="${DEFAULT_CHANNEL}" \
+            --output yaml > catalog-fbc/catalog.yaml
+
+          # Registries config workaround (from hack/opm-render.sh)
+          if [[ -f /etc/containers/registries.conf ]] && grep -q '^\[registries' /etc/containers/registries.conf 2>/dev/null; then
+            printf 'unqualified-search-registries = ["docker.io"]\n' > /tmp/opm-registries.conf
+            export CONTAINERS_REGISTRIES_CONF=/tmp/opm-registries.conf
+          fi
+
+          opm render "${BUNDLE_REF}" --output yaml >> catalog-fbc/catalog.yaml
+
+          printf -- '---\nschema: olm.channel\npackage: %s\nname: %s\nentries:\n  - name: %s-operator.v%s\n' \
+            "${BUNDLE_METADATA_PACKAGE_NAME}" "${DEFAULT_CHANNEL}" "${PROFILE_SHORT}" "${SAFE_FULL_TAG}" \
+            >> catalog-fbc/catalog.yaml
+
+          opm validate catalog-fbc
+
+          printf 'FROM scratch\nADD catalog.yaml /configs/catalog.yaml\nLABEL operators.operatorframework.io.index.configs.v1=/configs/\n' \
+            > catalog-fbc/catalog.Dockerfile
+
+          podman build --platform linux/amd64 \
+            -f catalog-fbc/catalog.Dockerfile \
+            -t "${CATALOG_REF}" \
+            --label "quay.expires-after=7d" \
+            catalog-fbc/
+
+      - name: Push catalog image
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          CATALOG_REF="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${SAFE_FULL_TAG}"
+          CATALOG_ALIAS="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}-catalog:${SAFE_ALIAS_TAG}"
+
+          podman push "${CATALOG_REF}"
+          podman tag "${CATALOG_REF}" "${CATALOG_ALIAS}"
+          podman push "${CATALOG_ALIAS}"
+
+      - name: Set expiration on PR images
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        env:
+          API_TOKEN: ${{ secrets.QUAY_OAUTH_TOKEN || secrets.QUAY_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${API_TOKEN:?API_TOKEN is required to set image expiration}"
+
+          set_tag_expiration() {
+            local image="$1"
+            local tag="$2"
+            local url="https://${REGISTRY}/api/v1/repository/${REGISTRY_ORG}/${image}/tag/${tag}"
+
+            echo "Setting expiration for ${image}:${tag}"
+            response=$(curl -s -w "\n%{http_code}" -X PUT \
+              -H "Authorization: Bearer ${API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"expiration\": ${EXPIRATION_TIMESTAMP}}" \
+              "${url}")
+
+            http_code=$(echo "$response" | tail -n1)
+            if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+              echo "::warning::Failed to set expiration for ${image}:${tag} (HTTP ${http_code})"
+            fi
+          }
+
+          for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-bundle" "${OPERATOR_IMAGE_NAME}-catalog"; do
+            set_tag_expiration "${image}" "${SAFE_FULL_TAG}" || true
+            set_tag_expiration "${image}" "${SAFE_ALIAS_TAG}" || true
+          done
+
+      - name: Comment image links in PR
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          PR_NUM: ${{ env.SAFE_PR_NUMBER }}
+          FULL_TAG: ${{ env.SAFE_FULL_TAG }}
+          ALIAS_TAG: ${{ env.SAFE_ALIAS_TAG }}
+          REG: ${{ env.REGISTRY }}
+          ORG: ${{ env.REGISTRY_ORG }}
+          IMG: ${{ env.OPERATOR_IMAGE_NAME }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUM);
+            const fullTag = process.env.FULL_TAG;
+            const aliasTag = process.env.ALIAS_TAG;
+            const base = `${process.env.REG}/${process.env.ORG}/${process.env.IMG}`;
+
+            await github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `✅ **PR images built and pushed successfully!**
+
+            Images are available for testing (expires in 7 days):
+
+            | Image | Full tag | PR tag |
+            |---|---|---|
+            | **Operator** | \`${base}:${fullTag}\` | \`${base}:${aliasTag}\` |
+            | **Bundle** | \`${base}-bundle:${fullTag}\` | \`${base}-bundle:${aliasTag}\` |
+            | **Catalog** | \`${base}-catalog:${fullTag}\` | \`${base}-catalog:${aliasTag}\` |`
+            });
+
+      - name: Summary
+        if: steps.check-artifact.outputs.exists == 'true' && steps.meta.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          BASE="${REGISTRY}/${REGISTRY_ORG}/${OPERATOR_IMAGE_NAME}"
+          echo "### Push Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **PR Number**: ${SAFE_PR_NUMBER}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Full tag**: ${SAFE_FULL_TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Alias tag**: ${SAFE_ALIAS_TAG}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Status**: Pushed and expiration set" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | Reference |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Operator | \`${BASE}:${SAFE_FULL_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Bundle | \`${BASE}-bundle:${SAFE_FULL_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Catalog | \`${BASE}-catalog:${SAFE_FULL_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summary (skipped — no artifact)
+        if: steps.check-artifact.outputs.exists != 'true'
+        run: |
+          set -euo pipefail
+          echo "### Push Skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "No \`pr-images\` artifact was produced by the PR Container Build workflow." >> "$GITHUB_STEP_SUMMARY"
+          echo "This is expected when the PR changes don't affect the container image (e.g., docs-only changes)." >> "$GITHUB_STEP_SUMMARY"
+
+  notify-failure:
+    name: Notify Build Failure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'failure'
+    permissions:
+      pull-requests: write
+      actions: read
+
+    steps:
+      - name: Get the PR number from the workflow run
+        id: pr-number
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const sha = context.payload.workflow_run.head_sha;
+            const branch = context.payload.workflow_run.head_branch;
+            const headRepoOwner = context.payload.workflow_run.head_repository?.owner?.login;
+            const isFork = headRepoOwner && headRepoOwner !== context.repo.owner;
+
+            const workflowPRs = context.payload.workflow_run.pull_requests || [];
+            if (workflowPRs.length > 0) {
+              core.setOutput("number", workflowPRs[0].number);
+              return;
+            }
+
+            const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: sha,
+            });
+            let pr = pulls.find(p => p.state === "open");
+
+            if (!pr && isFork) {
+              const { data: branchPulls } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "open",
+                head: `${headRepoOwner}:${branch}`,
+              });
+              pr = branchPulls[0];
+            }
+
+            if (!pr) {
+              core.setFailed(`No open PR found for commit ${sha}`);
+              return;
+            }
+            core.setOutput("number", pr.number);
+
+      - name: Comment on failure
+        if: steps.pr-number.outputs.number
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          PR_NUM: ${{ steps.pr-number.outputs.number }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUM);
+            const runUrl = process.env.RUN_URL;
+            await github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `❌ **PR image build failed**\n\nSee [workflow run](${runUrl}) for details.`
+            });

@@ -1749,11 +1749,52 @@ spec:
                           the ConfigMapRefs field
                         type: string
                     type: object
+                  dynamicPlugins:
+                    description: |-
+                      Inline dynamic plugins configuration.
+                      Allows configuring dynamic plugins directly in the Backstage CR without requiring a separate ConfigMap.
+                      Each plugin can specify its package reference, enabled state, plugin-specific configuration, and integrity checksum.
+                      Mutually exclusive with DynamicPluginsConfigMapName field.
+                    items:
+                      description: |-
+                        DynamicPluginConfig defines configuration for a single dynamic plugin.
+                        Dynamic plugins can be configured inline within the Backstage CR instead of using a separate ConfigMap.
+                      properties:
+                        enabled:
+                          description: |-
+                            Enable or disable the plugin. Defaults to true if not specified.
+                            Takes precedence over the Disabled field if both are set.
+                          type: boolean
+                        integrity:
+                          description: |-
+                            Integrity checksum for the plugin package (e.g., sha256, sha512).
+                            Used to verify the integrity of the downloaded plugin.
+                          type: string
+                        package:
+                          description: |-
+                            Package reference for the plugin.
+                            Supported formats:
+                            - ref://plugin-name (references a plugin from the default catalog)
+                            - oci://registry/image@digest or oci://registry/image:tag
+                            - npm package name
+                            - ./relative/path or /absolute/path
+                          minLength: 1
+                          type: string
+                        pluginConfig:
+                          description: |-
+                            Plugin-specific configuration as arbitrary YAML.
+                            This configuration will be merged into the app-config under the plugin's namespace.
+                          x-kubernetes-preserve-unknown-fields: true
+                      required:
+                      - package
+                      type: object
+                    type: array
                   dynamicPluginsConfigMapName:
                     description: |-
                       Reference to an existing ConfigMap for Dynamic Plugins.
                       A new one will be generated with the default config if not set.
                       The ConfigMap object must have an existing key named: 'dynamic-plugins.yaml'.
+                      Mutually exclusive with DynamicPlugins field.
                     type: string
                   extraEnvs:
                     description: Extra environment variables
@@ -2851,7 +2892,7 @@ data:
                   value: /var/lib/pgsql/data
                 - name: PGDATA
                   value: /var/lib/pgsql/data/userdata
-              image: quay.io/fedora/postgresql-15:latest # will be replaced with the actual image
+              image: quay.io/fedora/postgresql-18:latest # will be replaced with the actual image
               imagePullPolicy: IfNotPresent
               securityContext:
                 # runAsUser:26 does not work for Openshift but looks work for AKS/EKS
@@ -3214,6 +3255,27 @@ data:
               protocol: TCP
 
     ---
+    # Redis is part of the recommended checklist for production deployments
+    # (see https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.10/html/setting_up_and_configuring_your_first_red_hat_developer_hub_instance/checklist-to-run-your-first-rhdh-instance-in-production_setting-up-and-configuring-your-first-red-hat-developer-hub-instance).
+    # RHDH does not deploy Redis OOTB; users bring their own, which could be in the same
+    # namespace, a different namespace, or an external managed service. The rule therefore
+    # has no pod or namespace selector.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-redis-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - port: 6379
+              protocol: TCP
+
+    ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
@@ -3252,6 +3314,10 @@ data:
                 matchLabels:
                   # OpenShift platform monitoring
                   kubernetes.io/metadata.name: openshift-monitoring
+            - namespaceSelector:
+                matchLabels:
+                  # OpenShift user workload monitoring (scrapes user-deployed ServiceMonitors)
+                  kubernetes.io/metadata.name: openshift-user-workload-monitoring
             - namespaceSelector:
                 matchLabels:
                   # GKE Standard: Google Managed Prometheus
@@ -3729,15 +3795,15 @@ data:
     data:
       dynamic-plugins.yaml: |
         plugins:
-          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator:{{inherit}}'
+          - package: 'ref://red-hat-developer-hub-backstage-plugin-orchestrator'
             enabled: true
-          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-backend:{{inherit}}'
+          - package: 'ref://red-hat-developer-hub-backstage-plugin-orchestrator-backend'
             enabled: true
             dependencies:
               - ref: sonataflow
-          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator:{{inherit}}'
+          - package: 'ref://red-hat-developer-hub-backstage-plugin-scaffolder-backend-module-orchestrator'
             enabled: true
-          - package: 'oci://registry.access.redhat.com/rhdh/red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets:{{inherit}}'
+          - package: 'ref://red-hat-developer-hub-backstage-plugin-orchestrator-form-widgets'
             enabled: true
   metadata.yaml: |
     # Orchestrator flavour metadata
@@ -3865,7 +3931,7 @@ data:
         spec:
           containers:
             - name: psql
-              image: quay.io/fedora/postgresql-15:latest
+              image: quay.io/fedora/postgresql-18:latest
               resources:
                 limits:
                   cpu: "100m"
@@ -4420,7 +4486,7 @@ spec:
         - name: OPERATOR_DP_PROCESSING
           value: 'true'
         - name: RELATED_IMAGE_postgresql
-          value: quay.io/fedora/postgresql-15:latest
+          value: quay.io/fedora/postgresql-18:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
         - name: RELATED_IMAGE_plugin_installer

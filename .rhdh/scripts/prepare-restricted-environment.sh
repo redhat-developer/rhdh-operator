@@ -1858,8 +1858,8 @@ EOF
   spec:
     imageDigestMirrors:
     - mirrors:
-      - ${registry_url_internal}/rhel9/postgresql-15
-      source: registry.redhat.io/rhel9/postgresql-15
+      - ${registry_url_internal}/rhel10/postgresql-18
+      source: registry.redhat.io/rhel10/postgresql-18
     - mirrors:
       - ${registry_url_internal}/rhdh
       source: registry.redhat.io/rhdh

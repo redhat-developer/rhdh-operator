@@ -33,6 +33,7 @@ The behavior is configurable using the following environment variables:
 | `BACKSTAGE_OPERATOR_TESTS_AIRGAP_MIRROR_REGISTRY`                                              | string | Existing mirror registry to use in the airgap scenario.<br>Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is `rhdh-airgap`.                                                                                                                                                                                                                                                                                                                       |                                                   | `my-registry.example.com`                               |
 | `BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS`                                                  | bool   | Whether to test access using an Ingress resource on K8s                                                                                                                                                                                                                                                                                                                                                                                       |                                                   | `true`                                                  |
 | `BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN`                                                  | string | Ingress domain. Relevant only if `BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS` is `true`.                                                                                                                                                                                                                                                                                                                                                     |                                                   | `$(minikube ip).nip.io`                                 |
+| `BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE`                                                  | bool   | Enables the PostgreSQL 15 to 18 dump, volume replacement, and restore flow in the Operator upgrade test. Requires `FROM_OPERATOR_MANIFEST` and `TO_OPERATOR_MANIFEST`.                                                                                                                                                                                                                                                                          | `false`                                           | `true`                                                  |
 
 ### Examples
 
@@ -108,6 +109,24 @@ This requires OLM to be installed in the cluster.
 ```shell
 $ make test-e2e BACKSTAGE_OPERATOR_TEST_MODE=olm
 ```
+
+#### Testing the PostgreSQL 15 to 18 Operator upgrade
+
+The upgrade test can validate the local PostgreSQL major-version migration while upgrading an existing Operator installation. It stops Backstage, creates a logical dump with `pg_dumpall`, deletes the test instance's generated PostgreSQL StatefulSet and PVC, restores the dump into PostgreSQL 18, and verifies that the test data remains available. The generated PostgreSQL Secret is preserved.
+
+The command below uses RHDH 1.10 as the PostgreSQL 15 source and the current working tree's generated manifest as the PostgreSQL 18 target:
+
+```shell
+$ BACKSTAGE_OPERATOR_TESTS_PLATFORM=kind \
+    BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE=true \
+    PROFILE=rhdh \
+    FROM_OPERATOR_MANIFEST=https://raw.githubusercontent.com/redhat-developer/rhdh-operator/refs/heads/release-1.10/dist/rhdh/install.yaml \
+    TO_OPERATOR_MANIFEST="$(pwd)/dist/rhdh/install.yaml" \
+    OPERATOR_MANIFEST="$(pwd)/dist/rhdh/install.yaml" \
+    make test-e2e-upgrade
+```
+
+Run this only against a disposable cluster. The upgrade suite replaces the Operator installation and its cluster-scoped resources, and this test permanently deletes the generated PVC in its temporary namespace.
 
 #### Testing a downstream build of Red Hat Developer Hub (RHDH)
 

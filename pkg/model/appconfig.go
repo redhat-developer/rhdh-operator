@@ -16,7 +16,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const PluginsAppConfigFile = "app-config.dynamic-plugins.yaml"
+const (
+	PluginsAppConfigFile = "app-config.dynamic-plugins.yaml"
+	PluginsAppConfigName = "plugins-appconfig"
+)
 
 type AppConfigFactory struct{}
 
@@ -96,7 +99,7 @@ func (b *AppConfig) addPluginsAppConfig(namespace string) error {
 			Kind:       "ConfigMap",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "plugins-appconfig",
+			Name:      PluginsAppConfigName,
 			Namespace: namespace,
 		},
 		Data: map[string]string{PluginsAppConfigFile: string(configYaml)},
