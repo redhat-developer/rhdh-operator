@@ -99,10 +99,10 @@ is_plugin_infra_managed() {
 
   if [[ -n "${namespace}" ]]; then
     managed_by="$(kubectl get -n "${namespace}" "${resource}" \
-      -o "jsonpath={.metadata.labels['${PLUGIN_INFRA_LABEL_KEY}']}" 2>/dev/null || true)"
+      -o jsonpath="{.metadata.labels.rhdh\.redhat\.com/managed-by}" 2>/dev/null || true)"
   else
     managed_by="$(kubectl get "${resource}" \
-      -o "jsonpath={.metadata.labels['${PLUGIN_INFRA_LABEL_KEY}']}" 2>/dev/null || true)"
+      -o jsonpath="{.metadata.labels.rhdh\.redhat\.com/managed-by}" 2>/dev/null || true)"
   fi
 
   [[ "${managed_by}" == "${PLUGIN_INFRA_LABEL_VALUE}" ]]
