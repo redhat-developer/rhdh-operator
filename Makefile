@@ -7,6 +7,7 @@ PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec 
 # to use other config - add a directory with config,
 # use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
 PROFILE ?= rhdh
+OLM_VERSION ?= auto
 
 # Enable operator dynamic plugins processing (default: true)
 OPERATOR_DP_PROCESSING ?= true
@@ -424,7 +425,7 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 .PHONY: plugin-infra
 plugin-infra:
 	@if [ -f "config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh" ]; then \
-		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh; \
+		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh --olm-version $(OLM_VERSION); \
 	else \
 		echo "File config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh does not exist."; \
 	fi
@@ -432,7 +433,7 @@ plugin-infra:
 .PHONY: plugin-infra-undeploy
 plugin-infra-undeploy:
 	@if [ -f "config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh" ]; then \
-		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh delete; \
+		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh delete --olm-version $(OLM_VERSION); \
 	else \
 		echo "File config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh does not exist."; \
 	fi

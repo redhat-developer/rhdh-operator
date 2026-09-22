@@ -124,8 +124,15 @@ make undeploy
 
 In a case if Profile contain plugin infrastructure manifests `/config/profile/<profile>/plugin-infra` it can be deployed by:
 ```sh
-make plugin-infra [PROFILE=<configuration-profile>]
+make plugin-infra [PROFILE=<configuration-profile>] [OLM_VERSION=auto|v0|v1]
 ```
+
+To remove plugin infrastructure installed by the same script:
+```sh
+make plugin-infra-undeploy [PROFILE=<configuration-profile>] [OLM_VERSION=auto|v0|v1]
+```
+
+`OLM_VERSION` is forwarded to `plugin-infra.sh` as `--olm-version`. See [orchestrator guide](orchestrator.md#rhdh-helper-script) for details on OLM v0 vs v1 manifest selection.
 
 **UnDeploy the controller from the cluster:**
 
