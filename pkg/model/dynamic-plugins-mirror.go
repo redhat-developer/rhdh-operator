@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v2"
-	"k8s.io/klog/v2"
 )
 
 // ImageDigestMirrors defines mirror configuration (compatible with OpenShift IDMS)
@@ -26,8 +25,6 @@ type ImageDigestMirror struct {
 // Implements IDMS "most specific namespace match" rule: when multiple sources match,
 // the longest/most specific source wins (e.g., quay.io/foo/bar beats quay.io/foo)
 func ApplyMirror(ref string, mirrors *ImageDigestMirrors) string {
-	originalRef := ref
-
 	if mirrors == nil || len(mirrors.ImageDigestMirrors) == 0 {
 		return ref // Early return for performance when no mirrors configured
 	}
@@ -58,33 +55,19 @@ func ApplyMirror(ref string, mirrors *ImageDigestMirrors) string {
 	// Apply the most specific mirror
 	if bestMatch != nil && len(bestMatch.Mirrors) > 0 {
 		mirrored := strings.Replace(ociRef, bestMatch.Source, bestMatch.Mirrors[0], 1)
-		result := "oci://" + mirrored
-		klog.V(1).Infof("Mirror: %s -> %s (source: %s, mirror: %s)", originalRef, result, bestMatch.Source, bestMatch.Mirrors[0])
-		return result
+		return "oci://" + mirrored
 	}
 
-	klog.V(1).Infof("Mirror: %s (no match)", originalRef)
 	return ref
 }
 
 // GetMirrorConfig reads mirror configuration from mounted file
 // Returns nil if file doesn't exist (no mirroring)
 func GetMirrorConfig() (*ImageDigestMirrors, error) {
-
 	// When empty: relative path "plugins-mirror/mirrors.yaml" (for make run with -C bin)
 	// When set in cluster: absolute path "/plugins-mirror/mirrors.yaml"
 	mirrorFile := filepath.Join(os.Getenv("LOCALBIN"), "plugins-mirror", "mirrors.yaml")
-
-	klog.Infof("Reading mirror config from: %s (LOCALBIN=%s)", mirrorFile, os.Getenv("LOCALBIN"))
-	mirrors, err := readMirrorConfigFromFile(mirrorFile)
-	if err != nil {
-		klog.Warningf("Error reading mirror config: %v", err)
-	} else if mirrors == nil {
-		klog.Infof("No mirror config found")
-	} else {
-		klog.Infof("Loaded %d mirror rules", len(mirrors.ImageDigestMirrors))
-	}
-	return mirrors, err
+	return readMirrorConfigFromFile(mirrorFile)
 }
 
 // readMirrorConfigFromFile reads mirror configuration from specified file path

@@ -4541,6 +4541,9 @@ spec:
           name: default-config
         - mountPath: /plugin-deps
           name: plugin-deps
+        - mountPath: /plugins-mirror
+          name: mirror-config
+          readOnly: true
         - mountPath: /tmp
           name: tmp
       securityContext:
@@ -4561,6 +4564,10 @@ spec:
           name: rhdh-plugin-deps
           optional: true
         name: plugin-deps
+      - configMap:
+          name: plugin-registry-mirror
+          optional: true
+        name: mirror-config
       - emptyDir: {}
         name: tmp
 ---

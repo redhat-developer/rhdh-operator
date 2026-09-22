@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-09-16T09:12:32Z"
+    createdAt: "2026-09-22T07:06:45Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -290,6 +290,9 @@ spec:
                   name: default-config
                 - mountPath: /plugin-deps
                   name: plugin-deps
+                - mountPath: /plugins-mirror
+                  name: mirror-config
+                  readOnly: true
                 - mountPath: /tmp
                   name: tmp
               securityContext:
@@ -304,6 +307,10 @@ spec:
                   name: plugin-deps
                   optional: true
                 name: plugin-deps
+              - configMap:
+                  name: plugin-registry-mirror
+                  optional: true
+                name: mirror-config
               - emptyDir: {}
                 name: tmp
       permissions:
