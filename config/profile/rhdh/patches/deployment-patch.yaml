@@ -23,7 +23,7 @@ spec:
             - name: OPERATOR_DP_PROCESSING
               value: "{{OPERATOR_DP_PROCESSING}}"
             - name: RELATED_IMAGE_postgresql
-              value: quay.io/fedora/postgresql-15:latest
+              value: quay.io/fedora/postgresql-18:latest
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh-community/rhdh:next
             - name: RELATED_IMAGE_plugin_installer
