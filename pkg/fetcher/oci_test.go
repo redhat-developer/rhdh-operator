@@ -55,7 +55,7 @@ func TestSkipTLSVerifyUsesHTTPS(t *testing.T) {
 	require.NoError(t, err)
 
 	// Registry should use default scheme (HTTPS)
-	assert.Equal(t, "https", imgRef.Context().Registry.Scheme())
+	assert.Equal(t, "https", imgRef.Context().Scheme())
 }
 
 func TestWithInsecureUsesHTTP(t *testing.T) {
@@ -68,7 +68,7 @@ func TestWithInsecureUsesHTTP(t *testing.T) {
 	require.NoError(t, err)
 
 	// Registry should use HTTP scheme when insecure flag is set
-	assert.Equal(t, "http", imgRef.Context().Registry.Scheme())
+	assert.Equal(t, "http", imgRef.Context().Scheme())
 }
 
 func TestWithCACert(t *testing.T) {
