@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"os"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -123,8 +124,14 @@ data:`
 func TestPlatformPatchMerge(t *testing.T) {
 
 	// ocp (no patch, so default)
-	// t.Setenv(PlatformEnvVar, "ocp")
-	obj, err := ReadYamlFiles("testdata/deployment.yaml", *util_test_scheme, "ocp")
+	conf, err := os.ReadFile("testdata/deployment.yaml")
+	assert.NoError(t, err)
+
+	// Read platform patch
+	pp, err := ReadPlatformPatch("testdata/deployment.yaml", "ocp")
+	assert.NoError(t, err)
+
+	obj, err := ReadYamls(conf, pp, *util_test_scheme)
 	assert.NoError(t, err)
 
 	depl, ok := obj[0].(*appsv1.Deployment)
@@ -133,9 +140,10 @@ func TestPlatformPatchMerge(t *testing.T) {
 	assert.Nil(t, depl.Spec.Template.Spec.SecurityContext)
 
 	// k8s (patched)
-	// t.Setenv(PlatformEnvVar, "k8s")
+	pp, err = ReadPlatformPatch("testdata/deployment.yaml", "k8s")
+	assert.NoError(t, err)
 
-	obj, err = ReadYamlFiles("testdata/deployment.yaml", *util_test_scheme, "k8s")
+	obj, err = ReadYamls(conf, pp, *util_test_scheme)
 	assert.NoError(t, err)
 
 	depl, ok = obj[0].(*appsv1.Deployment)

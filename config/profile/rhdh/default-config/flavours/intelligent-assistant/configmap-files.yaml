@@ -1,6 +1,94 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
+  name: llama-stack-config
+  annotations:
+    rhdh.redhat.com/containers: "lightspeed-core"
+    rhdh.redhat.com/mount-path: "/app-root"
+    rhdh.redhat.com/sub-path: "*"
+data:
+  config.yaml: |
+    #
+    #
+    # Copyright Red Hat
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    #     http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+    version: 4
+    distro_name: intelligent-assistant-ogx
+    apis:
+      - responses
+      - inference
+      - tool_runtime
+      - vector_io
+      - files
+      - file_processors
+    container_image:
+    external_providers_dir: '/app-root/providers.d' #built into lcore image
+    providers:
+      responses:
+        - config:
+            persistence:
+              responses:
+                table_name: responses
+                backend: sql_default
+          provider_id: meta-reference
+          provider_type: inline::builtin
+      files:
+        - provider_id: localfs
+          provider_type: inline::localfs
+          config:
+            storage_dir: /tmp/llama-stack-files
+            metadata_store:
+              table_name: files_metadata
+              backend: sql_default
+      file_processors:
+        - provider_id: pypdf
+          provider_type: inline::pypdf
+          config:
+            default_chunk_size_tokens: 800
+            default_chunk_overlap_tokens: 400
+    storage:
+      backends:
+        kv_default:
+          type: kv_sqlite
+          db_path: /tmp/kvstore.db
+        sql_default:
+          type: sql_sqlite
+          db_path: /tmp/sql_store.db
+      stores:
+        metadata:
+          namespace: registry
+          backend: kv_default
+        inference:
+          table_name: inference_store
+          backend: sql_default
+          max_write_queue_size: 10000
+          num_writers: 4
+        conversations:
+          table_name: openai_conversations
+          backend: sql_default
+    server:
+      auth:
+      host:
+      port: 8321
+      quota:
+      tls_cafile:
+      tls_certfile:
+      tls_keyfile:
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
   name: lightspeed-stack-config
   annotations:
     rhdh.redhat.com/containers: "lightspeed-core"
@@ -153,16 +241,15 @@ data:
         url: 'http://localhost:7007/api/mcp-actions/v1'
         authorization_headers:
           Authorization: 'client'
-    # TODO: Uncomment when OKP is added
-    # rag:
-    #   okp:
-    #     rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'
-    #     offline: true
-    #     chunk_filter_query: 'product:*developer_hub*'
-    #   retrieval:
-    #     tool:
-    #       sources:
-    #         - okp
+    rag:
+      okp:
+        rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'
+        offline: true
+        chunk_filter_query: 'product:*developer_hub*'
+      retrieval:
+        tool:
+          sources:
+            - okp
 ---
 kind: ConfigMap
 apiVersion: v1
