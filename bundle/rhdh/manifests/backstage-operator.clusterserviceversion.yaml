@@ -62,12 +62,12 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <2.0.0'
+    skipRange: '>=1.0.0 <2.1.0'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.arm64: supported
-  name: rhdh-operator.v2.0.0
+  name: rhdh-operator.v2.1.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -493,4 +493,4 @@ spec:
   - image: quay.io/rhdh-community/rhdh-plugin-installer:next
     name: plugin-installer
   replaces: rhdh-operator.v1.10.0
-  version: 2.0.0
+  version: 2.1.0

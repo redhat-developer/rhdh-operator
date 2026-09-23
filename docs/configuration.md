@@ -244,7 +244,7 @@ The following configuration files support multi-object definitions:
 - **secret-files.yaml** 
 - **secret-envs.yaml** 
 - **pvcs.yaml**
-- **networkpolicy.yaml** (since 2.0.0)
+- **networkpolicy.yaml** (since 2.1.0)
 
 For example, adding the following to **pvcs.yaml** will create 2 PVCs and mount them to the Backstage container:
 
