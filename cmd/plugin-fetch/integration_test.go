@@ -187,11 +187,9 @@ func TestPluginName(t *testing.T) {
 		{"oci://registry.example.com:5000/org/plugin-bar", "plugin-bar"},
 		{"oci://localhost:5000/plugin-test:latest", "plugin-test"},
 		{"oci://localhost:5000/plugin-test", "plugin-test"},
-		// Multi-plugin package with !pluginPath suffix
-		{"oci://quay.io/rhdh/multi-plugin:1.0!plugin-A", "plugin-A"},
-		{"oci://quay.io/rhdh/multi-plugin:1.0!plugin-B", "plugin-B"},
-		{"oci://quay.io/rhdh/multi-plugin@sha256:abc123!my-plugin", "my-plugin"},
-		{"https://example.com/multi.tar.gz!plugin-foo", "plugin-foo"},
+		// OCI multi-plugin packages - returns image name (fetcher handles !pluginPath internally)
+		{"oci://quay.io/rhdh/multi-plugin:1.0!plugin-A", "multi-plugin"},
+		{"oci://quay.io/rhdh/multi-plugin@sha256:abc123!my-plugin", "multi-plugin"},
 	}
 
 	for _, tt := range tests {

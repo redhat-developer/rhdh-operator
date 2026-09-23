@@ -108,11 +108,17 @@ func WithPluginMode() OCIOption {
 // Supports multi-plugin packages via !pluginPath suffix (e.g., oci://reg/pkg:1.0!plugin-A).
 func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) error {
 	// 1. Parse pluginPath from ref (only in plugin mode)
+	// Use first ! to split, in case selector itself contains !
 	pluginPath := ""
 	if c.pluginMode {
-		if idx := strings.LastIndex(ref, "!"); idx != -1 {
+		if idx := strings.Index(ref, "!"); idx != -1 {
 			pluginPath = ref[idx+1:]
 			ref = ref[:idx] // Strip !pluginPath for download
+
+			// Validate pluginPath to prevent path traversal
+			if err := validatePluginSelector(pluginPath); err != nil {
+				return fmt.Errorf("invalid plugin selector in %q: %w", ref+"!"+pluginPath, err)
+			}
 		}
 	}
 
@@ -184,7 +190,7 @@ func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) erro
 	}
 
 	// 10. Determine expected plugin directory name
-	// Either from !pluginPath or from OCI image name (last path segment)
+	// Either from !pluginPath (already validated) or from OCI image name (last path segment)
 	expectedDir := pluginPath
 	if expectedDir == "" {
 		// Extract image name from OCI reference (last path component)
@@ -193,6 +199,11 @@ func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) erro
 			expectedDir = repo[idx+1:]
 		} else {
 			expectedDir = repo
+		}
+
+		// Validate extracted image name to prevent path traversal
+		if err := validatePluginSelector(expectedDir); err != nil {
+			return fmt.Errorf("invalid OCI image name for plugin extraction: %w", err)
 		}
 	}
 
@@ -297,6 +308,37 @@ func authToAuthenticator(auth dockerAuthConfig) (authn.Authenticator, error) {
 	}
 
 	return authn.Anonymous, nil
+}
+
+// validatePluginSelector validates that a plugin selector is safe for use as a directory name.
+// Rejects empty, absolute, dot, traversal, and separator-containing selectors to prevent path traversal.
+func validatePluginSelector(selector string) error {
+	if selector == "" {
+		return fmt.Errorf("selector cannot be empty")
+	}
+
+	// Reject absolute paths
+	if filepath.IsAbs(selector) {
+		return fmt.Errorf("selector cannot be an absolute path: %q", selector)
+	}
+
+	// Reject . and ..
+	if selector == "." || selector == ".." {
+		return fmt.Errorf("selector cannot be %q", selector)
+	}
+
+	// Reject any path containing separators (/, \)
+	if strings.ContainsAny(selector, `/\`) {
+		return fmt.Errorf("selector cannot contain path separators: %q", selector)
+	}
+
+	// Additional check: after cleaning, must be a single component
+	cleaned := filepath.Clean(selector)
+	if cleaned != selector || strings.Contains(cleaned, string(filepath.Separator)) {
+		return fmt.Errorf("selector must be a single path component: %q", selector)
+	}
+
+	return nil
 }
 
 // movePluginContent moves the plugin subdirectory from srcDir to destDir.

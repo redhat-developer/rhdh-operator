@@ -81,8 +81,9 @@ func (p *DynaPlugin) IsDirectLink() bool {
 //   - oci://x/plugin-foo:{{inherit}}!custom-path uses base's version but user's plugin-path
 func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (string, error) {
 	// Parse package to extract !plugin-path suffix if present
+	// Use first ! to split, in case selector itself contains !
 	var pluginPath string
-	if idx := strings.LastIndex(packageURL, "!"); idx != -1 {
+	if idx := strings.Index(packageURL, "!"); idx != -1 {
 		pluginPath = packageURL[idx:] // includes "!"
 		packageURL = packageURL[:idx]
 	}
@@ -111,7 +112,8 @@ func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (strin
 			// If user specified !plugin-path, use it; otherwise use full default URL
 			if pluginPath != "" {
 				// Extract image part from default (without !plugin-path)
-				if idx := strings.LastIndex(fullURL, "!"); idx != -1 {
+				// Use first ! to strip, in case selector itself contains !
+				if idx := strings.Index(fullURL, "!"); idx != -1 {
 					fullURL = fullURL[:idx]
 				}
 				return fullURL + pluginPath, nil
@@ -166,7 +168,8 @@ func (p *DynaPlugin) Name() string {
 	packageURL := p.Package
 
 	// If !plugin-path present, return it as the plugin name
-	if idx := strings.LastIndex(packageURL, "!"); idx != -1 {
+	// Use first ! to split, in case selector itself contains !
+	if idx := strings.Index(packageURL, "!"); idx != -1 {
 		return packageURL[idx+1:]
 	}
 

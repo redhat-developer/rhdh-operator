@@ -170,7 +170,7 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 					continue
 				}
 				// Warn if package name contains "!plugin-path" syntax (multi-plugin package)
-				if idx := strings.LastIndex(plugin.Package, "!"); idx != -1 {
+				if idx := strings.Index(plugin.Package, "!"); idx != -1 {
 					klog.Warningf("package %q contains '!plugin-path' syntax", plugin.Package)
 				}
 

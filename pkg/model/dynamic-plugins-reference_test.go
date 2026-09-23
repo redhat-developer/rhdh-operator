@@ -344,6 +344,11 @@ func TestName(t *testing.T) {
 			package_: "./dynamic-plugins/dist/multi-plugin!specific-plugin",
 			expected: "specific-plugin",
 		},
+		{
+			name:     "OCI with pluginPath containing exclamation mark",
+			package_: "oci://quay.io/rhdh/multi-plugin:1.0!plugin-v2!beta",
+			expected: "plugin-v2!beta",
+		},
 	}
 
 	for _, tt := range tests {

@@ -310,6 +310,91 @@ func TestPluginAnnotation(t *testing.T) {
 	assert.Equal(t, "io.backstage.dynamic-packages", PluginAnnotation)
 }
 
+func TestValidatePluginSelector(t *testing.T) {
+	tests := []struct {
+		name        string
+		selector    string
+		expectError bool
+	}{
+		{
+			name:        "valid simple name",
+			selector:    "plugin-foo",
+			expectError: false,
+		},
+		{
+			name:        "valid name with underscores",
+			selector:    "plugin_bar_123",
+			expectError: false,
+		},
+		{
+			name:        "empty selector",
+			selector:    "",
+			expectError: true,
+		},
+		{
+			name:        "absolute path unix",
+			selector:    "/etc/passwd",
+			expectError: true,
+		},
+		{
+			name:        "absolute path windows",
+			selector:    "C:\\Windows",
+			expectError: true,
+		},
+		{
+			name:        "dot reference",
+			selector:    ".",
+			expectError: true,
+		},
+		{
+			name:        "dot dot reference",
+			selector:    "..",
+			expectError: true,
+		},
+		{
+			name:        "traversal with slash",
+			selector:    "../etc",
+			expectError: true,
+		},
+		{
+			name:        "traversal with backslash",
+			selector:    "..\\windows",
+			expectError: true,
+		},
+		{
+			name:        "subdirectory with slash",
+			selector:    "sub/dir",
+			expectError: true,
+		},
+		{
+			name:        "subdirectory with backslash",
+			selector:    "sub\\dir",
+			expectError: true,
+		},
+		{
+			name:        "hidden traversal",
+			selector:    "plugin/../etc",
+			expectError: true,
+		},
+		{
+			name:        "selector with exclamation mark is valid",
+			selector:    "plugin-v2!beta",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePluginSelector(tt.selector)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 // TestTransportIsConfigurable verifies transport configuration
 func TestTransportIsConfigurable(t *testing.T) {
 	customTransport := &http.Transport{
