@@ -39,20 +39,20 @@ arches:
     name: ca-certificates
     evr: 2025.2.80_v9.0.305-102.el10_1
     sourcerpm: ca-certificates-2025.2.80_v9.0.305-102.el10_1.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/c/coreutils-9.5-8.el10_2.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/c/coreutils-9.5-8.el10_2.1.aarch64.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
-    size: 1140543
-    checksum: sha256:13b8adebf6895b25855bba40bbc7fa1ac7a27b4a88f7091b9143cf0f171ec16e
+    size: 1141992
+    checksum: sha256:8de8c7a26f9bf8f976865d7af05f9a7818106a59ece3fb8421e8ce3fbf43bdf6
     name: coreutils
-    evr: 9.5-8.el10_2
-    sourcerpm: coreutils-9.5-8.el10_2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/c/coreutils-common-9.5-8.el10_2.aarch64.rpm
+    evr: 9.5-8.el10_2.1
+    sourcerpm: coreutils-9.5-8.el10_2.1.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/c/coreutils-common-9.5-8.el10_2.1.aarch64.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
-    size: 2255487
-    checksum: sha256:4c691cacab8f9b7e637f2da70938b4643d3dca212fe6c3783fc821da7622fa65
+    size: 2255514
+    checksum: sha256:ab1a64e283fbc37b96012bb91e79357fc9f7da40aef8eecabd6c97fae3852e49
     name: coreutils-common
-    evr: 9.5-8.el10_2
-    sourcerpm: coreutils-9.5-8.el10_2.src.rpm
+    evr: 9.5-8.el10_2.1
+    sourcerpm: coreutils-9.5-8.el10_2.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/c/crypto-policies-20260216-1.git0e54016.el10_2.2.noarch.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
     size: 103561
@@ -341,12 +341,12 @@ arches:
     checksum: sha256:ee9d2ca962558aa026014cf34d76116c313d003fe1cb14e430d03f811cdd655f
     name: chkconfig
     evr: 1.30-2.el10
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/c/coreutils-9.5-8.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/c/coreutils-9.5-8.el10_2.1.src.rpm
     repoid: ubi-10-for-aarch64-baseos-source-rpms
-    size: 6214208
-    checksum: sha256:523c7df56a69ed335f5316236adc722f8f953c9f0786fa24f2de1ebbce6e48f0
+    size: 6215989
+    checksum: sha256:ecbca7a74dc976e0a47dc768298586dceabeb1eab01ef4b373a145104a6ebd4b
     name: coreutils
-    evr: 9.5-8.el10_2
+    evr: 9.5-8.el10_2.1
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/c/crypto-policies-20260216-1.git0e54016.el10_2.2.src.rpm
     repoid: ubi-10-for-aarch64-baseos-source-rpms
     size: 177582
@@ -535,20 +535,20 @@ arches:
     name: ca-certificates
     evr: 2025.2.80_v9.0.305-102.el10_1
     sourcerpm: ca-certificates-2025.2.80_v9.0.305-102.el10_1.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/c/coreutils-9.5-8.el10_2.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/c/coreutils-9.5-8.el10_2.1.x86_64.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
-    size: 1181662
-    checksum: sha256:eb4b9998679c61ce2693ac4ea7259f6266d8d2ce9270eba5a36b0505905e2246
+    size: 1182809
+    checksum: sha256:b15d96974729985a5c8be0f965b4861cec93c68fb01db0eacddd6399551af2b7
     name: coreutils
-    evr: 9.5-8.el10_2
-    sourcerpm: coreutils-9.5-8.el10_2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/c/coreutils-common-9.5-8.el10_2.x86_64.rpm
+    evr: 9.5-8.el10_2.1
+    sourcerpm: coreutils-9.5-8.el10_2.1.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/c/coreutils-common-9.5-8.el10_2.1.x86_64.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
-    size: 2255527
-    checksum: sha256:fd5161e5f272fea709ee04c90bf99a473c07056e1a07a89a02e8bf5b1efb87b9
+    size: 2255550
+    checksum: sha256:8021f6ecfa0a946dcc07b35a9f4a6ff8c960f0cc472d21df548cd8f4b51870dd
     name: coreutils-common
-    evr: 9.5-8.el10_2
-    sourcerpm: coreutils-9.5-8.el10_2.src.rpm
+    evr: 9.5-8.el10_2.1
+    sourcerpm: coreutils-9.5-8.el10_2.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/c/crypto-policies-20260216-1.git0e54016.el10_2.2.noarch.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
     size: 103561
@@ -837,12 +837,12 @@ arches:
     checksum: sha256:ee9d2ca962558aa026014cf34d76116c313d003fe1cb14e430d03f811cdd655f
     name: chkconfig
     evr: 1.30-2.el10
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/c/coreutils-9.5-8.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/c/coreutils-9.5-8.el10_2.1.src.rpm
     repoid: ubi-10-for-x86_64-baseos-source-rpms
-    size: 6214208
-    checksum: sha256:523c7df56a69ed335f5316236adc722f8f953c9f0786fa24f2de1ebbce6e48f0
+    size: 6215989
+    checksum: sha256:ecbca7a74dc976e0a47dc768298586dceabeb1eab01ef4b373a145104a6ebd4b
     name: coreutils
-    evr: 9.5-8.el10_2
+    evr: 9.5-8.el10_2.1
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/c/crypto-policies-20260216-1.git0e54016.el10_2.2.src.rpm
     repoid: ubi-10-for-x86_64-baseos-source-rpms
     size: 177582

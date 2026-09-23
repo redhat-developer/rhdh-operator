@@ -1,6 +1,37 @@
 apiVersion: v1
 data:
-  configmap-files.yaml: "kind: ConfigMap\napiVersion: v1\nmetadata:\n  name: lightspeed-stack-config\n
+  configmap-files.yaml: "kind: ConfigMap\napiVersion: v1\nmetadata:\n  name: llama-stack-config\n
+    \ annotations:\n    rhdh.redhat.com/containers: \"lightspeed-core\"\n    rhdh.redhat.com/mount-path:
+    \"/app-root\"\n    rhdh.redhat.com/sub-path: \"*\"\ndata:\n  config.yaml: |\n
+    \   #\n    #\n    # Copyright Red Hat\n    #\n    # Licensed under the Apache
+    License, Version 2.0 (the \"License\");\n    # you may not use this file except
+    in compliance with the License.\n    # You may obtain a copy of the License at\n
+    \   #\n    #     http://www.apache.org/licenses/LICENSE-2.0\n    #\n    # Unless
+    required by applicable law or agreed to in writing, software\n    # distributed
+    under the License is distributed on an \"AS IS\" BASIS,\n    # WITHOUT WARRANTIES
+    OR CONDITIONS OF ANY KIND, either express or implied.\n    # See the License for
+    the specific language governing permissions and\n    # limitations under the License.\n
+    \   version: 4\n    distro_name: intelligent-assistant-ogx\n    apis:\n      -
+    responses\n      - inference\n      - tool_runtime\n      - vector_io\n      -
+    files\n      - file_processors\n    container_image:\n    external_providers_dir:
+    '/app-root/providers.d' #built into lcore image\n    providers:\n      responses:\n
+    \       - config:\n            persistence:\n              responses:\n                table_name:
+    responses\n                backend: sql_default\n          provider_id: meta-reference\n
+    \         provider_type: inline::builtin\n      files:\n        - provider_id:
+    localfs\n          provider_type: inline::localfs\n          config:\n            storage_dir:
+    /tmp/llama-stack-files\n            metadata_store:\n              table_name:
+    files_metadata\n              backend: sql_default\n      file_processors:\n        -
+    provider_id: pypdf\n          provider_type: inline::pypdf\n          config:\n
+    \           default_chunk_size_tokens: 800\n            default_chunk_overlap_tokens:
+    400\n    storage:\n      backends:\n        kv_default:\n          type: kv_sqlite\n
+    \         db_path: /tmp/kvstore.db\n        sql_default:\n          type: sql_sqlite\n
+    \         db_path: /tmp/sql_store.db\n      stores:\n        metadata:\n          namespace:
+    registry\n          backend: kv_default\n        inference:\n          table_name:
+    inference_store\n          backend: sql_default\n          max_write_queue_size:
+    10000\n          num_writers: 4\n        conversations:\n          table_name:
+    openai_conversations\n          backend: sql_default\n    server:\n      auth:\n
+    \     host:\n      port: 8321\n      quota:\n      tls_cafile:\n      tls_certfile:\n
+    \     tls_keyfile:\n---\nkind: ConfigMap\napiVersion: v1\nmetadata:\n  name: lightspeed-stack-config\n
     \ annotations:\n    rhdh.redhat.com/containers: \"lightspeed-core\"\n    rhdh.redhat.com/mount-path:
     \"/app-root\"\n    rhdh.redhat.com/sub-path: \"*\"\ndata:\n  lightspeed-stack.yaml:
     |\n    #\n    #\n    # Copyright Red Hat\n    #\n    # Licensed under the Apache
@@ -74,10 +105,10 @@ data:
     your question is relevant to these areas, and feel free to ask again!\n    skills:\n
     \     paths:\n        - /app-root/skills\n    mcp_servers:\n      - name: mcp-integration-tools\n
     \       provider_id: 'model-context-protocol'\n        url: 'http://localhost:7007/api/mcp-actions/v1'\n
-    \       authorization_headers:\n          Authorization: 'client'\n    # TODO:
-    Uncomment when OKP is added\n    # rag:\n    #   okp:\n    #     rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'\n
-    \   #     offline: true\n    #     chunk_filter_query: 'product:*developer_hub*'\n
-    \   #   retrieval:\n    #     tool:\n    #       sources:\n    #         - okp\n---\nkind:
+    \       authorization_headers:\n          Authorization: 'client'\n    rag:\n
+    \     okp:\n        rhokp_url: '${env.OKP_SERVICE_URL:=http://localhost:8080}'\n
+    \       offline: true\n        chunk_filter_query: 'product:*developer_hub*'\n
+    \     retrieval:\n        tool:\n          sources:\n            - okp\n---\nkind:
     ConfigMap\napiVersion: v1\nmetadata:\n  name: rhdh-profile\n  annotations:\n    rhdh.redhat.com/containers:
     \"lightspeed-core\"\n    rhdh.redhat.com/mount-path: \"/app-root\"\n    rhdh.redhat.com/sub-path:
     \"*\"\ndata:\n  rhdh-profile.py: |\n    # There is no need for enforcing line
@@ -217,32 +248,20 @@ data:
     spec:
       template:
         spec:
-          initContainers:
-            - name: init-rag-data
-              image: quay.io/redhat-ai-dev/rag-content:release-1.10-lls-0.5.0
-              command:
-                - "sh"
-                - "-c"
-                - "echo 'Copying RAG data...'; cp -r --no-preserve=mode,ownership /rag/. /data/ && mkdir -p /data/vector_db/notebooks && chmod -R a+rwX /data/embeddings_model /data/vector_db && echo 'Copy complete.'"
-              resources:
-                requests:
-                  memory: 150Mi
-                  cpu: 50m
-                limits:
-                  memory: 500Mi
-                  cpu: 100m
-              volumeMounts:
-                - mountPath: /data
-                  name: rag-data-volume
-
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:dev-20260824-cbd182b # TODO: Update to 0.7.x release tag when available (by FF)
+              image: quay.io/lightspeed-core/lightspeed-stack:0.7.0rc3 # TODO: Update to 0.7.x release tag when available (by FF)
               imagePullPolicy: Always
-              args:
-                - --synthesized-config-output
-                - /tmp/.generated/run.yaml
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
               ports:
                 - containerPort: 8080
                   name: lcs-backend
@@ -254,29 +273,26 @@ data:
                 limits:
                   cpu: 1000m
                   memory: 2Gi
+              args:
+                - "--synthesized-config-output"
+                - "/tmp/.generated/run.yaml"
               env:
-                - name: KV_STORE_PATH
-                  value: /tmp/kvstore.db
-                - name: SQL_STORE_PATH
-                  value: /tmp/sql_store.db
-                - name: SQLITE_STORE_DIR
-                  value: /tmp/llama-stack-files
+                - name: HF_HOME
+                  value: /tmp/hf_cache
                 - name: OTEL_SDK_DISABLED
                   value: "true"
+                {{- if eq .Rhdh.Runtime.Platform "ocp"}}
+                - name: OKP_SERVICE_URL
+                  value: "http://lightspeed-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
+                {{- end}}
               volumeMounts:
-                - mountPath: /tmp/data/feedback
-                  name: shared-storage
-                - mountPath: /rag-content
-                  name: rag-data-volume
-                - mountPath: /tmp              # Add this to make /tmp writable
-                  name: temp
+                - mountPath: /tmp
+                  name: lightspeed-data
 
           volumes:
-            - name: shared-storage
+            - name: lightspeed-data
               emptyDir: { }
-            - name: rag-data-volume
-              emptyDir: { }
-  dynamic-plugins.yaml: |
+  dynamic-plugins.yaml: |+
     apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -285,15 +301,73 @@ data:
       dynamic-plugins.yaml: |
         plugins:
           # Intelligent Assistant Plugins
-          - package: 'ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant'
+          - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant
+            enabled: true
+            pluginConfig:
+              dynamicPlugins:
+                frontend:
+                  red-hat-developer-hub.backstage-plugin-intelligent-assistant:
+                    translationResources:
+                      - importName: lightspeedTranslations
+                        module: Alpha
+                        ref: intelligentAssistantTranslationRef
+                    dynamicRoutes:
+                      - path: /intelligent-assistant
+                        importName: LightspeedPage
+                        module: Legacy
+                    mountPoints:
+                      - mountPoint: application/listener
+                        importName: LightspeedFAB
+                        module: Legacy
+                      - mountPoint: application/provider
+                        importName: LightspeedDrawerProvider
+                        module: Legacy
+                      - mountPoint: application/internal/drawer-state
+                        importName: LightspeedDrawerStateExposer
+                        module: Legacy
+                        config:
+                          id: intelligent-assistant
+                      - mountPoint: application/internal/drawer-content
+                        importName: LightspeedChatContainer
+                        module: Legacy
+                        config:
+                          id: intelligent-assistant
+                          priority: 100
+
+          - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend
+            enabled: true
+            {{- if eq .Rhdh.Runtime.Platform "ocp"}}
+            dependencies:
+              - ref: okp
+            {{- end}}
+          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-auth-backend-module-guest-provider:next__0.2.20
             enabled: true
 
-          - package: 'ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend'
-            enabled: true
   metadata.yaml: |
     # Intelligent Assistant flavour metadata
     # This flavour is enabled by default and provides Developer Hub Intelligent Assistant functionality
     enabledByDefault: true
+  networkpolicy.yaml: |
+    # NetworkPolicy to allow Backstage pod to access OKP service for Intelligent Assistant flavour
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-okp-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        # Allow HTTP egress on port 80 (for OKP external route through OpenShift router)
+        - ports:
+            - protocol: TCP
+              port: 80
+        # Allow HTTP egress on port 8080 (for OKP internal service or external route if using :8080)
+        - ports:
+            - protocol: TCP
+              port: 8080
 kind: ConfigMap
 metadata:
   name: rhdh-flavour-intelligent-assistant-config
