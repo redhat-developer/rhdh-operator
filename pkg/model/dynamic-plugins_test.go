@@ -995,13 +995,13 @@ func TestPackagesIntegrity(t *testing.T) {
 	assert.Contains(t, packagesData, "@scope/plugin@1.0.0 sha256-xyz")
 }
 
-func TestDeprecatedPluginPathSyntax(t *testing.T) {
+func TestMultiPluginPackageSyntax(t *testing.T) {
 	t.Setenv(OperatorDPProcessingEnvVar, "true")
 
 	bs := testDynamicPluginsBackstage.DeepCopy()
 	bs.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{
 		{
-			Package: "oci://quay.io/rhdh/plugin:1.0!plugin",
+			Package: "oci://quay.io/rhdh/multi-plugin:1.0!plugin-a",
 		},
 	}
 
@@ -1013,9 +1013,8 @@ func TestDeprecatedPluginPathSyntax(t *testing.T) {
 	dpObj := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
 	packagesData := dpObj.enabledPluginsCM.Data["packages.txt"]
 
-	// Verify the "!plugin" suffix is stripped
-	assert.Contains(t, packagesData, "oci://quay.io/rhdh/plugin:1.0")
-	assert.NotContains(t, packagesData, "!plugin", "deprecated !plugin-path syntax should be stripped")
+	// Verify the "!plugin-a" suffix is preserved (multi-plugin package support)
+	assert.Contains(t, packagesData, "oci://quay.io/rhdh/multi-plugin:1.0!plugin-a", "!plugin-path syntax should be preserved for multi-plugin packages")
 }
 
 func TestDynamicPluginsMutualExclusivity(t *testing.T) {

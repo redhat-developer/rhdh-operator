@@ -169,10 +169,9 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
 					continue
 				}
-				// Warn if package name contains deprecated "!plugin-path" syntax and strip the package
+				// Warn if package name contains "!plugin-path" syntax (multi-plugin package)
 				if idx := strings.LastIndex(plugin.Package, "!"); idx != -1 {
-					klog.Warningf("package %q contains deprecated '!plugin-path' syntax", plugin.Package)
-					plugin.Package = plugin.Package[:idx]
+					klog.Warningf("package %q contains '!plugin-path' syntax", plugin.Package)
 				}
 
 				p.enabledPlugins = append(p.enabledPlugins, plugin)

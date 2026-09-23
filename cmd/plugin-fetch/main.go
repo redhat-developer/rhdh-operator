@@ -333,6 +333,11 @@ func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package
 
 // pluginName extracts a directory name from various URL formats
 func pluginName(url string) string {
+	// If !pluginPath present, use it as the directory name
+	if idx := strings.LastIndex(url, "!"); idx != -1 {
+		return url[idx+1:]
+	}
+
 	// Remove scheme prefixes
 	url = strings.TrimPrefix(url, "oci://")
 	url = strings.TrimPrefix(url, "https://")

@@ -105,8 +105,18 @@ func WithPluginMode() OCIOption {
 // Fetch downloads an OCI artifact and extracts it to destDir.
 // Streams directly to extraction without buffering the entire layer in memory.
 // For plugin artifacts, extracts the plugin subdirectory content to destDir.
+// Supports multi-plugin packages via !pluginPath suffix (e.g., oci://reg/pkg:1.0!plugin-A).
 func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) error {
-	// 1. Parse reference
+	// 1. Parse pluginPath from ref (only in plugin mode)
+	pluginPath := ""
+	if c.pluginMode {
+		if idx := strings.LastIndex(ref, "!"); idx != -1 {
+			pluginPath = ref[idx+1:]
+			ref = ref[:idx] // Strip !pluginPath for download
+		}
+	}
+
+	// 2. Parse reference
 	imgRef, err := name.ParseReference(ref)
 	if err != nil {
 		return fmt.Errorf("invalid OCI reference %q: %w", ref, err)
@@ -173,9 +183,21 @@ func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) erro
 		return err
 	}
 
-	// 10. Find and move the plugin subdirectory
-	// Plugin artifacts have content in a subdirectory named after the plugin
-	return movePluginContent(tmpDir, destDir)
+	// 10. Determine expected plugin directory name
+	// Either from !pluginPath or from OCI image name (last path segment)
+	expectedDir := pluginPath
+	if expectedDir == "" {
+		// Extract image name from OCI reference (last path component)
+		repo := imgRef.Context().RepositoryStr()
+		if idx := strings.LastIndex(repo, "/"); idx != -1 {
+			expectedDir = repo[idx+1:]
+		} else {
+			expectedDir = repo
+		}
+	}
+
+	// 11. Move the plugin subdirectory
+	return movePluginContent(tmpDir, destDir, expectedDir)
 }
 
 // ----------------------------------------------------------------------------
@@ -277,36 +299,32 @@ func authToAuthenticator(auth dockerAuthConfig) (authn.Authenticator, error) {
 	return authn.Anonymous, nil
 }
 
-// movePluginContent finds the plugin subdirectory in srcDir and moves its contents to destDir.
-// Plugin OCI artifacts contain files in a subdirectory named after the plugin.
-func movePluginContent(srcDir, destDir string) error {
-	entries, err := os.ReadDir(srcDir)
+// movePluginContent moves the plugin subdirectory from srcDir to destDir.
+// expectedDir is the name of the subdirectory to extract (derived from OCI image name or !pluginPath).
+// Validates that the directory exists and contains package.json.
+func movePluginContent(srcDir, destDir, expectedDir string) error {
+	targetDir := filepath.Join(srcDir, expectedDir)
+
+	// Check if the expected subdirectory exists
+	stat, err := os.Stat(targetDir)
 	if err != nil {
-		return fmt.Errorf("failed to read extracted content: %w", err)
-	}
-
-	// Find the first directory that looks like plugin content (has package.json)
-	var pluginDir string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		candidate := filepath.Join(srcDir, entry.Name())
-		if _, err := os.Stat(filepath.Join(candidate, "package.json")); err == nil {
-			pluginDir = candidate
-			break
-		}
-	}
-
-	// If no directory with package.json found, check if package.json is at root
-	if pluginDir == "" {
-		if _, err := os.Stat(filepath.Join(srcDir, "package.json")); err == nil {
-			// Content is already at root level, just rename
+		// Directory doesn't exist - check if content is at root level
+		if _, rootErr := os.Stat(filepath.Join(srcDir, "package.json")); rootErr == nil {
+			// Content is at root level, just rename
 			return os.Rename(srcDir, destDir)
 		}
-		return fmt.Errorf("no plugin content found (no package.json in any subdirectory)")
+		return fmt.Errorf("plugin subdirectory %q not found in extracted content", expectedDir)
+	}
+
+	if !stat.IsDir() {
+		return fmt.Errorf("expected %q to be a directory, but it's a file", expectedDir)
+	}
+
+	// Verify package.json exists in the subdirectory
+	if _, err := os.Stat(filepath.Join(targetDir, "package.json")); err != nil {
+		return fmt.Errorf("plugin subdirectory %q is missing package.json", expectedDir)
 	}
 
 	// Move the plugin directory to destination
-	return os.Rename(pluginDir, destDir)
+	return os.Rename(targetDir, destDir)
 }

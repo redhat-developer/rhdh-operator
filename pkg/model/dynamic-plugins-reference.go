@@ -153,17 +153,21 @@ func resolveRefReference(packageURL string, basePlugins []DynaPlugin) (string, e
 }
 
 // Name extracts the plugin name from the package URL.
-// For example:
+// For multi-plugin packages with !pluginPath, returns the pluginPath.
+// For single-plugin packages, extracts the name from the URL.
+//
+// Examples:
 //   - oci://quay.io/rhdh/backstage-plugin-techdocs@sha256:abc -> backstage-plugin-techdocs
 //   - oci://quay.io/rhdh/backstage-plugin-techdocs:1.0.0 -> backstage-plugin-techdocs
+//   - oci://quay.io/rhdh/multi-plugin:1.0!plugin-A -> plugin-A
 //   - https://example.com/path/backstage-plugin-foo-1.0.0.tgz -> backstage-plugin-foo
 //   - ./dynamic-plugins/dist/backstage-plugin-techdocs -> backstage-plugin-techdocs
 func (p *DynaPlugin) Name() string {
 	packageURL := p.Package
 
-	// Strip !plugin-path suffix if present
+	// If !plugin-path present, return it as the plugin name
 	if idx := strings.LastIndex(packageURL, "!"); idx != -1 {
-		packageURL = packageURL[:idx]
+		return packageURL[idx+1:]
 	}
 
 	// Handle OCI URLs
