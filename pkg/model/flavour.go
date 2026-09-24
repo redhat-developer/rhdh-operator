@@ -15,6 +15,8 @@ import (
 type FlavourMetadata struct {
 	// EnabledByDefault controls whether this flavour is enabled when spec.flavours is not specified
 	EnabledByDefault bool `yaml:"enabledByDefault"`
+	// Requires lists other flavours that must be enabled with this flavour.
+	Requires []string `yaml:"requires,omitempty"`
 }
 
 // enabledFlavour represents a flavour that is enabled for this Backstage instance
@@ -67,12 +69,30 @@ func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
 		}
 	}
 
-	// Step 3: Apply unmentioned defaults first in stable order, then explicitly
-	// configured flavours in CR declaration order. Flavour order affects merge
-	// precedence and mount order, so it must not depend on map iteration or names.
+	// Validate dependencies after explicit overrides have been applied. This
+	// prevents add-on flavours from being rendered without their base flavour.
+	for name, flavour := range allFlavours {
+		if !flavour.enabled {
+			continue
+		}
+		for _, requiredName := range flavour.requires {
+			required, exists := allFlavours[requiredName]
+			if !exists {
+				return nil, fmt.Errorf("flavour '%s' requires unknown flavour '%s'", name, requiredName)
+			}
+			if !required.enabled {
+				return nil, fmt.Errorf("flavour '%s' requires flavour '%s' to be enabled", name, requiredName)
+			}
+		}
+	}
+
+	// Step 3: Apply enabled default flavours first in stable order, then enabled
+	// opt-in flavours in CR declaration order. Opt-in flavours are add-ons that
+	// must be able to override the default configuration regardless of their
+	// position in spec.flavours.
 	var defaultNames []string
 	for name, flavour := range allFlavours {
-		if _, explicit := explicitNames[name]; !explicit && flavour.enabled {
+		if flavour.enabled && flavour.enabledByDefault {
 			defaultNames = append(defaultNames, name)
 		}
 	}
@@ -89,7 +109,8 @@ func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
 		appendFlavour(name)
 	}
 	for _, name := range explicitOrder {
-		if allFlavours[name].enabled {
+		flavour := allFlavours[name]
+		if flavour.enabled && !flavour.enabledByDefault {
 			appendFlavour(name)
 		}
 	}
@@ -99,8 +120,10 @@ func GetEnabledFlavours(spec api.BackstageSpec) ([]enabledFlavour, error) {
 
 // flavourInfo holds information about a discovered flavour
 type flavourInfo struct {
-	basePath string
-	enabled  bool
+	basePath         string
+	enabled          bool
+	enabledByDefault bool
+	requires         []string
 }
 
 // loadAllFlavours loads all available flavours from the flavours directory
@@ -131,8 +154,10 @@ func loadAllFlavours(flavoursDir string) (map[string]flavourInfo, error) {
 		}
 
 		flavours[flavourName] = flavourInfo{
-			basePath: flavourPath,
-			enabled:  metadata.EnabledByDefault,
+			basePath:         flavourPath,
+			enabled:          metadata.EnabledByDefault,
+			enabledByDefault: metadata.EnabledByDefault,
+			requires:         metadata.Requires,
 		}
 	}
 

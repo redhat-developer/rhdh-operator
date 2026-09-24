@@ -15,7 +15,7 @@ spec:
 
 The example lists both flavours explicitly for clarity. Because `intelligent-assistant` is enabled by default, specifying only `intelligent-assistant-okp` with `enabled: true` also enables the complete combination. Do not explicitly disable `intelligent-assistant` while enabling `intelligent-assistant-okp`; the add-on requires the base Intelligent Assistant flavour.
 
-On OpenShift, enabling the add-on causes the Operator to:
+On OpenShift, enabling the add-on causes the Operator to create the following resources in the same namespace as the `Backstage` custom resource:
 
 - Add the `okp` dependency to the Intelligent Assistant backend plugin.
 - Create the OKP Deployment, Service, and edge-terminated Route.
@@ -63,7 +63,7 @@ spec:
     extraEnvs:
       envs:
         - name: OKP_SERVICE_URL
-          value: https://intelligent-assistant-okp-developer-hub-rhdh-test.apps.example.com
+          value: https://ia-okp-developer-hub-rhdh-test.apps.example.com
           containers:
             - lightspeed-core
     extraFiles:

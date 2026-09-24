@@ -13,5 +13,5 @@ spec:
           {{- if eq .Rhdh.Runtime.Platform "ocp"}}
           env:
             - name: OKP_SERVICE_URL
-              value: "http://intelligent-assistant-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
+              value: "http://ia-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
           {{- end}}

@@ -34,7 +34,7 @@ data:
     llama_stack:
       use_as_library_client: true
       config:
-        profile: /app-root/config.yaml
+        baseline: byo-llm
         native_override:
           vector_stores:
             annotation_prompt_params:
@@ -56,8 +56,8 @@ data:
         #       tls:
         #         verify: ${env.VLLM_TLS_VERIFY:=true}
         # - type: openai
-        #  id: openai
-        #  api_key_env: OPENAI_API_KEY
+        #   id: openai
+        #   api_key_env: OPENAI_API_KEY
         # - type: vertexai
         #   id: vertexai
         #   extra:
@@ -83,10 +83,7 @@ data:
         db_path: '/tmp/cache.db'
     customization:
       profile_path: '/app-root/rhdh-profile.py'
-    # LCORE-owned safety shields (not Llama Stack / OGX Safety API resources).
-    # Listed via GET /v1/shields; selected per request with optional shield_ids.
-    # Opt-in: set ENABLE_VALIDATION=question_validity (OGX skips the entry when
-    # provider_id resolves to __disabled__). See docs/CONTRIBUTING.md.
+    # Opt-in: set ENABLE_VALIDATION=question_validity. Entry skipped when provider_id resolves to __disabled__.
     shields:
       - name: lightspeed_question_validity
         provider_id: ${env.ENABLE_VALIDATION:=__disabled__}

@@ -382,7 +382,7 @@ var _ = When("create default rhdh", func() {
 			okpDeploy := &appsv1.Deployment{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
 				Namespace: ns,
-				Name:      "intelligent-assistant-okp-" + backstageName,
+				Name:      "ia-okp-" + backstageName,
 			}, okpDeploy)
 			g.Expect(client.IgnoreNotFound(err)).ShouldNot(HaveOccurred())
 			g.Expect(err).To(HaveOccurred())
@@ -427,14 +427,14 @@ var _ = When("create default rhdh", func() {
 			okpDeploy := &appsv1.Deployment{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
 				Namespace: ns,
-				Name:      "intelligent-assistant-okp-" + backstageName,
+				Name:      "ia-okp-" + backstageName,
 			}, okpDeploy)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
 			okpService := &corev1.Service{}
 			err = k8sClient.Get(ctx, types.NamespacedName{
 				Namespace: ns,
-				Name:      "intelligent-assistant-okp-" + backstageName,
+				Name:      "ia-okp-" + backstageName,
 			}, okpService)
 			g.Expect(err).ShouldNot(HaveOccurred())
 
@@ -465,6 +465,50 @@ var _ = When("create default rhdh", func() {
 				}
 			}
 
+		}, 20*time.Second, time.Second).Should(Succeed())
+
+		deleteNamespace(ctx, ns)
+	})
+
+	It("applies the OKP add-on after Intelligent Assistant regardless of flavour declaration order", func() {
+
+		if !isProfile("rhdh") {
+			Skip("Skipped for non rhdh config")
+		}
+
+		ctx := context.Background()
+		ns := createNamespace(ctx)
+		backstageName := createAndReconcileBackstage(ctx, ns, api.BackstageSpec{
+			Flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant-okp", Enabled: true},
+				{Name: "intelligent-assistant", Enabled: true},
+			},
+		}, "")
+
+		Eventually(func(g Gomega) {
+			okpDeploy := &appsv1.Deployment{}
+			err := k8sClient.Get(ctx, types.NamespacedName{
+				Namespace: ns,
+				Name:      "ia-okp-" + backstageName,
+			}, okpDeploy)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
+			g.Expect(err).ShouldNot(HaveOccurred())
+
+			foundLightspeedCore := false
+			for _, container := range deploy.PodSpec().Containers {
+				if container.Name == "lightspeed-core" {
+					foundLightspeedCore = true
+					g.Expect(container.Args).To(Equal([]string{
+						"--config",
+						"/app-root/lightspeed-stack-okp.yaml",
+						"--synthesized-config-output",
+						"/tmp/.generated/run.yaml",
+					}))
+				}
+			}
+			g.Expect(foundLightspeedCore).To(BeTrue())
 		}, 20*time.Second, time.Second).Should(Succeed())
 
 		deleteNamespace(ctx, ns)

@@ -1,6 +1,6 @@
 # Enabling OKP on Kubernetes
 
-The `intelligent-assistant-okp` flavour creates the OKP Deployment and Service, mounts `lightspeed-stack-okp.yaml`, and selects it as the LCORE configuration. The RHDH Operator does not manage Kubernetes Ingress, registry credentials, or the public OKP hostname.
+The `intelligent-assistant-okp` flavour creates the OKP Deployment and Service in the same namespace as the `Backstage` custom resource, mounts `lightspeed-stack-okp.yaml`, and selects it as the LCORE configuration. The RHDH Operator does not manage Kubernetes Ingress, registry credentials, or the public OKP hostname.
 
 The public hostname must be reachable by both Lightspeed Core inside the cluster and users' browsers so that retrieval and clickable citation links use the same URL.
 
@@ -42,15 +42,6 @@ spec:
       enabled: true
 ```
 
-The current OKP image declares the named user `default` with UID 1001. If Kubernetes rejects `runAsNonRoot: true` because the image user is non-numeric, patch the generated Deployment after it appears:
-
-```bash
-kubectl patch deployment "intelligent-assistant-okp-${BACKSTAGE_NAME}" \
-  --namespace "$NAMESPACE" \
-  --type strategic \
-  --patch '{"spec":{"template":{"spec":{"containers":[{"name":"okp","securityContext":{"runAsUser":1001}}]}}}}'
-```
-
 ## Create an Ingress
 
 Create a TLS Secret for the public hostname:
@@ -84,7 +75,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: intelligent-assistant-okp-developer-hub
+                name: ia-okp-developer-hub
                 port:
                   number: 8080
 ```

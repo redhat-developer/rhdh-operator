@@ -2,6 +2,7 @@ package template
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -94,6 +95,27 @@ data:
 			assert.Equal(t, content, result)
 		})
 	}
+}
+
+func TestApplyTemplatePreservesIntelligentAssistantProfileFString(t *testing.T) {
+	templateData := NewTemplateData(
+		&MockBackstageCR{Name: "my-backstage", Namespace: "my-namespace"},
+		&MockPlatform{Extension: "k8s"},
+		&MockExternalConfig{IngressDomain: ""},
+	)
+
+	configPath := filepath.Join(
+		"..", "..", "config", "profile", "rhdh", "default-config", "flavours",
+		"intelligent-assistant", "configmap-files.yaml",
+	)
+	content, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+
+	result, err := ApplyTemplate(templateData, content)
+	require.NoError(t, err)
+	assert.Equal(t, content, result)
+	assert.Contains(t, string(result), "${{message}}")
+	assert.NotContains(t, string(result), `${{ "{{" }}message{{ "}}" }}`)
 }
 
 func TestApplyTemplateWithNoDataSet(t *testing.T) {

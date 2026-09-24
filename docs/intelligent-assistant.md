@@ -71,11 +71,11 @@ spec:
 
 The example lists both flavours explicitly. Because Intelligent Assistant is enabled by default, a CR can enable only the `intelligent-assistant-okp` entry and retain the default IA flavour. The OKP add-on must not be enabled together with an explicitly disabled `intelligent-assistant` flavour.
 
-The first installation can take significantly longer while the large OKP image is downloaded.
+The first installation can take significantly longer while the large OKP image is downloaded. Lightspeed Core might restart temporarily if it starts before OKP and its Solr service are ready. It recovers automatically after OKP becomes ready.
 
-On OpenShift, the Operator creates an OKP Deployment, Service, and Route and configures Lightspeed Core to use the HTTP Route automatically. For OpenShift configuration and optional HTTPS on a cluster with a private router CA, see [Enabling OKP on OpenShift](intelligent-assistant-okp-openshift.md).
+On OpenShift, the Operator creates an OKP Deployment, Service, and Route in the same namespace as the `Backstage` custom resource and configures Lightspeed Core to use the HTTP Route automatically. For OpenShift configuration and optional HTTPS on a cluster with a private router CA, see [Enabling OKP on OpenShift](intelligent-assistant-okp-openshift.md).
 
-On Kubernetes, the Operator creates the OKP Deployment and Service but does not manage Ingress. Registry authentication, networking, and the public `OKP_SERVICE_URL` must be configured by the user. See [Enabling OKP on Kubernetes](intelligent-assistant-okp-kubernetes.md).
+On Kubernetes, the Operator creates the OKP Deployment and Service in the same namespace as the `Backstage` custom resource but does not manage Ingress. Registry authentication, networking, and the public `OKP_SERVICE_URL` must be configured by the user. See [Enabling OKP on Kubernetes](intelligent-assistant-okp-kubernetes.md).
 
 #### Manual Plugin Configuration
 
