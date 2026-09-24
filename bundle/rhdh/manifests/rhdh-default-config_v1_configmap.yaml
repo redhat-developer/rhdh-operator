@@ -432,6 +432,27 @@ data:
               protocol: TCP
 
     ---
+    # Internal HTTP egress: plugins that talk to in-cluster services behind plain
+    # HTTP routes or services (e.g., Keycloak without TLS termination) need port 80.
+    # Restricted to cluster-internal destinations via namespaceSelector.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-http-egress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Egress
+      egress:
+        - to:
+            - namespaceSelector: {}
+          ports:
+            - port: 80
+              protocol: TCP
+
+    ---
     # Redis is part of the recommended checklist for production deployments
     # (see https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.10/html/setting_up_and_configuring_your_first_red_hat_developer_hub_instance/checklist-to-run-your-first-rhdh-instance-in-production_setting-up-and-configuring-your-first-red-hat-developer-hub-instance).
     # RHDH does not deploy Redis OOTB; users bring their own, which could be in the same
