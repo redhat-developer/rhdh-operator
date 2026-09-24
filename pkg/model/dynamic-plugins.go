@@ -168,6 +168,10 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
 					continue
 				}
+
+				// Apply mirror transformation to OCI package URLs only
+				plugin.Package = ApplyMirror(plugin.Package, p.model.ExternalConfig.Mirrors)
+
 				p.enabledPlugins = append(p.enabledPlugins, plugin)
 				// Build package entry: "url integrity"
 				// Integrity is respected for HTTP and npm packages, ignored for OCI

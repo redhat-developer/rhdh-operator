@@ -12,7 +12,7 @@ OLM_VERSION ?= auto
 # Enable operator dynamic plugins processing (default: true)
 OPERATOR_DP_PROCESSING ?= true
 # Install dynamic plugins image (required when OPERATOR_DP_PROCESSING=true)
-RELATED_IMAGE_plugin_installer ?= quay.io/rhdh-community/rhdh-plugin-installer:next
+RELATED_IMAGE_plugin_installer ?= quay.io/rhdh-community/rhdh-plugin-installer:latest
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
