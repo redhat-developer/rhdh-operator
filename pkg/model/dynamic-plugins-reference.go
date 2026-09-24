@@ -81,8 +81,9 @@ func (p *DynaPlugin) IsDirectLink() bool {
 //   - oci://x/plugin-foo:{{inherit}}!custom-path uses base's version but user's plugin-path
 func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (string, error) {
 	// Parse package to extract !plugin-path suffix if present
+	// Use first ! to split, in case selector itself contains !
 	var pluginPath string
-	if idx := strings.LastIndex(packageURL, "!"); idx != -1 {
+	if idx := strings.Index(packageURL, "!"); idx != -1 {
 		pluginPath = packageURL[idx:] // includes "!"
 		packageURL = packageURL[:idx]
 	}
@@ -111,7 +112,8 @@ func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (strin
 			// If user specified !plugin-path, use it; otherwise use full default URL
 			if pluginPath != "" {
 				// Extract image part from default (without !plugin-path)
-				if idx := strings.LastIndex(fullURL, "!"); idx != -1 {
+				// Use first ! to strip, in case selector itself contains !
+				if idx := strings.Index(fullURL, "!"); idx != -1 {
 					fullURL = fullURL[:idx]
 				}
 				return fullURL + pluginPath, nil
@@ -153,17 +155,22 @@ func resolveRefReference(packageURL string, basePlugins []DynaPlugin) (string, e
 }
 
 // Name extracts the plugin name from the package URL.
-// For example:
+// For multi-plugin packages with !pluginPath, returns the pluginPath.
+// For single-plugin packages, extracts the name from the URL.
+//
+// Examples:
 //   - oci://quay.io/rhdh/backstage-plugin-techdocs@sha256:abc -> backstage-plugin-techdocs
 //   - oci://quay.io/rhdh/backstage-plugin-techdocs:1.0.0 -> backstage-plugin-techdocs
+//   - oci://quay.io/rhdh/multi-plugin:1.0!plugin-A -> plugin-A
 //   - https://example.com/path/backstage-plugin-foo-1.0.0.tgz -> backstage-plugin-foo
 //   - ./dynamic-plugins/dist/backstage-plugin-techdocs -> backstage-plugin-techdocs
 func (p *DynaPlugin) Name() string {
 	packageURL := p.Package
 
-	// Strip !plugin-path suffix if present
-	if idx := strings.LastIndex(packageURL, "!"); idx != -1 {
-		packageURL = packageURL[:idx]
+	// If !plugin-path present, return it as the plugin name
+	// Use first ! to split, in case selector itself contains !
+	if idx := strings.Index(packageURL, "!"); idx != -1 {
+		return packageURL[idx+1:]
 	}
 
 	// Handle OCI URLs

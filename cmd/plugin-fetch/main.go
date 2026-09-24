@@ -332,6 +332,7 @@ func processParallel(ctx context.Context, f *fetcher.Fetcher, packages []Package
 }
 
 // pluginName extracts a directory name from various URL formats
+// Note: !pluginPath syntax is only valid for OCI URLs and is handled by the OCI fetcher
 func pluginName(url string) string {
 	// Remove scheme prefixes
 	url = strings.TrimPrefix(url, "oci://")

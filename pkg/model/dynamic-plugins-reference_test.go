@@ -8,9 +8,9 @@ import (
 
 func TestResolveInheritReference(t *testing.T) {
 	basePlugins := []DynaPlugin{
-		{Package: "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a-path"},
+		{Package: "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a"},
 		{Package: "oci://quay.io/rhdh/plugin-b@sha256:def456"},
-		{Package: "oci://registry.access.redhat.com/plugin-c@sha256:xyz789!rh-plugin"},
+		{Package: "oci://registry.access.redhat.com/plugin-c@sha256:xyz789!plugin-c"},
 		{Package: "./dynamic-plugins/dist/plugin-local"},
 	}
 
@@ -23,7 +23,7 @@ func TestResolveInheritReference(t *testing.T) {
 		{
 			name:       "inherit without plugin path - uses full default",
 			packageURL: "oci://quay.io/rhdh/plugin-a:{{inherit}}",
-			expected:   "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a-path",
+			expected:   "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a",
 		},
 		{
 			name:       "inherit with plugin path - keeps user's plugin path",
@@ -43,7 +43,7 @@ func TestResolveInheritReference(t *testing.T) {
 		{
 			name:       "inherit with different registry - matches by name",
 			packageURL: "oci://other-registry.io/different/plugin-c:{{inherit}}",
-			expected:   "oci://registry.access.redhat.com/plugin-c@sha256:xyz789!rh-plugin",
+			expected:   "oci://registry.access.redhat.com/plugin-c@sha256:xyz789!plugin-c",
 		},
 		{
 			name:        "inherit with no matching base - error",
@@ -206,7 +206,7 @@ plugins:
 func TestResolveRefReference(t *testing.T) {
 	basePlugins := []DynaPlugin{
 		{Package: "oci://quay.io/rhdh/backstage-plugin-foo@sha256:abc123"},
-		{Package: "oci://quay.io/rhdh/backstage-plugin-bar@sha256:def456!plugin-path"},
+		{Package: "oci://quay.io/rhdh/backstage-plugin-bar@sha256:def456!backstage-plugin-bar"},
 		{Package: "https://example.com/plugins/backstage-plugin-https-1.0.0.tgz"},
 		{Package: "./dynamic-plugins/dist/backstage-plugin-local"},
 	}
@@ -225,7 +225,7 @@ func TestResolveRefReference(t *testing.T) {
 		{
 			name:       "ref to OCI plugin with path",
 			packageURL: "ref://backstage-plugin-bar",
-			expected:   "oci://quay.io/rhdh/backstage-plugin-bar@sha256:def456!plugin-path",
+			expected:   "oci://quay.io/rhdh/backstage-plugin-bar@sha256:def456!backstage-plugin-bar",
 		},
 		{
 			name:        "ref to non-existent plugin",
@@ -323,6 +323,31 @@ func TestName(t *testing.T) {
 			name:     "Local path",
 			package_: "./dynamic-plugins/dist/backstage-plugin-techdocs",
 			expected: "backstage-plugin-techdocs",
+		},
+		{
+			name:     "OCI with pluginPath suffix",
+			package_: "oci://quay.io/rhdh/multi-plugin:1.0!plugin-A",
+			expected: "plugin-A",
+		},
+		{
+			name:     "OCI with digest and pluginPath",
+			package_: "oci://quay.io/rhdh/multi-plugin@sha256:abc123!my-plugin",
+			expected: "my-plugin",
+		},
+		{
+			name:     "HTTPS with pluginPath suffix",
+			package_: "https://example.com/plugins/multi-1.0.0.tgz!plugin-B",
+			expected: "plugin-B",
+		},
+		{
+			name:     "Local path with pluginPath suffix",
+			package_: "./dynamic-plugins/dist/multi-plugin!specific-plugin",
+			expected: "specific-plugin",
+		},
+		{
+			name:     "OCI with pluginPath containing exclamation mark",
+			package_: "oci://quay.io/rhdh/multi-plugin:1.0!plugin-v2!beta",
+			expected: "plugin-v2!beta",
 		},
 	}
 

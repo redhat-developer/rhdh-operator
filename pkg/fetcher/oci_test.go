@@ -310,6 +310,91 @@ func TestPluginAnnotation(t *testing.T) {
 	assert.Equal(t, "io.backstage.dynamic-packages", PluginAnnotation)
 }
 
+func TestValidatePluginSelector(t *testing.T) {
+	tests := []struct {
+		name        string
+		selector    string
+		expectError bool
+	}{
+		{
+			name:        "valid simple name",
+			selector:    "plugin-foo",
+			expectError: false,
+		},
+		{
+			name:        "valid name with underscores",
+			selector:    "plugin_bar_123",
+			expectError: false,
+		},
+		{
+			name:        "empty selector",
+			selector:    "",
+			expectError: true,
+		},
+		{
+			name:        "absolute path unix",
+			selector:    "/etc/passwd",
+			expectError: true,
+		},
+		{
+			name:        "absolute path windows",
+			selector:    "C:\\Windows",
+			expectError: true,
+		},
+		{
+			name:        "dot reference",
+			selector:    ".",
+			expectError: true,
+		},
+		{
+			name:        "dot dot reference",
+			selector:    "..",
+			expectError: true,
+		},
+		{
+			name:        "traversal with slash",
+			selector:    "../etc",
+			expectError: true,
+		},
+		{
+			name:        "traversal with backslash",
+			selector:    "..\\windows",
+			expectError: true,
+		},
+		{
+			name:        "subdirectory with slash",
+			selector:    "sub/dir",
+			expectError: true,
+		},
+		{
+			name:        "subdirectory with backslash",
+			selector:    "sub\\dir",
+			expectError: true,
+		},
+		{
+			name:        "hidden traversal",
+			selector:    "plugin/../etc",
+			expectError: true,
+		},
+		{
+			name:        "selector with exclamation mark is valid",
+			selector:    "plugin-v2!beta",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePluginSelector(tt.selector)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 // TestTransportIsConfigurable verifies transport configuration
 func TestTransportIsConfigurable(t *testing.T) {
 	customTransport := &http.Transport{
@@ -331,11 +416,13 @@ func TestMovePluginContent(t *testing.T) {
 	tests := []struct {
 		name        string
 		setup       func(t *testing.T, srcDir string)
+		expectedDir string
 		expectError bool
 		errorMsg    string
 	}{
 		{
-			name: "plugin in subdirectory",
+			name:        "plugin in subdirectory",
+			expectedDir: "my-plugin",
 			setup: func(t *testing.T, srcDir string) {
 				pluginDir := filepath.Join(srcDir, "my-plugin")
 				require.NoError(t, os.MkdirAll(pluginDir, 0755))
@@ -345,7 +432,8 @@ func TestMovePluginContent(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "plugin at root level",
+			name:        "plugin at root level",
+			expectedDir: "root-plugin",
 			setup: func(t *testing.T, srcDir string) {
 				require.NoError(t, os.WriteFile(filepath.Join(srcDir, "package.json"), []byte(`{"name":"root-plugin"}`), 0644))
 				require.NoError(t, os.WriteFile(filepath.Join(srcDir, "index.js"), []byte(`module.exports = {}`), 0644))
@@ -353,27 +441,60 @@ func TestMovePluginContent(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "no package.json anywhere",
+			name:        "expected subdirectory not found",
+			expectedDir: "missing-plugin",
 			setup: func(t *testing.T, srcDir string) {
-				subDir := filepath.Join(srcDir, "some-dir")
+				subDir := filepath.Join(srcDir, "some-other-dir")
 				require.NoError(t, os.MkdirAll(subDir, 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(subDir, "readme.txt"), []byte("no plugin here"), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(subDir, "readme.txt"), []byte("wrong directory"), 0644))
 			},
 			expectError: true,
-			errorMsg:    "no plugin content found",
+			errorMsg:    "not found in extracted content",
 		},
 		{
-			name: "multiple subdirs picks first with package.json",
+			name:        "specific plugin from multi-plugin package",
+			expectedDir: "plugin-A",
 			setup: func(t *testing.T, srcDir string) {
-				// Create two subdirs, only second has package.json
-				dir1 := filepath.Join(srcDir, "aaa-no-plugin")
-				dir2 := filepath.Join(srcDir, "bbb-plugin")
-				require.NoError(t, os.MkdirAll(dir1, 0755))
-				require.NoError(t, os.MkdirAll(dir2, 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(dir1, "readme.txt"), []byte("not a plugin"), 0644))
-				require.NoError(t, os.WriteFile(filepath.Join(dir2, "package.json"), []byte(`{"name":"bbb-plugin"}`), 0644))
+				// Multi-plugin package with two plugins
+				pluginA := filepath.Join(srcDir, "plugin-A")
+				pluginB := filepath.Join(srcDir, "plugin-B")
+				require.NoError(t, os.MkdirAll(pluginA, 0755))
+				require.NoError(t, os.MkdirAll(pluginB, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(pluginA, "package.json"), []byte(`{"name":"plugin-A"}`), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(pluginB, "package.json"), []byte(`{"name":"plugin-B"}`), 0644))
 			},
 			expectError: false,
+		},
+		{
+			name:        "expected directory not found",
+			expectedDir: "nonexistent-plugin",
+			setup: func(t *testing.T, srcDir string) {
+				pluginDir := filepath.Join(srcDir, "other-plugin")
+				require.NoError(t, os.MkdirAll(pluginDir, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(pluginDir, "package.json"), []byte(`{"name":"other"}`), 0644))
+			},
+			expectError: true,
+			errorMsg:    "not found",
+		},
+		{
+			name:        "expected directory exists but no package.json",
+			expectedDir: "incomplete-plugin",
+			setup: func(t *testing.T, srcDir string) {
+				pluginDir := filepath.Join(srcDir, "incomplete-plugin")
+				require.NoError(t, os.MkdirAll(pluginDir, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(pluginDir, "readme.txt"), []byte("not a plugin"), 0644))
+			},
+			expectError: true,
+			errorMsg:    "missing package.json",
+		},
+		{
+			name:        "expected name is a file not directory",
+			expectedDir: "plugin.txt",
+			setup: func(t *testing.T, srcDir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(srcDir, "plugin.txt"), []byte("file content"), 0644))
+			},
+			expectError: true,
+			errorMsg:    "to be a directory",
 		},
 	}
 
@@ -384,7 +505,7 @@ func TestMovePluginContent(t *testing.T) {
 
 			tt.setup(t, srcDir)
 
-			err := movePluginContent(srcDir, destDir)
+			err := movePluginContent(srcDir, destDir, tt.expectedDir)
 
 			if tt.expectError {
 				require.Error(t, err)
