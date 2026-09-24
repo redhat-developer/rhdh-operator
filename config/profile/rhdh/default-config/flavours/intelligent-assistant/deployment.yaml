@@ -6,7 +6,7 @@ spec:
       containers:
         # Lightspeed Core Backend
         - name: lightspeed-core
-          image: quay.io/lightspeed-core/lightspeed-stack:dev-20260824-cbd182b # TODO: Update to 0.7.x release tag when available (by FF)
+          image: quay.io/lightspeed-core/lightspeed-stack:0.7.0rc3 # TODO: Update to 0.7.x release tag when available (by FF)
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
