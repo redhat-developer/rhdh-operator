@@ -36,10 +36,6 @@ spec:
               value: /tmp/hf_cache
             - name: OTEL_SDK_DISABLED
               value: "true"
-            {{- if eq .Rhdh.Runtime.Platform "ocp"}}
-            - name: OKP_SERVICE_URL
-              value: "http://lightspeed-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
-            {{- end}}
           volumeMounts:
             - mountPath: /tmp
               name: lightspeed-data

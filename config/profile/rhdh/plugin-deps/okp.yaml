@@ -5,16 +5,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: intelligent-assistant-okp-{{backstage-name}}
+  name: ia-okp-{{backstage-name}}
+  annotations:
+    rhdh.redhat.com/platform: ocp
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+      app.kubernetes.io/name: ia-okp-{{backstage-name}}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+        app.kubernetes.io/name: ia-okp-{{backstage-name}}
     spec:
       # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
       automountServiceAccountToken: false
@@ -60,17 +62,78 @@ spec:
               cpu: "2"
               memory: 4Gi
 ---
+# Kubernetes requires a numeric UID when runAsNonRoot is set and the image
+# declares a named user. UID 1001 is the image's `default` user.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ia-okp-{{backstage-name}}
+  annotations:
+    rhdh.redhat.com/platform: k8s
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ia-okp-{{backstage-name}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ia-okp-{{backstage-name}}
+    spec:
+      # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
+      automountServiceAccountToken: false
+      containers:
+        - name: okp
+          image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.12-1788274041
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: httpd
+              containerPort: 8080
+              protocol: TCP
+            - name: solr
+              containerPort: 8983
+              protocol: TCP
+          env:
+            - name: SOLR_JAVA_MEM
+              value: "-Xms1g -Xmx1g"
+            - name: SOLR_HOST_BIND
+              value: "0.0.0.0"
+            - name: MIMIR_HTTPD_SERVER_NAME
+              value: "localhost"
+            - name: COMPRESSED
+              value: "true"
+            - name: ENCRYPT
+              value: "false"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+---
 # OKP (Offline Knowledge Portal) standalone OpenShift Route.
 # name/labels and spec.to.name are set by the operator at runtime (per Backstage CR).
 # Applied on OpenShift only.
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: lightspeed-okp-{{backstage-name}}
+  name: ia-okp-{{backstage-name}}
+  annotations:
+    rhdh.redhat.com/platform: ocp
 spec:
   to:
     kind: Service
-    name: lightspeed-okp-{{backstage-name}}
+    name: ia-okp-{{backstage-name}}
   port:
     targetPort: httpd
   tls:
@@ -82,11 +145,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: lightspeed-okp-{{backstage-name}}
+  name: ia-okp-{{backstage-name}}
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: lightspeed-okp-{{backstage-name}}
+    app.kubernetes.io/name: ia-okp-{{backstage-name}}
   ports:
     - name: httpd
       port: 8080
