@@ -49,6 +49,23 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: allow-http-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 80
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: allow-redis-egress
 spec:
   podSelector:
