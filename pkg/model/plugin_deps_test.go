@@ -3,17 +3,20 @@ package model
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/redhat-developer/rhdh-operator/api"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/ptr"
 )
 
 func TestReadPluginDeps(t *testing.T) {
@@ -225,6 +228,76 @@ metadata:
 			}
 			assert.ElementsMatch(t, tt.wantNames, gotNames)
 		})
+	}
+}
+
+func TestReadOkpPluginDepsPlatformSecurityContext(t *testing.T) {
+	pluginDepsDir := filepath.Join("..", "..", "config", "profile", "rhdh", "plugin-deps")
+
+	tests := []struct {
+		name          string
+		platform      string
+		wantRunAsUser *int64
+	}{
+		{
+			name:     "OpenShift uses the cluster-assigned UID",
+			platform: "ocp",
+		},
+		{
+			name:          "Kubernetes uses the OKP image UID",
+			platform:      "k8s",
+			wantRunAsUser: ptr.To(int64(1001)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objects, err := ReadPluginDeps(pluginDepsDir, "developer-hub", "rhdh-test", []string{"okp"}, tt.platform)
+			assert.NoError(t, err)
+
+			var deployments []appsv1.Deployment
+			for _, obj := range objects {
+				if obj.GetKind() != "Deployment" {
+					continue
+				}
+
+				var deployment appsv1.Deployment
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &deployment)
+				assert.NoError(t, err)
+				deployments = append(deployments, deployment)
+			}
+
+			if assert.Len(t, deployments, 1) && assert.Len(t, deployments[0].Spec.Template.Spec.Containers, 1) {
+				assert.Equal(t, tt.wantRunAsUser, deployments[0].Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
+			}
+		})
+	}
+}
+
+func TestReadOkpPluginDepsNamesFitKubernetesLimits(t *testing.T) {
+	pluginDepsDir := filepath.Join("..", "..", "config", "profile", "rhdh", "plugin-deps")
+	// A Backstage Deployment uses the longer "backstage-" prefix, so a
+	// 53-character CR name can already be valid for the base installation.
+	backstageName := strings.Repeat("a", 53)
+
+	objects, err := ReadPluginDeps(pluginDepsDir, backstageName, "rhdh-test", []string{"okp"}, "k8s")
+	assert.NoError(t, err)
+
+	for _, obj := range objects {
+		assert.LessOrEqual(t, len(obj.GetName()), 63, "%s name exceeds the Kubernetes DNS label limit", obj.GetKind())
+		if value := obj.GetLabels()["app.kubernetes.io/name"]; value != "" {
+			assert.LessOrEqual(t, len(value), 63, "%s app.kubernetes.io/name exceeds the label limit", obj.GetKind())
+		}
+
+		if obj.GetKind() == "Deployment" {
+			selector, found, nestedErr := unstructured.NestedString(
+				obj.Object,
+				"spec", "selector", "matchLabels", "app.kubernetes.io/name",
+			)
+			assert.NoError(t, nestedErr)
+			assert.True(t, found)
+			assert.LessOrEqual(t, len(selector), 63)
+		}
 	}
 }
 

@@ -14,6 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 CONFIGMAP_FILE="${REPO_ROOT}/config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml"
+OKP_CONFIGMAP_FILE="${REPO_ROOT}/config/profile/rhdh/default-config/flavours/intelligent-assistant-okp/configmap-files.yaml"
 EXAMPLE_SECRET_FILE="${REPO_ROOT}/examples/intelligent-assistant.yaml"
 
 REF="main"
@@ -60,7 +61,7 @@ fetch_upstream_file() {
 }
 
 indent_file() {
-    sed 's/^/    /' "$1"
+    sed -e 's/[[:space:]]*$//' -e '/^$/!s/^/    /' "$1"
 }
 
 # Upstream env keys that are not user Secret fields.
@@ -174,9 +175,11 @@ main() {
     trap cleanup EXIT
 
     local stack_file="${TMP_DIR}/lightspeed-stack.yaml"
+    local stack_no_okp_file="${TMP_DIR}/lightspeed-stack-no-okp.yaml"
     local profile_file="${TMP_DIR}/rhdh-profile.py"
     local env_file="${TMP_DIR}/default-values.env"
     local stack_block="${TMP_DIR}/stack-block.yaml"
+    local stack_no_okp_block="${TMP_DIR}/stack-no-okp-block.yaml"
     local profile_block="${TMP_DIR}/profile-block.yaml"
     local secret_entries="${TMP_DIR}/secret-entries.yaml"
 
@@ -184,11 +187,15 @@ main() {
     fetch_upstream_file "$UPSTREAM_PROFILE_PATH" "$profile_file"
     fetch_upstream_file "$UPSTREAM_ENV_PATH" "$env_file"
 
+    yq 'del(.rag)' "$stack_file" > "$stack_no_okp_file"
+
     indent_file "$stack_file" > "$stack_block"
+    indent_file "$stack_no_okp_file" > "$stack_no_okp_block"
     indent_file "$profile_file" > "$profile_block"
     render_secret_entries "$env_file" > "$secret_entries"
 
-    replace_indented_block "$CONFIGMAP_FILE" "  lightspeed-stack.yaml: |" 4 "$stack_block"
+    replace_indented_block "$CONFIGMAP_FILE" "  lightspeed-stack.yaml: |" 4 "$stack_no_okp_block"
+    replace_indented_block "$OKP_CONFIGMAP_FILE" "  lightspeed-stack-okp.yaml: |" 4 "$stack_block"
     replace_indented_block "$CONFIGMAP_FILE" "  rhdh-profile.py: |" 4 "$profile_block"
     replace_indented_block "$EXAMPLE_SECRET_FILE" "stringData:" 2 "$secret_entries"
 

@@ -187,8 +187,8 @@ func TestGetEnabledFlavours(t *testing.T) {
 					{Name: "flavor2", Enabled: true},
 				},
 			},
-			// flavor2 (explicit) + defaults (flavor1, flavor3)
-			wantFlavours: []string{"flavor2", "flavor1", "flavor3"},
+			// Defaults first, then opt-in flavours in CR order.
+			wantFlavours: []string{"flavor1", "flavor3", "flavor2"},
 			wantErr:      false,
 		},
 		{
@@ -209,8 +209,8 @@ func TestGetEnabledFlavours(t *testing.T) {
 					{Name: "flavor2", Enabled: true},
 				},
 			},
-			// flavor2 (explicit enabled) + defaults (flavor1, flavor3)
-			wantFlavours: []string{"flavor2", "flavor1", "flavor3"},
+			// Defaults first, then opt-in flavours in CR order.
+			wantFlavours: []string{"flavor1", "flavor3", "flavor2"},
 			wantErr:      false,
 		},
 		{
@@ -222,9 +222,42 @@ func TestGetEnabledFlavours(t *testing.T) {
 					{Name: "flavor3", Enabled: true},  // default=true, spec=enabled
 				},
 			},
-			// flavor2 (explicit), flavor3 (explicit), no flavor1 (disabled)
-			wantFlavours: []string{"flavor2", "flavor3"},
+			// Enabled defaults precede opt-in flavours; disabled flavor1 is omitted.
+			wantFlavours: []string{"flavor3", "flavor2"},
 			wantErr:      false,
+		},
+		{
+			name: "opt-in flavour listed before default flavour",
+			spec: api.BackstageSpec{
+				Flavours: &[]api.Flavour{
+					{Name: "flavor2", Enabled: true},  // default=false, opt-in add-on
+					{Name: "flavor1", Enabled: true},  // default=true, base configuration
+					{Name: "flavor3", Enabled: false}, // omit the other default
+				},
+			},
+			wantFlavours: []string{"flavor1", "flavor2"},
+			wantErr:      false,
+		},
+		{
+			name: "opt-in add-on can rely on an omitted default flavour",
+			spec: api.BackstageSpec{
+				Flavours: &[]api.Flavour{
+					{Name: "flavor4", Enabled: true},
+				},
+			},
+			wantFlavours: []string{"flavor1", "flavor3", "flavor4"},
+			wantErr:      false,
+		},
+		{
+			name: "opt-in add-on rejects an explicitly disabled required flavour",
+			spec: api.BackstageSpec{
+				Flavours: &[]api.Flavour{
+					{Name: "flavor1", Enabled: false},
+					{Name: "flavor4", Enabled: true},
+				},
+			},
+			wantErr:     true,
+			errContains: "flavour 'flavor4' requires flavour 'flavor1' to be enabled",
 		},
 		{
 			name: "all flavours explicitly enabled",
@@ -236,7 +269,7 @@ func TestGetEnabledFlavours(t *testing.T) {
 				},
 			},
 
-			wantFlavours: []string{"flavor3", "flavor2", "flavor1"},
+			wantFlavours: []string{"flavor1", "flavor3", "flavor2"},
 			wantErr:      false,
 		},
 		{
@@ -269,11 +302,96 @@ func TestGetEnabledFlavours(t *testing.T) {
 					gotNames[i] = f.name
 				}
 
-				if !assert.ElementsMatch(t, tt.wantFlavours, gotNames) {
+				if !assert.Equal(t, tt.wantFlavours, gotNames) {
 					t.Logf("Expected flavours: %v", tt.wantFlavours)
 					t.Logf("Got flavours: %v", gotNames)
 				}
 			}
+		})
+	}
+}
+
+func TestGetEnabledIntelligentAssistantFlavours(t *testing.T) {
+	localBin := t.TempDir()
+	flavoursDir := filepath.Join(localBin, "default-config", "flavours")
+	require.NoError(t, os.MkdirAll(filepath.Join(flavoursDir, "intelligent-assistant"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(flavoursDir, "intelligent-assistant-okp"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(flavoursDir, "intelligent-assistant", "metadata.yaml"),
+		[]byte("enabledByDefault: true\n"),
+		0o600,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(flavoursDir, "intelligent-assistant-okp", "metadata.yaml"),
+		[]byte("enabledByDefault: false\nrequires:\n  - intelligent-assistant\n"),
+		0o600,
+	))
+	t.Setenv("LOCALBIN", localBin)
+
+	tests := []struct {
+		name         string
+		flavours     *[]api.Flavour
+		wantFlavours []string
+		wantErr      string
+	}{
+		{
+			name:         "default IA",
+			wantFlavours: []string{"intelligent-assistant"},
+		},
+		{
+			name: "explicit IA only",
+			flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant", Enabled: true},
+			},
+			wantFlavours: []string{"intelligent-assistant"},
+		},
+		{
+			name: "IA then OKP",
+			flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant", Enabled: true},
+				{Name: "intelligent-assistant-okp", Enabled: true},
+			},
+			wantFlavours: []string{"intelligent-assistant", "intelligent-assistant-okp"},
+		},
+		{
+			name: "OKP only keeps default IA",
+			flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant-okp", Enabled: true},
+			},
+			wantFlavours: []string{"intelligent-assistant", "intelligent-assistant-okp"},
+		},
+		{
+			name: "OKP before IA is reordered",
+			flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant-okp", Enabled: true},
+				{Name: "intelligent-assistant", Enabled: true},
+			},
+			wantFlavours: []string{"intelligent-assistant", "intelligent-assistant-okp"},
+		},
+		{
+			name: "OKP rejects explicitly disabled IA",
+			flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant", Enabled: false},
+				{Name: "intelligent-assistant-okp", Enabled: true},
+			},
+			wantErr: "flavour 'intelligent-assistant-okp' requires flavour 'intelligent-assistant' to be enabled",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flavours, err := GetEnabledFlavours(api.BackstageSpec{Flavours: tt.flavours})
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+
+			gotNames := make([]string, len(flavours))
+			for i, flavour := range flavours {
+				gotNames[i] = flavour.name
+			}
+			assert.Equal(t, tt.wantFlavours, gotNames)
 		})
 	}
 }

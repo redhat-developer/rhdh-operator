@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-dynamic-plugins
+data:
+  dynamic-plugins.yaml: |
+    plugins:
+      - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend
+        enabled: true
+        dependencies:
+          - ref: okp
