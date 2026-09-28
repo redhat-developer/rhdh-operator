@@ -23,7 +23,7 @@ spec:
             - name: OPERATOR_DP_PROCESSING
               value: "{{OPERATOR_DP_PROCESSING}}"
             - name: RELATED_IMAGE_postgresql
-              value: quay.io/fedora/postgresql-15:latest
+              value: quay.io/fedora/postgresql-18:latest
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh-community/rhdh:next
             - name: RELATED_IMAGE_plugin_installer
@@ -31,12 +31,17 @@ spec:
           volumeMounts:
             - mountPath: /default-config/flavours/intelligent-assistant
               name: flavour-intelligent-assistant-config
+            - mountPath: /default-config/flavours/intelligent-assistant-okp
+              name: flavour-intelligent-assistant-okp-config
             - mountPath: /default-config/flavours/orchestrator
               name: flavour-orchestrator-config
       volumes:
         - name: flavour-intelligent-assistant-config
           configMap:
             name: flavour-intelligent-assistant-config
+        - name: flavour-intelligent-assistant-okp-config
+          configMap:
+            name: flavour-intelligent-assistant-okp-config
         - name: flavour-orchestrator-config
           configMap:
             name: flavour-orchestrator-config

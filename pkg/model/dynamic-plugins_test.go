@@ -995,6 +995,28 @@ func TestPackagesIntegrity(t *testing.T) {
 	assert.Contains(t, packagesData, "@scope/plugin@1.0.0 sha256-xyz")
 }
 
+func TestMultiPluginPackageSyntax(t *testing.T) {
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	bs.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{
+		{
+			Package: "oci://quay.io/rhdh/multi-plugin:1.0!plugin-a",
+		},
+	}
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
+	packagesData := dpObj.enabledPluginsCM.Data["packages.txt"]
+
+	// Verify the "!plugin-a" suffix is preserved (multi-plugin package support)
+	assert.Contains(t, packagesData, "oci://quay.io/rhdh/multi-plugin:1.0!plugin-a", "!plugin-path syntax should be preserved for multi-plugin packages")
+}
+
 func TestDynamicPluginsMutualExclusivity(t *testing.T) {
 	// Both specified - invalid
 	bs3 := testDynamicPluginsBackstage.DeepCopy()

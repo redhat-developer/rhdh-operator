@@ -240,7 +240,9 @@ spec:
 					}
 
 					var isRouteEnabledNow bool
+					var routeExisted bool
 					if helper.IsOpenShift() {
+						routeExisted = !tt.isRouteDisabled
 						By("updating route spec in CR", func() {
 							// enables route that was previously disabled, and disables route that was previously enabled.
 							isRouteEnabledNow = tt.isRouteDisabled
@@ -258,18 +260,13 @@ spec:
 							Expect(err).ShouldNot(HaveOccurred())
 						})
 						if isRouteEnabledNow {
+							routeExisted = true
 							By("ensuring the route is reachable", func() {
 								ensureRouteIsReachable(appReachabilityTimeout, ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
 							})
-						} else {
-							By("ensuring route no longer exists eventually", func() {
-								Eventually(func(g Gomega, crName string) {
-									exists, err := helper.DoesBackstageRouteExist(ns, tt.crName)
-									g.Expect(err).ShouldNot(HaveOccurred())
-									g.Expect(exists).Should(BeFalse())
-								}, time.Minute, time.Second).WithArguments(tt.crName).Should(Succeed())
-							})
 						}
+						// When route is disabled (enabled: false), the operator stops managing it but does not
+						// delete the existing route. Cleanup happens via owner reference GC when the CR is deleted.
 					}
 
 					By("deleting CR", func() {
@@ -278,8 +275,8 @@ spec:
 						Expect(err).ShouldNot(HaveOccurred())
 					})
 
-					if helper.IsOpenShift() && isRouteEnabledNow {
-						By("ensuring application is no longer reachable", func() {
+					if helper.IsOpenShift() && routeExisted {
+						By("ensuring route no longer exists after CR deletion", func() {
 							Eventually(func(g Gomega, crName string) {
 								exists, err := helper.DoesBackstageRouteExist(ns, tt.crName)
 								g.Expect(err).ShouldNot(HaveOccurred())

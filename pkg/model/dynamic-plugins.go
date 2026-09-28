@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -167,6 +168,10 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 				// TODO temporary workaround to not to fail until wrappers removed
 				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
 					continue
+				}
+				// Warn if package name contains "!plugin-path" syntax (multi-plugin package)
+				if idx := strings.Index(plugin.Package, "!"); idx != -1 {
+					klog.Warningf("package %q contains '!plugin-path' syntax", plugin.Package)
 				}
 
 				// Apply mirror transformation to OCI package URLs only

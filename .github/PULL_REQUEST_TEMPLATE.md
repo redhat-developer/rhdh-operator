@@ -21,13 +21,7 @@ Please explain the changes you made here.
 Detailed instructions may help reviewers test this PR quickly and provide quicker feedback.
 -->
 
-## Building Container Images for Testing
+## Container Images
 
-Need to test container images from this PR?
-
-**For Maintainers:** To trigger a test image build, review the code and comment `/build-images`.
-This always builds the HEAD of the PR branch.
-
-**For Contributors:** Ask a maintainer to run `/build-images`.
-
-Images will be built and pushed to Quay with links posted in comments.
+Container images are built and pushed to Quay automatically when relevant files change.
+Image links will be posted in a PR comment once the push completes.

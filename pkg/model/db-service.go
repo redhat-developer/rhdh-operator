@@ -23,7 +23,7 @@ type DbService struct {
 }
 
 func init() {
-	registerConfig(DbServiceKey, DbServiceFactory{}, false, nil)
+	registerConfig(DbServiceKey, DbServiceFactory{}, false, noMerge)
 }
 
 func DbServiceName(backstageName string) string {

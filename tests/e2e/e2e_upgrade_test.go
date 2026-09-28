@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/redhat-developer/rhdh-operator/tests/helper"
@@ -18,6 +19,11 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 	var ns string
 
 	BeforeEach(func() {
+		if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE") {
+			suiteConfig, _ := GinkgoConfiguration()
+			Expect(suiteConfig.ParallelTotal).To(Equal(1),
+				"the PostgreSQL upgrade test scales the shared Operator deployment and must run with one Ginkgo process")
+		}
 		ns = fmt.Sprintf("e2e-test-%d-%s", GinkgoParallelProcess(), helper.RandString(5))
 		helper.CreateNamespace(ns)
 	})
@@ -40,6 +46,7 @@ var _ = Describe("Operator upgrade with existing instances", func() {
 			// Uninstall the current version of the operator (which was installed in the SynchronizedBeforeSuite),
 			// because this test needs to start from a previous version, then perform the upgrade.
 			uninstallOperator()
+			waitForNamespaceDeletion(_namespace)
 
 			fromDeploymentManifest = os.Getenv("FROM_OPERATOR_MANIFEST")
 			Expect(fromDeploymentManifest).NotTo(BeEmpty(), "The FROM_OPERATOR_MANIFEST env var must not be empty")
@@ -81,33 +88,32 @@ metadata:
 				Should(Succeed())
 		})
 
-		AfterEach(func() {
-			for _, m := range []string{"FROM", "TO"} {
-				if manifest := os.Getenv(m + "_OPERATOR_MANIFEST"); manifest != "" {
-					cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", manifest, "--ignore-not-found=true")
-					_, _ = helper.Run(cmd)
-				}
-			}
-			uninstallOperator()
-
-			if fromDeploymentManifest != "" {
-				cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", fromDeploymentManifest, "--ignore-not-found=true")
-				_, _ = helper.Run(cmd)
+		JustAfterEach(func() {
+			if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE") && CurrentSpecReport().Failed() {
+				GinkgoWriter.Println(postgresqlUpgradeDiagnostics(ns, crName))
 			}
 		})
 
 		It("should successfully reconcile existing CR when upgrading the operator", func() {
+			var postgresqlUpgrade *postgresqlUpgradeState
+			if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE") {
+				postgresqlUpgrade = preparePostgresqlUpgrade(ns, crName)
+			}
+
 			By("Upgrading the operator", func() {
 				if toOperatorManifest := os.Getenv("TO_OPERATOR_MANIFEST"); toOperatorManifest != "" {
-					cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", toOperatorManifest)
-					_, err := helper.Run(cmd)
-					Expect(err).ShouldNot(HaveOccurred())
+					installRhdhOperatorManifest(toOperatorManifest)
 				} else {
 					installOperatorWithMakeDeploy(false)
 				}
+				waitForOperatorRollout()
 				EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, 10*time.Second).
 					WithArguments(managerPodLabel).Should(Succeed())
 			})
+
+			if postgresqlUpgrade != nil {
+				completePostgresqlUpgrade(ns, crName, postgresqlUpgrade)
+			}
 
 			crLabel := fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName)
 
@@ -164,3 +170,25 @@ metadata:
 	})
 
 })
+
+func waitForOperatorRollout() {
+	cmd := exec.Command(helper.GetPlatformTool(), "-n", _namespace, "rollout", "status", "deployment/rhdh-operator", "--timeout=5m")
+	_, err := helper.Run(cmd)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+	if expectedImage := os.Getenv("IMG"); expectedImage != "" {
+		cmd = exec.Command(helper.GetPlatformTool(), "-n", _namespace, "get", "deployment", "rhdh-operator",
+			"-o", "jsonpath={.spec.template.spec.containers[0].image}")
+		out, err := helper.Run(cmd)
+		ExpectWithOffset(1, err).NotTo(HaveOccurred())
+		ExpectWithOffset(1, string(out)).To(Equal(expectedImage))
+	}
+}
+
+func waitForNamespaceDeletion(namespace string) {
+	EventuallyWithOffset(1, func() bool {
+		cmd := exec.Command(helper.GetPlatformTool(), "get", "namespace", namespace)
+		_, err := helper.Run(cmd)
+		return err != nil && strings.Contains(strings.ToLower(err.Error()), "not found")
+	}, 5*time.Minute, 5*time.Second).Should(BeTrue())
+}

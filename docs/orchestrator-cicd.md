@@ -11,7 +11,7 @@ There are three methods to install GitOps/Pipelines Operator
 ### Method 1: Install the Operators using Scripts
 
 Refer to the `RHDH helper script` section in [orchestrator guide](orchestrator.md) and set the `--with-cicd` flag to
-true when running the script.
+true when running the script. GitOps and Pipelines are installed via OLM v0 Subscriptions; only OpenShift Serverless and Serverless Logic follow the script's OLM version selection (`--olm-version` or auto-detect).
 
 ### Method 2: Install the Operators from Demo Charts
 

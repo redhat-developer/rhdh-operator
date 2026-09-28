@@ -25,7 +25,7 @@ type SecretFiles struct {
 }
 
 func init() {
-	registerConfig(SecretFilesKey, SecretFilesFactory{}, true, nil)
+	registerConfig(SecretFilesKey, SecretFilesFactory{}, true, noMerge)
 }
 
 func (p *SecretFiles) Object() runtime.Object {

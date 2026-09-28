@@ -137,6 +137,7 @@ var _ = When("create default backstage", func() {
 				BackstageConfigName: bsRaw,
 				LocalDbConfigName:   dbRaw,
 			},
+			Flavours: &[]api.Flavour{}, // Disable flavours - raw config doesn't include intelligent-assistant containers
 		}, "")
 
 		Eventually(func(g Gomega) {

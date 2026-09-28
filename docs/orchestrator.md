@@ -51,14 +51,30 @@ This script provides a quick way to install the OpenShift Serverless infrastruct
 You can specify the RHDH version in the URL (`/release-X.Y/`, e.g., `1.7` in this example) or use main.
 2. Run the script:
    ```bash
-   bash plugin-infra.sh [--with-cicd] [delete] [--branch <branch>]
+   bash plugin-infra.sh [--with-cicd] [delete] [--branch <branch>] [--olm-version auto|v0|v1]
    ```  
 Flags:
-* `--with-cicd` flag will also install the OpenShift Pipelines Operator (Tekton) and OpenShift GitOps Operator (ArgoCD) in addition to the required components for the Orchestrator plugin. To continue the configuration for CICD, please follow this [guide](orchestrator-cicd.md).
-* `delete`  will delete the installed components instead of installing them.
+* `--with-cicd` flag will also install the OpenShift Pipelines Operator (Tekton) and OpenShift GitOps Operator (ArgoCD) in addition to the required components for the Orchestrator plugin. To continue the configuration for CICD, please follow this [guide](orchestrator-cicd.md). GitOps and Pipelines are still installed via OLM v0 Subscriptions even when Serverless and Serverless Logic use OLM v1.
+* `delete`  will delete the installed components instead of installing them. Delete removes OLM v1 ClusterExtensions first, then Knative CRs, then OLM v0 Subscriptions when present. Resources managed by Helm or not labeled by the script are skipped.
 * `--branch <branch>` flag allows to specify the branch of the RHDH Operator repository where the configuration yaml files will be taken (ignored if you have local yaml files). If not specified, it defaults to the `main` branch.
+* `--olm-version` selects the OLM API used for OpenShift Serverless and Serverless Logic (`auto`, `v0`, or `v1`; default `auto`). In `auto` mode the script uses OLM v1 when ClusterExtension and ClusterCatalog CRDs exist and a platform `ClusterCatalog` labeled `openshift-redhat-operators` is present; otherwise it uses OLM v0 Subscriptions.
 
-The script is checking if the directory where plugin-infra.sh is located contains the corresponding configuration files, e.g., serverless.yaml, knative.yaml, serverless-logic.yaml... (see [plugin-infra directory](../config/profile/rhdh/plugin-infra) for the complete list). If the files are not found, it will download them from the specified branch of the RHDH Operator repository.
+The script checks whether the directory where `plugin-infra.sh` is located contains the corresponding configuration files (see [plugin-infra directory](../config/profile/rhdh/plugin-infra) for the complete list). If the files are not found, it downloads them from the specified branch of the RHDH Operator repository.
+
+Manifest files for orchestrator operators:
+
+| OLM version | Serverless | Serverless Logic |
+|-------------|------------|------------------|
+| v0 | `serverless.yaml` | `serverless-logic.yaml` |
+| v1 | `serverless-v1.yaml` | `serverless-logic-v1.yaml` |
+
+Both paths apply `knative.yaml` after the Serverless operator CRDs are available. OLM v1 manifests use `ClusterExtension` resources and require the platform Red Hat Operators `ClusterCatalog`; they are not created by this script.
+
+Example: force the legacy Subscription path on a cluster that also has OLM v1:
+
+```bash
+bash plugin-infra.sh --olm-version v0
+```
 
 #### RHDH Orchestrator Infra Helm Chart
 This method has similar usage and cautions as the RHDH Helper Utility.

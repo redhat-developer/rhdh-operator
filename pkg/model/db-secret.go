@@ -24,7 +24,7 @@ type DbSecret struct {
 }
 
 func init() {
-	registerConfig(DbSecretKey, DbSecretFactory{}, false, nil)
+	registerConfig(DbSecretKey, DbSecretFactory{}, false, noMerge)
 }
 
 func DbSecretDefaultName(backstageName string) string {

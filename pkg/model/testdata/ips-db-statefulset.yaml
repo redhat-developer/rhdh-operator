@@ -18,6 +18,6 @@ spec:
         - name: ips-db2
       automountServiceAccountToken: false
       containers:
-        - image: quay.io/fedora/postgresql-15:latest
+        - image: quay.io/fedora/postgresql-18:latest
           name: postgres
 

@@ -18,3 +18,8 @@ var (
 func (p Platform) IsOpenshift() bool {
 	return p == OpenShift
 }
+
+// GetExtension returns the platform extension (e.g., "ocp" or "k8s")
+func (p Platform) GetExtension() string {
+	return p.Extension
+}

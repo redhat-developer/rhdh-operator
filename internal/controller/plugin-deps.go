@@ -26,7 +26,7 @@ func (r *BackstageReconciler) applyPluginDeps(ctx context.Context, backstage api
 	}
 	plugins := *obj.(*model.DynamicPlugins)
 
-	objects, err := model.GetPluginDeps(backstage, plugins, r.Scheme)
+	objects, err := model.GetPluginDeps(backstage, plugins, r.Scheme, r.Platform.Extension)
 	if err != nil {
 		return fmt.Errorf("failed to get plugin dependencies: %w", err)
 	}

@@ -28,7 +28,7 @@ type DbStatefulSet struct {
 }
 
 func init() {
-	registerConfig(DbStatefulSetKey, DbStatefulSetFactory{}, false, nil)
+	registerConfig(DbStatefulSetKey, DbStatefulSetFactory{}, false, noMerge)
 }
 
 func DbStatefulSetName(backstageName string) string {
