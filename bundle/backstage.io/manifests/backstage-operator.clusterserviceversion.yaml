@@ -367,4 +367,4 @@ spec:
   provider:
     name: Red Hat Inc.
     url: https://www.redhat.com/
-  version: 2.1.0
+  version: 1.2.0
