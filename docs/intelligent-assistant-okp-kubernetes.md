@@ -1,6 +1,6 @@
 # Enabling OKP on Kubernetes
 
-The `intelligent-assistant-okp` flavour creates the OKP Deployment and Service in the same namespace as the `Backstage` custom resource, mounts `lightspeed-stack-okp.yaml`, and selects it as the LCORE configuration. The RHDH Operator does not manage Kubernetes Ingress, registry credentials, or the public OKP hostname.
+The `intelligent-assistant-okp` flavour creates the OKP Deployment and Service in the same namespace as the `Backstage` custom resource and replaces `lightspeed-stack.yaml` with the complete OKP-enabled configuration. The filename and `/app-root/lightspeed-stack.yaml` mount path remain the same with or without OKP. The RHDH Operator does not manage Kubernetes Ingress, registry credentials, or the public OKP hostname.
 
 The public hostname must be reachable by both Lightspeed Core inside the cluster and users' browsers so that retrieval and clickable citation links use the same URL.
 

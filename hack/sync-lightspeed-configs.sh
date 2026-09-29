@@ -205,7 +205,7 @@ main() {
     render_secret_entries "$env_file" > "$secret_entries"
 
     replace_indented_block "$CONFIGMAP_FILE" "  lightspeed-stack.yaml: |" 4 "$stack_no_okp_block"
-    replace_indented_block "$OKP_CONFIGMAP_FILE" "  lightspeed-stack-okp.yaml: |" 4 "$stack_block"
+    replace_indented_block "$OKP_CONFIGMAP_FILE" "  lightspeed-stack.yaml: |" 4 "$stack_block"
     replace_indented_block "$CONFIGMAP_FILE" "  rhdh-profile.py: |" 4 "$profile_block"
     replace_indented_block "$EXAMPLE_SECRET_FILE" "stringData:" 2 "$secret_entries"
 

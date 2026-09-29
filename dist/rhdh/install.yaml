@@ -4030,7 +4030,7 @@ data:
         rhdh.redhat.com/mount-path: "/app-root"
         rhdh.redhat.com/sub-path: "*"
     data:
-      lightspeed-stack-okp.yaml: |
+      lightspeed-stack.yaml: |
         #
         #
         # Copyright Red Hat
@@ -4193,11 +4193,6 @@ data:
         spec:
           containers:
             - name: lightspeed-core
-              args:
-                - "--config"
-                - "/app-root/lightspeed-stack-okp.yaml"
-                - "--synthesized-config-output"
-                - "/tmp/.generated/run.yaml"
               {{- if eq .Rhdh.Runtime.Platform "ocp"}}
               env:
                 - name: OKP_SERVICE_URL
