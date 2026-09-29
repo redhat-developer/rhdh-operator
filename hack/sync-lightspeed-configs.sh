@@ -64,6 +64,16 @@ indent_file() {
     sed -e 's/[[:space:]]*$//' -e '/^$/!s/^/    /' "$1"
 }
 
+remove_rag_config() {
+    # Keep upstream comments in place. yq moves provider examples under the
+    # preceding list item when it rewrites the document.
+    awk '
+        /^rag:[[:space:]]*($|#)/ { skip = 1; next }
+        skip && /^[A-Za-z_][A-Za-z0-9_-]*:/ { skip = 0 }
+        !skip { print }
+    ' "$1"
+}
+
 # Upstream env keys that are not user Secret fields.
 # Images stay hardcoded in deployment.yaml; storage, OTEL, and logging are sidecar defaults.
 SKIP_SECRET_KEYS=(
@@ -187,7 +197,7 @@ main() {
     fetch_upstream_file "$UPSTREAM_PROFILE_PATH" "$profile_file"
     fetch_upstream_file "$UPSTREAM_ENV_PATH" "$env_file"
 
-    yq 'del(.rag)' "$stack_file" > "$stack_no_okp_file"
+    remove_rag_config "$stack_file" > "$stack_no_okp_file"
 
     indent_file "$stack_file" > "$stack_block"
     indent_file "$stack_no_okp_file" > "$stack_no_okp_block"

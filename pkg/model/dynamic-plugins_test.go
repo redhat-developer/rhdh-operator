@@ -489,8 +489,24 @@ includes:
 	assert.NoError(t, err)
 	// Validate that the marshalled string omits empty fields
 	assert.NotContains(t, string(marshalledE), "integrity", "The string should not contain 'integrity:'")
-	// Validate that the marshalled string always includes disabled field
-	assert.Contains(t, string(marshalledE), "disabled", "The string should contain 'disabled:'")
+	// Do not generate deprecated disabled: false for entries without that key.
+	assert.NotContains(t, string(marshalledE), "disabled:")
+}
+
+func TestDynaPluginDisabledYAMLRoundTrip(t *testing.T) {
+	for _, input := range []string{
+		"package: p\n",
+		"package: p\nenabled: true\n",
+		"package: p\ndisabled: false\n",
+		"package: p\ndisabled: true\n",
+		"package: p\nenabled: true\ndisabled: true\n",
+	} {
+		var plugin DynaPlugin
+		assert.NoError(t, yaml.Unmarshal([]byte(input), &plugin))
+		output, err := yaml.Marshal(plugin)
+		assert.NoError(t, err)
+		assert.YAMLEq(t, input, string(output))
+	}
 }
 
 func TestIsDisabled(t *testing.T) {
@@ -503,12 +519,12 @@ func TestIsDisabled(t *testing.T) {
 		expected bool
 	}{
 		{"neither set defaults to enabled", DynaPlugin{Package: "p"}, false},
-		{"disabled: true", DynaPlugin{Package: "p", Disabled: true}, true},
-		{"disabled: false", DynaPlugin{Package: "p", Disabled: false}, false},
+		{"disabled: true", DynaPlugin{Package: "p", Disabled: &true_}, true},
+		{"disabled: false", DynaPlugin{Package: "p", Disabled: &false_}, false},
 		{"enabled: true", DynaPlugin{Package: "p", Enabled: &true_}, false},
 		{"enabled: false", DynaPlugin{Package: "p", Enabled: &false_}, true},
-		{"enabled takes precedence over disabled", DynaPlugin{Package: "p", Enabled: &true_, Disabled: true}, false},
-		{"enabled: false takes precedence over disabled: false", DynaPlugin{Package: "p", Enabled: &false_, Disabled: false}, true},
+		{"enabled takes precedence over disabled", DynaPlugin{Package: "p", Enabled: &true_, Disabled: &true_}, false},
+		{"enabled: false takes precedence over disabled: false", DynaPlugin{Package: "p", Enabled: &false_, Disabled: &false_}, true},
 	}
 
 	for _, tt := range tests {
@@ -565,6 +581,7 @@ plugins:
 		plugin := findPluginByPackage(config.Plugins, "./plugin-a")
 		assert.NotNil(t, plugin)
 		assert.False(t, plugin.IsDisabled(), "enabled: true should override disabled: true")
+		assert.NotContains(t, merged, "disabled:", "do not emit a synthetic legacy key alongside enabled")
 	})
 
 	// Overlay omits both fields — enabled by default
@@ -593,6 +610,30 @@ plugins:
 		assert.Equal(t, "sha256-overridden", plugin.Integrity)
 	})
 
+	t.Run("explicit both-key overlay survives the merge", func(t *testing.T) {
+		base := "plugins:\n  - package: ./plugin-a\n    disabled: true\n"
+		overlay := "plugins:\n  - package: ./plugin-a\n    enabled: false\n    disabled: false\n"
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+		assert.Contains(t, merged, "enabled: false")
+		assert.Contains(t, merged, "disabled: false")
+		var config DynaPluginsConfig
+		assert.NoError(t, yaml.Unmarshal([]byte(merged), &config))
+		assert.True(t, config.Plugins[0].IsDisabled(), "enabled still wins")
+	})
+
+	t.Run("explicit disabled false overlay survives the merge", func(t *testing.T) {
+		base := "plugins:\n  - package: ./plugin-a\n    enabled: false\n"
+		overlay := "plugins:\n  - package: ./plugin-a\n    disabled: false\n"
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+		assert.Contains(t, merged, "disabled: false")
+		assert.NotContains(t, merged, "enabled:")
+		var config DynaPluginsConfig
+		assert.NoError(t, yaml.Unmarshal([]byte(merged), &config))
+		assert.False(t, config.Plugins[0].IsDisabled())
+	})
+
 	// Pure legacy config still works
 	t.Run("legacy disabled-only config works", func(t *testing.T) {
 		base := `
@@ -611,6 +652,7 @@ plugins:
 
 		pluginA := findPluginByPackage(config.Plugins, "./plugin-a")
 		assert.False(t, pluginA.IsDisabled())
+		assert.Contains(t, merged, "disabled: false", "preserve explicit legacy input")
 		pluginB := findPluginByPackage(config.Plugins, "./plugin-b")
 		assert.True(t, pluginB.IsDisabled())
 	})
