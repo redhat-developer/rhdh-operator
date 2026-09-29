@@ -851,8 +851,8 @@ touch "${LOG_FILE}"
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
-# shellcheck disable=SC2064
 trap dump_logs_on_error ERR
+# shellcheck disable=SC2064
 trap "rm -fr '$TMPDIR' || true; jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null" EXIT
 trap "exit 1" INT TERM
 
