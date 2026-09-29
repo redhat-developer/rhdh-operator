@@ -7,7 +7,7 @@ metadata:
     rhdh.redhat.com/mount-path: "/app-root"
     rhdh.redhat.com/sub-path: "*"
 data:
-  lightspeed-stack-okp.yaml: |
+  lightspeed-stack.yaml: |
     #
     #
     # Copyright Red Hat
