@@ -3034,7 +3034,7 @@ data:
                 - /dynamic-plugins-root
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
               # image will be replaced with RELATED_IMAGE_plugin_installer if OPERATOR_DP_PROCESSING==true
-              image: quay.io/rhdh-community/rhdh:next
+              image: quay.io/rhdh-community/rhdh:next-2.1
               imagePullPolicy: IfNotPresent
               securityContext:
                 readOnlyRootFilesystem: true
@@ -3081,7 +3081,7 @@ data:
           containers:
             - name: backstage-backend
               # image will be replaced by the value of the `RELATED_IMAGE_backstage` env var, if set
-              image: quay.io/rhdh-community/rhdh:next
+              image: quay.io/rhdh-community/rhdh:next-2.1
               imagePullPolicy: IfNotPresent
               args:
                 - "--config"
@@ -5193,7 +5193,7 @@ spec:
         - name: RELATED_IMAGE_postgresql
           value: quay.io/fedora/postgresql-18:latest
         - name: RELATED_IMAGE_backstage
-          value: quay.io/rhdh-community/rhdh:next
+          value: quay.io/rhdh-community/rhdh:next-2.1
         - name: RELATED_IMAGE_plugin_installer
           value: 'quay.io/rhdh-community/rhdh-plugin-installer:next'
         - name: POD_NAME
