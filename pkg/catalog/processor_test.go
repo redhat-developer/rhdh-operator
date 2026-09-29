@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
+	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model"
 )
@@ -161,8 +162,8 @@ func TestBuildPatch(t *testing.T) {
 	plugins := make(PluginMap)
 
 	plugins["plugin-test"] = model.DynaPlugin{
-		Package:  "oci://registry.example.com/rhdh/plugin-test:1.0",
-		Disabled: false,
+		Package: "oci://registry.example.com/rhdh/plugin-test:1.0",
+		Enabled: ptr.To(true),
 	}
 
 	patchBytes, err := p.BuildPatch(plugins)
@@ -177,6 +178,8 @@ func TestBuildPatch(t *testing.T) {
 
 	// Verify the content is a ConfigMap YAML
 	dpContent := data[model.DynamicPluginsFile].(string)
+	assert.Contains(t, dpContent, "enabled: true")
+	assert.NotContains(t, dpContent, "disabled:")
 	var configMap map[string]interface{}
 	require.NoError(t, yaml.Unmarshal([]byte(dpContent), &configMap))
 
