@@ -417,7 +417,7 @@ var _ = When("create default rhdh", func() {
 				if cm.Annotations[model.SourceAnnotation] == "flavour-intelligent-assistant" {
 					foundIaConfig = true
 				}
-				if strings.Contains(cm.Data["lightspeed-stack-okp.yaml"], "\nrag:\n  okp:") {
+				if strings.Contains(cm.Data["lightspeed-stack.yaml"], "\nrag:\n  okp:") {
 					foundOkpConfig = true
 				}
 			}
@@ -451,19 +451,35 @@ var _ = When("create default rhdh", func() {
 
 			deploy, err := backstageDeployment(ctx, k8sClient, ns, backstageName)
 			g.Expect(err).ShouldNot(HaveOccurred())
+			stackVolumeName := ""
 			for _, c := range deploy.PodSpec().Containers {
 				if c.Name == "lightspeed-core" {
 					g.Expect(c.Args).To(Equal([]string{
-						"--config",
-						"/app-root/lightspeed-stack-okp.yaml",
 						"--synthesized-config-output",
 						"/tmp/.generated/run.yaml",
 					}))
+					for _, mount := range c.VolumeMounts {
+						g.Expect(mount.MountPath).NotTo(Equal("/app-root/lightspeed-stack-okp.yaml"))
+						if mount.MountPath == "/app-root/lightspeed-stack.yaml" {
+							stackVolumeName = mount.Name
+							g.Expect(mount.SubPath).To(Equal("lightspeed-stack.yaml"))
+						}
+					}
 					for _, env := range c.Env {
 						g.Expect(env.Name).NotTo(Equal("OKP_SERVICE_URL"))
 					}
 				}
 			}
+			g.Expect(stackVolumeName).NotTo(BeEmpty())
+			foundOkpStackVolume := false
+			for _, volume := range deploy.PodSpec().Volumes {
+				if volume.Name == stackVolumeName {
+					g.Expect(volume.ConfigMap).NotTo(BeNil())
+					g.Expect(volume.ConfigMap.Name).To(ContainSubstring("lightspeed-stack-okp-config"))
+					foundOkpStackVolume = true
+				}
+			}
+			g.Expect(foundOkpStackVolume).To(BeTrue())
 
 		}, 20*time.Second, time.Second).Should(Succeed())
 
@@ -501,8 +517,6 @@ var _ = When("create default rhdh", func() {
 				if container.Name == "lightspeed-core" {
 					foundLightspeedCore = true
 					g.Expect(container.Args).To(Equal([]string{
-						"--config",
-						"/app-root/lightspeed-stack-okp.yaml",
 						"--synthesized-config-output",
 						"/tmp/.generated/run.yaml",
 					}))

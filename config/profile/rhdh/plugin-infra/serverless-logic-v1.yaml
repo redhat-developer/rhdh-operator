@@ -44,7 +44,7 @@ spec:
       packageName: logic-operator
       channels:
         - stable
-      version: "1.38.0"
+      version: "1.38.1"
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: openshift-redhat-operators

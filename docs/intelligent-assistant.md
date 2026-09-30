@@ -97,11 +97,11 @@ The plugins use the `intelligent-assistant:` app-config namespace (not `lightspe
 
 #### LLM Providers
 
-The flavour includes a default Lightspeed Core stack config in `lightspeed-stack.yaml`. Enabling the OKP add-on selects `lightspeed-stack-okp.yaml` instead. The Operator manages both bundled copies, so do not edit them directly. Create a user-managed ConfigMap with your own copy of the active file when you need to configure an LLM provider.
+The flavour includes a default Lightspeed Core stack config in `lightspeed-stack.yaml`. Enabling the OKP add-on replaces its contents with the complete configuration containing OKP retrieval while keeping the same filename and mount path. The Operator manages both bundled copies, so do not edit them directly. Create a user-managed ConfigMap with your own copy of the appropriate configuration when you need to configure an LLM provider.
 
 To add a provider:
 
-1. Copy the active stack ConfigMap into a new manifest file. For IA without OKP, use [`intelligent-assistant/configmap-files.yaml`](../config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml) and keep `lightspeed-stack.yaml`. With the OKP add-on enabled, use [`intelligent-assistant-okp/configmap-files.yaml`](../config/profile/rhdh/default-config/flavours/intelligent-assistant-okp/configmap-files.yaml) and keep `lightspeed-stack-okp.yaml`. The [`examples/intelligent-assistant.yaml`](../examples/intelligent-assistant.yaml) file also contains a complete no-OKP, user-managed ConfigMap that enables OpenAI.
+1. Copy the appropriate stack ConfigMap into a new manifest file. For IA without OKP, use [`intelligent-assistant/configmap-files.yaml`](../config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml). With the OKP add-on enabled, use [`intelligent-assistant-okp/configmap-files.yaml`](../config/profile/rhdh/default-config/flavours/intelligent-assistant-okp/configmap-files.yaml) so the OKP retrieval configuration is preserved. Keep the `lightspeed-stack.yaml` data key in either case. The [`examples/intelligent-assistant.yaml`](../examples/intelligent-assistant.yaml) file also contains a complete no-OKP, user-managed ConfigMap that enables OpenAI.
 2. Change `metadata.name` from `lightspeed-stack-config` to a name you own, such as `my-lightspeed-stack`.
 3. Under `inference.providers`, keep the `sentence_transformers` entry and uncomment the provider entry you want to use. Set its `id` to a unique value and update any provider-specific fields. For example:
 
@@ -117,7 +117,7 @@ To add a provider:
    The bundled file includes commented examples for `openai`, `vllm`, and `vertexai`. You can enable more than one provider, but every provider must have a unique `id`.
 4. Add the environment variables named by `api_key_env` and any other provider settings to the Secret that you inject into `lightspeed-core`. For the example above, add `OPENAI_API_KEY` to `intelligent-assistant-secrets` and replace the placeholder with your key.
 5. Apply the ConfigMap and Secret in the same namespace as the Backstage custom resource.
-6. Reference the ConfigMap from the Backstage CR. The `key` must match the active file (`lightspeed-stack.yaml` without OKP or `lightspeed-stack-okp.yaml` with OKP), and the ConfigMap must be mounted into the `lightspeed-core` container at `/app-root` so that it replaces the bundled file:
+6. Reference the ConfigMap from the Backstage CR. Use the `lightspeed-stack.yaml` key and mount the ConfigMap into the `lightspeed-core` container at `/app-root` so that it replaces the bundled file:
 
 ```yaml
 spec:
