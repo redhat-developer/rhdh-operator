@@ -6,8 +6,8 @@
 FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1790644709@sha256:290ba654458e9a269b1509d10e6ebbd3c2b2456570e73e73201adb3ee54fb244 AS builder
 ARG TARGETOS
 ARG TARGETARCH
-# Build as the go-toolset default user (non-root). Hermeto prefetch must chmod the
-# /cachi2 cache (see scripts/local-hermeto-build.sh and CI) so this user can use gomod offline.
+# Build as the go-toolset default user (non-root). Local hermetic builds grant /cachi2
+# via setfacl for Podman-mapped UIDs (see scripts/local-hermeto-build.sh); CI uses chown+chmod.
 ENV GOPATH=/go/
 ENV GOCACHE=/tmp/go-build-cache
 

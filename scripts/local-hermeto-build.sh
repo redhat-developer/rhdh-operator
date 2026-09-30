@@ -126,11 +126,124 @@ transform_containerfile() {
 }
 
 #######################################
-# Make prefetched cache usable for non-root build stages (matches CI chown+chmod).
+# Default UID in an image (container user namespace).
+#######################################
+hermetic_container_uid() {
+  local image="$1"
+  local container_user="${2:-}"
+  local platform_args=()
+  local -a run_args
+
+  if [[ -n "${TARGET_PLATFORM}" ]]; then
+    platform_args=(--platform "${TARGET_PLATFORM}")
+  fi
+
+  run_args=(run --rm "${platform_args[@]}" --entrypoint id)
+  if [[ -n "${container_user}" ]]; then
+    run_args+=(--user "${container_user}")
+  fi
+  run_args+=("${image}" -u)
+
+  podman "${run_args[@]}"
+}
+
+#######################################
+# Map a container UID to the host UID used for volume access (rootless Podman).
+#######################################
+hermetic_host_uid_for_container() {
+  local container_uid="$1"
+  local subuid_line subuid_start subuid_count
+
+  if [[ "${container_uid}" == "0" ]]; then
+    echo "Error: use hermetic_probe_rootless_root_host_uid for container UID 0" >&2
+    return 1
+  fi
+
+  subuid_line=$(grep "^${USER}:" /etc/subuid | head -1)
+  if [[ -z "${subuid_line}" ]]; then
+    echo "Error: no /etc/subuid entry for ${USER}" >&2
+    return 1
+  fi
+
+  subuid_start=$(echo "${subuid_line}" | cut -d: -f2)
+  subuid_count=$(echo "${subuid_line}" | cut -d: -f3)
+
+  if [[ "${container_uid}" -lt 1 || "${container_uid}" -ge "${subuid_count}" ]]; then
+    echo "Error: container UID ${container_uid} is outside the subuid range" >&2
+    return 1
+  fi
+
+  echo $(( subuid_start + container_uid - 1 ))
+}
+
+#######################################
+# Host UID for container UID 0 (first uid_map entry, not subuid arithmetic).
+#######################################
+hermetic_probe_rootless_root_host_uid() {
+  local image="$1"
+  local local_cache_dir="$2"
+  local probe_name=".hermeto-uid-probe.$$"
+  local probe_path="${local_cache_dir}/${probe_name}"
+  local platform_args=()
+  local prior_mode
+
+  if [[ -n "${TARGET_PLATFORM}" ]]; then
+    platform_args=(--platform "${TARGET_PLATFORM}")
+  fi
+
+  prior_mode=$(stat -c '%a' "${local_cache_dir}")
+  chmod o+rwx "${local_cache_dir}"
+
+  if ! podman run --rm "${platform_args[@]}" --user 0 \
+    -v "${local_cache_dir}:/cachi2:z" --entrypoint touch "${image}" "/cachi2/${probe_name}"; then
+    chmod "${prior_mode}" "${local_cache_dir}"
+    echo "Error: could not probe host UID for root in ${image}" >&2
+    exit 1
+  fi
+
+  chmod "${prior_mode}" "${local_cache_dir}"
+  stat -c '%u' "${probe_path}"
+  rm -f "${probe_path}"
+}
+
+#######################################
+# Host UIDs used during podman build for stages that mount /cachi2.
+#######################################
+hermetic_build_host_uids() {
+  local component_dir="$1"
+  local local_cache_dir="$2"
+  local dockerfile="${component_dir}/Dockerfile"
+  local go_image ubi_image
+  local builder_container_uid builder_host_uid root_host_uid
+
+  if [[ ! -f "${dockerfile}" ]]; then
+    echo "Error: ${dockerfile} not found" >&2
+    exit 1
+  fi
+
+  go_image=$(awk '/^FROM / && /go-toolset/ { print $2; exit }' "${dockerfile}")
+  ubi_image=$(awk '/^FROM / && /ubi10\/ubi:/ { print $2; exit }' "${dockerfile}")
+
+  if [[ -z "${go_image}" || -z "${ubi_image}" ]]; then
+    echo "Error: could not parse builder base images from ${dockerfile}" >&2
+    exit 1
+  fi
+
+  builder_container_uid=$(hermetic_container_uid "${go_image}")
+  builder_host_uid=$(hermetic_host_uid_for_container "${builder_container_uid}")
+  root_host_uid=$(hermetic_probe_rootless_root_host_uid "${ubi_image}" "${local_cache_dir}")
+
+  printf '%s\n%s\n' "${builder_host_uid}" "${root_host_uid}" | sort -un
+}
+
+#######################################
+# Make prefetched cache usable for offline build without world-writable perms.
 #######################################
 prepare_cache_for_build() {
   local local_cache_dir="$1"
-  local uid gid parent_dir
+  local component_dir="$2"
+  local uid gid parent_dir host_uid
+
   uid="$(id -u)"
   gid="$(id -g)"
   parent_dir="$(dirname "${local_cache_dir}")"
@@ -147,13 +260,23 @@ prepare_cache_for_build() {
     exit 1
   fi
 
-  # Limit directory traversal on shared hosts; contents stay world-accessible for build UIDs (Konflux/CI).
+  # Traverse-only for non-owners so Podman-mapped UIDs can reach ACL-protected cache paths.
   if [[ -d "${parent_dir}" ]] && [[ "$(stat -c '%u' "${parent_dir}")" == "${uid}" ]]; then
-    chmod 700 "${parent_dir}"
+    chmod 711 "${parent_dir}"
   fi
 
-  # Offline build stages may run as an arbitrary UID and must read/write /cachi2.
-  chmod -R a+rwX "${local_cache_dir}"
+  if ! command -v setfacl &>/dev/null; then
+    echo "Error: setfacl is required for hermetic builds (install the acl package)" >&2
+    exit 1
+  fi
+
+  # Base mode: owner only. Podman build UIDs are granted explicitly below (do not chmod after setfacl).
+  chmod -R "u+rwX,g-rwx,o-rwx" "${local_cache_dir}"
+
+  while IFS= read -r host_uid; do
+    setfacl -R -m "u:${host_uid}:rwX" "${local_cache_dir}"
+    setfacl -R -d -m "u:${host_uid}:rwX" "${local_cache_dir}"
+  done < <(hermetic_build_host_uids "${component_dir}" "${local_cache_dir}")
 }
 
 #######################################
@@ -202,7 +325,7 @@ build_cache() {
     "${HERMETO_IMAGE}" \
     inject-files /cachi2/output
 
-  prepare_cache_for_build "${local_cache_dir}"
+  prepare_cache_for_build "${local_cache_dir}" "${component_dir}"
   return 0
 }
 
@@ -226,7 +349,7 @@ build_image() {
     exit 1
   fi
 
-  prepare_cache_for_build "${local_cache_dir}"
+  prepare_cache_for_build "${local_cache_dir}" "${component_dir}"
 
   transform_containerfile \
     "${component_dir}/Dockerfile" \
