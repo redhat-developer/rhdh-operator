@@ -21,7 +21,8 @@ set -euo pipefail
 #######################################
 # Constants
 #######################################
-readonly LOCAL_CACHE_BASEDIR='./hermeto-cache/'
+# Same path as CI (.github/actions/docker-build); keep cache out of the git tree.
+readonly LOCAL_CACHE_DIR='/tmp/hermeto-cache/operator'
 
 # Image tag comes from HERMETO_IMAGE in the Makefile (also used by CI).
 HERMETO_IMAGE="${HERMETO_IMAGE:-}"
@@ -125,6 +126,37 @@ transform_containerfile() {
 }
 
 #######################################
+# Make prefetched cache usable for non-root build stages (matches CI chown+chmod).
+#######################################
+prepare_cache_for_build() {
+  local local_cache_dir="$1"
+  local uid gid parent_dir
+  uid="$(id -u)"
+  gid="$(id -g)"
+  parent_dir="$(dirname "${local_cache_dir}")"
+
+  # Hermeto runs in Podman and may leave root-owned files on the host mount.
+  if podman unshare chown -R "${uid}:${gid}" "${local_cache_dir}" 2>/dev/null; then
+    :
+  elif chown -R "${uid}:${gid}" "${local_cache_dir}" 2>/dev/null; then
+    :
+  elif command -v sudo &>/dev/null && sudo chown -R "${uid}:${gid}" "${local_cache_dir}"; then
+    :
+  else
+    echo "Error: could not take ownership of ${local_cache_dir} (try: podman unshare chown -R ${uid}:${gid} ...)" >&2
+    exit 1
+  fi
+
+  # Limit directory traversal on shared hosts; contents stay world-accessible for build UIDs (Konflux/CI).
+  if [[ -d "${parent_dir}" ]] && [[ "$(stat -c '%u' "${parent_dir}")" == "${uid}" ]]; then
+    chmod 700 "${parent_dir}"
+  fi
+
+  # Offline build stages may run as an arbitrary UID and must read/write /cachi2.
+  chmod -R a+rwX "${local_cache_dir}"
+}
+
+#######################################
 # Builds the dependency cache using Hermeto.
 #######################################
 build_cache() {
@@ -170,8 +202,7 @@ build_cache() {
     "${HERMETO_IMAGE}" \
     inject-files /cachi2/output
 
-  # Match Konflux/CI: any UID in the build container can read/write the cache.
-  chmod -R a+rwX "${local_cache_dir}"
+  prepare_cache_for_build "${local_cache_dir}"
   return 0
 }
 
@@ -194,6 +225,8 @@ build_image() {
     echo "example: $0 -d ${component_dir} -i <image>"
     exit 1
   fi
+
+  prepare_cache_for_build "${local_cache_dir}"
 
   transform_containerfile \
     "${component_dir}/Dockerfile" \
@@ -276,15 +309,14 @@ main() {
     no_image=true
   fi
 
-  mkdir -p "${LOCAL_CACHE_BASEDIR}"
-
   local resolved_component_dir
   local local_cache_dir
   local local_cache_output_dir
 
   resolved_component_dir="$(realpath "${component_dir}")"
-  local_cache_dir="$(realpath "${LOCAL_CACHE_BASEDIR}")/$(basename "${resolved_component_dir}")"
+  local_cache_dir="${LOCAL_CACHE_DIR}"
   local_cache_output_dir="${local_cache_dir}/output"
+  mkdir -p "${local_cache_output_dir}"
 
   if [[ -z "${HERMETO_IMAGE}" ]]; then
     HERMETO_IMAGE=$(sed -n 's/^HERMETO_IMAGE ?= //p' "${resolved_component_dir}/Makefile" | head -1)

@@ -185,6 +185,8 @@ The operator image can be built hermetically (offline/reproducible) using [Herme
 
 The Hermeto image is pinned once in the Makefile (`HERMETO_IMAGE`); CI and local hermetic builds read that same value.
 
+Local dependency cache: `/tmp/hermeto-cache/operator` (same as CI; not stored in the git tree).
+
 Requirements: `podman` must be installed.
 
 ```sh
