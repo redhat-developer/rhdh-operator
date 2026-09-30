@@ -22,7 +22,9 @@ set -euo pipefail
 # Constants
 #######################################
 readonly LOCAL_CACHE_BASEDIR='./hermeto-cache/'
-readonly HERMETO_IMAGE='quay.io/konflux-ci/hermeto:0.60.1'
+
+# Image tag comes from HERMETO_IMAGE in the Makefile (also used by CI).
+HERMETO_IMAGE="${HERMETO_IMAGE:-}"
 
 # Target platform for cross-builds (e.g., linux/arm64, linux/amd64)
 TARGET_PLATFORM="${TARGET_PLATFORM:-}"
@@ -76,6 +78,7 @@ Options:
   -h, --help              Show this help message
 
 Environment variables:
+  HERMETO_IMAGE            Hermeto image (default: HERMETO_IMAGE from the Makefile)
   TARGET_PLATFORM         Target platform for podman (e.g., linux/arm64, linux/amd64).
                           If not set, builds for the native platform.
 
@@ -166,6 +169,9 @@ build_cache() {
     -w /source \
     "${HERMETO_IMAGE}" \
     inject-files /cachi2/output
+
+  # Match Konflux/CI: any UID in the build container can read/write the cache.
+  chmod -R a+rwX "${local_cache_dir}"
   return 0
 }
 
@@ -280,8 +286,17 @@ main() {
   local_cache_dir="$(realpath "${LOCAL_CACHE_BASEDIR}")/$(basename "${resolved_component_dir}")"
   local_cache_output_dir="${local_cache_dir}/output"
 
+  if [[ -z "${HERMETO_IMAGE}" ]]; then
+    HERMETO_IMAGE=$(sed -n 's/^HERMETO_IMAGE ?= //p' "${resolved_component_dir}/Makefile" | head -1)
+  fi
+  if [[ -z "${HERMETO_IMAGE}" ]]; then
+    echo "Error: set HERMETO_IMAGE or define it in ${resolved_component_dir}/Makefile" >&2
+    exit 1
+  fi
+
   echo "Component dir: ${resolved_component_dir}"
   echo "Local cache dir: ${local_cache_dir}"
+  echo "Hermeto image: ${HERMETO_IMAGE}"
 
   if [[ "${no_cache}" == false ]]; then
     echo "Building cache..."

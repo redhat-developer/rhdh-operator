@@ -183,6 +183,8 @@ You can do it all together using:
 
 The operator image can be built hermetically (offline/reproducible) using [Hermeto](https://github.com/konflux-ci/hermeto), matching how downstream Konflux builds work. This pre-fetches all Go modules and RPM dependencies, then builds with `--network none` to ensure nothing is downloaded during the build.
 
+The Hermeto image is pinned once in the Makefile (`HERMETO_IMAGE`); CI and local hermetic builds read that same value.
+
 Requirements: `podman` must be installed.
 
 ```sh
