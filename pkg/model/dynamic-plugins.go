@@ -164,11 +164,12 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		packages := []string{}
 		for _, plugin := range pluginsData {
 			// Warn if package name contains "!plugin-path" syntax (multi-plugin package)
-			if idx := strings.Index(plugin.Package, "!"); idx != -1 {
-				klog.Warningf("package %q contains '!plugin-path' syntax", plugin.Package)
-			}
 
 			if !plugin.IsDisabled() {
+
+				if idx := strings.Index(plugin.Package, "!"); idx != -1 {
+					klog.Warningf("package %q contains '!plugin-path' syntax", plugin.Package)
+				}
 				// Apply mirror transformation to OCI package URLs only
 				plugin.Package = ApplyMirror(plugin.Package, p.model.ExternalConfig.Mirrors)
 

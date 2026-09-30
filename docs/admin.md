@@ -67,16 +67,18 @@ When creating the Backstage CR, the Operator will try to create a Backstage Pod,
 Also, if Backstage CR configured with *EnabledLocalDb*,  it will create a PostgreSQL container pod, configured in *(db-statefulset.yaml).spec.template.spec.Containers[].image*
 
 By default, the Backstage Operator is configured to use publicly available images.
-If you plan to deploy to a [restricted environment](https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html),
+If you plan to deploy to a [restricted environment](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/olm-restricted-networks),
 you will need to configure your cluster or network to allow these images to be pulled.
 For the list of related images deployed by the Operator, see the `RELATED_IMAGE_*` env vars or `relatedImages` section of the [CSV](../bundle/manifests/backstage-operator.clusterserviceversion.yaml).
-See also https://docs.openshift.com/container-platform/4.14/operators/admin/olm-restricted-networks.html
+See also https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/olm-restricted-networks
 
 #### Plugin Registry Mirroring
 
 In air-gapped environments, Backstage dynamic plugins distributed as OCI artifacts need to be mirrored to internal registries. The Backstage Operator supports optional plugin registry mirroring that automatically transforms plugin package URLs to use your internal mirror registries.
 
-The mirror configuration uses the same format and matching rules as OpenShift's [ImageDigestMirrorSet (IDMS)](https://docs.openshift.com/container-platform/4.14/openshift_images/image-configuration.html#images-configuration-registry-mirror_image-configuration), making it familiar to OpenShift administrators and allowing direct reuse of existing IDMS configurations.
+The mirror configuration uses the same format and matching rules as OpenShift's [ImageDigestMirrorSet (IDMS)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/images/image-configuration-classic#images-configuration-registry-mirror_image-configuration) and [ImageTagMirrorSet (ITMS)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/images/image-configuration-classic#images-configuration-registry-mirror_image-configuration), making it familiar to OpenShift administrators and allowing direct reuse of existing IDMS/ITMS configurations.
+
+**Important:** Unlike OpenShift's IDMS (digest-only) and ITMS (tag-only) which only mirror specific pull types, the operator's mirror configuration **supports both field names** (`imageDigestMirrors` and `imageTagMirrors`) and works for **both tag-based** (`:v1.0`) **and digest-based** (`@sha256:...`) plugin references. This is because the operator performs application-level URL transformation before the init container pulls plugins, rather than container runtime-level mirroring like IDMS/ITMS.
 
 **How it works:**
 
@@ -97,7 +99,9 @@ metadata:
   namespace: rhdh-operator  # Must be in operator namespace
 data:
   mirrors.yaml: |
-    # Same structure as OpenShift ImageDigestMirrorSet
+    # Supports both OpenShift IDMS and ITMS formats
+    # Use either 'imageDigestMirrors' or 'imageTagMirrors' (or both)
+    # Both work for tag-based and digest-based plugin references
     imageDigestMirrors:
     # Mirror quay.io to internal registry
     - source: quay.io
@@ -128,23 +132,27 @@ kubectl rollout restart deployment rhdh-operator -n rhdh-operator
 kubectl get backstage my-backstage -o jsonpath='{.status.plugins}' | jq
 ```
 
-**Mirroring rules (same as IDMS):**
+**Mirroring rules (based on IDMS):**
 
 - **Most specific namespace match**: When multiple sources match a plugin URL, the longest/most specific source wins. For example, if you have both `quay.io` and `quay.io/rhdh` configured, a plugin from `oci://quay.io/rhdh/plugin:1.0` will use the `quay.io/rhdh` mirror configuration.
-- **Only OCI URLs are mirrored**: Plugins specified as `oci://registry.example.com/plugin:tag` are transformed. npm packages (`@scope/package`), HTTP URLs (`https://...`), and file paths are not affected.
+- **Only OCI URLs are mirrored**: Plugins specified as `oci://registry.example.com/plugin:tag` or `oci://registry.example.com/plugin@sha256:...` are transformed. npm packages (`@scope/package`), HTTP URLs (`https://...`), and file paths are not affected.
 - **First mirror is used**: If multiple mirrors are specified for a source, only the first one is used (fallback support may be added in future versions).
 
-**For OpenShift users with existing IDMS:**
+**For OpenShift users with existing IDMS/ITMS:**
 
-You can directly copy your existing ImageDigestMirrorSet configuration to the ConfigMap format:
+You can directly copy your existing ImageDigestMirrorSet or ImageTagMirrorSet configuration to the ConfigMap format:
 
 ```bash
 # Extract IDMS config
-kubectl get imagedigestmirrorset rhdh-plugins -o jsonpath='{.spec.imageDigestMirrors}' | \
+oc get imagedigestmirrorset rhdh-plugins -o jsonpath='{.spec.imageDigestMirrors}' | \
   yq -P 'imageDigestMirrors: .' > mirrors.yaml
 
+# OR extract ITMS config (keeps the imageTagMirrors field name - both work!)
+oc get imagetagmirrorset rhdh-plugins -o jsonpath='{.spec.imageTagMirrors}' | \
+  yq -P 'imageTagMirrors: .' > mirrors.yaml
+
 # Create ConfigMap from extracted config
-kubectl create configmap plugin-registry-mirror \
+oc create configmap plugin-registry-mirror \
   --from-file=mirrors.yaml \
   -n rhdh-operator
 ```
@@ -158,7 +166,7 @@ kubectl create configmap plugin-registry-mirror \
 
 
 ### Installing Operator on Openshift cluster
-https://docs.openshift.com/container-platform/4.15/operators/admin/olm-adding-operators-to-cluster.html 
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/operators/administrator-tasks#olm-adding-operators-to-a-cluster 
 
 ## Memory Optimization for Large Clusters
 

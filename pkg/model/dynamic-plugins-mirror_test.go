@@ -192,6 +192,40 @@ func TestApplyMirror(t *testing.T) {
 			},
 			expected: "oci://mirror.example.com/local/plugin:1.0", // Mirrored - exact match followed by /
 		},
+		// Test imageTagMirrors field support (ITMS format)
+		{
+			name: "imageTagMirrors field works for tags",
+			ref:  "oci://quay.io/rhdh/plugin:1.0",
+			mirrors: &ImageDigestMirrors{
+				ImageTagMirrors: []ImageDigestMirror{
+					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
+				},
+			},
+			expected: "oci://mirror.example.com/quay/rhdh/plugin:1.0",
+		},
+		{
+			name: "imageTagMirrors field works for digests",
+			ref:  "oci://quay.io/rhdh/plugin@sha256:abc123",
+			mirrors: &ImageDigestMirrors{
+				ImageTagMirrors: []ImageDigestMirror{
+					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
+				},
+			},
+			expected: "oci://mirror.example.com/quay/rhdh/plugin@sha256:abc123",
+		},
+		{
+			name: "both fields combined - most specific wins",
+			ref:  "oci://quay.io/rhdh/plugin:1.0",
+			mirrors: &ImageDigestMirrors{
+				ImageDigestMirrors: []ImageDigestMirror{
+					{Source: "quay.io", Mirrors: []string{"mirror1.example.com/quay"}},
+				},
+				ImageTagMirrors: []ImageDigestMirror{
+					{Source: "quay.io/rhdh", Mirrors: []string{"mirror2.example.com/rhdh"}},
+				},
+			},
+			expected: "oci://mirror2.example.com/rhdh/plugin:1.0", // More specific source from imageTagMirrors wins
+		},
 	}
 
 	for _, tt := range tests {
@@ -283,6 +317,47 @@ func TestReadMirrorConfigFromFile(t *testing.T) {
 				assert.Len(t, mirrors.ImageDigestMirrors, 1)
 				assert.Equal(t, "ghcr.io", mirrors.ImageDigestMirrors[0].Source)
 				assert.Equal(t, []string{"primary-mirror.example.com/ghcr", "backup-mirror.example.com/ghcr"}, mirrors.ImageDigestMirrors[0].Mirrors)
+			},
+		},
+		{
+			name: "imageTagMirrors field (ITMS format)",
+			fileContent: `imageTagMirrors:
+  - source: quay.io
+    mirrors:
+      - mirror.example.com/quay
+  - source: registry.redhat.io
+    mirrors:
+      - mirror.example.com/redhat
+`,
+			expectError: false,
+			expectNil:   false,
+			validateFunc: func(t *testing.T, result interface{}) {
+				mirrors := result.(*ImageDigestMirrors)
+				assert.Len(t, mirrors.ImageTagMirrors, 2)
+				assert.Equal(t, "quay.io", mirrors.ImageTagMirrors[0].Source)
+				assert.Equal(t, []string{"mirror.example.com/quay"}, mirrors.ImageTagMirrors[0].Mirrors)
+				assert.Equal(t, "registry.redhat.io", mirrors.ImageTagMirrors[1].Source)
+			},
+		},
+		{
+			name: "both imageDigestMirrors and imageTagMirrors",
+			fileContent: `imageDigestMirrors:
+  - source: quay.io
+    mirrors:
+      - mirror1.example.com/quay
+imageTagMirrors:
+  - source: ghcr.io
+    mirrors:
+      - mirror2.example.com/ghcr
+`,
+			expectError: false,
+			expectNil:   false,
+			validateFunc: func(t *testing.T, result interface{}) {
+				mirrors := result.(*ImageDigestMirrors)
+				assert.Len(t, mirrors.ImageDigestMirrors, 1)
+				assert.Len(t, mirrors.ImageTagMirrors, 1)
+				assert.Equal(t, "quay.io", mirrors.ImageDigestMirrors[0].Source)
+				assert.Equal(t, "ghcr.io", mirrors.ImageTagMirrors[0].Source)
 			},
 		},
 	}
