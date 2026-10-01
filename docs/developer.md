@@ -185,22 +185,25 @@ The operator image can be built hermetically (offline/reproducible) using [Herme
 
 The Hermeto image is pinned once in the Makefile (`HERMETO_IMAGE`); CI and local hermetic builds read that same value.
 
-Local dependency cache: `/tmp/hermeto-cache/operator` (same as CI; not stored in the git tree). The local script sets owner-only mode bits and uses `setfacl` so Podman build UIDs can use the cache without world-writable permissions.
+Local dependency caches live under `/tmp/hermeto-cache/` (e.g. `operator` for the manager image, same path as CI; not stored in the git tree). The script sets owner-only mode bits and uses `setfacl` so Podman build UIDs can use the cache without world-writable permissions.
 
 Requirements: `podman` and the `acl` package (`setfacl`) must be installed.
 
 ```sh
 # Build cache and image in one step
-./scripts/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag
+./hack/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag
 
 # Build only the dependency cache (no image)
-./scripts/local-hermeto-build.sh -d . --no-image
+./hack/local-hermeto-build.sh -d . --no-image
 
 # Build image using existing cache (skip re-fetching dependencies)
-./scripts/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag --no-cache
+./hack/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag --no-cache
 
 # Cross-platform build (e.g., ARM on x86)
-TARGET_PLATFORM=linux/arm64 ./scripts/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag
+TARGET_PLATFORM=linux/arm64 ./hack/local-hermeto-build.sh -d . -i <your-registry>/backstage-operator:tag
+
+# Plugin installer (separate cache under /tmp/hermeto-cache/plugin-installer)
+make dp-installer-hermetic-build
 ```
 
 Or use the Makefile shortcut:

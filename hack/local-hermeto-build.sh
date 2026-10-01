@@ -21,14 +21,16 @@ set -euo pipefail
 #######################################
 # Constants
 #######################################
-# Same path as CI (.github/actions/docker-build); keep cache out of the git tree.
-readonly LOCAL_CACHE_DIR='/tmp/hermeto-cache/operator'
+readonly LOCAL_CACHE_BASEDIR='/tmp/hermeto-cache'
 
 # Image tag comes from HERMETO_IMAGE in the Makefile (also used by CI).
 HERMETO_IMAGE="${HERMETO_IMAGE:-}"
 
 # Target platform for cross-builds (e.g., linux/arm64, linux/amd64)
 TARGET_PLATFORM="${TARGET_PLATFORM:-}"
+
+# Dockerfile path relative to the component directory (default: repo-root operator image).
+CONTAINERFILE="${CONTAINERFILE:-Dockerfile}"
 
 #######################################
 # Normalizes architecture names to Linux conventions used by RPM repos.
@@ -80,6 +82,7 @@ Options:
 
 Environment variables:
   HERMETO_IMAGE            Hermeto image (default: HERMETO_IMAGE from the Makefile)
+  CONTAINERFILE            Dockerfile path relative to -d (default: Dockerfile)
   TARGET_PLATFORM         Target platform for podman (e.g., linux/arm64, linux/amd64).
                           If not set, builds for the native platform.
 
@@ -90,8 +93,46 @@ Examples (assume you are in the root of the rhdh-operator repository):
 
 Cross-platform build (ARM on x86), requires qemu-user-static:
   TARGET_PLATFORM=linux/arm64 $0 -d . -i quay.io/example/image:tag
+  CONTAINERFILE=plugin-installer/Dockerfile $0 -d . -i localhost/plugin-installer:test
 EOF
   exit 1
+}
+
+#######################################
+# Local cache directory for a given CONTAINERFILE (operator matches CI path).
+#######################################
+hermetic_local_cache_dir() {
+  local containerfile="$1"
+  local name
+
+  if [[ "${containerfile}" == "Dockerfile" ]]; then
+    name="operator"
+  else
+    name="$(dirname "${containerfile}")"
+  fi
+
+  echo "${LOCAL_CACHE_BASEDIR}/${name}"
+}
+
+#######################################
+# Extract a container image reference from a Dockerfile line.
+#######################################
+dockerfile_image_ref() {
+  local line="$1"
+  local field
+
+  for field in ${line}; do
+    if [[ "${field}" == FROM || "${field}" == AS || "${field}" == AS* ]]; then
+      continue
+    fi
+    if [[ "${field}" == --* ]]; then
+      continue
+    fi
+    echo "${field}"
+    return 0
+  done
+
+  return 1
 }
 
 #######################################
@@ -210,10 +251,10 @@ hermetic_probe_rootless_root_host_uid() {
 # Host UIDs used during podman build for stages that mount /cachi2.
 #######################################
 hermetic_build_host_uids() {
-  local component_dir="$1"
+  local dockerfile="$1"
   local local_cache_dir="$2"
-  local dockerfile="${component_dir}/Dockerfile"
   local go_image ubi_image
+  local line
   local builder_container_uid builder_host_uid root_host_uid
 
   if [[ ! -f "${dockerfile}" ]]; then
@@ -221,11 +262,22 @@ hermetic_build_host_uids() {
     exit 1
   fi
 
-  go_image=$(awk '/^FROM / && /go-toolset/ { print $2; exit }' "${dockerfile}")
-  ubi_image=$(awk '/^FROM / && /ubi10\/ubi:/ { print $2; exit }' "${dockerfile}")
+  go_image=""
+  ubi_image=""
+  while IFS= read -r line; do
+    if [[ -z "${go_image}" && "${line}" == FROM* && "${line}" == *go-toolset* ]]; then
+      go_image=$(dockerfile_image_ref "${line}") || true
+    fi
+    if [[ -z "${ubi_image}" && "${line}" == FROM* && "${line}" == *ubi10/ubi:* && "${line}" != *ubi-micro* ]]; then
+      ubi_image=$(dockerfile_image_ref "${line}") || true
+    fi
+    if [[ -n "${go_image}" && -n "${ubi_image}" ]]; then
+      break
+    fi
+  done < "${dockerfile}"
 
   if [[ -z "${go_image}" || -z "${ubi_image}" ]]; then
-    echo "Error: could not parse builder base images from ${dockerfile}" >&2
+    echo "Error: could not parse go-toolset and ubi10/ubi base images from ${dockerfile}" >&2
     exit 1
   fi
 
@@ -241,7 +293,7 @@ hermetic_build_host_uids() {
 #######################################
 prepare_cache_for_build() {
   local local_cache_dir="$1"
-  local component_dir="$2"
+  local containerfile_path="$2"
   local uid gid parent_dir host_uid
 
   uid="$(id -u)"
@@ -276,7 +328,7 @@ prepare_cache_for_build() {
   while IFS= read -r host_uid; do
     setfacl -R -m "u:${host_uid}:rwX" "${local_cache_dir}"
     setfacl -R -d -m "u:${host_uid}:rwX" "${local_cache_dir}"
-  done < <(hermetic_build_host_uids "${component_dir}" "${local_cache_dir}")
+  done < <(hermetic_build_host_uids "${containerfile_path}" "${local_cache_dir}")
 }
 
 #######################################
@@ -286,6 +338,7 @@ build_cache() {
   local component_dir="$1"
   local local_cache_dir="$2"
   local local_cache_output_dir="$3"
+  local containerfile_path="$4"
   local platform_args=()
 
   if [[ -n "${TARGET_PLATFORM}" ]]; then
@@ -295,10 +348,10 @@ build_cache() {
 
   mkdir -p "${local_cache_output_dir}"
 
-  podman pull "${platform_args[@]}" "${HERMETO_IMAGE}"
+  podman pull ${platform_args[@]+"${platform_args[@]}"} "${HERMETO_IMAGE}"
 
   podman run --rm \
-    "${platform_args[@]}" \
+    ${platform_args[@]+"${platform_args[@]}"} \
     -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
@@ -310,7 +363,7 @@ build_cache() {
     '[{"type": "rpm", "path": "."}, {"type": "gomod", "path": "."}]'
 
   podman run --rm \
-    "${platform_args[@]}" \
+    ${platform_args[@]+"${platform_args[@]}"} \
     -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
@@ -318,14 +371,14 @@ build_cache() {
     generate-env --format env --output /cachi2/cachi2.env /cachi2/output
 
   podman run --rm \
-    "${platform_args[@]}" \
+    ${platform_args[@]+"${platform_args[@]}"} \
     -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
     "${HERMETO_IMAGE}" \
     inject-files /cachi2/output
 
-  prepare_cache_for_build "${local_cache_dir}" "${component_dir}"
+  prepare_cache_for_build "${local_cache_dir}" "${containerfile_path}"
   return 0
 }
 
@@ -336,6 +389,8 @@ build_image() {
   local component_dir="$1"
   local local_cache_dir="$2"
   local image="$3"
+  local containerfile_path="$4"
+  local transformed_containerfile="${containerfile_path}.hermeto"
   local platform_args=()
 
   if [[ -n "${TARGET_PLATFORM}" ]]; then
@@ -349,21 +404,19 @@ build_image() {
     exit 1
   fi
 
-  prepare_cache_for_build "${local_cache_dir}" "${component_dir}"
+  prepare_cache_for_build "${local_cache_dir}" "${containerfile_path}"
 
-  transform_containerfile \
-    "${component_dir}/Dockerfile" \
-    "${component_dir}/Dockerfile.hermeto"
+  transform_containerfile "${containerfile_path}" "${transformed_containerfile}"
 
   # Prevent podman from injecting host RHEL subscriptions into the container
   EMPTY_DIR=$(mktemp -d)
   trap 'rm -rf "${EMPTY_DIR}" || true' EXIT
 
   podman build -t "${image}" \
-    "${platform_args[@]}" \
+    ${platform_args[@]+"${platform_args[@]}"} \
     --network none \
     --no-cache \
-    -f "${component_dir}/Dockerfile.hermeto" \
+    -f "${transformed_containerfile}" \
     -v "${local_cache_dir}:/cachi2" \
     -v /dev/null:/run/secrets/redhat.repo \
     -v "${EMPTY_DIR}:/run/secrets/rhsm:z" \
@@ -435,9 +488,16 @@ main() {
   local resolved_component_dir
   local local_cache_dir
   local local_cache_output_dir
+  local containerfile_path
 
   resolved_component_dir="$(realpath "${component_dir}")"
-  local_cache_dir="${LOCAL_CACHE_DIR}"
+  containerfile_path="${resolved_component_dir}/${CONTAINERFILE}"
+  if [[ ! -f "${containerfile_path}" ]]; then
+    echo "Error: containerfile not found: ${containerfile_path}" >&2
+    exit 1
+  fi
+
+  local_cache_dir="$(hermetic_local_cache_dir "${CONTAINERFILE}")"
   local_cache_output_dir="${local_cache_dir}/output"
   mkdir -p "${local_cache_output_dir}"
 
@@ -450,19 +510,20 @@ main() {
   fi
 
   echo "Component dir: ${resolved_component_dir}"
+  echo "Containerfile: ${CONTAINERFILE}"
   echo "Local cache dir: ${local_cache_dir}"
   echo "Hermeto image: ${HERMETO_IMAGE}"
 
   if [[ "${no_cache}" == false ]]; then
     echo "Building cache..."
-    build_cache "${resolved_component_dir}" "${local_cache_dir}" "${local_cache_output_dir}"
+    build_cache "${resolved_component_dir}" "${local_cache_dir}" "${local_cache_output_dir}" "${containerfile_path}"
   else
     echo "Skipping cache build (--no-cache specified)"
   fi
 
   if [[ "${no_image}" == false ]]; then
     echo "Building image..."
-    build_image "${resolved_component_dir}" "${local_cache_dir}" "${image}"
+    build_image "${resolved_component_dir}" "${local_cache_dir}" "${image}" "${containerfile_path}"
   else
     echo "Skipping image build (--no-image specified or -i/--image not provided)"
   fi

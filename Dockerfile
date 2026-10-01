@@ -7,7 +7,7 @@ FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1790644709@sha256:290ba654
 ARG TARGETOS
 ARG TARGETARCH
 # Build as the go-toolset default user (non-root). Local hermetic builds grant /cachi2
-# via setfacl for Podman-mapped UIDs (see scripts/local-hermeto-build.sh); CI uses chown+chmod.
+# via setfacl for Podman-mapped UIDs (see hack/local-hermeto-build.sh); CI uses chown+chmod.
 ENV GOPATH=/go/
 ENV GOCACHE=/tmp/go-build-cache
 

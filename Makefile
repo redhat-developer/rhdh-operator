@@ -274,7 +274,11 @@ image-build: ## Build container image with the manager.
 
 .PHONY: hermetic-build
 hermetic-build: ## Build operator image hermetically using Hermeto (local simulation of Konflux)
-	HERMETO_IMAGE="$(HERMETO_IMAGE)" scripts/local-hermeto-build.sh -d . -i $(IMG)
+	HERMETO_IMAGE="$(HERMETO_IMAGE)" hack/local-hermeto-build.sh -d . -i $(IMG)
+
+.PHONY: dp-installer-hermetic-build
+dp-installer-hermetic-build: ## Build plugin installer image hermetically using Hermeto
+	HERMETO_IMAGE="$(HERMETO_IMAGE)" CONTAINERFILE=plugin-installer/Dockerfile hack/local-hermeto-build.sh -d . -i $(RELATED_IMAGE_plugin_installer)
 
 .PHONY: image-push
 image-push: ## Push container image with the manager.
