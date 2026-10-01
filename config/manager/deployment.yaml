@@ -100,6 +100,9 @@ spec:
               name: default-config
             - mountPath: /plugin-deps
               name: plugin-deps
+            - mountPath: /plugins-mirror
+              name: mirror-config
+              readOnly: true
             - mountPath: /tmp
               name: tmp
 
@@ -112,6 +115,10 @@ spec:
         - name: plugin-deps
           configMap:
             name: plugin-deps
+            optional: true
+        - name: mirror-config
+          configMap:
+            name: plugin-registry-mirror
             optional: true
         - name: tmp
           emptyDir: {}
