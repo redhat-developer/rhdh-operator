@@ -165,16 +165,15 @@ func (p *DynamicPlugins) addToModel(model *BackstageModel, backstage api.Backsta
 		}
 		packages := []string{}
 		for _, plugin := range pluginsData {
+			// Warn if package name contains "!plugin-path" syntax (multi-plugin package)
+
 			if !plugin.IsDisabled() {
-				// Skip local paths - they're built into the image and don't need downloading
-				// TODO temporary workaround to not to fail until wrappers removed
-				if strings.HasPrefix(plugin.Package, "./") || strings.HasPrefix(plugin.Package, "/") {
-					continue
-				}
-				// Warn if package name contains "!plugin-path" syntax (multi-plugin package)
+
 				if idx := strings.Index(plugin.Package, "!"); idx != -1 {
 					klog.Warningf("package %q contains '!plugin-path' syntax", plugin.Package)
 				}
+				// Apply mirror transformation to OCI package URLs only
+				plugin.Package = ApplyMirror(plugin.Package, p.model.ExternalConfig.Mirrors)
 
 				p.enabledPlugins = append(p.enabledPlugins, plugin)
 				// Build package entry: "url integrity"

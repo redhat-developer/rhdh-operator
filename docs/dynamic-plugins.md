@@ -136,6 +136,8 @@ spec:
 
 #### Skip TLS Verification (Development Only)
 
+For development registries with self-signed certificates, you can skip certificate verification:
+
 ```yaml
 apiVersion: rhdh.redhat.com/v1alpha5
 kind: DevHubPluginCatalog
@@ -147,6 +149,12 @@ spec:
     ref: oci://dev-registry.local:5000/rhdh/plugin-catalog:dev
     skipTLSVerify: true
 ```
+
+**Security Note:**
+- Connection remains encrypted (HTTPS)
+- Only certificate validation is skipped
+- Not recommended for production use
+- Prefer using `certificateAuthority` for self-signed certificates
 
 #### Proxy Settings
 
