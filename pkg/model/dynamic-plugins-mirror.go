@@ -9,11 +9,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// ImageDigestMirrors defines mirror configuration (compatible with OpenShift IDMS/ITMS)
-// Supports both imageDigestMirrors and imageTagMirrors field names for compatibility
+// ImageDigestMirrors defines mirror configuration (compatible with OpenShift IDMS/ITMS format)
+// Uses imageMirrors field to avoid confusion with OpenShift's digest-only/tag-only limitations
 type ImageDigestMirrors struct {
-	ImageDigestMirrors []ImageDigestMirror `yaml:"imageDigestMirrors,omitempty" json:"imageDigestMirrors,omitempty"`
-	ImageTagMirrors    []ImageDigestMirror `yaml:"imageTagMirrors,omitempty" json:"imageTagMirrors,omitempty"`
+	ImageMirrors []ImageDigestMirror `yaml:"imageMirrors,omitempty" json:"imageMirrors,omitempty"`
 }
 
 // ImageDigestMirror represents a single mirror configuration
@@ -26,17 +25,9 @@ type ImageDigestMirror struct {
 // Only applies to oci:// URLs - npm packages, HTTP URLs, and file paths are unchanged
 // Implements IDMS "most specific namespace match" rule: when multiple sources match,
 // the longest/most specific source wins (e.g., quay.io/foo/bar beats quay.io/foo)
-// Supports both imageDigestMirrors and imageTagMirrors fields (works for both tags and digests)
+// Works for both tag-based and digest-based references
 func ApplyMirror(ref string, mirrors *ImageDigestMirrors) string {
-	if mirrors == nil {
-		return ref
-	}
-
-	// Combine both imageDigestMirrors and imageTagMirrors into a single list
-	allMirrors := append([]ImageDigestMirror{}, mirrors.ImageDigestMirrors...)
-	allMirrors = append(allMirrors, mirrors.ImageTagMirrors...)
-
-	if len(allMirrors) == 0 {
+	if mirrors == nil || len(mirrors.ImageMirrors) == 0 {
 		return ref // Early return for performance when no mirrors configured
 	}
 
@@ -52,8 +43,8 @@ func ApplyMirror(ref string, mirrors *ImageDigestMirrors) string {
 	var bestMatch *ImageDigestMirror
 	var bestMatchLen int
 
-	for i := range allMirrors {
-		m := &allMirrors[i]
+	for i := range mirrors.ImageMirrors {
+		m := &mirrors.ImageMirrors[i]
 		if isOCIMatch(ociRef, m.Source) {
 			// Most specific match = longest source string
 			if len(m.Source) > bestMatchLen {

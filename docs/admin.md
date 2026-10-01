@@ -78,7 +78,7 @@ In air-gapped environments, Backstage dynamic plugins distributed as OCI artifac
 
 The mirror configuration uses the same format and matching rules as OpenShift's [ImageDigestMirrorSet (IDMS)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/images/image-configuration-classic#images-configuration-registry-mirror_image-configuration) and [ImageTagMirrorSet (ITMS)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/images/image-configuration-classic#images-configuration-registry-mirror_image-configuration), making it familiar to OpenShift administrators and allowing direct reuse of existing IDMS/ITMS configurations.
 
-**Important:** Unlike OpenShift's IDMS (digest-only) and ITMS (tag-only) which only mirror specific pull types, the operator's mirror configuration **supports both field names** (`imageDigestMirrors` and `imageTagMirrors`) and works for **both tag-based** (`:v1.0`) **and digest-based** (`@sha256:...`) plugin references. This is because the operator performs application-level URL transformation before the init container pulls plugins, rather than container runtime-level mirroring like IDMS/ITMS.
+**Important:** Unlike OpenShift's IDMS (digest-only) and ITMS (tag-only) which only mirror specific pull types, the operator's mirror configuration works for **both tag-based** (`:v1.0`) **and digest-based** (`@sha256:...`) plugin references. This is because the operator performs application-level URL transformation before the init container pulls plugins, rather than container runtime-level mirroring like IDMS/ITMS.
 
 **How it works:**
 
@@ -99,10 +99,9 @@ metadata:
   namespace: rhdh-operator  # Must be in operator namespace
 data:
   mirrors.yaml: |
-    # Supports both OpenShift IDMS and ITMS formats
-    # Use either 'imageDigestMirrors' or 'imageTagMirrors' (or both)
-    # Both work for tag-based and digest-based plugin references
-    imageDigestMirrors:
+    # Mirror configuration for plugin OCI images
+    # Works for both tag-based (:v1.0) and digest-based (@sha256:...) references
+    imageMirrors:
     # Mirror quay.io to internal registry
     - source: quay.io
       mirrors:
@@ -140,18 +139,18 @@ kubectl get backstage my-backstage -o jsonpath='{.status.plugins}' | jq
 
 **For OpenShift users with existing IDMS/ITMS:**
 
-You can directly copy your existing ImageDigestMirrorSet or ImageTagMirrorSet configuration to the ConfigMap format:
+You can copy mirror entries from your existing ImageDigestMirrorSet or ImageTagMirrorSet:
 
 ```bash
-# Extract IDMS config
+# Extract entries from IDMS
 oc get imagedigestmirrorset rhdh-plugins -o jsonpath='{.spec.imageDigestMirrors}' | \
-  yq -P 'imageDigestMirrors: .' > mirrors.yaml
+  yq -P 'imageMirrors: .' > mirrors.yaml
 
-# OR extract ITMS config (keeps the imageTagMirrors field name - both work!)
+# OR extract entries from ITMS
 oc get imagetagmirrorset rhdh-plugins -o jsonpath='{.spec.imageTagMirrors}' | \
-  yq -P 'imageTagMirrors: .' > mirrors.yaml
+  yq -P 'imageMirrors: .' > mirrors.yaml
 
-# Create ConfigMap from extracted config
+# Create ConfigMap from the mirror configuration
 oc create configmap plugin-registry-mirror \
   --from-file=mirrors.yaml \
   -n rhdh-operator

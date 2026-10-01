@@ -26,7 +26,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "empty mirrors list",
 			ref:  "oci://quay.io/rhdh/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{},
+				ImageMirrors: []ImageDigestMirror{},
 			},
 			expected: "oci://quay.io/rhdh/plugin:1.0",
 		},
@@ -34,7 +34,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "non-OCI URL not transformed",
 			ref:  "https://example.com/plugin.tgz",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "example.com", Mirrors: []string{"mirror.example.com"}},
 				},
 			},
@@ -44,7 +44,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "npm package not transformed",
 			ref:  "@scope/package@1.0.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "registry.npmjs.org", Mirrors: []string{"npm-mirror.example.com"}},
 				},
 			},
@@ -54,7 +54,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "simple mirror transformation",
 			ref:  "oci://quay.io/rhdh/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
 				},
 			},
@@ -64,7 +64,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "most specific source wins",
 			ref:  "oci://quay.io/rhdh/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io", Mirrors: []string{"mirror1.example.com/quay"}},
 					{Source: "quay.io/rhdh", Mirrors: []string{"mirror2.example.com/rhdh"}},
 				},
@@ -75,7 +75,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "no matching source",
 			ref:  "oci://registry.redhat.io/rhdh/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
 				},
 			},
@@ -85,7 +85,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "mirror with digest",
 			ref:  "oci://quay.io/rhdh/plugin@sha256:abc123",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
 				},
 			},
@@ -95,7 +95,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "multiple mirrors - uses first",
 			ref:  "oci://quay.io/rhdh/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io", Mirrors: []string{"mirror1.example.com/quay", "mirror2.example.com/quay"}},
 				},
 			},
@@ -105,7 +105,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "mirror source without mirrors list",
 			ref:  "oci://quay.io/rhdh/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io", Mirrors: []string{}},
 				},
 			},
@@ -115,7 +115,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "exact source match",
 			ref:  "oci://registry.access.redhat.com/rhdh/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "registry.access.redhat.com", Mirrors: []string{"internal-mirror.example.com/redhat"}},
 				},
 			},
@@ -126,7 +126,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "registry substring does not match different domain",
 			ref:  "oci://quay.io.malicious.com/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
 				},
 			},
@@ -136,7 +136,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "namespace substring does not match different namespace",
 			ref:  "oci://quay.io/foobar/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io/foo", Mirrors: []string{"mirror.example.com/foo"}},
 				},
 			},
@@ -146,7 +146,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "plugin name substring does not match sibling plugin",
 			ref:  "oci://quay.io/rhdh/backstage-plugin-orchestrator-backend:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io/rhdh/backstage-plugin-orchestrator", Mirrors: []string{"mirror.example.com/orchestrator"}},
 				},
 			},
@@ -156,7 +156,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "exact repository match with tag",
 			ref:  "oci://quay.io/rhdh/backstage-plugin-orchestrator:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io/rhdh/backstage-plugin-orchestrator", Mirrors: []string{"mirror.example.com/orchestrator"}},
 				},
 			},
@@ -166,7 +166,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "exact repository match with digest",
 			ref:  "oci://quay.io/rhdh/backstage-plugin-orchestrator@sha256:abc123",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "quay.io/rhdh/backstage-plugin-orchestrator", Mirrors: []string{"mirror.example.com/orchestrator"}},
 				},
 			},
@@ -176,7 +176,7 @@ func TestApplyMirror(t *testing.T) {
 			name: "registry with port does not match registry without port",
 			ref:  "oci://localhost:5000/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "localhost", Mirrors: []string{"mirror.example.com/local"}},
 				},
 			},
@@ -186,45 +186,11 @@ func TestApplyMirror(t *testing.T) {
 			name: "registry with port matches exactly",
 			ref:  "oci://localhost:5000/plugin:1.0",
 			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
+				ImageMirrors: []ImageDigestMirror{
 					{Source: "localhost:5000", Mirrors: []string{"mirror.example.com/local"}},
 				},
 			},
 			expected: "oci://mirror.example.com/local/plugin:1.0", // Mirrored - exact match followed by /
-		},
-		// Test imageTagMirrors field support (ITMS format)
-		{
-			name: "imageTagMirrors field works for tags",
-			ref:  "oci://quay.io/rhdh/plugin:1.0",
-			mirrors: &ImageDigestMirrors{
-				ImageTagMirrors: []ImageDigestMirror{
-					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
-				},
-			},
-			expected: "oci://mirror.example.com/quay/rhdh/plugin:1.0",
-		},
-		{
-			name: "imageTagMirrors field works for digests",
-			ref:  "oci://quay.io/rhdh/plugin@sha256:abc123",
-			mirrors: &ImageDigestMirrors{
-				ImageTagMirrors: []ImageDigestMirror{
-					{Source: "quay.io", Mirrors: []string{"mirror.example.com/quay"}},
-				},
-			},
-			expected: "oci://mirror.example.com/quay/rhdh/plugin@sha256:abc123",
-		},
-		{
-			name: "both fields combined - most specific wins",
-			ref:  "oci://quay.io/rhdh/plugin:1.0",
-			mirrors: &ImageDigestMirrors{
-				ImageDigestMirrors: []ImageDigestMirror{
-					{Source: "quay.io", Mirrors: []string{"mirror1.example.com/quay"}},
-				},
-				ImageTagMirrors: []ImageDigestMirror{
-					{Source: "quay.io/rhdh", Mirrors: []string{"mirror2.example.com/rhdh"}},
-				},
-			},
-			expected: "oci://mirror2.example.com/rhdh/plugin:1.0", // More specific source from imageTagMirrors wins
 		},
 	}
 
@@ -242,7 +208,7 @@ func TestApplyMirrorPerformance(t *testing.T) {
 	assert.Equal(t, "oci://quay.io/rhdh/plugin:1.0", result)
 
 	// Test that early return works for empty mirrors
-	emptyMirrors := &ImageDigestMirrors{ImageDigestMirrors: []ImageDigestMirror{}}
+	emptyMirrors := &ImageDigestMirrors{ImageMirrors: []ImageDigestMirror{}}
 	result = ApplyMirror("oci://quay.io/rhdh/plugin:1.0", emptyMirrors)
 	assert.Equal(t, "oci://quay.io/rhdh/plugin:1.0", result)
 }
@@ -257,7 +223,7 @@ func TestReadMirrorConfigFromFile(t *testing.T) {
 	}{
 		{
 			name: "valid mirror config with multiple sources",
-			fileContent: `imageDigestMirrors:
+			fileContent: `imageMirrors:
   - source: quay.io
     mirrors:
       - mirror.example.com/quay
@@ -269,21 +235,21 @@ func TestReadMirrorConfigFromFile(t *testing.T) {
 			expectNil:   false,
 			validateFunc: func(t *testing.T, result interface{}) {
 				mirrors := result.(*ImageDigestMirrors)
-				assert.Len(t, mirrors.ImageDigestMirrors, 2)
-				assert.Equal(t, "quay.io", mirrors.ImageDigestMirrors[0].Source)
-				assert.Equal(t, []string{"mirror.example.com/quay"}, mirrors.ImageDigestMirrors[0].Mirrors)
-				assert.Equal(t, "registry.redhat.io", mirrors.ImageDigestMirrors[1].Source)
+				assert.Len(t, mirrors.ImageMirrors, 2)
+				assert.Equal(t, "quay.io", mirrors.ImageMirrors[0].Source)
+				assert.Equal(t, []string{"mirror.example.com/quay"}, mirrors.ImageMirrors[0].Mirrors)
+				assert.Equal(t, "registry.redhat.io", mirrors.ImageMirrors[1].Source)
 			},
 		},
 		{
 			name: "empty mirrors list",
-			fileContent: `imageDigestMirrors: []
+			fileContent: `imageMirrors: []
 `,
 			expectError: false,
 			expectNil:   false,
 			validateFunc: func(t *testing.T, result interface{}) {
 				mirrors := result.(*ImageDigestMirrors)
-				assert.Empty(t, mirrors.ImageDigestMirrors)
+				assert.Empty(t, mirrors.ImageMirrors)
 			},
 		},
 		{
@@ -299,12 +265,12 @@ func TestReadMirrorConfigFromFile(t *testing.T) {
 			expectNil:   false,
 			validateFunc: func(t *testing.T, result interface{}) {
 				mirrors := result.(*ImageDigestMirrors)
-				assert.Empty(t, mirrors.ImageDigestMirrors)
+				assert.Empty(t, mirrors.ImageMirrors)
 			},
 		},
 		{
 			name: "mirror with multiple fallback mirrors",
-			fileContent: `imageDigestMirrors:
+			fileContent: `imageMirrors:
   - source: ghcr.io
     mirrors:
       - primary-mirror.example.com/ghcr
@@ -314,50 +280,9 @@ func TestReadMirrorConfigFromFile(t *testing.T) {
 			expectNil:   false,
 			validateFunc: func(t *testing.T, result interface{}) {
 				mirrors := result.(*ImageDigestMirrors)
-				assert.Len(t, mirrors.ImageDigestMirrors, 1)
-				assert.Equal(t, "ghcr.io", mirrors.ImageDigestMirrors[0].Source)
-				assert.Equal(t, []string{"primary-mirror.example.com/ghcr", "backup-mirror.example.com/ghcr"}, mirrors.ImageDigestMirrors[0].Mirrors)
-			},
-		},
-		{
-			name: "imageTagMirrors field (ITMS format)",
-			fileContent: `imageTagMirrors:
-  - source: quay.io
-    mirrors:
-      - mirror.example.com/quay
-  - source: registry.redhat.io
-    mirrors:
-      - mirror.example.com/redhat
-`,
-			expectError: false,
-			expectNil:   false,
-			validateFunc: func(t *testing.T, result interface{}) {
-				mirrors := result.(*ImageDigestMirrors)
-				assert.Len(t, mirrors.ImageTagMirrors, 2)
-				assert.Equal(t, "quay.io", mirrors.ImageTagMirrors[0].Source)
-				assert.Equal(t, []string{"mirror.example.com/quay"}, mirrors.ImageTagMirrors[0].Mirrors)
-				assert.Equal(t, "registry.redhat.io", mirrors.ImageTagMirrors[1].Source)
-			},
-		},
-		{
-			name: "both imageDigestMirrors and imageTagMirrors",
-			fileContent: `imageDigestMirrors:
-  - source: quay.io
-    mirrors:
-      - mirror1.example.com/quay
-imageTagMirrors:
-  - source: ghcr.io
-    mirrors:
-      - mirror2.example.com/ghcr
-`,
-			expectError: false,
-			expectNil:   false,
-			validateFunc: func(t *testing.T, result interface{}) {
-				mirrors := result.(*ImageDigestMirrors)
-				assert.Len(t, mirrors.ImageDigestMirrors, 1)
-				assert.Len(t, mirrors.ImageTagMirrors, 1)
-				assert.Equal(t, "quay.io", mirrors.ImageDigestMirrors[0].Source)
-				assert.Equal(t, "ghcr.io", mirrors.ImageTagMirrors[0].Source)
+				assert.Len(t, mirrors.ImageMirrors, 1)
+				assert.Equal(t, "ghcr.io", mirrors.ImageMirrors[0].Source)
+				assert.Equal(t, []string{"primary-mirror.example.com/ghcr", "backup-mirror.example.com/ghcr"}, mirrors.ImageMirrors[0].Mirrors)
 			},
 		},
 	}
