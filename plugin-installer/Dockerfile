@@ -4,7 +4,11 @@ FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:1.26.
 ARG TARGETOS=linux
 ARG TARGETARCH
 
-WORKDIR /workspace
+# Switch to root for hermetic builds (avoid permission issues)
+USER 0
+
+# Use the default go-toolset workdir (has proper permissions for hermetic builds)
+WORKDIR /opt/app-root/src
 
 # Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
@@ -20,9 +24,9 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w
 # CA certificates stage - install ca-certificates package the Red Hat way
 FROM registry.access.redhat.com/ubi10/ubi:10.2-1790572136@sha256:9c6a62df091dd9fcef9c52ca4e10c252bdeaa0cb48b363f7e61b4c975dc75d75 AS certs
 
-RUN mkdir -p /mnt/rootfs && \
-    dnf install --installroot /mnt/rootfs ca-certificates \
-        --releasever 9 --setopt=install_weak_deps=0 --nodocs -y && \
+RUN mkdir -p /mnt/rootfs
+RUN dnf install --installroot /mnt/rootfs ca-certificates \
+        --releasever 9 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
     dnf --installroot /mnt/rootfs clean all && \
     rm -rf /mnt/rootfs/var/cache/* /mnt/rootfs/var/log/* /mnt/rootfs/tmp/*
 
@@ -35,7 +39,7 @@ WORKDIR /
 COPY --from=certs /mnt/rootfs/etc/pki /etc/pki
 
 # Copy binary from builder
-COPY --from=builder /workspace/plugin-fetch /usr/local/bin/plugin-fetch
+COPY --from=builder /opt/app-root/src/plugin-fetch /usr/local/bin/plugin-fetch
 
 # Default environment variables
 ENV INPUT_FILE=/input/packages.txt \
