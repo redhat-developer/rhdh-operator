@@ -25,7 +25,7 @@ metadata:
           }
         }
       ]
-    createdAt: "2026-09-30T19:01:01Z"
+    createdAt: "2026-10-01T08:57:15Z"
     description: Backstage Operator
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
