@@ -7,8 +7,8 @@ data:
     plugins:
       # Minimal catalog for testing ref:// resolution
       - package: oci://quay.io/backstage/backstage-plugin-kubernetes@sha256:test123
-        disabled: false
+        enabled: true
       - package: oci://quay.io/backstage/backstage-plugin-scaffolder-backend-module-github@sha256:test456
-        disabled: false
+        enabled: true
       - package: oci://quay.io/backstage/backstage-plugin-techdocs@sha256:test789
         enabled: true

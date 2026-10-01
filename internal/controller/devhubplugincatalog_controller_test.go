@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -320,12 +321,12 @@ func TestApplyConfigMap_WithPlugins(t *testing.T) {
 	// Create plugins map
 	plugins := make(catalog.PluginMap)
 	plugins["plugin-techdocs"] = model.DynaPlugin{
-		Package:  "oci://registry.example.com/rhdh/plugin-techdocs:1.0",
-		Disabled: false,
+		Package: "oci://registry.example.com/rhdh/plugin-techdocs:1.0",
+		Enabled: ptr.To(true),
 	}
 	plugins["plugin-kubernetes"] = model.DynaPlugin{
-		Package:  "oci://registry.example.com/rhdh/plugin-kubernetes:2.0",
-		Disabled: false,
+		Package: "oci://registry.example.com/rhdh/plugin-kubernetes:2.0",
+		Enabled: ptr.To(true),
 	}
 
 	err := r.applyConfigMap(context.TODO(), plugins)
@@ -342,6 +343,8 @@ func TestApplyConfigMap_WithPlugins(t *testing.T) {
 	// Verify dynamic-plugins.yaml was replaced
 	assert.Contains(t, cm.Data, "dynamic-plugins.yaml")
 	dpContent := cm.Data["dynamic-plugins.yaml"]
+	assert.Contains(t, dpContent, "enabled: true")
+	assert.NotContains(t, dpContent, "disabled:")
 
 	// Content should be a ConfigMap YAML
 	var configMap map[string]interface{}
