@@ -118,7 +118,7 @@ func (p *Processor) fetch(ctx context.Context, cat CatalogInput) ([]byte, error)
 
 	var opts []fetcher.OCIOption
 	if cat.SkipTLSVerify {
-		opts = append(opts, fetcher.WithInsecure())
+		opts = append(opts, fetcher.WithSkipTLSVerify())
 	}
 	if cat.DockerConfig != nil {
 		opts = append(opts, fetcher.WithDockerConfig(cat.DockerConfig))
