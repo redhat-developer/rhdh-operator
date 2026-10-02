@@ -44,6 +44,8 @@ chmod +x install-rhdh-catalog-source.sh
 # install catalog source and operator subscription, for the latest downstream stable, RC or GA build from the release-1.yy branch
 ./install-rhdh-catalog-source.sh --latest --install-operator rhdh  
 
+# quieter by default; use --debug or --log-level debug for verbose output 
+
 # OR, install catalog source and operator subscription, for the next donwstream CI build from the main branch
 ./install-rhdh-catalog-source.sh --next --install-operator rhdh  
 ----

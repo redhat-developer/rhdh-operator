@@ -6,6 +6,10 @@
 
 set -euo pipefail
 
+LOG_LEVEL="${LOG_LEVEL:-info}"
+LOG_FILE=""
+
+
 NC='\033[0m'
 
 IS_OPENSHIFT=""
@@ -30,6 +34,10 @@ function logf() {
   local msg=$3
   local fullMsg="[${prefix}] ${msg}"
 
+  if [[ -n "${LOG_FILE}" ]]; then
+    printf '%s\n' "${fullMsg}" >> "${LOG_FILE}"
+  fi
+
   if [[ "$TERM" == *"color"* ]]; then
     echo -e "${color}${fullMsg}${NC}"
   else
@@ -46,7 +54,9 @@ function warnf() {
 }
 
 function debugf() {
-  logf "DEBUG" "\033[0;90m" "$1"
+  if [[ "${LOG_LEVEL}" == "debug" ]]; then
+    logf "DEBUG" "\033[0;90m" "$1"
+  fi
 }
 
 function errorf() {
@@ -76,6 +86,8 @@ Options:
   --install-operator <NAME>           : Install operator named \$NAME after creating CatalogSource
   --install-plan-approval <STRATEGY>  : Specify the install plan strategy for the subscription (default: Automatic)
   --olm-version v0|v1|auto            : Force OLM version for catalog/operator resources (default: auto-detect)
+  --log-level error|warn|info|debug   : Log verbosity (default: info)
+  --debug                             : Same as --log-level debug
 
 Examples:
   $0 \\
@@ -153,6 +165,14 @@ function resolve_olm_version() {
 
   if [[ "${RESOLVED_OLM_VERSION}" == "v1" && "${INSTALL_PLAN_APPROVAL}" != "Automatic" ]]; then
     warnf "--install-plan-approval is only relevant with OLM v0 and will be ignored with OLM v1"
+  fi
+}
+
+function dump_logs_on_error() {
+  local rc=$?
+  if [[ "${rc}" -ne 0 && -n "${LOG_FILE}" && -f "${LOG_FILE}" ]]; then
+    echo "[ERROR] Command failed (exit ${rc}). Full log:" >&2
+    cat "${LOG_FILE}" >&2 || true
   fi
 }
 
@@ -781,6 +801,40 @@ if [[ "$#" -lt 1 ]]; then
   exit 0
 fi
 
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+  esac
+done
+
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+  case "${args[$i]}" in
+    --debug)
+      LOG_LEVEL="debug"
+      ;;
+    --log-level)
+      if [[ $((i+1)) -ge ${#args[@]} ]]; then
+        errorf "--log-level requires a value: error, warn, info, or debug."
+        usage
+        exit 1
+      fi
+      LOG_LEVEL="${args[$((i+1))]}"
+      case "${LOG_LEVEL}" in
+        error|warn|info|debug) ;;
+        *)
+        errorf "Unknown log level: ${LOG_LEVEL}. Must be error, warn, info, or debug."
+        usage
+        exit 1
+        ;;
+    esac
+    ;;
+  esac
+done
+
 # minimum requirements
 if ! command -v jq &> /dev/null; then
   errorf "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
@@ -792,9 +846,12 @@ if ! command -v skopeo &> /dev/null; then
 fi
 
 TMPDIR=$(mktemp -d)
+LOG_FILE="${TMPDIR}/install.log"
+touch "${LOG_FILE}"
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
+trap dump_logs_on_error ERR
 # shellcheck disable=SC2064
 trap "rm -fr '$TMPDIR' || true; jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null" EXIT
 trap "exit 1" INT TERM
@@ -890,6 +947,26 @@ while [[ "$#" -gt 0 ]]; do
           ;;
       esac
       OLM_VERSION="$2"
+      shift 1
+      ;;
+    '--debug')
+      LOG_LEVEL="debug"
+      ;;
+    '--log-level')
+      if [[ $# -lt 2 ]]; then
+        errorf "--log-level requires a value: error, warn, info, or debug."
+        usage
+        exit 1
+      fi
+      case "$2" in
+        error|warn|info|debug) ;;
+        *)
+          errorf "Unknown log level: $2. Must be error, warn, info, or debug."
+          usage
+          exit 1
+          ;;
+      esac
+      LOG_LEVEL="$2"
       shift 1
       ;;
     '-h'|'--help')
