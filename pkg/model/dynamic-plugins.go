@@ -33,7 +33,7 @@ import (
 const dynamicPluginInitContainerName = "install-dynamic-plugins"
 const DynamicPluginsFile = "dynamic-plugins.yaml"
 const OperatorDPProcessingEnvVar = "OPERATOR_DP_PROCESSING"
-const InstallDpImageEnvVar = "RELATED_IMAGE_plugin_installer"
+const InstallDpImageEnvVar = "DYN_PLUGINS_INSTALLER_IMAGE"
 
 type DynamicPluginsFactory struct{}
 
@@ -310,7 +310,7 @@ func (p *DynamicPlugins) getInitContainer() (int, *corev1.Container) {
 	}
 	// Override image with env var, but only when NOT using operator DP processing.
 	// When OPERATOR_DP_PROCESSING=true, the init container image is already set
-	// to RELATED_IMAGE_plugin_installer in deployment.addToModel() and should not be overwritten.
+	// to DYN_PLUGINS_INSTALLER_IMAGE in deployment.addToModel() and should not be overwritten.
 	if !IsOperatorDPProcessing() && os.Getenv(BackstageImageEnvVar) != "" {
 		initContainer.Image = os.Getenv(BackstageImageEnvVar)
 	}
