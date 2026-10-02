@@ -185,9 +185,9 @@ The operator image can be built hermetically (offline/reproducible) using [Herme
 
 The Hermeto image is pinned once in the Makefile (`HERMETO_IMAGE`); CI and local hermetic builds read that same value.
 
-Local dependency caches live under `/tmp/hermeto-cache/` (e.g. `operator` for the manager image, same path as CI; not stored in the git tree). The script sets owner-only mode bits and uses `setfacl` so Podman build UIDs can use the cache without world-writable permissions.
+Local dependency caches live under `/tmp/hermeto-cache/` (e.g. `operator` for the manager image, same path as CI; not stored in the git tree). After prefetch, the script chowns the cache and runs `chmod -R a+rwX`, matching [rhdh-must-gather](https://github.com/redhat-developer/rhdh-must-gather) and CI.
 
-Requirements: `podman` and the `acl` package (`setfacl`) must be installed.
+Requirements: `podman` must be installed.
 
 ```sh
 # Build cache and image in one step
