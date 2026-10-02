@@ -6,9 +6,10 @@
 FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1790644709@sha256:290ba654458e9a269b1509d10e6ebbd3c2b2456570e73e73201adb3ee54fb244 AS builder
 ARG TARGETOS
 ARG TARGETARCH
-# hadolint ignore=DL3002
-USER 0
+# Build as the go-toolset default user (non-root). Hermeto prefetch must chmod the
+# /cachi2 cache (see hack/local-hermeto-build.sh and CI) so this user can use gomod offline.
 ENV GOPATH=/go/
+ENV GOCACHE=/tmp/go-build-cache
 
 ENV EXTERNAL_SOURCE=.
 ENV CONTAINER_SOURCE=/opt/app-root/src
