@@ -263,7 +263,7 @@ local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-
 LABEL ?= quay.expires-after=14d
 PLATFORM ?= linux/amd64
 # renovate: datasource=docker depName=quay.io/konflux-ci/hermeto
-HERMETO_IMAGE ?= quay.io/konflux-ci/hermeto:0.60.1
+HERMETO_IMAGE ?= quay.io/konflux-ci/hermeto:0.62.0
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
