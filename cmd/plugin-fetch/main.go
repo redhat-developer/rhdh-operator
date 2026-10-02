@@ -22,7 +22,8 @@ const (
 	OutputDirEnvVar      = "OUTPUT_DIR"      // Output directory (default: /dynamic-plugins-root)
 	DockerConfigEnvVar   = "DOCKER_CONFIG"   // Path to dockerconfigjson file
 	CAFileEnvVar         = "CA_FILE"         // Path to CA certificate file
-	InsecureEnvVar       = "INSECURE"        // Skip TLS verification (true/false)
+	InsecureEnvVar       = "INSECURE"        // Enable plain HTTP protocol (true/false). WARNING: Exposes credentials.
+	SkipTLSVerifyEnvVar  = "SKIP_TLS_VERIFY" // Skip TLS certificate verification for HTTPS (true/false)
 	PluginModeEnvVar     = "PLUGIN_MODE"     // Enable plugin mode: validate annotation and extract plugin subdirectory (default: true)
 	ParallelEnvVar       = "PARALLEL"        // Number of parallel downloads (default: 4)
 	LockFileEnvVar       = "LOCK_FILE"       // Lock file path (default: OUTPUT_DIR/install-dynamic-plugins.lock)
@@ -54,6 +55,7 @@ func main() {
 	dockerConfig := utils.StringEnvVar(DockerConfigEnvVar, "")
 	caFile := utils.StringEnvVar(CAFileEnvVar, "")
 	insecure := utils.BoolEnvVar(InsecureEnvVar, false)
+	skipTLSVerify := utils.BoolEnvVar(SkipTLSVerifyEnvVar, false)
 	pluginMode := utils.BoolEnvVar(PluginModeEnvVar, true)
 	parallel := utils.IntEnvVar(ParallelEnvVar, 4)
 	if parallel <= 0 {
@@ -102,6 +104,9 @@ func main() {
 	var baseOciOpts []fetcher.OCIOption
 	if insecure {
 		baseOciOpts = append(baseOciOpts, fetcher.WithInsecure())
+	}
+	if skipTLSVerify {
+		baseOciOpts = append(baseOciOpts, fetcher.WithSkipTLSVerify())
 	}
 	if caFile != "" {
 		caCert, err := os.ReadFile(caFile)
