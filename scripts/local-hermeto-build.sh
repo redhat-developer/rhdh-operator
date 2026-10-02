@@ -27,6 +27,9 @@ readonly HERMETO_IMAGE='quay.io/konflux-ci/hermeto:0.60.1'
 # Target platform for cross-builds (e.g., linux/arm64, linux/amd64)
 TARGET_PLATFORM="${TARGET_PLATFORM:-}"
 
+# Path to Dockerfile relative to component directory (default: Dockerfile)
+CONTAINERFILE="${CONTAINERFILE:-Dockerfile}"
+
 #######################################
 # Normalizes architecture names to Linux conventions used by RPM repos.
 #######################################
@@ -78,6 +81,8 @@ Options:
 Environment variables:
   TARGET_PLATFORM         Target platform for podman (e.g., linux/arm64, linux/amd64).
                           If not set, builds for the native platform.
+  CONTAINERFILE              Path to Dockerfile relative to component directory (default: Dockerfile).
+                          Example: CONTAINERFILE=plugin-installer/Dockerfile
 
 Examples (assume you are in the root of the rhdh-operator repository):
   $0 -d . --no-image                                # Build cache only
@@ -91,16 +96,14 @@ EOF
 }
 
 #######################################
-# Check for GNU sed on macOS
+# Check that GNU sed is available
 #######################################
 check_gnu_sed() {
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    if ! sed --version 2>/dev/null | grep -q "GNU sed"; then
-      echo "Error: GNU sed is required on macOS." >&2
-      echo "Install it with: brew install gnu-sed" >&2
-      echo "Then add to your PATH: export PATH=\"\$(brew --prefix)/opt/gnu-sed/libexec/gnubin:\$PATH\"" >&2
-      exit 1
-    fi
+  if ! sed --version 2>/dev/null | grep -q "GNU sed"; then
+    echo "Error: GNU sed is required but not found." >&2
+    echo "On macOS, install with: brew install gnu-sed" >&2
+    echo "Then add to PATH or create alias: alias sed=gsed" >&2
+    exit 1
   fi
 }
 
@@ -113,11 +116,11 @@ transform_containerfile() {
 
   cp "${containerfile}" "${transformed_containerfile}"
 
-  # Configure dnf/microdnf to use the cachi2 repo
-  sed -i "/RUN *\(dnf\|microdnf\) install/i RUN rm -r /etc/yum.repos.d/* && cp /cachi2/output/deps/rpm/${TARGET_ARCH}/repos.d/hermeto.repo /etc/yum.repos.d/" \
+  # Insert repo configuration BEFORE dnf/microdnf install commands
+  sed -i "/RUN  *\(dnf\|microdnf\) install/i RUN rm -r /etc/yum.repos.d/* && cp /cachi2/output/deps/rpm/${TARGET_ARCH}/repos.d/hermeto.repo /etc/yum.repos.d/" \
     "${transformed_containerfile}"
 
-  # Prepend cachi2 env sourcing to every RUN command
+  # Add cachi2.env sourcing to all RUN commands
   sed -i 's/^\s*RUN /RUN . \/cachi2\/cachi2.env \&\& /' "$transformed_containerfile"
 }
 
@@ -137,10 +140,10 @@ build_cache() {
 
   mkdir -p "${local_cache_output_dir}"
 
-  podman pull "${platform_args[@]}" "${HERMETO_IMAGE}"
+  podman pull ${platform_args[@]+"${platform_args[@]}"} "${HERMETO_IMAGE}"
 
   podman run --rm \
-    "${platform_args[@]}" \
+    ${platform_args[@]+"${platform_args[@]}"} \
     -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
@@ -152,7 +155,7 @@ build_cache() {
     '[{"type": "rpm", "path": "."}, {"type": "gomod", "path": "."}]'
 
   podman run --rm \
-    "${platform_args[@]}" \
+    ${platform_args[@]+"${platform_args[@]}"} \
     -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
@@ -160,7 +163,7 @@ build_cache() {
     generate-env --format env --output /cachi2/cachi2.env /cachi2/output
 
   podman run --rm \
-    "${platform_args[@]}" \
+    ${platform_args[@]+"${platform_args[@]}"} \
     -v "${component_dir}:/source:z" \
     -v "${local_cache_dir}:/cachi2:z" \
     -w /source \
@@ -190,18 +193,18 @@ build_image() {
   fi
 
   transform_containerfile \
-    "${component_dir}/Dockerfile" \
-    "${component_dir}/Dockerfile.hermeto"
+    "${component_dir}/${CONTAINERFILE}" \
+    "${component_dir}/${CONTAINERFILE}.hermeto"
 
   # Prevent podman from injecting host RHEL subscriptions into the container
   EMPTY_DIR=$(mktemp -d)
   trap 'rm -rf "${EMPTY_DIR}" || true' EXIT
 
   podman build -t "${image}" \
-    "${platform_args[@]}" \
+    ${platform_args[@]+"${platform_args[@]}"} \
     --network none \
     --no-cache \
-    -f "${component_dir}/Dockerfile.hermeto" \
+    -f "${component_dir}/${CONTAINERFILE}.hermeto" \
     -v "${local_cache_dir}:/cachi2" \
     -v /dev/null:/run/secrets/redhat.repo \
     -v "${EMPTY_DIR}:/run/secrets/rhsm:z" \
