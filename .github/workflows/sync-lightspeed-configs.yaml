@@ -15,6 +15,7 @@ jobs:
       matrix:
         branch:
           - release-1.10
+          - release-2.1
 
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.branch }}
@@ -46,18 +47,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Sync Lightspeed Core config files
-        run: |
-          if [[ "${{ matrix.branch }}" == "release-1.10" ]]; then
-            ./hack/sync-lightspeed-configs.sh --repo redhat-ai-dev/lightspeed-configs --ref ${{ matrix.branch }}
-          else
-            ./hack/sync-lightspeed-configs.sh --ref ${{ matrix.branch }}
-          fi
-
-      - name: Check for changes
+      - name: Sync Lightspeed Core config files and check for changes
         id: changes
         run: |
-          if git diff --quiet config/profile/rhdh/default-config/flavours/intelligent-assistant/ examples/intelligent-assistant.yaml; then
+          ./hack/sync-lightspeed-configs.sh --ref ${{ matrix.branch }}
+
+          if [[ "${{ matrix.branch }}" == "release-1.10" ]]; then
+            CHANGE_PATHS=(config/profile/rhdh/default-config/flavours/lightspeed/ examples/lightspeed.yaml)
+          else
+            CHANGE_PATHS=(config/profile/rhdh/default-config/flavours/intelligent-assistant/ config/profile/rhdh/default-config/flavours/intelligent-assistant-okp/ examples/intelligent-assistant.yaml)
+          fi
+
+          if git diff --quiet -- "${CHANGE_PATHS[@]}"; then
             echo "No changes from upstream."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
@@ -81,6 +82,14 @@ jobs:
           
           if [[ "${TARGET_BRANCH}" == "release-1.10" ]]; then
             TARGET_REPO="redhat-ai-dev/lightspeed-configs"
+            SYNCED_FILES=$(printf '%s\n' \
+              '- `config/profile/rhdh/default-config/flavours/lightspeed/configmap-files.yaml`' \
+              '- `examples/lightspeed.yaml`')
+          else
+            SYNCED_FILES=$(printf '%s\n' \
+              '- `config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml`' \
+              '- `config/profile/rhdh/default-config/flavours/intelligent-assistant-okp/configmap-files.yaml`' \
+              '- `examples/intelligent-assistant.yaml`')
           fi
 
           EXISTING_PR=$(gh pr list --head "${BRANCH}" --base "${TARGET_BRANCH}" --state open --json number --jq '.[0].number // empty')
@@ -104,8 +113,7 @@ jobs:
           Automated nightly sync of Lightspeed Core config files from [${TARGET_REPO} @ ${TARGET_BRANCH}](https://github.com/${TARGET_REPO}/tree/${TARGET_BRANCH}).
 
           ### Synced files
-          - \`config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml\`
-          - \`examples/intelligent-assistant.yaml\`
+          ${SYNCED_FILES}
 
           > [!CAUTION]
           > Please review the upstream changes carefully before merging.
