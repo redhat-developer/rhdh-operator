@@ -21,13 +21,11 @@ spec:
             - name: OPERATOR_NAME
               value: rhdh-operator
             - name: OPERATOR_DP_PROCESSING
-              value: "{{OPERATOR_DP_PROCESSING}}"
+              value: "false"
             - name: RELATED_IMAGE_postgresql
               value: quay.io/fedora/postgresql-18:latest
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh-community/rhdh:next-2.1
-            - name: DYN_PLUGINS_INSTALLER_IMAGE
-              value: "{{DYN_PLUGINS_INSTALLER_IMAGE}}"
           volumeMounts:
             - mountPath: /default-config/flavours/intelligent-assistant
               name: flavour-intelligent-assistant-config
