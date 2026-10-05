@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -10,6 +11,7 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -249,4 +251,47 @@ func TestNetworkPolicyWithOverlay(t *testing.T) {
 
 	mo := obj.Object().(*multiobject.MultiObject)
 	assert.Equal(t, 1, len(mo.Items))
+}
+
+func TestOrchestratorNetworkPolicies(t *testing.T) {
+	// bin/ is populated by make test (real default-config + local-test plugin catalog).
+	t.Setenv("LOCALBIN", filepath.Join("..", "..", "bin"))
+
+	bs := api.Backstage{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-orchestrator-np", Namespace: "test-ns"},
+		Spec: api.BackstageSpec{
+			Flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant", Enabled: false},
+				{Name: "orchestrator", Enabled: true},
+			},
+		},
+	}
+	testObj := createBackstageTest(bs).withLocalDb(false)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	require.NoError(t, err)
+
+	backendLabel := utils.BackstageAppLabelValue(bs.Name)
+	var orchCount int
+	for _, item := range model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject).Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[SourceAnnotation] != "flavour-orchestrator" {
+			continue
+		}
+		orchCount++
+		name := np.GetAnnotations()[ConfiguredNameAnnotation]
+		assert.NotEmpty(t, np.Spec.PodSelector.MatchLabels, "%s uses empty podSelector", name)
+
+		switch name {
+		case "allow-backstage-to-sonataflow":
+			from, ok := findPeerLabel(np.Spec.Ingress[0].From)
+			assert.True(t, ok)
+			assert.Equal(t, backendLabel, from)
+		case "allow-backstage-to-sonataflow-egress":
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+		default:
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+		}
+	}
+	assert.Equal(t, 7, orchCount)
 }
