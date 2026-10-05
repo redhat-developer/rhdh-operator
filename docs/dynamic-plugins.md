@@ -189,6 +189,32 @@ By default, the `rhdh` profile [injects](../config/profile/rhdh/patches/deployme
 
 For multiple catalog sources in this mode, use the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. See [Using extra catalog index images](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-extra-catalog-index-images) for details.
 
+### Operator processing Mode (Dev Preview)
+
+When `OPERATOR_DP_PROCESSING=true`, the operator takes over dynamic plugin processing using a dedicated Go-based plugin installer image instead of the default init container.
+
+This feature is currently a **Dev Preview** and is disabled by default. To enable it, set the following environment variables on the operator deployment:
+
+- `OPERATOR_DP_PROCESSING`: set to `"true"`
+- `RELATED_IMAGE_plugin_installer`: set to the plugin installer image (e.g., `quay.io/rhdh-community/rhdh-plugin-installer:latest`)
+
+If using OLM, both can be set via the operator's `Subscription` spec:
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhdh-operator
+spec:
+  # ...
+  config:
+    env:
+      - name: OPERATOR_DP_PROCESSING
+        value: "true"
+      - name: RELATED_IMAGE_plugin_installer
+        value: "quay.io/rhdh-community/rhdh-plugin-installer:latest"
+```
+
 ## Supported Package URL Formats
 
 | Format | Type | Description |
