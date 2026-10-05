@@ -26,8 +26,8 @@ spec:
               value: quay.io/fedora/postgresql-18:latest
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh-community/rhdh:next-2.1
-            - name: DYN_PLUGINS_INSTALLER_IMAGE
-              value: "{{DYN_PLUGINS_INSTALLER_IMAGE}}"
+            - name: RELATED_IMAGE_plugin_installer
+              value: "{{RELATED_IMAGE_plugin_installer}}"
           volumeMounts:
             - mountPath: /default-config/flavours/intelligent-assistant
               name: flavour-intelligent-assistant-config

@@ -9,13 +9,10 @@ PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec 
 PROFILE ?= rhdh
 OLM_VERSION ?= auto
 
-# Enable operator dynamic plugins processing (default: false, dev preview)
-# TODO: re-enable (set to true) once the Operator DP processing feature is GA.
-OPERATOR_DP_PROCESSING ?= false
+# Enable operator dynamic plugins processing (default: true)
+OPERATOR_DP_PROCESSING ?= true
 # Install dynamic plugins image (required when OPERATOR_DP_PROCESSING=true)
-# TODO: rename to RELATED_IMAGE_plugin_installer once the Go-based plugin installer
-# and Operator DP processing feature is GA, so it gets included in spec.relatedImages.
-DYN_PLUGINS_INSTALLER_IMAGE ?= quay.io/rhdh-community/rhdh-plugin-installer:latest
+RELATED_IMAGE_plugin_installer ?= quay.io/rhdh-community/rhdh-plugin-installer:latest
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
@@ -175,12 +172,12 @@ fmt: goimports ## Format the code using goimports
 .PHONY: test
 test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) DYN_PLUGINS_INSTALLER_IMAGE=$(DYN_PLUGINS_INSTALLER_IMAGE) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) DYN_PLUGINS_INSTALLER_IMAGE=$(DYN_PLUGINS_INSTALLER_IMAGE) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
 POLL_PROGRESS_INTERVAL := 600s
@@ -254,7 +251,7 @@ build: manifests generate fmt vet ## Build manager binary.
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
 	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
-	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) DYN_PLUGINS_INSTALLER_IMAGE=$(DYN_PLUGINS_INSTALLER_IMAGE) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
 
 .PHONY: local-dynamic-plugins
 local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-index image for local testing
@@ -283,7 +280,7 @@ image-push: ## Push container image with the manager.
 
 .PHONY: dp-installer-buildx
 dp-installer-buildx: ## Build and push multiplatform plugin installer image
-	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(DYN_PLUGINS_INSTALLER_IMAGE) --label $(LABEL) -f plugin-installer/Dockerfile .
+	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(RELATED_IMAGE_plugin_installer) --label $(LABEL) -f plugin-installer/Dockerfile .
 
 .PHONY: dp-installer-test
 dp-installer-test: ## Run plugin installer tests (unit + integration)
@@ -321,7 +318,7 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	$(KUSTOMIZE) build config/profile/$(PROFILE) > dist/$(PROFILE)/install.yaml
 	@sed $(SED_I) 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' dist/$(PROFILE)/install.yaml
 	@sed $(SED_I) 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' dist/$(PROFILE)/install.yaml
-	@sed $(SED_I) 's|{{DYN_PLUGINS_INSTALLER_IMAGE}}|$(DYN_PLUGINS_INSTALLER_IMAGE)|g' dist/$(PROFILE)/install.yaml
+	@sed $(SED_I) 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' dist/$(PROFILE)/install.yaml
 	@echo "Generated operator installer manifest: dist/$(PROFILE)/install.yaml"
 
 .PHONY: deployment-manifest
@@ -353,7 +350,7 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 	$(KUSTOMIZE) build config/manifests/$(PROFILE) | \
 		sed 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' | \
 		sed 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' | \
-		sed 's|{{DYN_PLUGINS_INSTALLER_IMAGE}}|$(DYN_PLUGINS_INSTALLER_IMAGE)|g' | \
+		sed 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' | \
 		$(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 	@sed $(SED_I) 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
@@ -418,7 +415,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	$(KUSTOMIZE) build config/profile/$(PROFILE) | \
 		sed 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' | \
 		sed 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' | \
-		sed 's|{{DYN_PLUGINS_INSTALLER_IMAGE}}|$(DYN_PLUGINS_INSTALLER_IMAGE)|g' | \
+		sed 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' | \
 		$(KUBECTL) apply -f -
 
 .PHONY: undeploy
