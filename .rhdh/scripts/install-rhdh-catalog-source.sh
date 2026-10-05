@@ -7,7 +7,7 @@
 set -euo pipefail
 
 LOG_LEVEL="${LOG_LEVEL:-info}"
-LOG_FILE=""
+
 
 
 NC='\033[0m'
@@ -34,8 +34,24 @@ function logf() {
   local msg=$3
   local fullMsg="[${prefix}] ${msg}"
 
-  if [[ -n "${LOG_FILE}" ]]; then
-    printf '%s\n' "${fullMsg}" >> "${LOG_FILE}"
+  local msg_rank=2
+  case "${prefix}" in
+    ERROR) msg_rank=0 ;;
+    WARN) msg_rank=1 ;;
+    INFO) msg_rank=2 ;;
+    DEBUG) msg_rank=3 ;;
+  esac
+
+  local current_rank=2
+  case "${LOG_LEVEL}" in
+    error) current_rank=0 ;;
+    warn) current_rank=1 ;;
+    info) current_rank=2 ;;
+    debug) current_rank=3 ;;
+  esac
+
+  if [[ "${msg_rank}" -gt "${current_rank}" ]]; then
+    return 0
   fi
 
   if [[ "$TERM" == *"color"* ]]; then
@@ -54,9 +70,7 @@ function warnf() {
 }
 
 function debugf() {
-  if [[ "${LOG_LEVEL}" == "debug" ]]; then
     logf "DEBUG" "\033[0;90m" "$1"
-  fi
 }
 
 function errorf() {
@@ -87,7 +101,6 @@ Options:
   --install-plan-approval <STRATEGY>  : Specify the install plan strategy for the subscription (default: Automatic)
   --olm-version v0|v1|auto            : Force OLM version for catalog/operator resources (default: auto-detect)
   --log-level error|warn|info|debug   : Log verbosity (default: info)
-  --debug                             : Same as --log-level debug
 
 Examples:
   $0 \\
@@ -168,12 +181,12 @@ function resolve_olm_version() {
   fi
 }
 
-function dump_logs_on_error() {
-  local rc=$?
-  if [[ "${rc}" -ne 0 && -n "${LOG_FILE}" && -f "${LOG_FILE}" ]]; then
-    echo "[ERROR] Command failed (exit ${rc}). Full log:" >&2
-    cat "${LOG_FILE}" >&2 || true
-  fi
+
+
+function cleanup() {
+  rm -fr "${TMPDIR}" || true
+  jobs -p | xargs -r kill 2>/dev/null || true
+  wait 2>/dev/null || true
 }
 
 # On failure, print ClusterCatalog / ClusterExtension status so CI logs show why Serving/Installed never became True.
@@ -810,29 +823,83 @@ for arg in "$@"; do
   esac
 done
 
-args=("$@")
-for ((i=0; i<${#args[@]}; i++)); do
-  case "${args[$i]}" in
-    --debug)
-      LOG_LEVEL="debug"
+# if logged in, this should return something like latest-v4.12-x86_64
+IIB_STREAM="latest"
+TO_INSTALL=""
+
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    '--install-operator')
+      TO_INSTALL="$2"
+      shift 1
       ;;
-    --log-level)
-      if [[ $((i+1)) -ge ${#args[@]} ]]; then
+    '--next'|'--latest')
+      # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
+      IIB_STREAM="${1/--/}"
+      ;;
+    '-v')
+      IIB_STREAM="${2}"
+      OLM_CHANNEL="fast-${2}"
+      shift 1
+      ;;
+    '--catalog-source')
+      UPSTREAM_IIB_OVERRIDE="$2"
+      shift 1
+      ;;
+    '--install-plan-approval')
+      if [[ "$2" != "Manual" && "$2" != "Automatic" ]]; then
+        errorf "Unknown parameter used: $2. Must be Manual or Automatic."
+        usage
+        exit 1
+      fi
+      INSTALL_PLAN_APPROVAL="$2"
+      shift 1
+      ;;
+    '--olm-version')
+      if [[ $# -lt 2 ]]; then
+        errorf "--olm-version requires a value: v0, v1, or auto."
+        usage
+        exit 1
+      fi
+      case "$2" in
+        v0|v1|auto) ;;
+        *)
+          errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
+          usage
+          exit 1
+          ;;
+      esac
+      OLM_VERSION="$2"
+      shift 1
+      ;;
+    '--log-level')
+      if [[ $# -lt 2 ]]; then
         errorf "--log-level requires a value: error, warn, info, or debug."
         usage
         exit 1
       fi
-      LOG_LEVEL="${args[$((i+1))]}"
-      case "${LOG_LEVEL}" in
+      case "$2" in
         error|warn|info|debug) ;;
         *)
-        errorf "Unknown log level: ${LOG_LEVEL}. Must be error, warn, info, or debug."
-        usage
-        exit 1
-        ;;
-    esac
-    ;;
+          errorf "Unknown log level: $2. Must be error, warn, info, or debug."
+          usage
+          exit 1
+          ;;
+      esac
+      LOG_LEVEL="$2"
+      shift 1
+      ;;
+    '-h'|'--help')
+      usage
+      exit 0
+      ;;
+    *)
+      errorf "Unknown parameter is used: $1."
+      usage
+      exit 1
+      ;;
   esac
+  shift 1
 done
 
 # minimum requirements
@@ -846,14 +913,10 @@ if ! command -v skopeo &> /dev/null; then
 fi
 
 TMPDIR=$(mktemp -d)
-LOG_FILE="${TMPDIR}/install.log"
-touch "${LOG_FILE}"
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
-trap dump_logs_on_error ERR
-# shellcheck disable=SC2064
-trap "rm -fr '$TMPDIR' || true; jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null" EXIT
+trap cleanup EXIT
 trap "exit 1" INT TERM
 
 detect_ocp_and_set_env_var
@@ -900,87 +963,7 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   fi
 fi
 
-# if logged in, this should return something like latest-v4.12-x86_64
-IIB_TAG="latest-${OCP_VER}-${OCP_ARCH}"
-TO_INSTALL=""
-
-while [[ "$#" -gt 0 ]]; do
-  case $1 in
-    '--install-operator')
-      TO_INSTALL="$2"
-      shift 1
-      ;;
-    '--next'|'--latest')
-      # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
-      IIB_TAG="${1/--/}-${OCP_VER}-$OCP_ARCH"
-      ;;
-    '-v')
-      IIB_TAG="${2}-${OCP_VER}-$OCP_ARCH"
-      OLM_CHANNEL="fast-${2}"
-      shift 1
-      ;;
-    '--catalog-source')
-      UPSTREAM_IIB_OVERRIDE="$2"
-      shift 1
-      ;;
-    '--install-plan-approval')
-      if [[ "$2" != "Manual" && "$2" != "Automatic" ]]; then
-        errorf "Unknown parameter used: $2. Must be Manual or Automatic."
-        usage
-        exit 1
-      fi
-      INSTALL_PLAN_APPROVAL="$2"
-      shift 1
-      ;;
-    '--olm-version')
-      if [[ $# -lt 2 ]]; then
-        errorf "--olm-version requires a value: v0, v1, or auto."
-        usage
-        exit 1
-      fi
-      case "$2" in
-        v0|v1|auto) ;;
-        *)
-          errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
-          usage
-          exit 1
-          ;;
-      esac
-      OLM_VERSION="$2"
-      shift 1
-      ;;
-    '--debug')
-      LOG_LEVEL="debug"
-      ;;
-    '--log-level')
-      if [[ $# -lt 2 ]]; then
-        errorf "--log-level requires a value: error, warn, info, or debug."
-        usage
-        exit 1
-      fi
-      case "$2" in
-        error|warn|info|debug) ;;
-        *)
-          errorf "Unknown log level: $2. Must be error, warn, info, or debug."
-          usage
-          exit 1
-          ;;
-      esac
-      LOG_LEVEL="$2"
-      shift 1
-      ;;
-    '-h'|'--help')
-      usage
-      exit 0
-      ;;
-    *)
-      errorf "Unknown parameter is used: $1."
-      usage
-      exit 1
-      ;;
-  esac
-  shift 1
-done
+IIB_TAG="${IIB_STREAM}-${OCP_VER}-${OCP_ARCH}"
 
 if [[ $UPSTREAM_IIB_OVERRIDE ]]; then
   UPSTREAM_IIB="$UPSTREAM_IIB_OVERRIDE"
