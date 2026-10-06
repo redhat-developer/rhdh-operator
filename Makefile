@@ -12,7 +12,7 @@ OLM_VERSION ?= auto
 # Enable operator dynamic plugins processing (default: true)
 OPERATOR_DP_PROCESSING ?= true
 # Install dynamic plugins image (required when OPERATOR_DP_PROCESSING=true)
-RELATED_IMAGE_plugin_installer ?= quay.io/rhdh-community/rhdh-plugin-installer:next
+RELATED_IMAGE_plugin_installer ?= quay.io/rhdh-community/rhdh-plugin-installer:latest
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
@@ -22,7 +22,7 @@ PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 # Set a default VERSION if it is not defined
 ifeq ($(origin VERSION), undefined)
-VERSION ?= 2.1.0
+VERSION ?= 2.2.0
 DEFAULT_VERSION := true
 else
 DEFAULT_VERSION := false
@@ -262,6 +262,8 @@ local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-
 # set a longer timeout (or set no label to keep images forever)
 LABEL ?= quay.expires-after=14d
 PLATFORM ?= linux/amd64
+# renovate: datasource=docker depName=quay.io/konflux-ci/hermeto
+HERMETO_IMAGE ?= quay.io/konflux-ci/hermeto:0.62.0
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -272,7 +274,11 @@ image-build: ## Build container image with the manager.
 
 .PHONY: hermetic-build
 hermetic-build: ## Build operator image hermetically using Hermeto (local simulation of Konflux)
-	scripts/local-hermeto-build.sh -d . -i $(IMG)
+	HERMETO_IMAGE="$(HERMETO_IMAGE)" hack/local-hermeto-build.sh -d . -i $(IMG)
+
+.PHONY: dp-installer-hermetic-build
+dp-installer-hermetic-build: ## Build plugin installer image hermetically using Hermeto
+	HERMETO_IMAGE="$(HERMETO_IMAGE)" CONTAINERFILE=plugin-installer/Dockerfile hack/local-hermeto-build.sh -d . -i $(RELATED_IMAGE_plugin_installer)
 
 .PHONY: image-push
 image-push: ## Push container image with the manager.

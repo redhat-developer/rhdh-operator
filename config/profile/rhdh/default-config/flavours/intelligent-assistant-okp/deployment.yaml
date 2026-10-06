@@ -5,11 +5,6 @@ spec:
     spec:
       containers:
         - name: lightspeed-core
-          args:
-            - "--config"
-            - "/app-root/lightspeed-stack-okp.yaml"
-            - "--synthesized-config-output"
-            - "/tmp/.generated/run.yaml"
           {{- if eq .Rhdh.Runtime.Platform "ocp"}}
           env:
             - name: OKP_SERVICE_URL

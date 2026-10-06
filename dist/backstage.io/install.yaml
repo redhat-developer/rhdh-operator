@@ -2289,7 +2289,9 @@ spec:
                       key containing CA certificate
                     properties:
                       key:
-                        description: The key to select.
+                        description: |-
+                          The key to select from the ConfigMap's Data field.
+                          Keys in the BinaryData field are not currently propagated to container env vars.
                         type: string
                       name:
                         default: ""
@@ -3057,7 +3059,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/rhdh-community/operator:2.1.0
+        image: quay.io/rhdh-community/operator:2.2.0
         livenessProbe:
           httpGet:
             path: /healthz
@@ -3095,6 +3097,9 @@ spec:
           name: default-config
         - mountPath: /plugin-deps
           name: plugin-deps
+        - mountPath: /plugins-mirror
+          name: mirror-config
+          readOnly: true
         - mountPath: /tmp
           name: tmp
       securityContext:
@@ -3109,5 +3114,9 @@ spec:
           name: plugin-deps
           optional: true
         name: plugin-deps
+      - configMap:
+          name: plugin-registry-mirror
+          optional: true
+        name: mirror-config
       - emptyDir: {}
         name: tmp

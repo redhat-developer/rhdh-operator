@@ -2289,7 +2289,9 @@ spec:
                       key containing CA certificate
                     properties:
                       key:
-                        description: The key to select.
+                        description: |-
+                          The key to select from the ConfigMap's Data field.
+                          Keys in the BinaryData field are not currently propagated to container env vars.
                         type: string
                       name:
                         default: ""
@@ -3051,7 +3053,7 @@ data:
                 - name: MAX_ENTRY_SIZE
                   value: "40000000"
                 - name: CATALOG_INDEX_IMAGE
-                  value: "quay.io/rhdh/plugin-catalog-index:2.1.0"
+                  value: "quay.io/rhdh/plugin-catalog-index:2.2.0"
                 - name: CATALOG_ENTITIES_EXTRACT_DIR
                   value: '/extensions'
                 - name: INPUT_FILE
@@ -3490,94 +3492,6 @@ data:
     kind: ConfigMap
     apiVersion: v1
     metadata:
-      name: llama-stack-config
-      annotations:
-        rhdh.redhat.com/containers: "lightspeed-core"
-        rhdh.redhat.com/mount-path: "/app-root"
-        rhdh.redhat.com/sub-path: "*"
-    data:
-      config.yaml: |
-        #
-        #
-        # Copyright Red Hat
-        #
-        # Licensed under the Apache License, Version 2.0 (the "License");
-        # you may not use this file except in compliance with the License.
-        # You may obtain a copy of the License at
-        #
-        #     http://www.apache.org/licenses/LICENSE-2.0
-        #
-        # Unless required by applicable law or agreed to in writing, software
-        # distributed under the License is distributed on an "AS IS" BASIS,
-        # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-        # See the License for the specific language governing permissions and
-        # limitations under the License.
-        version: 4
-        distro_name: intelligent-assistant-ogx
-        apis:
-          - responses
-          - inference
-          - tool_runtime
-          - vector_io
-          - files
-          - file_processors
-        container_image:
-        external_providers_dir: '/app-root/providers.d' #built into lcore image
-        providers:
-          responses:
-            - config:
-                persistence:
-                  responses:
-                    table_name: responses
-                    backend: sql_default
-              provider_id: meta-reference
-              provider_type: inline::builtin
-          files:
-            - provider_id: localfs
-              provider_type: inline::localfs
-              config:
-                storage_dir: /tmp/llama-stack-files
-                metadata_store:
-                  table_name: files_metadata
-                  backend: sql_default
-          file_processors:
-            - provider_id: pypdf
-              provider_type: inline::pypdf
-              config:
-                default_chunk_size_tokens: 800
-                default_chunk_overlap_tokens: 400
-        storage:
-          backends:
-            kv_default:
-              type: kv_sqlite
-              db_path: /tmp/kvstore.db
-            sql_default:
-              type: sql_sqlite
-              db_path: /tmp/sql_store.db
-          stores:
-            metadata:
-              namespace: registry
-              backend: kv_default
-            inference:
-              table_name: inference_store
-              backend: sql_default
-              max_write_queue_size: 10000
-              num_writers: 4
-            conversations:
-              table_name: openai_conversations
-              backend: sql_default
-        server:
-          auth:
-          host:
-          port: 8321
-          quota:
-          tls_cafile:
-          tls_certfile:
-          tls_keyfile:
-    ---
-    kind: ConfigMap
-    apiVersion: v1
-    metadata:
       name: lightspeed-stack-config
       annotations:
         rhdh.redhat.com/containers: "lightspeed-core"
@@ -3617,28 +3531,29 @@ data:
                 annotation_prompt_params:
                   enable_annotations: true
                   annotation_instruction_template: >
-                    When appropriate, cite sources at the end of sentences using doc_url and doc_title format. Citing sources is not always required because citations are handled externally. Never include any citation that is in the form '<| file-id |>'.
-
+                    When appropriate, cite sources at the end of sentences using doc_url and doc_title format.
+                    Citing sources is not always required because citations are handled externally.
+                    Never include any citation that is in the form '<| file-id |>'.
         inference:
           providers:
             - type: sentence_transformers
-              # - type: vllm
-              #   id: vllm
-              #   api_key_env: VLLM_API_KEY
-              #   extra:
-              #     base_url: ${env.VLLM_URL:=}
-              #     max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
-              #     network:
-              #       tls:
-              #         verify: ${env.VLLM_TLS_VERIFY:=true}
-              # - type: openai
-              #   id: openai
-              #   api_key_env: OPENAI_API_KEY
-              # - type: vertexai
-              #   id: vertexai
-              #   extra:
-              #     project: ${env.VERTEX_AI_PROJECT:=}
-              #     location: ${env.VERTEX_AI_LOCATION:=global}
+            # - type: vllm
+            #   id: vllm
+            #   api_key_env: VLLM_API_KEY
+            #   extra:
+            #     base_url: ${env.VLLM_URL:=}
+            #     max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
+            #     network:
+            #       tls:
+            #         verify: ${env.VLLM_TLS_VERIFY:=true}
+            # - type: openai
+            #   id: openai
+            #   api_key_env: OPENAI_API_KEY
+            # - type: vertexai
+            #   id: vertexai
+            #   extra:
+            #     project: ${env.VERTEX_AI_PROJECT:=}
+            #     location: ${env.VERTEX_AI_LOCATION:=global}
         vector_store:
           default_provider: notebooks
           providers:
@@ -4007,7 +3922,7 @@ data:
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:0.7.0rc3 # TODO: Update to 0.7.x release tag when available (by FF)
+              image: quay.io/lightspeed-core/lightspeed-stack:0.7.0
               imagePullPolicy: Always
               securityContext:
                 allowPrivilegeEscalation: false
@@ -4035,6 +3950,12 @@ data:
               env:
                 - name: HF_HOME
                   value: /tmp/hf_cache
+                - name: KV_STORE_PATH
+                  value: /tmp/kvstore.db
+                - name: SQL_STORE_PATH
+                  value: /tmp/sql_store.db
+                - name: SQLITE_STORE_DIR
+                  value: /tmp/llama-stack-files
                 - name: OTEL_SDK_DISABLED
                   value: "true"
               volumeMounts:
@@ -4088,8 +4009,6 @@ data:
 
           - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend
             enabled: true
-          - package: oci://ghcr.io/redhat-developer/rhdh-plugin-export-overlays/backstage-plugin-auth-backend-module-guest-provider:next__0.2.20
-            enabled: true
   metadata.yaml: |
     # Intelligent Assistant flavour metadata
     # This flavour is enabled by default and provides Developer Hub Intelligent Assistant functionality
@@ -4111,7 +4030,7 @@ data:
         rhdh.redhat.com/mount-path: "/app-root"
         rhdh.redhat.com/sub-path: "*"
     data:
-      lightspeed-stack-okp.yaml: |
+      lightspeed-stack.yaml: |
         #
         #
         # Copyright Red Hat
@@ -4274,11 +4193,6 @@ data:
         spec:
           containers:
             - name: lightspeed-core
-              args:
-                - "--config"
-                - "/app-root/lightspeed-stack-okp.yaml"
-                - "--synthesized-config-output"
-                - "/tmp/.generated/run.yaml"
               {{- if eq .Rhdh.Runtime.Platform "ocp"}}
               env:
                 - name: OKP_SERVICE_URL
@@ -4916,7 +4830,7 @@ data:
             set -eu
 
             microdnf install -y tar gzip
-            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.38.0/kn-workflow-linux-amd64.tar.gz"
+            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.38.1/kn-workflow-linux-amd64.tar.gz"
             curl -L "$KN_CLI_URL" | tar -xz --no-same-owner && chmod +x kn-workflow-linux-amd64 && mv kn-workflow-linux-amd64 kn-workflow
             ./kn-workflow gen-manifest --namespace ""
     ---
@@ -5189,13 +5103,11 @@ spec:
         - name: OPERATOR_NAME
           value: rhdh-operator
         - name: OPERATOR_DP_PROCESSING
-          value: 'true'
+          value: "false"
         - name: RELATED_IMAGE_postgresql
           value: quay.io/fedora/postgresql-18:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
-        - name: RELATED_IMAGE_plugin_installer
-          value: 'quay.io/rhdh-community/rhdh-plugin-installer:next'
         - name: POD_NAME
           valueFrom:
             fieldRef:
@@ -5204,7 +5116,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/rhdh-community/operator:2.1.0
+        image: quay.io/rhdh-community/operator:2.2.0
         livenessProbe:
           httpGet:
             path: /healthz
@@ -5248,6 +5160,9 @@ spec:
           name: default-config
         - mountPath: /plugin-deps
           name: plugin-deps
+        - mountPath: /plugins-mirror
+          name: mirror-config
+          readOnly: true
         - mountPath: /tmp
           name: tmp
       securityContext:
@@ -5271,6 +5186,10 @@ spec:
           name: rhdh-plugin-deps
           optional: true
         name: plugin-deps
+      - configMap:
+          name: plugin-registry-mirror
+          optional: true
+        name: mirror-config
       - emptyDir: {}
         name: tmp
 ---
@@ -5281,4 +5200,4 @@ metadata:
   namespace: rhdh-operator
 spec:
   source:
-    ref: oci://quay.io/rhdh/plugin-catalog-index:2.1.0
+    ref: oci://quay.io/rhdh/plugin-catalog-index:2.2.0

@@ -772,6 +772,8 @@ Each plugin can be configured with the following fields:
 - `integrity` (optional): Integrity checksum for the plugin package.
 - `includes` (optional, ConfigMap only): Array of local dynamic plugin files to include (e.g., `dynamic-plugins.default.yaml`). Only supported in init container processing mode. Not supported when using operator-processed dynamic plugins (`OPERATOR_DP_PROCESSING=true`).
 
+**Note:** The legacy per-plugin `disabled` key in `dynamic-plugins.yaml` remains supported but is deprecated. Use `enabled` for new or updated entries.
+
 **Configuration Options:**
 
 There are two mutually exclusive ways to configure Dynamic Plugins in the Backstage CR:

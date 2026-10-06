@@ -6,7 +6,7 @@ spec:
       containers:
         # Lightspeed Core Backend
         - name: lightspeed-core
-          image: quay.io/lightspeed-core/lightspeed-stack:0.7.0rc3 # TODO: Update to 0.7.x release tag when available (by FF)
+          image: quay.io/lightspeed-core/lightspeed-stack:0.7.0
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
@@ -34,6 +34,12 @@ spec:
           env:
             - name: HF_HOME
               value: /tmp/hf_cache
+            - name: KV_STORE_PATH
+              value: /tmp/kvstore.db
+            - name: SQL_STORE_PATH
+              value: /tmp/sql_store.db
+            - name: SQLITE_STORE_DIR
+              value: /tmp/llama-stack-files
             - name: OTEL_SDK_DISABLED
               value: "true"
           volumeMounts:

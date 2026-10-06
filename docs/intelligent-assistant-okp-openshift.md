@@ -19,7 +19,7 @@ On OpenShift, enabling the add-on causes the Operator to create the following re
 
 - Add the `okp` dependency to the Intelligent Assistant backend plugin.
 - Create the OKP Deployment, Service, and edge-terminated Route.
-- Select the generated `lightspeed-stack-okp.yaml` LCORE configuration.
+- Replace the generated `lightspeed-stack.yaml` LCORE configuration with the complete OKP-enabled version.
 - Allow HTTP egress from Lightspeed Core to OKP on ports 80 and 8080.
 - Set `OKP_SERVICE_URL` to the Route's HTTP URL.
 
@@ -89,7 +89,7 @@ spec:
                     export SSL_CERT_FILE=/tmp/combined-ca-bundle.crt
                     export REQUESTS_CA_BUNDLE=/tmp/combined-ca-bundle.crt
                     exec /app-root/entrypoint.sh \
-                      --config /app-root/lightspeed-stack-okp.yaml \
+                      --config /app-root/lightspeed-stack.yaml \
                       --synthesized-config-output /tmp/.generated/run.yaml
 ```
 
