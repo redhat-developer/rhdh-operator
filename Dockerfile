@@ -3,7 +3,7 @@
 
 #@follow_tag(registry.redhat.io/rhel10/go-toolset:latest)
 # https://registry.access.redhat.com/ubi10/go-toolset
-FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1791216793@sha256:8106afc02bac6f3d78384a7380460aa51bf0118f8179453609c80ca1858c5454 AS builder
+FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1791362847@sha256:f6b33401d7dc17d32bed91be97ba14c642646031ef2e89630b035a822d1755bf AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # Build as the go-toolset default user (non-root). Hermeto prefetch must chmod the
@@ -35,7 +35,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Install openssl for FIPS support into an isolated rootfs
 #@follow_tag(registry.redhat.io/ubi10/ubi:latest)
 # https://registry.access.redhat.com/ubi10/ubi
-FROM registry.access.redhat.com/ubi10/ubi:10.2-1790841271@sha256:454c3b22fd9dc97859df5a6bce662da1af5e3cf18313ef034190de3759392add AS rpm-builder
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1791321487@sha256:7b345008df0328d31a4325894d3fe79c3d6ffc55c733c9e72c8671771b0639b6 AS rpm-builder
 RUN mkdir -p /mnt/rootfs
 RUN dnf install --installroot /mnt/rootfs \
     openssl \
