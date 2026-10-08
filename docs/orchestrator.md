@@ -139,7 +139,7 @@ The orchestrator plugin instance requires the following dependencies to be insta
 **Note:** If your Orchestrator workflows use an external Kafka broker for CloudEvents, the default NetworkPolicies do not allow Backstage egress to Kafka (typically TCP/9092).
 Create an additive NetworkPolicy in the Backstage CR namespace that allows egress from the Backstage pod (`rhdh.redhat.com/app: backstage-<cr-name>`) to your broker host/port.
 
-**Upgrade note:** This release renames the Orchestrator NetworkPolicies to SonataFlow-scoped names. The operator creates the new policies but does not delete the old ones. On upgrade, delete the previous namespace-wide policies so they do not continue to allow broad access:
+**Upgrade note:** Starting in RHDH 2.1, the Orchestrator NetworkPolicies are renamed to SonataFlow-scoped names. The operator creates the new policies but does not delete the old ones. On upgrade, delete the previous namespace-wide policies so they do not continue to allow broad access:
 
 ```bash
 oc delete networkpolicy \
