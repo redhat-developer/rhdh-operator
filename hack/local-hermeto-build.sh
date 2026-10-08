@@ -21,7 +21,7 @@ set -euo pipefail
 #######################################
 # Constants
 #######################################
-readonly LOCAL_CACHE_BASEDIR='/tmp/hermeto-cache'
+readonly LOCAL_CACHE_BASEDIR="${HOME}/.cache/hermeto"
 
 # Image tag comes from HERMETO_IMAGE in the Makefile (also used by CI).
 HERMETO_IMAGE="${HERMETO_IMAGE:-}"

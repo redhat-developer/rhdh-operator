@@ -290,7 +290,7 @@ dp-installer-buildx: ## Build and push multiplatform plugin installer image
 
 .PHONY: dp-installer-hermetic-build
 dp-installer-hermetic-build: ## Build plugin installer hermetically using Hermeto (local simulation of Konflux)
-	CONTAINERFILE=plugin-installer/Dockerfile scripts/local-hermeto-build.sh -d . -i $(RELATED_IMAGE_plugin_installer)
+	CONTAINERFILE=plugin-installer/Dockerfile hack/local-hermeto-build.sh -d . -i $(RELATED_IMAGE_plugin_installer)
 
 .PHONY: dp-installer-test
 dp-installer-test: ## Run plugin installer tests (unit + integration)

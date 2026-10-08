@@ -22,13 +22,11 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o plugin-fetch ./cmd/plugin-fetch/
 
 # CA certificates stage - install ca-certificates package the Red Hat way
-FROM registry.access.redhat.com/ubi10/ubi:10.2-1791270413@sha256:7841f74fafade0225e92a7312308c73196ae431637c8a9a192a99bc4d4eda1fc AS certs
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/ubi:10.2-1791270413@sha256:7841f74fafade0225e92a7312308c73196ae431637c8a9a192a99bc4d4eda1fc AS certs
 
-RUN mkdir -p /mnt/rootfs
-RUN dnf install --installroot /mnt/rootfs ca-certificates \
-        --releasever 9 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
-    dnf --installroot /mnt/rootfs clean all && \
-    rm -rf /mnt/rootfs/var/cache/* /mnt/rootfs/var/log/* /mnt/rootfs/tmp/*
+RUN dnf install ca-certificates --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
+    dnf clean all && \
+    rm -rf /var/cache/* /var/log/*
 
 # Runtime stage - minimal image
 FROM registry.access.redhat.com/ubi10/ubi-micro:10.2-1787684489@sha256:37fadb004c6bea628fcdd81376c8fb77bd8d9fd432d90503af4d9e76b1ff7191
@@ -36,7 +34,7 @@ FROM registry.access.redhat.com/ubi10/ubi-micro:10.2-1787684489@sha256:37fadb004
 WORKDIR /
 
 # Copy CA certificates from certs stage
-COPY --from=certs /mnt/rootfs/etc/pki /etc/pki
+COPY --from=certs /etc/pki /etc/pki
 
 # Copy binary from builder
 COPY --from=builder /opt/app-root/src/plugin-fetch /usr/local/bin/plugin-fetch
