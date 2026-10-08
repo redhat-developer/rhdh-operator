@@ -139,6 +139,18 @@ The orchestrator plugin instance requires the following dependencies to be insta
 **Note:** If your Orchestrator workflows use an external Kafka broker for CloudEvents, the default NetworkPolicies do not allow Backstage egress to Kafka (typically TCP/9092).
 Create an additive NetworkPolicy in the Backstage CR namespace that allows egress from the Backstage pod (`rhdh.redhat.com/app: backstage-<cr-name>`) to your broker host/port.
 
+**Upgrade note:** This release renames the Orchestrator NetworkPolicies to SonataFlow-scoped names. The operator creates the new policies but does not delete the old ones. On upgrade, delete the previous namespace-wide policies so they do not continue to allow broad access:
+
+```bash
+oc delete networkpolicy \
+  backstage-netpol-<cr-name>-allow-infra-ns-to-workflow-ns \
+  backstage-netpol-<cr-name>-allow-external-communication \
+  backstage-netpol-<cr-name>-allow-intra-network \
+  backstage-netpol-<cr-name>-allow-monitoring-to-sonataflow-and-workflows \
+  backstage-netpol-<cr-name>-allow-all-egress \
+  -n <namespace> --ignore-not-found
+```
+
 The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
 
 **Note:** Upgrading an existing OpenShift Serverless Logic Operator subscription to v1.37 requires deleting the previous logic-operator-rhel8 subscription before installing the new one. That being said, the related SonataflowPlatform operands **should not be deleted**. See [OpenShift Serverless Logic Operator documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.37/html/serverless_logic/getting-started#serverless-logic-upgrading-operator) for more details on the recently released OpenShift Serverless Logic Operator versions and upgrade process.
