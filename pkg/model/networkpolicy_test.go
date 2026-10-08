@@ -12,9 +12,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1 "k8s.io/api/core/v1"
 )
 
 var networkPolicyTestBackstage = api.Backstage{
@@ -297,7 +297,6 @@ func TestOrchestratorNetworkPolicies(t *testing.T) {
 			require.Len(t, np.Spec.Ingress, 1)
 			from := np.Spec.Ingress[0].From
 			require.Len(t, from, 2)
-			
 
 			// From includes SonataFlow-managed pods and the DB-creation job
 			var sawSonataFlow, sawDbJob bool
