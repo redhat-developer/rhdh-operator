@@ -133,7 +133,7 @@ As for RHDH 1.7 the orchestrator plugin packages are located in **npm.registry.r
 
 The orchestrator plugin instance requires the following dependencies to be installed:
 - A SonataflowPlatform custom resource - created in the namespace of the Backstage CR.
-- A set of NetworkPolicies scoped to SonataFlow-managed pods (`app.kubernetes.io/managed-by: sonataflow-operator`) to allow traffic from infra namespaces (Knative Eventing/Serving and OpenShift Serverless Logic), OpenShift Router, monitoring, SonataFlow inter-pod communication, and RHDH backend access to SonataFlow / Data Index on port 80. SonataFlow pods are also granted unrestricted egress.
+- - A set of NetworkPolicies created in the Backstage custom resource's namespace, scoped to SonataFlow-managed pods (`app.kubernetes.io/managed-by: sonataflow-operator`) to allow traffic from infra namespaces (Knative Eventing/Serving and OpenShift Serverless Logic), OpenShift Router, monitoring, SonataFlow inter-pod communication, and RHDH backend access to SonataFlow / Data Index on port 80. SonataFlow pods are also granted unrestricted egress.
 - A PostgreSQL database to store the orchestrator workflows data.
 
 The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
