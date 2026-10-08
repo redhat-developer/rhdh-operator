@@ -136,6 +136,9 @@ The orchestrator plugin instance requires the following dependencies to be insta
 - - A set of NetworkPolicies created in the Backstage custom resource's namespace, scoped to SonataFlow-managed pods (`app.kubernetes.io/managed-by: sonataflow-operator`) to allow traffic from infra namespaces (Knative Eventing/Serving and OpenShift Serverless Logic), OpenShift Router, monitoring, SonataFlow inter-pod communication, and RHDH backend access to SonataFlow / Data Index on port 80. SonataFlow pods are also granted unrestricted egress.
 - A PostgreSQL database to store the orchestrator workflows data.
 
+**Note:** If your Orchestrator workflows use an external Kafka broker for CloudEvents, the default NetworkPolicies do not allow Backstage egress to Kafka (typically TCP/9092).
+Create an additive NetworkPolicy in the Backstage CR namespace that allows egress from the Backstage pod (`rhdh.redhat.com/app: backstage-<cr-name>`) to your broker host/port.
+
 The orchestrator-backend plugin uses the service **sonataflow-platform-data-index-service**, which is created by the SonataFlowPlatform CR. This service is used to communicate with the SonataFlow platform.
 
 **Note:** Upgrading an existing OpenShift Serverless Logic Operator subscription to v1.37 requires deleting the previous logic-operator-rhel8 subscription before installing the new one. That being said, the related SonataflowPlatform operands **should not be deleted**. See [OpenShift Serverless Logic Operator documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_serverless/1.37/html/serverless_logic/getting-started#serverless-logic-upgrading-operator) for more details on the recently released OpenShift Serverless Logic Operator versions and upgrade process.
