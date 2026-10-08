@@ -9,12 +9,12 @@ require (
 	github.com/google/go-containerregistry v0.21.9
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/openshift/api v0.0.0-20261005181437-18d5eb0e5ecb
+	github.com/openshift/api v0.0.0-20261007152721-ef6066a4b80e
 	github.com/openshift/controller-runtime-common v0.0.0-20261005093240-b39eb7218441
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
-	golang.org/x/exp v0.0.0-20261005173118-76772065c9b0
+	golang.org/x/exp v0.0.0-20261007192929-f45ad48fbe92
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.37.1
 	k8s.io/apiextensions-apiserver v0.37.1
