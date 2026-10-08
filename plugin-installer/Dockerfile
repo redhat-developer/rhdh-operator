@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:1.26.7-1791362847@sha256:f6b33401d7dc17d32bed91be97ba14c642646031ef2e89630b035a822d1755bf AS builder
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:1.26.7-1791462472@sha256:7ec4dc8858bd3467b5e13ecccc9f913a0908978e50420958922d4494bf7b65b9 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
