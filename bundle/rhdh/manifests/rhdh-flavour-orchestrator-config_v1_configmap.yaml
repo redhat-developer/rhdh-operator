@@ -23,7 +23,7 @@ data:
     # This flavour is disabled by default due to heavy infrastructure dependencies
     # (requires Tekton, ArgoCD, Serverless Workflow Operator)
     enabledByDefault: false
-  networkpolicy.yaml: |
+  networkpolicy.yaml: |-
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
@@ -158,6 +158,29 @@ data:
                   app.kubernetes.io/managed-by: sonataflow-operator
           ports:
             - port: 80
+              protocol: TCP
+    ---
+    # Allow SonataFlow services and the DB-creation job to reach the local PostgreSQL used by the Orchestrator.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-sonataflow-to-db-ingress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+            - podSelector:
+                matchLabels:
+                  rhdh.redhat.com/app : create-sonataflow-database
+          ports:
+            - port: 5432
               protocol: TCP
 kind: ConfigMap
 metadata:

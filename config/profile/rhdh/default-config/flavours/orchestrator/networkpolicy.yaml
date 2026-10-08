@@ -142,7 +142,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/managed-by: backstage-psql
+      rhdh.redhat.com/app: backstage-psql
   policyTypes:
     - Ingress
   ingress:

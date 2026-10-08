@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var networkPolicyTestBackstage = api.Backstage{
@@ -266,12 +267,13 @@ func TestOrchestratorNetworkPolicies(t *testing.T) {
 			},
 		},
 	}
-	testObj := createBackstageTest(bs).withLocalDb(false)
+	testObj := createBackstageTest(bs).withLocalDb(true)
 
 	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
 	require.NoError(t, err)
 
 	backendLabel := utils.BackstageAppLabelValue(bs.Name)
+	dbLabel := utils.BackstageDbAppLabelValue(bs.Name)
 	var orchCount int
 	for _, item := range model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject).Items {
 		np := item.(*networkingv1.NetworkPolicy)
@@ -289,9 +291,34 @@ func TestOrchestratorNetworkPolicies(t *testing.T) {
 			assert.Equal(t, backendLabel, from)
 		case "allow-backstage-to-sonataflow-egress":
 			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+		case "allow-sonataflow-to-db-ingress":
+			assert.Equal(t, dbLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+
+			require.Len(t, np.Spec.Ingress, 1)
+			from := np.Spec.Ingress[0].From
+			require.Len(t, from, 2)
+			
+
+			// From includes SonataFlow-managed pods and the DB-creation job
+			var sawSonataFlow, sawDbJob bool
+			for _, peer := range from {
+				require.NotNil(t, peer.PodSelector)
+				if peer.PodSelector.MatchLabels["app.kubernetes.io/managed-by"] == "sonataflow-operator" {
+					sawSonataFlow = true
+				}
+				if peer.PodSelector.MatchLabels[BackstageAppLabel] == "create-sonataflow-database" {
+					sawDbJob = true
+				}
+			}
+			assert.True(t, sawSonataFlow, "expected from peer with sonataflow-operator")
+			assert.True(t, sawDbJob, "expected from peer with create-sonataflow-database")
+
+			require.Len(t, np.Spec.Ingress[0].Ports, 1)
+			assert.Equal(t, int32(5432), np.Spec.Ingress[0].Ports[0].Port.IntVal)
+			assert.Equal(t, corev1.ProtocolTCP, *np.Spec.Ingress[0].Ports[0].Protocol)
 		default:
 			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
 		}
 	}
-	assert.Equal(t, 7, orchCount)
+	assert.Equal(t, 8, orchCount)
 }
