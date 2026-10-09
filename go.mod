@@ -2,7 +2,7 @@ module github.com/redhat-developer/rhdh-operator
 
 go 1.26.0
 
-toolchain go1.26.7
+toolchain go1.26.9
 
 require (
 	github.com/cyphar/filepath-securejoin v0.7.0
