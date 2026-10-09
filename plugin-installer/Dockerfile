@@ -24,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w
 # CA certificates stage - install ca-certificates package the Red Hat way
 FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/ubi:10.2-1791375475@sha256:3ef7bffd1dc7e55f8d34d5cc9737d188e3b9613e562942d2955e2fc867dd74d2 AS certs
 
-RUN dnf install ca-certificates --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
+RUN dnf install ca-certificates --releasever 10 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
     dnf clean all && \
     rm -rf /var/cache/* /var/log/*
 
