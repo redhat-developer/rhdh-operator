@@ -288,10 +288,6 @@ image-push: ## Push container image with the manager.
 dp-installer-buildx: ## Build and push multiplatform plugin installer image
 	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(RELATED_IMAGE_plugin_installer) --label $(LABEL) -f plugin-installer/Dockerfile .
 
-.PHONY: dp-installer-hermetic-build
-dp-installer-hermetic-build: ## Build plugin installer hermetically using Hermeto (local simulation of Konflux)
-	CONTAINERFILE=plugin-installer/Dockerfile hack/local-hermeto-build.sh -d . -i $(RELATED_IMAGE_plugin_installer)
-
 .PHONY: dp-installer-test
 dp-installer-test: ## Run plugin installer tests (unit + integration)
 	go test ./pkg/fetcher/... -v
