@@ -13,6 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: tombi-toml/setup-tombi@d8f3250344c4e9107b91c02bc11efcf72baf5793 # v1
+      - uses: tombi-toml/setup-tombi@6b212641348ff5d87e27ea3e63ccb751d880eaf0 # v1
       - name: Validate TOML files
         run: tombi lint
