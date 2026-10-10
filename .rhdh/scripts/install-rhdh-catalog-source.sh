@@ -6,6 +6,10 @@
 
 set -euo pipefail
 
+LOG_LEVEL="${LOG_LEVEL:-info}"
+
+
+
 NC='\033[0m'
 
 IS_OPENSHIFT=""
@@ -30,6 +34,26 @@ function logf() {
   local msg=$3
   local fullMsg="[${prefix}] ${msg}"
 
+  local msg_rank=2
+  case "${prefix}" in
+    ERROR) msg_rank=0 ;;
+    WARN) msg_rank=1 ;;
+    INFO) msg_rank=2 ;;
+    DEBUG) msg_rank=3 ;;
+  esac
+
+  local current_rank=2
+  case "${LOG_LEVEL}" in
+    error) current_rank=0 ;;
+    warn) current_rank=1 ;;
+    info) current_rank=2 ;;
+    debug) current_rank=3 ;;
+  esac
+
+  if [[ "${msg_rank}" -gt "${current_rank}" ]]; then
+    return 0
+  fi
+
   if [[ "$TERM" == *"color"* ]]; then
     echo -e "${color}${fullMsg}${NC}"
   else
@@ -46,7 +70,7 @@ function warnf() {
 }
 
 function debugf() {
-  logf "DEBUG" "\033[0;90m" "$1"
+    logf "DEBUG" "\033[0;90m" "$1"
 }
 
 function errorf() {
@@ -76,6 +100,7 @@ Options:
   --install-operator <NAME>           : Install operator named \$NAME after creating CatalogSource
   --install-plan-approval <STRATEGY>  : Specify the install plan strategy for the subscription (default: Automatic)
   --olm-version v0|v1|auto            : Force OLM version for catalog/operator resources (default: auto-detect)
+  --log-level error|warn|info|debug   : Log verbosity (default: info)
 
 Examples:
   $0 \\
@@ -154,6 +179,14 @@ function resolve_olm_version() {
   if [[ "${RESOLVED_OLM_VERSION}" == "v1" && "${INSTALL_PLAN_APPROVAL}" != "Automatic" ]]; then
     warnf "--install-plan-approval is only relevant with OLM v0 and will be ignored with OLM v1"
   fi
+}
+
+
+
+function cleanup() {
+  rm -fr "${TMPDIR}" || true
+  jobs -p | xargs -r kill 2>/dev/null || true
+  wait 2>/dev/null || true
 }
 
 # On failure, print ClusterCatalog / ClusterExtension status so CI logs show why Serving/Installed never became True.
@@ -781,6 +814,94 @@ if [[ "$#" -lt 1 ]]; then
   exit 0
 fi
 
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+  esac
+done
+
+# if logged in, this should return something like latest-v4.12-x86_64
+IIB_STREAM="latest"
+TO_INSTALL=""
+
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    '--install-operator')
+      TO_INSTALL="$2"
+      shift 1
+      ;;
+    '--next'|'--latest')
+      # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
+      IIB_STREAM="${1/--/}"
+      ;;
+    '-v')
+      IIB_STREAM="${2}"
+      OLM_CHANNEL="fast-${2}"
+      shift 1
+      ;;
+    '--catalog-source')
+      UPSTREAM_IIB_OVERRIDE="$2"
+      shift 1
+      ;;
+    '--install-plan-approval')
+      if [[ "$2" != "Manual" && "$2" != "Automatic" ]]; then
+        errorf "Unknown parameter used: $2. Must be Manual or Automatic."
+        usage
+        exit 1
+      fi
+      INSTALL_PLAN_APPROVAL="$2"
+      shift 1
+      ;;
+    '--olm-version')
+      if [[ $# -lt 2 ]]; then
+        errorf "--olm-version requires a value: v0, v1, or auto."
+        usage
+        exit 1
+      fi
+      case "$2" in
+        v0|v1|auto) ;;
+        *)
+          errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
+          usage
+          exit 1
+          ;;
+      esac
+      OLM_VERSION="$2"
+      shift 1
+      ;;
+    '--log-level')
+      if [[ $# -lt 2 ]]; then
+        errorf "--log-level requires a value: error, warn, info, or debug."
+        usage
+        exit 1
+      fi
+      case "$2" in
+        error|warn|info|debug) ;;
+        *)
+          errorf "Unknown log level: $2. Must be error, warn, info, or debug."
+          usage
+          exit 1
+          ;;
+      esac
+      LOG_LEVEL="$2"
+      shift 1
+      ;;
+    '-h'|'--help')
+      usage
+      exit 0
+      ;;
+    *)
+      errorf "Unknown parameter is used: $1."
+      usage
+      exit 1
+      ;;
+  esac
+  shift 1
+done
+
 # minimum requirements
 if ! command -v jq &> /dev/null; then
   errorf "Please install jq 1.2+ from an RPM or https://pypi.org/project/jq/"
@@ -795,8 +916,7 @@ TMPDIR=$(mktemp -d)
 pushd "${TMPDIR}" > /dev/null
 debugf ">>> WORKING DIR: $TMPDIR <<<"
 
-# shellcheck disable=SC2064
-trap "rm -fr '$TMPDIR' || true; jobs -p | xargs -r kill 2>/dev/null; wait 2>/dev/null" EXIT
+trap cleanup EXIT
 trap "exit 1" INT TERM
 
 detect_ocp_and_set_env_var
@@ -843,67 +963,7 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   fi
 fi
 
-# if logged in, this should return something like latest-v4.12-x86_64
-IIB_TAG="latest-${OCP_VER}-${OCP_ARCH}"
-TO_INSTALL=""
-
-while [[ "$#" -gt 0 ]]; do
-  case $1 in
-    '--install-operator')
-      TO_INSTALL="$2"
-      shift 1
-      ;;
-    '--next'|'--latest')
-      # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
-      IIB_TAG="${1/--/}-${OCP_VER}-$OCP_ARCH"
-      ;;
-    '-v')
-      IIB_TAG="${2}-${OCP_VER}-$OCP_ARCH"
-      OLM_CHANNEL="fast-${2}"
-      shift 1
-      ;;
-    '--catalog-source')
-      UPSTREAM_IIB_OVERRIDE="$2"
-      shift 1
-      ;;
-    '--install-plan-approval')
-      if [[ "$2" != "Manual" && "$2" != "Automatic" ]]; then
-        errorf "Unknown parameter used: $2. Must be Manual or Automatic."
-        usage
-        exit 1
-      fi
-      INSTALL_PLAN_APPROVAL="$2"
-      shift 1
-      ;;
-    '--olm-version')
-      if [[ $# -lt 2 ]]; then
-        errorf "--olm-version requires a value: v0, v1, or auto."
-        usage
-        exit 1
-      fi
-      case "$2" in
-        v0|v1|auto) ;;
-        *)
-          errorf "Unknown OLM version: $2. Must be v0, v1, or auto."
-          usage
-          exit 1
-          ;;
-      esac
-      OLM_VERSION="$2"
-      shift 1
-      ;;
-    '-h'|'--help')
-      usage
-      exit 0
-      ;;
-    *)
-      errorf "Unknown parameter is used: $1."
-      usage
-      exit 1
-      ;;
-  esac
-  shift 1
-done
+IIB_TAG="${IIB_STREAM}-${OCP_VER}-${OCP_ARCH}"
 
 if [[ $UPSTREAM_IIB_OVERRIDE ]]; then
   UPSTREAM_IIB="$UPSTREAM_IIB_OVERRIDE"
