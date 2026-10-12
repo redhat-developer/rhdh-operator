@@ -1,6 +1,19 @@
-# More info: https://docs.docker.com/engine/reference/builder/#dockerignore-file
-# Ignore build and test binaries.
+
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts
 bin/
+dist/
 testbin/
 
 # Hermetic build artifacts

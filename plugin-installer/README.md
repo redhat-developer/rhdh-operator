@@ -20,7 +20,9 @@ The image is based on Red Hat UBI 9 Micro with the `plugin-fetch` binary.
 
 ### Building Images
 
-Build using Make targets:
+#### Standard Multi-platform Build
+
+Build and push multiplatform image using Docker buildx:
 
 ```bash
 # Run tests
@@ -30,8 +32,52 @@ make dp-installer-test
 make dp-installer-buildx
 
 # Or build with custom image name
-make dp-installer-buildx INSTALL_DP_IMAGE=myregistry/my-plugin-installer:v1
+make dp-installer-buildx RELATED_IMAGE_plugin_installer=myregistry/my-plugin-installer:v1
 ```
+
+#### Hermetic Build (Local Konflux Simulation)
+
+Test hermetic builds locally using Hermeto before pushing to Konflux:
+
+```bash
+# Prerequisites (macOS)
+brew install gnu-sed podman
+
+# Add GNU sed to PATH
+export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
+
+# Run hermetic build
+make dp-installer-hermetic-build
+
+# Clean cache if needed
+sudo rm -rf hermeto-cache
+```
+
+**What is a hermetic build?**
+
+A hermetic build is a network-isolated, reproducible build where all dependencies are prefetched before the build starts. This ensures:
+- **Reproducibility**: Same inputs always produce same outputs
+- **Security**: No network access during build prevents supply chain attacks
+- **Compliance**: Meets Red Hat security standards for production releases
+
+The hermetic build process:
+1. Prefetches dependencies (Go modules, RPMs) using Cachi2
+2. Builds container with `--network none` (no internet access)
+3. Uses only prefetched dependencies from local cache
+4. Validates the build works exactly as it will in Konflux
+
+**Relationship to Konflux:**
+
+The `make dp-installer-hermetic-build` target simulates how Konflux builds containers in production. Konflux automatically:
+- Triggers on commits to configured branches
+- Prefetches dependencies hermetically
+- Builds for multiple architectures (amd64, arm64)
+- Generates SBOM (Software Bill of Materials)
+- Runs security scans (Snyk, ClamAV, ACS)
+- Signs images with Sigstore
+- Publishes to `quay.io/rhdh/rhdh-plugin-installer-rhel10`
+
+Testing locally with hermetic builds helps catch issues before they appear in Konflux CI.
 
 ## Usage
 
