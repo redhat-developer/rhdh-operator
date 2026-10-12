@@ -18,7 +18,7 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o plugin-fetch ./cmd/plugin-fetch/
 
 # CA certificates stage - install ca-certificates package the Red Hat way
-FROM registry.access.redhat.com/ubi10/ubi:10.2-1791444044@sha256:27e14f4987d7abe56664d7e1b1dddcd0226d4ca593da5726f0f65697a17d0fee AS certs
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1791784404@sha256:ad0d8e4fcd4c83cf4a2d025de402f010fd068e43f253d0a57b5681d1ad45f044 AS certs
 
 RUN mkdir -p /mnt/rootfs && \
     dnf install --installroot /mnt/rootfs ca-certificates \
