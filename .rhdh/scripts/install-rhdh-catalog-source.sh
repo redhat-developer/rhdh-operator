@@ -11,7 +11,11 @@ NC='\033[0m'
 IS_OPENSHIFT=""
 
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
-OLM_CHANNEL="fast"
+if [[ -n "${CI_X_VERSION:-}" && -n "${CI_Y_VERSION:-}" ]]; then
+  OLM_CHANNEL="fast-${CI_X_VERSION}.${CI_Y_VERSION}"
+else
+  OLM_CHANNEL="${OLM_CHANNEL:-fast}"
+fi
 UPSTREAM_IIB_OVERRIDE=""
 INSTALL_PLAN_APPROVAL="Automatic"
 OLM_VERSION="auto"
@@ -60,7 +64,7 @@ as a catalog source. On OLM v0, a CatalogSource is created in 'openshift-marketp
 a ClusterCatalog is created (cluster-scoped); when --install-operator is also provided, a ClusterExtension, ServiceAccount, and
 ClusterRoleBinding are created in the '${NAMESPACE_SUBSCRIPTION}' namespace. By default, the OLM version is auto-detected based on
 the presence of the ClusterExtension CRD. When installing an operator, the script waits for readiness before exiting successfully.
-The default catalog/resource name is 'operatorName-channelName' (eg., rhdh-fast).
+The default catalog/resource name is 'operatorName-channelName' (eg., rhdh-fast-2.2).
 
 If IIB installation fails, see https://docs.engineering.redhat.com/display/CFC/Test and
 follow steps in section 'Adding Brew Pull Secret'

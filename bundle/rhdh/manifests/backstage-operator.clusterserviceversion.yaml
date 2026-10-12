@@ -62,7 +62,7 @@ metadata:
     operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <2.2.0'
+    skipRange: '>=2.1.0 <2.2.0'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
