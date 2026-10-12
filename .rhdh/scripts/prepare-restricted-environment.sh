@@ -918,8 +918,6 @@ function render_index() {
       "$YQ" 'select(
           (.schema == "olm.package" and .name == "'${prod_operator_package_name}'")
           or
-          (.schema == "olm.channel" and .package == "'${prod_operator_package_name}'" and .name == "fast")
-          or
           '"$chanFilterList"'
           or
           '"$bundleFilterList"'
@@ -1545,7 +1543,6 @@ EOF
     if [[ "${NO_VERSION_FILTER}" != "true" ]]; then
       cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
         channels:
-          - name: fast
 EOF
       for v in "${FILTERED_VERSIONS[@]}"; do
         cat <<EOF >>"${TMPDIR}/imageset-config.yaml"
@@ -1958,6 +1955,15 @@ if [[ -z "${TO_REGISTRY}" ]] && [[ "${OLM_VERSION}" == "auto" ]]; then
   infof "Generating both OLM v0 and v1 manifest templates for export."
 fi
 
+# Compute the OLM channel for generated manifests
+if [[ "${NO_VERSION_FILTER}" != "true" && ${#FILTERED_VERSIONS[@]} -gt 0 && "${FILTERED_VERSIONS[0]}" != "*" ]]; then
+  OLM_CHANNEL_NAME="fast-${FILTERED_VERSIONS[-1]}"
+elif [[ -n "${CI_X_VERSION:-}" && -n "${CI_Y_VERSION:-}" ]]; then
+  OLM_CHANNEL_NAME="fast-${CI_X_VERSION}.${CI_Y_VERSION}"
+else
+  OLM_CHANNEL_NAME="${OLM_CHANNEL_NAME:-fast}"
+fi
+
 if should_generate_v1_manifests; then
   # shellcheck disable=SC2016
   SA_NAME='${SA_NAME}'
@@ -2101,7 +2107,7 @@ spec:
     catalog:
       packageName: rhdh
       channels:
-      - fast
+      - ${OLM_CHANNEL_NAME}
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: ${TARGET_CATALOG}
@@ -2124,7 +2130,7 @@ metadata:
   name: rhdh-operator
   namespace: ${NAMESPACE_OPERATOR}
 spec:
-  channel: fast
+  channel: ${OLM_CHANNEL_NAME}
   installPlanApproval: Automatic
   name: rhdh
   source: ${TARGET_CATALOG}
