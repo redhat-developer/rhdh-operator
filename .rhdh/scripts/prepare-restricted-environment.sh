@@ -1961,8 +1961,8 @@ if [[ "${NO_VERSION_FILTER}" != "true" && ${#FILTERED_VERSIONS[@]} -gt 0 && "${F
 elif [[ -n "${CI_X_VERSION:-}" && -n "${CI_Y_VERSION:-}" ]]; then
   OLM_CHANNEL_NAME="fast-${CI_X_VERSION}.${CI_Y_VERSION}"
 else
-  errorf "Cannot determine OLM channel. Please specify --filter-versions or set CI_X_VERSION and CI_Y_VERSION."
-  exit 1
+  OLM_CHANNEL_NAME=""
+  warnf "OLM channel could not be determined. The catalog's defaultChannel will be used."
 fi
 
 if should_generate_v1_manifests; then
@@ -2106,9 +2106,9 @@ spec:
   source:
     sourceType: Catalog
     catalog:
-      packageName: rhdh
+      packageName: rhdh$(if [[ -n "${OLM_CHANNEL_NAME}" ]]; then echo "
       channels:
-      - ${OLM_CHANNEL_NAME}
+      - ${OLM_CHANNEL_NAME}"; fi)
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: ${TARGET_CATALOG}
@@ -2131,7 +2131,7 @@ metadata:
   name: rhdh-operator
   namespace: ${NAMESPACE_OPERATOR}
 spec:
-  channel: ${OLM_CHANNEL_NAME}
+$(if [[ -n "${OLM_CHANNEL_NAME}" ]]; then echo "  channel: ${OLM_CHANNEL_NAME}"; fi)
   installPlanApproval: Automatic
   name: rhdh
   source: ${TARGET_CATALOG}
