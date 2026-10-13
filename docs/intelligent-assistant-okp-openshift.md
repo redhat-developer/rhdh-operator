@@ -51,7 +51,7 @@ The ConfigMap contains only a public CA certificate. Do not copy the router Secr
 
 ### Verify HTTPS egress
 
-The default RHDH NetworkPolicies allow HTTPS egress from the Backstage pod on TCP port 443. If you replace the default policies, ensure that the replacement permits HTTPS access to the OKP Route.
+The default RHDH NetworkPolicies allow HTTPS egress from the Backstage pod on TCP ports 443 and 6443 (Kubernetes API server). If you replace the default policies, ensure that the replacement permits HTTPS access to the OKP Route.
 
 ### Mount and trust the CA
 
