@@ -1961,7 +1961,8 @@ if [[ "${NO_VERSION_FILTER}" != "true" && ${#FILTERED_VERSIONS[@]} -gt 0 && "${F
 elif [[ -n "${CI_X_VERSION:-}" && -n "${CI_Y_VERSION:-}" ]]; then
   OLM_CHANNEL_NAME="fast-${CI_X_VERSION}.${CI_Y_VERSION}"
 else
-  OLM_CHANNEL_NAME="${OLM_CHANNEL_NAME:-fast}"
+  errorf "Cannot determine OLM channel. Please specify --filter-versions or set CI_X_VERSION and CI_Y_VERSION."
+  exit 1
 fi
 
 if should_generate_v1_manifests; then
