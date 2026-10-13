@@ -80,7 +80,7 @@ spec:
                   number: 8080
 ```
 
-The default RHDH NetworkPolicies already allow HTTPS egress from the Backstage pod on TCP port 443. The OKP add-on additionally allows HTTP egress on ports 80 and 8080. If you replace the default policies, ensure that the replacement permits the port used by `OKP_SERVICE_URL`.
+The default RHDH NetworkPolicies already allow HTTPS egress from the Backstage pod on TCP ports 443 and 6443 (Kubernetes API server). The OKP add-on additionally allows HTTP egress on ports 80 and 8080. If you replace the default policies, ensure that the replacement permits the port used by `OKP_SERVICE_URL`.
 
 ## Configure the public OKP URL
 
