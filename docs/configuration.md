@@ -230,6 +230,7 @@ For example, Backstage CR named **mybackstage** will create K8s Deployment resou
     - DB-scoped policies are filtered out when `spec.database.enableLocalDb` is `false`
     - When local DB is disabled, the `allow-psql-egress` policy allows egress on port 5432 to any destination (for external databases)
     - The `allow-redis-egress` policy allows egress on port 6379 TCP to any destination (Redis is not deployed by the operator; users bring their own)
+    - The `allow-https-egress` policy also allows egress on port 6443 TCP (Kubernetes API server) — needed by plugins that query cluster resources (Tekton, ArgoCD/GitOps, Topology, KServe model catalog, etc.). On some managed platforms (GKE, EKS) the API server listens on port 443 instead.
     - The `allow-metrics-ingress` policy allows ingress on port 9464 from `openshift-monitoring`, `openshift-user-workload-monitoring`, GKE GMP namespaces (`gmp-system`, `gke-gmp-system`), and `monitoring` (kube-prometheus-stack convention)
     - On OpenShift, the `allow-router-ingress` policy's `namespaceSelector` is set to `policy-group.network.openshift.io/ingress: ""`
 

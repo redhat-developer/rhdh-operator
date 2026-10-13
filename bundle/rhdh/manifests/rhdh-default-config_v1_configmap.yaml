@@ -430,6 +430,13 @@ data:
         - ports:
             - port: 443
               protocol: TCP
+            # Kubernetes API server (e.g., OpenShift uses 6443; some managed platforms
+            # use 443 above). Needed by plugins that query cluster resources: Tekton,
+            # ArgoCD/GitOps, Topology, KServe model catalog, and any catalog provider
+            # or frontend plugin that lists or watches Kubernetes objects.
+            # RBAC on the ServiceAccount is the access-control boundary, not NetworkPolicy.
+            - port: 6443
+              protocol: TCP
 
     ---
     # Redis is part of the recommended checklist for production deployments
