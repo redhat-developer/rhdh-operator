@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 func TestResolveInheritReference(t *testing.T) {
@@ -155,7 +157,7 @@ func TestResolveReferences(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := resolveReferences(tt.plugins, basePlugins)
+			result, err := resolveReferences(tt.plugins, basePlugins, false)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -201,6 +203,85 @@ plugins:
 	assert.Contains(t, mergedData, "oci://quay.io/rhdh/plugin-a@sha256:abc123!plugin-a")
 	assert.Contains(t, mergedData, "oci://quay.io/rhdh/plugin-b@sha256:def456!custom-path")
 	assert.NotContains(t, mergedData, "{{inherit}}")
+}
+
+func TestMergePluginsDataWithInlineCatalogReferences(t *testing.T) {
+	const base = `
+plugins:
+  - package: oci://quay.io/rhdh/plugin-a@sha256:abc123
+    enabled: false
+    integrity: sha256-catalog
+    pluginConfig:
+      title: catalog
+`
+	for _, mode := range []string{"false", "true"} {
+		for _, reference := range []string{"ref://plugin-a", "oci://quay.io/rhdh/plugin-a:{{inherit}}"} {
+			t.Run(mode+"/"+reference, func(t *testing.T) {
+				t.Setenv(OperatorDPProcessingEnvVar, mode)
+				overlay := "plugins:\n  - package: " + reference + "\n    enabled: true\n    pluginConfig:\n      title: flavour\n"
+				merged, err := MergePluginsData(base, overlay)
+				require.NoError(t, err)
+
+				var config DynaPluginsConfig
+				require.NoError(t, yaml.Unmarshal([]byte(merged), &config))
+				require.Len(t, config.Plugins, 1, "the flavour must override the catalog entry rather than add an unresolved duplicate")
+				plugin := config.Plugins[0]
+				assert.Equal(t, "oci://quay.io/rhdh/plugin-a@sha256:abc123", plugin.Package)
+				assert.False(t, plugin.IsDisabled())
+				assert.Equal(t, "sha256-catalog", plugin.Integrity)
+				assert.Equal(t, "flavour", plugin.PluginConfig["title"])
+			})
+		}
+	}
+}
+
+func TestMergePluginsDataWithInstallerReferences(t *testing.T) {
+	const base = `
+includes:
+  - dynamic-plugins.default.yaml
+plugins:
+  - package: oci://quay.io/rhdh/plugin-a@sha256:abc123
+    enabled: false
+`
+	const overlay = `
+plugins:
+  - package: ref://plugin-a
+    enabled: true
+  - package: ref://included-plugin
+    enabled: true
+  - package: oci://quay.io/rhdh/another-included-plugin:{{inherit}}
+    enabled: true
+  - package: '@example/npm-plugin'
+    enabled: true
+`
+	t.Run("installer resolves references from includes", func(t *testing.T) {
+		t.Setenv(OperatorDPProcessingEnvVar, "false")
+		merged, err := MergePluginsData(base, overlay)
+		require.NoError(t, err)
+
+		var config DynaPluginsConfig
+		require.NoError(t, yaml.Unmarshal([]byte(merged), &config))
+		assert.Equal(t, []string{"dynamic-plugins.default.yaml"}, config.Includes)
+		require.Len(t, config.Plugins, 4)
+		plugin := findPluginByPackage(config.Plugins, "oci://quay.io/rhdh/plugin-a@sha256:abc123")
+		require.NotNil(t, plugin)
+		assert.False(t, plugin.IsDisabled())
+		assert.NotNil(t, findPluginByPackage(config.Plugins, "ref://included-plugin"))
+		assert.NotNil(t, findPluginByPackage(config.Plugins, "oci://quay.io/rhdh/another-included-plugin:{{inherit}}"))
+		assert.NotNil(t, findPluginByPackage(config.Plugins, "@example/npm-plugin"))
+	})
+	t.Run("operator processing requires references to resolve", func(t *testing.T) {
+		t.Setenv(OperatorDPProcessingEnvVar, "true")
+		_, err := MergePluginsData(base, overlay)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot resolve ref:// reference")
+	})
+	t.Run("installer mode still rejects invalid references", func(t *testing.T) {
+		t.Setenv(OperatorDPProcessingEnvVar, "false")
+		_, err := MergePluginsData(base, "plugins:\n  - package: ref://\n")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "empty plugin name")
+	})
 }
 
 func TestResolveRefReference(t *testing.T) {
