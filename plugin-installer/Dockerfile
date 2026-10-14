@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:1.26.7-1791865085@sha256:dc8fa0b4f60cdb933ffb269ef4ca7212ae4b4ba6f8747b23cf0f48d0458564a5 AS builder
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:1.26.7-1791911662@sha256:4240036fd19bdad5d72ad15062d80b71cac9bc6b7789a45e53d6cc3e43167165 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -22,14 +22,14 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o plugin-fetch ./cmd/plugin-fetch/
 
 # CA certificates stage - install ca-certificates package the Red Hat way
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/ubi:10.2-1791784404@sha256:ad0d8e4fcd4c83cf4a2d025de402f010fd068e43f253d0a57b5681d1ad45f044 AS certs
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/ubi:10.2-1791893534@sha256:a75ad754aa048d808dd3260243452f8c9a665831d0493b4c9d92f0c88fe2f8c3 AS certs
 
 RUN dnf install ca-certificates --releasever 10 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
     dnf clean all && \
     rm -rf /var/cache/* /var/log/*
 
 # Runtime stage - minimal image
-FROM registry.access.redhat.com/ubi10/ubi-micro:10.2-1791441953@sha256:5b13e670e107509be71c066180032017ff5dddff2b6cd60d16311a5cea309953
+FROM registry.access.redhat.com/ubi10/ubi-micro:10.2-1791898871@sha256:09d42b63a4ef2a23543502bd09e892c495a4ca480d481e28f00b3070d62d2d24
 
 WORKDIR /
 
