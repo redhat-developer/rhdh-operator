@@ -387,9 +387,9 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
 	}
 
-	// Resolve references against inline catalog entries before merging, even when
-	// the installation script handles plugin installation. References absent from
-	// the inline catalog are left for the script to resolve from included files.
+	// Resolve references against inline OCI catalog entries before merging, even
+	// when the installation script handles plugin installation. References without
+	// a matching inline OCI package are left for the script to resolve from included files.
 	resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins, !IsOperatorDPProcessing())
 	if err != nil {
 		return "", err

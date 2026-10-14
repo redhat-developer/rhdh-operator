@@ -284,6 +284,38 @@ plugins:
 	})
 }
 
+func TestMergePluginsDataWithNonOCIInlineMatch(t *testing.T) {
+	for _, mode := range []string{"false", "true"} {
+		for _, packageURL := range []string{"https://example.com/plugin-a-1.0.0.tgz", "./dynamic-plugins/plugin-a"} {
+			for _, reference := range []string{"ref://plugin-a", "oci://quay.io/rhdh/plugin-a:{{inherit}}"} {
+				t.Run(mode+"/"+packageURL+"/"+reference, func(t *testing.T) {
+					t.Setenv(OperatorDPProcessingEnvVar, mode)
+					base := "plugins:\n  - package: " + packageURL + "\n    enabled: false\n"
+					overlay := "includes:\n  - included.yaml\nplugins:\n  - package: " + reference + "\n    enabled: true\n"
+					merged, err := MergePluginsData(base, overlay)
+					if mode == "true" {
+						require.Error(t, err, "Operator processing must keep its OCI-only reference restriction")
+						assert.Contains(t, err.Error(), "non-OCI")
+						return
+					}
+					require.NoError(t, err, "a non-OCI inline entry must not prevent the installer from resolving an included OCI plugin")
+
+					var config DynaPluginsConfig
+					require.NoError(t, yaml.Unmarshal([]byte(merged), &config))
+					assert.Equal(t, []string{"included.yaml"}, config.Includes)
+					require.Len(t, config.Plugins, 2)
+					inline := findPluginByPackage(config.Plugins, packageURL)
+					require.NotNil(t, inline)
+					assert.True(t, inline.IsDisabled(), "the non-OCI inline plugin must remain disabled")
+					deferred := findPluginByPackage(config.Plugins, reference)
+					require.NotNil(t, deferred, "preserve the reference unchanged for the installer")
+					assert.False(t, deferred.IsDisabled())
+				})
+			}
+		}
+	}
+}
+
 func TestResolveRefReference(t *testing.T) {
 	basePlugins := []DynaPlugin{
 		{Package: "oci://quay.io/rhdh/backstage-plugin-foo@sha256:abc123"},
