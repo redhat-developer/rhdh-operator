@@ -387,14 +387,14 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
 	}
 
-	// Resolve references ({{inherit}}, ref://, etc.) in secondPluginsConfig using firstPluginsConfig as base
-	if IsOperatorDPProcessing() {
-		resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins)
-		if err != nil {
-			return "", err
-		}
-		secondPluginsConfig.Plugins = resolvedPlugins
+	// Resolve references against inline catalog entries before merging, even when
+	// the installation script handles plugin installation. References absent from
+	// the inline catalog are left for the script to resolve from included files.
+	resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins, !IsOperatorDPProcessing())
+	if err != nil {
+		return "", err
 	}
+	secondPluginsConfig.Plugins = resolvedPlugins
 
 	// Merge Plugins by package field
 	pluginMap := make(map[string]DynaPlugin)
