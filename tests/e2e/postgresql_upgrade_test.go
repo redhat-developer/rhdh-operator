@@ -48,17 +48,51 @@ func postgresqlUpgradeDiagnostics(namespace, crName string) string {
 	return fmt.Sprintf(
 		"=== PostgreSQL upgrade diagnostics ===\n"+
 			"=== Operator and operand logs ===\n%s"+
+			"=== Backstage description ===\n%s"+
+			"=== Backstage init container logs ===\n%s"+
 			"=== PostgreSQL logs ===\n%s"+
 			"=== PostgreSQL description ===\n%s",
 		fetchOperatorAndOperandLogs(managerPodLabel, namespace, crLabel),
+		describePod(namespace, crLabel),
+		postgresqlUpgradeInitContainerLogs(namespace, crLabel),
 		getPodLogs(namespace, "", postgresqlLabel),
 		describePod(namespace, postgresqlLabel),
 	)
 }
 
+func postgresqlUpgradeInitContainerLogs(namespace, label string) string {
+	out, err := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "get", "pods", "-l", label,
+		"-o", `jsonpath={range .items[*]}{.metadata.name}{" "}{range .spec.initContainers[*]}{.name}{" "}{end}{"\n"}{end}`))
+	if err != nil {
+		return fmt.Sprintf("Failed to list Backstage init containers: %v\n%s\n", err, out)
+	}
+
+	var logs strings.Builder
+	for _, line := range helper.GetNonEmptyLines(string(out)) {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		for _, container := range fields[1:] {
+			for _, previous := range []bool{false, true} {
+				fmt.Fprintf(&logs, "=== %s/%s (previous=%t) ===\n", fields[0], container, previous)
+				output, logErr := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "logs", fields[0],
+					"-c", container, "--tail=100", fmt.Sprintf("--previous=%t", previous)))
+				logs.Write(output)
+				if logErr != nil {
+					fmt.Fprintf(&logs, "\nFailed to collect container logs: %v\n", logErr)
+				}
+			}
+		}
+	}
+	return logs.String()
+}
+
 func preparePostgresqlUpgrade(namespace, crName string) *postgresqlUpgradeState {
 	state := &postgresqlUpgradeState{}
 	postgresPod := waitForPostgresql(namespace, crName, postgresqlSourceImage, postgresqlSourceVersion)
+	By("waiting for source Backstage readiness before inspecting application databases")
+	state.backstagePodUID = readyPodUID(namespace, fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName))
 	state.databaseNames = postgresqlDatabaseNames(namespace, postgresPod)
 	Expect(state.databaseNames).To(ContainElement(postgresqlProofDatabase))
 
@@ -72,7 +106,6 @@ INSERT INTO public.rhdh_postgresql_upgrade_test VALUES ('`+postgresqlProofValue+
 	state.postgresPodUID = resourceUID(namespace, "pod", postgresPod)
 	state.pvcUID = resourceUID(namespace, "pvc", postgresqlPVCName(crName))
 	state.secretUID = resourceUID(namespace, "secret", postgresqlSecretName(crName))
-	state.backstagePodUID = readyPodUID(namespace, fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName))
 	logPostgresqlUpgradeCheckpoint("source-ready",
 		fmt.Sprintf("pod=%s", postgresPod),
 		fmt.Sprintf("podUID=%s", state.postgresPodUID),
