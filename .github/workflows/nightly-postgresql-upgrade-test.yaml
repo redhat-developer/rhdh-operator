@@ -41,9 +41,10 @@ jobs:
           FIX_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           CATALOG_FIX_COMMIT: 252af31f004c85d6ce1e0da823d8011b219db0c9
           E2E_FIX_COMMIT: d64c8371a8b3d25942db5f7788c24727bb34c9db
+          COMPATIBILITY_FIX_COMMIT: df467e0083df990b7126ca05aa0d966ec48bb71c
         run: |
-          git fetch --no-tags "https://github.com/$FIX_REPOSITORY.git" "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT"
-          git cherry-pick --no-commit "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT"
+          git fetch --no-tags "https://github.com/$FIX_REPOSITORY.git" "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT" "$COMPATIBILITY_FIX_COMMIT"
+          git cherry-pick --no-commit "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT" "$COMPATIBILITY_FIX_COMMIT"
           git diff --cached --stat
           {
             echo "### PostgreSQL upgrade candidate"
@@ -51,6 +52,7 @@ jobs:
             echo "- Target commit: $(git rev-parse HEAD)"
             echo "- Applied catalog fix: $CATALOG_FIX_COMMIT"
             echo "- Applied E2E fix: $E2E_FIX_COMMIT"
+            echo "- Applied compatibility fix: $COMPATIBILITY_FIX_COMMIT"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Go
