@@ -13,7 +13,10 @@ const httpsPrefix = "https://"
 const httpPrefix = "http://"
 const localPrefix = "./"
 
-var errPluginReferenceNotFound = errors.New("plugin not found in default plugins")
+var (
+	errPluginReferenceNotFound = errors.New("plugin not found in default plugins")
+	errPluginReferenceNonOCI   = errors.New("only OCI references are supported")
+)
 
 // resolveReferences resolves all reference types in plugin package URLs.
 //
@@ -33,8 +36,9 @@ var errPluginReferenceNotFound = errors.New("plugin not found in default plugins
 //   - http://...: HTTP URL to plugin archive
 //   - ./path: Local filesystem path
 //
-// When allowUnresolved is true, missing references and package formats supported
-// only by the installation script are left for the script to resolve.
+// When allowUnresolved is true, references without a matching inline OCI package
+// are left for the script to resolve from included files. Formats supported only
+// by the installation script are also left unchanged.
 func resolveReferences(plugins []DynaPlugin, basePlugins []DynaPlugin, allowUnresolved bool) ([]DynaPlugin, error) {
 	resolved := make([]DynaPlugin, len(plugins))
 	copy(resolved, plugins)
@@ -66,7 +70,7 @@ func resolveReferences(plugins []DynaPlugin, basePlugins []DynaPlugin, allowUnre
 		}
 
 		if err != nil {
-			if allowUnresolved && errors.Is(err, errPluginReferenceNotFound) {
+			if allowUnresolved && (errors.Is(err, errPluginReferenceNotFound) || errors.Is(err, errPluginReferenceNonOCI)) {
 				continue
 			}
 			return nil, err
@@ -117,7 +121,7 @@ func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (strin
 		}
 		if plugin.Name() == pluginName {
 			if !strings.HasPrefix(plugin.Package, ociPrefix) {
-				return "", fmt.Errorf("cannot resolve {{inherit}} reference: plugin %q has non-OCI package URL %q; {{inherit}} only supports OCI references", pluginName, plugin.Package)
+				return "", fmt.Errorf("cannot resolve {{inherit}} reference: plugin %q has non-OCI package URL %q: %w", pluginName, plugin.Package, errPluginReferenceNonOCI)
 			}
 			fullURL := plugin.Package
 
@@ -157,7 +161,7 @@ func resolveRefReference(packageURL string, basePlugins []DynaPlugin) (string, e
 		}
 		if plugin.Name() == refName {
 			if !strings.HasPrefix(plugin.Package, ociPrefix) {
-				return "", fmt.Errorf("cannot resolve ref:// reference: plugin %q has non-OCI package URL %q; ref:// only supports OCI references", refName, plugin.Package)
+				return "", fmt.Errorf("cannot resolve ref:// reference: plugin %q has non-OCI package URL %q: %w", refName, plugin.Package, errPluginReferenceNonOCI)
 			}
 			return plugin.Package, nil
 		}
