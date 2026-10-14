@@ -1,6 +1,7 @@
 name: Nightly PostgreSQL Upgrade Test
 
 on:
+  pull_request:
   workflow_dispatch:
   schedule:
     - cron: "25 0 * * *"
