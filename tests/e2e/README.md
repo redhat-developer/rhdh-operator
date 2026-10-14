@@ -114,7 +114,9 @@ $ make test-e2e BACKSTAGE_OPERATOR_TEST_MODE=olm
 
 The upgrade test can validate the local PostgreSQL major-version migration while upgrading an existing Operator installation. It stops Backstage, creates a logical dump with `pg_dumpall`, deletes the test instance's generated PostgreSQL StatefulSet and PVC, restores the dump into PostgreSQL 18, and verifies that the test data remains available. The generated PostgreSQL Secret is preserved.
 
-The command below uses RHDH 1.10 as the PostgreSQL 15 source and the current working tree's generated manifest as the PostgreSQL 18 target:
+The [Nightly PostgreSQL Upgrade Test](../../.github/workflows/nightly-postgresql-upgrade-test.yaml) runs the `release-1.10` to `release-2.1` path, covering the PostgreSQL 15 to 18 major-version migration.
+
+To reproduce this path locally, run the command below with `release-2.1` checked out, using its built Operator image and generated manifest as the PostgreSQL 18 target. RHDH 1.10 provides the PostgreSQL 15 source:
 
 ```shell
 $ BACKSTAGE_OPERATOR_TESTS_PLATFORM=kind \
