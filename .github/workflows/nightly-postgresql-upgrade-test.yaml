@@ -35,6 +35,24 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Temporarily apply candidate fixes to release-2.1
+        if: github.event_name == 'pull_request'
+        env:
+          FIX_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          CATALOG_FIX_COMMIT: 252af31f004c85d6ce1e0da823d8011b219db0c9
+          E2E_FIX_COMMIT: d64c8371a8b3d25942db5f7788c24727bb34c9db
+        run: |
+          git fetch --no-tags "https://github.com/$FIX_REPOSITORY.git" "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT"
+          git cherry-pick --no-commit "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT"
+          git diff --cached --stat
+          {
+            echo "### PostgreSQL upgrade candidate"
+            echo "- Target branch: ${{ matrix.to_branch }}"
+            echo "- Target commit: $(git rev-parse HEAD)"
+            echo "- Applied catalog fix: $CATALOG_FIX_COMMIT"
+            echo "- Applied E2E fix: $E2E_FIX_COMMIT"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
