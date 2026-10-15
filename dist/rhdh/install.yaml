@@ -3929,7 +3929,7 @@ data:
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:0.7.0
+              image: quay.io/lightspeed-core/lightspeed-stack:0.7.1
               imagePullPolicy: Always
               securityContext:
                 allowPrivilegeEscalation: false
@@ -4200,11 +4200,14 @@ data:
         spec:
           containers:
             - name: lightspeed-core
-              {{- if eq .Rhdh.Runtime.Platform "ocp"}}
               env:
+                # Match the embedding model used by the OKP 1.3 index.
+                - name: SOLR_EMBEDDING_MODEL
+                  value: "ibm-granite/granite-embedding-small-english-r2"
+                {{- if eq .Rhdh.Runtime.Platform "ocp"}}
                 - name: OKP_SERVICE_URL
                   value: "http://ia-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
-              {{- end}}
+                {{- end}}
   dynamic-plugins.yaml: |
     apiVersion: v1
     kind: ConfigMap
@@ -4408,7 +4411,7 @@ data:
           automountServiceAccountToken: false
           containers:
             - name: okp
-              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.12-1788274041
+              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1792010339
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
@@ -4470,7 +4473,7 @@ data:
           automountServiceAccountToken: false
           containers:
             - name: okp
-              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.12-1788274041
+              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1792010339
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
