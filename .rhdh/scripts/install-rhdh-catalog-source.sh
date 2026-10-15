@@ -11,7 +11,11 @@ NC='\033[0m'
 IS_OPENSHIFT=""
 
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
-OLM_CHANNEL="fast"
+if [[ -n "${CI_X_VERSION:-}" && -n "${CI_Y_VERSION:-}" ]]; then
+  OLM_CHANNEL="fast-${CI_X_VERSION}.${CI_Y_VERSION}"
+else
+  OLM_CHANNEL="${OLM_CHANNEL:-}"
+fi
 UPSTREAM_IIB_OVERRIDE=""
 INSTALL_PLAN_APPROVAL="Automatic"
 OLM_VERSION="auto"
@@ -60,7 +64,7 @@ as a catalog source. On OLM v0, a CatalogSource is created in 'openshift-marketp
 a ClusterCatalog is created (cluster-scoped); when --install-operator is also provided, a ClusterExtension, ServiceAccount, and
 ClusterRoleBinding are created in the '${NAMESPACE_SUBSCRIPTION}' namespace. By default, the OLM version is auto-detected based on
 the presence of the ClusterExtension CRD. When installing an operator, the script waits for readiness before exiting successfully.
-The default catalog/resource name is 'operatorName-channelName' (eg., rhdh-fast).
+The default catalog/resource name is 'operatorName-channelName' (eg., rhdh-fast-2.1).
 
 If IIB installation fails, see https://docs.engineering.redhat.com/display/CFC/Test and
 follow steps in section 'Adding Brew Pull Secret'
@@ -933,11 +937,15 @@ if [[ $UPSTREAM_IIB_OVERRIDE == "brew.registry.redhat.io/rh-osbs/iib-pub-pending
   CATALOGSOURCE_NAME="brew-registry-stage"
   DISPLAY_NAME_SUFFIX="brew-registry-stage"
 else
-  CATALOGSOURCE_NAME="${OPERATOR_NAME_TO_INSTALL}-${OLM_CHANNEL}"
+  CATALOGSOURCE_NAME="${OPERATOR_NAME_TO_INSTALL}-${OLM_CHANNEL:-default}"
   DISPLAY_NAME_SUFFIX="${IIB_NAME}"
 fi
 
 OPERATOR_GROUP_NAME="${OPERATOR_NAME_TO_INSTALL}-operator-group"
+
+if [[ -z "${OLM_CHANNEL}" ]]; then
+  warnf "OLM channel could not be determined. The catalog's defaultChannel will be used."
+fi
 
 # Detect leftover resources from a previous run using the other OLM version
 if [[ "${RESOLVED_OLM_VERSION}" == "v1" ]]; then
@@ -1206,9 +1214,9 @@ spec:
   source:
     sourceType: Catalog
     catalog:
-      packageName: ${OPERATOR_NAME_IN_CS}
+      packageName: ${OPERATOR_NAME_IN_CS}$(if [[ -n "${OLM_CHANNEL}" ]]; then echo "
       channels:
-      - ${OLM_CHANNEL}
+      - ${OLM_CHANNEL}"; fi)
       selector:
         matchLabels:
           olm.operatorframework.io/metadata.name: ${CATALOGSOURCE_NAME}
@@ -1294,7 +1302,7 @@ metadata:
   name: ${OPERATOR_NAME_TO_INSTALL}
   namespace: ${NAMESPACE_SUBSCRIPTION}
 spec:
-  channel: $OLM_CHANNEL
+$(if [[ -n "${OLM_CHANNEL}" ]]; then echo "  channel: ${OLM_CHANNEL}"; fi)
   installPlanApproval: ${INSTALL_PLAN_APPROVAL}
   name: ${OPERATOR_NAME_IN_CS}
   source: ${CATALOGSOURCE_NAME}
