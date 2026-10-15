@@ -390,7 +390,17 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 	// Resolve references against inline OCI catalog entries before merging, even
 	// when the installation script handles plugin installation. References without
 	// a matching inline OCI package are left for the script to resolve from included files.
-	resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins, !IsOperatorDPProcessing())
+	var (
+		resolvedPlugins []DynaPlugin
+		err             error
+	)
+	if IsOperatorDPProcessing() {
+		// Operator processing requires all references to resolve here.
+		resolvedPlugins, err = resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins, false)
+	} else {
+		// The init container can resolve references from included files.
+		resolvedPlugins, err = resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins, true)
+	}
 	if err != nil {
 		return "", err
 	}
