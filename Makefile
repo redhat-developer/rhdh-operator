@@ -44,8 +44,8 @@ ifeq ($(PROFILE), rhdh)
 	# TODO: Changed to 'rhdh-community' at least until 'rhdh' does not support arm64
 	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
 	IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
-	DEFAULT_CHANNEL ?= fast
-	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	DEFAULT_CHANNEL ?= fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	CHANNELS ?= fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
 	CATALOG_INDEX_IMAGE ?= quay.io/rhdh/plugin-catalog-index:$(IMAGE_TAG_VERSION)
 else

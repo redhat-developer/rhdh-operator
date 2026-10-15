@@ -15,8 +15,8 @@ env:
   # Update this checksum when OPM_VERSION changes (sha256 of linux-amd64-opm from checksums.txt)
   OPM_SHA256: b81b337baf851698a96b70fc5d419b6f239a8856c4f598df65b225d56c39fff6
   # OLM catalog constants (must match the rhdh profile in the Makefile)
+  # DEFAULT_CHANNEL is computed dynamically from the version in the "Load and validate metadata" step
   BUNDLE_METADATA_PACKAGE_NAME: rhdh
-  DEFAULT_CHANNEL: fast
   PROFILE_SHORT: rhdh
 
 concurrency:
@@ -177,6 +177,7 @@ jobs:
           echo "SAFE_SHORT_SHA=${TRUSTED_SHORT_SHA}" >> "$GITHUB_ENV"
           echo "SAFE_FULL_TAG=${FULL_TAG}" >> "$GITHUB_ENV"
           echo "SAFE_ALIAS_TAG=${ALIAS_TAG}" >> "$GITHUB_ENV"
+          echo "DEFAULT_CHANNEL=fast-$(echo "${BASE_VERSION}" | cut -d. -f1,2)" >> "$GITHUB_ENV"
           echo "EXPIRATION_TIMESTAMP=$(date -u -d '+7 days' +%s)" >> "$GITHUB_ENV"
 
       - name: Load operator image

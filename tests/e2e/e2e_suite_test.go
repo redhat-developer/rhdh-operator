@@ -95,6 +95,10 @@ func installRhdhOperatorAirgapped() (podLabel string) {
 	_, err := helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
+	// Derive the OLM channel from the operator version (e.g., v1.1.0 -> fast-1.1)
+	verParts := strings.SplitN(strings.TrimPrefix(operatorVersion, "v"), ".", 3)
+	olmChannel := fmt.Sprintf("fast-%s.%s", verParts[0], verParts[1])
+
 	// Create a subscription in the rhdh-operator namespace
 	helper.CreateNamespace(_namespace)
 	cmd = exec.Command(helper.GetPlatformTool(), "-n", _namespace, "apply", "-f", "-")
@@ -114,12 +118,12 @@ metadata:
   name: rhdh
   namespace: %s
 spec:
-  channel: fast
+  channel: %s
   installPlanApproval: Automatic
   name: rhdh
   source: rhdh-disconnected-install
   sourceNamespace: openshift-marketplace
-`, _namespace))
+`, _namespace, olmChannel))
 	}()
 	_, err = helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
@@ -351,9 +355,21 @@ func uninstallRhdhOperator(withAirgap bool) {
 	_, err := helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	cs := "rhdh-fast"
+	var cs string
 	if withAirgap {
 		cs = "rhdh-disconnected-install"
+	} else {
+		olmChannel := os.Getenv("OLM_CHANNEL")
+		if olmChannel == "" {
+			xVer := os.Getenv("CI_X_VERSION")
+			yVer := os.Getenv("CI_Y_VERSION")
+			if xVer != "" && yVer != "" {
+				olmChannel = fmt.Sprintf("fast-%s.%s", xVer, yVer)
+			} else {
+				olmChannel = "fast"
+			}
+		}
+		cs = "rhdh-" + olmChannel
 	}
 	cmd = exec.Command(
 		helper.GetPlatformTool(), "delete", "catalogsource", cs,
