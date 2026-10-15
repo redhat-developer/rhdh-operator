@@ -1,7 +1,6 @@
 package model
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -12,11 +11,6 @@ const ociPrefix = "oci://"
 const httpsPrefix = "https://"
 const httpPrefix = "http://"
 const localPrefix = "./"
-
-var (
-	errPluginReferenceNotFound = errors.New("plugin not found in default plugins")
-	errPluginReferenceNonOCI   = errors.New("only OCI references are supported")
-)
 
 // resolveReferences resolves all reference types in plugin package URLs.
 //
@@ -70,7 +64,8 @@ func resolveReferences(plugins []DynaPlugin, basePlugins []DynaPlugin, allowUnre
 		}
 
 		if err != nil {
-			if allowUnresolved && (errors.Is(err, errPluginReferenceNotFound) || errors.Is(err, errPluginReferenceNonOCI)) {
+			if allowUnresolved && (strings.HasSuffix(err.Error(), "plugin not found in default plugins") ||
+				strings.HasSuffix(err.Error(), "only OCI references are supported")) {
 				continue
 			}
 			return nil, err
@@ -121,7 +116,7 @@ func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (strin
 		}
 		if plugin.Name() == pluginName {
 			if !strings.HasPrefix(plugin.Package, ociPrefix) {
-				return "", fmt.Errorf("cannot resolve {{inherit}} reference: plugin %q has non-OCI package URL %q: %w", pluginName, plugin.Package, errPluginReferenceNonOCI)
+				return "", fmt.Errorf("cannot resolve {{inherit}} reference: plugin %q has non-OCI package URL %q: only OCI references are supported", pluginName, plugin.Package)
 			}
 			fullURL := plugin.Package
 
@@ -139,7 +134,7 @@ func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (strin
 		}
 	}
 
-	return "", fmt.Errorf("cannot resolve {{inherit}} reference %q: %w", pluginName, errPluginReferenceNotFound)
+	return "", fmt.Errorf("cannot resolve {{inherit}} reference %q: plugin not found in default plugins", pluginName)
 }
 
 // resolveRefReference resolves a ref:// reference by looking up plugin by name.
@@ -161,13 +156,13 @@ func resolveRefReference(packageURL string, basePlugins []DynaPlugin) (string, e
 		}
 		if plugin.Name() == refName {
 			if !strings.HasPrefix(plugin.Package, ociPrefix) {
-				return "", fmt.Errorf("cannot resolve ref:// reference: plugin %q has non-OCI package URL %q: %w", refName, plugin.Package, errPluginReferenceNonOCI)
+				return "", fmt.Errorf("cannot resolve ref:// reference: plugin %q has non-OCI package URL %q: only OCI references are supported", refName, plugin.Package)
 			}
 			return plugin.Package, nil
 		}
 	}
 
-	return "", fmt.Errorf("cannot resolve ref:// reference %q: %w", refName, errPluginReferenceNotFound)
+	return "", fmt.Errorf("cannot resolve ref:// reference %q: plugin not found in default plugins", refName)
 }
 
 // Name extracts the plugin name from the package URL.
