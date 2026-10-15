@@ -7,13 +7,8 @@
 set -euo pipefail
 
 LOG_LEVEL="${LOG_LEVEL:-info}"
-
-
-
 NC='\033[0m'
-
 IS_OPENSHIFT=""
-
 NAMESPACE_SUBSCRIPTION="rhdh-operator"
 OLM_CHANNEL="fast"
 UPSTREAM_IIB_OVERRIDE=""
@@ -40,6 +35,8 @@ function logf() {
     WARN) msg_rank=1 ;;
     INFO) msg_rank=2 ;;
     DEBUG) msg_rank=3 ;;
+    *)
+      ;;
   esac
 
   local current_rank=2
@@ -48,6 +45,8 @@ function logf() {
     warn) current_rank=1 ;;
     info) current_rank=2 ;;
     debug) current_rank=3 ;;
+    *)
+      ;;
   esac
 
   if [[ "${msg_rank}" -gt "${current_rank}" ]]; then
@@ -70,11 +69,32 @@ function warnf() {
 }
 
 function debugf() {
-    logf "DEBUG" "\033[0;90m" "$1"
+  logf "DEBUG" "\033[0;90m" "$1"
 }
 
 function errorf() {
   logf "ERROR" "\033[0;31m" "$1"
+}
+
+# Run a command. At debug, stream it. Otherwise hide stdout/stderr,
+# and print the captured output only if the command fails.
+function run_cmd() {
+  local out rc
+  if [[ "${LOG_LEVEL}" == "debug" ]]; then
+    "$@"
+    return $?
+  fi
+  out="$(mktemp)"
+  set +e
+  "$@" >"${out}" 2>&1
+  rc=$?
+  set -e
+  if [[ "${rc}" -ne 0 ]]; then
+    errorf "Command failed (${rc}): $*"
+    cat "${out}" >&2
+  fi
+  rm -f "${out}"
+  return "${rc}"
 }
 
 function usage() {
@@ -295,7 +315,11 @@ function render_iib() {
 
   mkdir -p "${TMPDIR}/rhdh/rhdh"
   debugf "Rendering IIB $UPSTREAM_IIB as a local file..."
-  opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
+  if [[ "${LOG_LEVEL}" == "debug" ]]; then
+    opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
+  else
+    opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml" 2>/dev/null
+  fi
   if [ ! -s "${TMPDIR}/rhdh/rhdh/render.yaml" ]; then
     errorf "
 [ERROR] 'opm render $UPSTREAM_IIB' returned an empty output, which likely means that this IIB Image does not contain any operators in it.
@@ -353,7 +377,7 @@ function process_bundle() {
   local pull_attempt
   local pull_ok=false
   for pull_attempt in $(seq 1 "$max_retries"); do
-    if skopeo copy "docker://$bundleImg" "oci:./${bundle_dir}/src:latest" 2>"${bundle_dir}/copy.err"; then
+    if run_cmd skopeo copy "docker://$bundleImg" "oci:./${bundle_dir}/src:latest"; then
       pull_ok=true
       break
     fi
@@ -361,12 +385,12 @@ function process_bundle() {
     sleep "$retry_delay"
   done
   if [[ "$pull_ok" != "true" ]]; then
-    debugf "bundle #${bundle_id}: skopeo copy failed after ${max_retries} attempts, skipping (see ${bundle_dir}/copy.err)" >&2
+    debugf "bundle #${bundle_id}: skopeo copy failed after ${max_retries} attempts, skipping" >&2
     return 0
   fi
   debugf "bundle #${bundle_id}: pulled ${bundleImg}" >&2
 
-  umoci unpack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked" --rootless
+  run_cmd umoci unpack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked" --rootless
 
   for folder in manifests metadata; do
     for file in "./${bundle_dir}/unpacked/rootfs/${folder}"/*; do
@@ -378,13 +402,13 @@ function process_bundle() {
     done
   done
 
-  umoci repack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked"
+  run_cmd umoci repack --image "./${bundle_dir}/src:latest" "./${bundle_dir}/unpacked"
 
   local newBundleImage="${my_registry}/rhdh/rhdh-operator-bundle:${digest}"
   local push_attempt
   local push_ok=false
   for push_attempt in $(seq 1 "$max_retries"); do
-    if skopeo copy --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}" 2>"${bundle_dir}/push.err"; then
+    if run_cmd skopeo copy --dest-tls-verify=false "oci:./${bundle_dir}/src:latest" "docker://${newBundleImage}"; then
       push_ok=true
       break
     fi
@@ -392,7 +416,7 @@ function process_bundle() {
     sleep "$retry_delay"
   done
   if [[ "$push_ok" != "true" ]]; then
-    errorf "bundle #${bundle_id}: push to registry failed after ${max_retries} attempts (see ${bundle_dir}/push.err)" >&2
+    errorf "bundle #${bundle_id}: push to registry failed after ${max_retries} attempts" >&2
     return 1
   fi
   debugf "bundle #${bundle_id}: pushed to ${newBundleImage}" >&2
@@ -471,7 +495,7 @@ function update_refs_in_iib_bundles() {
   fi
 
   debugf "Regenerating IIB Dockerfile with updated refs..." >&2
-  opm generate dockerfile rhdh/rhdh
+  run_cmd opm generate dockerfile rhdh/rhdh
 }
 
 function ocp_install() {
@@ -497,7 +521,7 @@ function ocp_install() {
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"disableRedirect":true}}' --type=merge >&2
   my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
-  skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
+  run_cmd skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry"
   oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh --ignore-not-found >&2
   oc -n openshift-marketplace delete secret internal-reg-ext-auth-for-rhdh --ignore-not-found >&2
   oc -n openshift-marketplace create secret docker-registry internal-reg-ext-auth-for-rhdh \
@@ -530,10 +554,10 @@ function ocp_install() {
 
   debugf "Submitting in-cluster build request for the updated IIB..." >&2
   if ! oc -n rhdh get buildconfig.build.openshift.io/iib >& /dev/null; then
-    oc -n rhdh new-build --strategy docker --binary --name iib >&2
+    run_cmd oc -n rhdh new-build --strategy docker --binary --name iib
   fi
   oc -n rhdh patch buildconfig.build.openshift.io/iib -p '{"spec": {"strategy": {"dockerStrategy": {"dockerfilePath": "rhdh.Dockerfile"}}}}' >&2
-  oc -n rhdh start-build iib --wait --follow --from-dir=rhdh >&2
+  run_cmd oc -n rhdh start-build iib --wait --follow --from-dir=rhdh
   local imageStreamWithTag="rhdh/iib:${IIB_TAG}"
   oc tag rhdh/iib:latest "${imageStreamWithTag}" >&2
 
@@ -693,7 +717,7 @@ EOF
   debugf "Port-forwarding from localhost:${portFwdLocalPort} to the cluster registry..." >&2
   local internal_registry_url
   internal_registry_url="localhost:${registrySvcNodePort}"
-  skopeo login -u "${username}" -p "${password}" --tls-verify=false "localhost:$portFwdLocalPort" >&2
+  run_cmd skopeo login -u "${username}" -p "${password}" --tls-verify=false "localhost:$portFwdLocalPort"
 
   local kaniko_internal_registry_url
   kaniko_internal_registry_url="${registry_name}.${namespace}.svc.cluster.local:5000"
@@ -793,15 +817,20 @@ EOF
     return 1
   fi
   debugf "Waiting for Kaniko pod $kanikoPod to be ready..." >&2
-  invoke_cluster_cli -n "${namespace}" wait --for=condition=Ready "pod/$kanikoPod" --timeout=60s >&2
-  invoke_cluster_cli -n "${namespace}" logs -f "${kanikoPod}" >&2 &
+
+  run_cmd invoke_cluster_cli -n "${namespace}" wait --for=condition=Ready "pod/$kanikoPod" --timeout=60s
+  if [[ "${LOG_LEVEL}" == "debug" ]]; then
+    invoke_cluster_cli -n "${namespace}" logs -f "${kanikoPod}" >&2 &
+  fi
 
   localContext=context.tar.gz
   tar -czf "${localContext}" -C rhdh . >&2
   invoke_cluster_cli -n "${namespace}" cp "${localContext}" "${kanikoPod}:/workspace/${localContext}" >&2
 
-  invoke_cluster_cli -n "${namespace}" wait --for=condition=complete "job/${kanikoJobName}" --timeout=300s >&2
-
+  if ! run_cmd invoke_cluster_cli -n "${namespace}" wait --for=condition=complete "job/${kanikoJobName}" --timeout=300s; then
+    invoke_cluster_cli -n "${namespace}" logs "${kanikoPod}" >&2
+    return 1
+  fi
   debugf "IIB built and pushed to internal cluster registry: $result..." >&2
   printf "%s" "${result}"
 }
@@ -813,15 +842,6 @@ if [[ "$#" -lt 1 ]]; then
   usage
   exit 0
 fi
-
-for arg in "$@"; do
-  case "$arg" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-  esac
-done
 
 # if logged in, this should return something like latest-v4.12-x86_64
 IIB_STREAM="latest"
