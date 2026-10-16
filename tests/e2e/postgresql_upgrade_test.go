@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -31,7 +32,15 @@ type postgresqlUpgradeState struct {
 	pvcUID          string
 	secretUID       string
 	backstagePodUID string
-	databaseNames   []string
+	databases       []postgresqlDatabase
+}
+
+type postgresqlDatabase struct {
+	Name           string `json:"name"`
+	Encoding       string `json:"encoding"`
+	LocaleProvider string `json:"locale_provider"`
+	Collate        string `json:"collate"`
+	Ctype          string `json:"ctype"`
 }
 
 func logPostgresqlUpgradeCheckpoint(name string, fields ...string) {
@@ -93,8 +102,9 @@ func preparePostgresqlUpgrade(namespace, crName string) *postgresqlUpgradeState 
 	postgresPod := waitForPostgresql(namespace, crName, postgresqlSourceImage, postgresqlSourceVersion)
 	By("waiting for source Backstage readiness before inspecting application databases")
 	state.backstagePodUID = readyPodUID(namespace, fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName))
-	state.databaseNames = postgresqlDatabaseNames(namespace, postgresPod)
-	Expect(state.databaseNames).To(ContainElement(postgresqlProofDatabase))
+	state.databases = postgresqlDatabases(namespace, postgresPod)
+	Expect(state.databases).To(ContainElement(HaveField("Name", postgresqlProofDatabase)))
+	logPostgresqlUpgradeCheckpoint("database-locales-recorded", fmt.Sprintf("databases=%+v", state.databases))
 
 	By("seeding data that must survive the PostgreSQL upgrade")
 	_, err := runPostgresqlSQL(namespace, postgresPod, postgresqlProofDatabase, `
@@ -112,7 +122,7 @@ INSERT INTO public.rhdh_postgresql_upgrade_test VALUES ('`+postgresqlProofValue+
 		fmt.Sprintf("pvcUID=%s", state.pvcUID),
 		fmt.Sprintf("secretUID=%s", state.secretUID),
 		fmt.Sprintf("backstagePodUID=%s", state.backstagePodUID),
-		fmt.Sprintf("databases=%d", len(state.databaseNames)),
+		fmt.Sprintf("databases=%d", len(state.databases)),
 		fmt.Sprintf("proofDatabase=%s", postgresqlProofDatabase),
 		fmt.Sprintf("proofValue=%s", postgresqlProofValue),
 	)
@@ -183,12 +193,13 @@ func completePostgresqlUpgrade(namespace, crName string, state *postgresqlUpgrad
 
 	By("restoring the PostgreSQL 15 dump into PostgreSQL 18")
 	restorePostgresql(namespace, postgresPod, state.dumpPath)
-	restoredDatabaseNames := postgresqlDatabaseNames(namespace, postgresPod)
-	Expect(restoredDatabaseNames).To(Equal(state.databaseNames))
+	restoredDatabases := postgresqlDatabases(namespace, postgresPod)
+	Expect(restoredDatabases).To(Equal(state.databases), "restored database names, encodings, and locales must match the source")
+	logPostgresqlUpgradeCheckpoint("database-locales-verified", fmt.Sprintf("databases=%d", len(restoredDatabases)))
 	expectNoPostgresqlCollationMismatches(namespace, postgresPod)
 	Expect(queryPostgresqlUpgradeProof(namespace, postgresPod)).To(Equal(postgresqlProofValue))
 	logPostgresqlUpgradeCheckpoint("restore-verified",
-		fmt.Sprintf("databases=%d", len(restoredDatabaseNames)),
+		fmt.Sprintf("databases=%d", len(restoredDatabases)),
 		fmt.Sprintf("proofDatabase=%s", postgresqlProofDatabase),
 		fmt.Sprintf("proofValue=%s", postgresqlProofValue),
 	)
@@ -318,25 +329,31 @@ func validatePostgresqlRestoreErrors(stderr string) error {
 	return nil
 }
 
-func postgresqlDatabaseNames(namespace, podName string) []string {
+func postgresqlDatabases(namespace, podName string) []postgresqlDatabase {
 	out, err := helper.Run(postgresqlSQLCommand(namespace, podName, "postgres",
-		"-tA", "-v", "ON_ERROR_STOP=1", "-c",
-		"SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;"))
+		"-tA", "-v", "ON_ERROR_STOP=1", "-c", `
+SELECT json_agg(database_metadata ORDER BY name)
+FROM (
+  SELECT datname AS name, pg_encoding_to_char(encoding) AS encoding,
+         datlocprovider AS locale_provider, datcollate AS collate, datctype AS ctype
+  FROM pg_database
+  WHERE NOT datistemplate
+) AS database_metadata;`))
 	Expect(err).NotTo(HaveOccurred())
-	return helper.GetNonEmptyLines(strings.TrimSpace(string(out)))
+	var databases []postgresqlDatabase
+	Expect(json.Unmarshal(out, &databases)).To(Succeed())
+	return databases
 }
 
-// expectNoPostgresqlCollationMismatches verifies that no database records a
-// collation version different from the one provided by the target image.
-// A logical restore into a fresh cluster records the target versions, so a
-// collation refresh is not needed. Refreshing here would hide a regression
-// instead of detecting it.
+// A logical restore rebuilds indexes and records the target collation versions.
+// Refreshing here would hide a mismatch instead of detecting it.
 func expectNoPostgresqlCollationMismatches(namespace, podName string) {
 	out, err := helper.Run(postgresqlSQLCommand(namespace, podName, "postgres",
 		"-tA", "-v", "ON_ERROR_STOP=1", "-c",
 		"SELECT datname FROM pg_database WHERE datallowconn AND datcollversion IS DISTINCT FROM pg_database_collation_actual_version(oid) ORDER BY datname;"))
 	Expect(err).NotTo(HaveOccurred())
-	Expect(helper.GetNonEmptyLines(string(out))).To(BeEmpty(), "databases with a collation version mismatch")
+	Expect(helper.GetNonEmptyLines(string(out))).To(BeEmpty(),
+		"databases with a collation version mismatch; rebuild affected indexes, then run ALTER DATABASE ... REFRESH COLLATION VERSION")
 	logPostgresqlUpgradeCheckpoint("collations-verified")
 }
 
