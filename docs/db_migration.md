@@ -1,135 +1,226 @@
-## Move Backstage databases to external DB server
+# Local database migration
 
-By default, Backstage hosts data for each plugin, so there are usually several databases, depending on the number of plugins, those databases usually prefixed with "backstage_plugin_".
+Backstage stores plugin data in several PostgreSQL databases, usually named `backstage_plugin_<plugin>`. This guide covers upgrading the Operator-managed local database from PostgreSQL 15 to 18, or moving its databases to an external service such as AWS RDS or Azure Database for PostgreSQL.
 
-````
-postgres=> \l
-List of databases
-Name                        |  Owner   | Encoding | Locale Provider |   Collate   |    Ctype    |   
-----------------------------+----------+----------+-----------------+-------------+-------------+
-backstage_plugin_app        | postgres | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 | 
-backstage_plugin_auth       | postgres | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |
-backstage_plugin_catalog    | postgres | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |
-backstage_plugin_permission | postgres | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |
-backstage_plugin_scaffolder | postgres | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |
-backstage_plugin_search     | postgres | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |
-postgres                    | postgres | UTF8     | libc            | en_US.UTF-8 | en_US.UTF-8 |
-````
+The commands assume one Backstage instance with the default database resources and a Backstage Deployment. Multiple instances or other services using the same database require coordinated downtime for all clients.
 
-To move the data from working Backstage instance hosted on a local PostgreSQL server to a production-ready PostgreSQL service (such as AWS RDB or Azure Database), you can use directly PostgreSQL utilities such as [pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html) with [psql](https://www.postgresql.org/docs/current/app-psql.html) or [pgAdmin](https://www.pgadmin.org/) and move the data from each database one-by-one.
-To simplify this process, we have a [**db_copy.sh**](../hack/db_copy.sh) script.
+## Preparation
+
+Use `kubectl` or the equivalent `oc` commands. Set the namespace and Backstage CR name:
+
+```bash
+NAMESPACE=<your-namespace>
+BACKSTAGE_CR=<backstage-cr-name>
+DB_STATEFULSET="backstage-psql-${BACKSTAGE_CR}"
+DB_POD="${DB_STATEFULSET}-0"
+DB_PVC="data-${DB_POD}"
+```
+
+The database credentials are in `backstage-psql-secret-<backstage-cr-name>`. Keep this Secret throughout the upgrade, together with a copy of the Backstage CR and the database backup.
+
+### Stop Backstage
+
+Record the original replica count, then stop Backstage through the CR so reconciliation keeps it stopped while you copy or restore data:
+
+```bash
+BACKSTAGE_REPLICAS=$(kubectl -n "$NAMESPACE" get deployment "backstage-${BACKSTAGE_CR}" -o jsonpath='{.spec.replicas}')
+kubectl -n "$NAMESPACE" get backstage "$BACKSTAGE_CR" -o yaml > backstage-before-migration.yaml
+kubectl -n "$NAMESPACE" patch backstage "$BACKSTAGE_CR" --type merge \
+  -p '{"spec":{"deployment":{"patch":{"spec":{"replicas":0}}}}}'
+kubectl -n "$NAMESPACE" wait --for=delete pod \
+  -l "rhdh.redhat.com/app=backstage-${BACKSTAGE_CR}" --timeout=5m
+```
+
+Keep Backstage and any other database clients stopped until the migration is verified.
+
+## Upgrade PostgreSQL 15 to 18
+
+RHDH 1.10 uses `registry.redhat.io/rhel9/postgresql-15`; RHDH 2.1 uses `registry.redhat.io/rhel10/postgresql-18`. This procedure follows PostgreSQL's [Upgrading Data via pg_dumpall](https://www.postgresql.org/docs/current/upgrading.html#UPGRADING-VIA-PGDUMPALL): dump the old databases, initialize a fresh database cluster, and restore the logical backup.
+
+In disconnected installations, take the backup **before applying the 2.1 `rhdh-idms` ImageDigestMirrorSet**. The generated manifest replaces the 1.10 mirror configuration. Preserve the PostgreSQL 15 source-to-mirror mapping alongside the new PostgreSQL 18 mapping, and keep the mirrored PostgreSQL 15 image until the upgrade is verified.
+
+1. Complete [Preparation](#preparation), including stopping Backstage. Check that the source server reports version `15.x`, and save the database list and locale information for comparison after restore:
+
+   ```bash
+   kubectl -n "$NAMESPACE" exec "$DB_POD" -- \
+     psql -X -U postgres -d postgres -c 'SHOW server_version;' -c '\l'
+   ```
+
+2. Dump all databases and roles to a file on your local machine. Confirm the command succeeds and the file is nonempty before continuing:
+
+   ```bash
+   kubectl -n "$NAMESPACE" exec "$DB_POD" -- \
+     pg_dumpall -U postgres > postgresql-15.sql
+   test -s postgresql-15.sql
+   ```
+
+3. Stop the database:
+
+   ```bash
+   kubectl -n "$NAMESPACE" scale statefulset "$DB_STATEFULSET" --replicas=0
+   kubectl -n "$NAMESPACE" wait --for=delete "pod/$DB_POD" --timeout=5m
+   ```
+
+4. Upgrade the Operator from RHDH 1.10 to 2.1 using your installation's normal upgrade procedure. Wait for the upgraded Operator to become ready and reconcile the database StatefulSet. Verify that the StatefulSet still has zero replicas and now selects the PostgreSQL 18 image:
+
+   ```bash
+   kubectl -n "$NAMESPACE" get statefulset "$DB_STATEFULSET" \
+     -o jsonpath='{.spec.replicas}{" "}{.spec.template.spec.containers[0].image}{"\n"}'
+   ```
+
+   The default database template leaves the replica count under your control during this procedure.
+
+5. Replace the old data volume and start PostgreSQL 18. Deleting this PVC removes the PostgreSQL 15 data; keep the successful dump and the existing credentials Secret:
+
+   ```bash
+   kubectl -n "$NAMESPACE" delete pvc "$DB_PVC" --wait=true
+   kubectl -n "$NAMESPACE" scale statefulset "$DB_STATEFULSET" --replicas=1
+   kubectl -n "$NAMESPACE" rollout status "statefulset/$DB_STATEFULSET" --timeout=10m
+   kubectl -n "$NAMESPACE" exec "$DB_POD" -- \
+     psql -X -U postgres -d postgres -c 'SHOW server_version;'
+   ```
+
+   The server must report version `18.x` before you restore the backup.
+
+6. Restore the dump into the fresh database cluster:
+
+   ```bash
+   kubectl -n "$NAMESPACE" exec -i "$DB_POD" -- \
+     psql -X -U postgres -d postgres < postgresql-15.sql
+   ```
+
+   The only expected error is `ERROR: role "postgres" already exists`, because the new cluster already has this bootstrap role. Review the restore output for any other errors before proceeding; `psql` can finish successfully despite SQL errors.
+
+7. List the restored databases and compare their names, encodings, and locales with the source. Check important application data as well:
+
+   ```bash
+   kubectl -n "$NAMESPACE" exec "$DB_POD" -- \
+     psql -X -U postgres -d postgres -c '\l'
+   ```
+
+   Logical restore rebuilds indexes using the target image's collation libraries and records their current versions, clearing collation-version warnings associated with the old volume. The following check should return no rows; an unconditional collation-version refresh is unnecessary:
+
+   ```bash
+   kubectl -n "$NAMESPACE" exec "$DB_POD" -- psql -X -U postgres -d postgres -c \
+     'SELECT datname FROM pg_database
+      WHERE datallowconn
+        AND datcollversion IS DISTINCT FROM pg_database_collation_actual_version(oid);'
+   ```
+
+8. [Restart Backstage](#restart-backstage). Retain the backup until application verification is complete.
+
+## Move databases to an external server
+
+Complete [Preparation](#preparation), including stopping Backstage. You can copy databases individually with [pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html) and [psql](https://www.postgresql.org/docs/current/app-psql.html), or adapt [db_copy.sh](../hack/db_copy.sh).
 
 ### Prerequisites
 
-- [**pg_dump**](https://www.postgresql.org/docs/current/backup-dump.html) and [**psql**](https://www.postgresql.org/docs/current/app-psql.html) client utilities installed on your local machine.
-- For data export the **PGSQL user** sufficient privileges to make a full dump of source (local) databases 
-- For data import the **PGSQL user** sufficient admin privileges to create (external) databases and populate it with database dumps
- 
+- Install compatible `pg_dump` and `psql` clients locally.
+- The source database user needs privileges to dump all application databases.
+- The destination database user needs privileges to create databases and restore their contents.
+- Configure source authentication, for example with a PostgreSQL password file.
 
-### Make [port forwarding](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/) of the source (local) database pod. 
+### Forward the source database port
 
-````
-kubectl port-forward -n <your-namespace> <pgsql-pod-name> <forward-to-port>:<forward-from-port>
-````
+Run this in a separate terminal, using the same namespace and Pod name as above:
 
-Where:
+```bash
+kubectl -n <your-namespace> port-forward <database-pod-name> 15432:5432
+```
 
-- **pgsql-pod-name**  a name of PostgreSQL pod with format like backstage-psql-<backstage-cr-name>-<_index>
-- **forward-to-port** port of your choice to forward PGSQL to
-- **forward-from-port** PGSQL port, usually 5432
+Keep this terminal running until the copy is complete. The source is then available at `127.0.0.1:15432`.
 
-For example:
+### Configure the copy
 
-````
-kubectl port-forward -n backstage backstage-psql-backstage1-0 15432:5432
-Forwarding from 127.0.0.1:15432 -> 5432
-Forwarding from [::1]:15432 -> 5432
-````
-**NOTE:** it has to be run on a dedicated terminal and interrupted as soon as data copy is completed.
+Copy `db_copy.sh` and set `to_host`, `to_port`, and `to_user` for the destination, and `from_host`, `from_port`, and `from_user` for the forwarded source.
 
-### Configure PGSQL connection
+Replace the script's example `allDB` array with **every application database** in your instance, including custom database names. Discover the databases instead of assuming the six names in the script are complete:
 
-Make a copy of **db_copy.sh** script and modify it according to your configuration:
+```bash
+psql -h 127.0.0.1 -p 15432 -U postgres -d postgres -Atc \
+  "SELECT datname FROM pg_database WHERE NOT datistemplate AND datname <> 'postgres' ORDER BY datname;"
+```
 
-* **to_host**=destination host name (e g #.#.#.rds.amazonaws.com)
-* **to_port**=destination port (usually 5432) 
-* **to_user**=destination server username (e g postgres)
-* **from_host**=usually 127.0.0.1
-* **from_port**=< forward-to-port >
-* **from_user**=source server username (e g postgres)
-* **allDB**=name of databases for import in double quotes separated by spaces, e g  ("backstage_plugin_app" "backstage_plugin_auth" "backstage_plugin_catalog" "backstage_plugin_permission" "backstage_plugin_scaffolder" "backstage_plugin_search")
+Put each returned name in the `allDB` array as a separate quoted entry. The query excludes the maintenance database `postgres`; if you store application data there, copy that data separately with `pg_dump` and `psql`. The script creates its destination databases, so those databases must not already exist.
 
-### Create destination databases and copy data
+### Copy the data
 
-````
-/bin/bash TO_PSW=<destination-db-password> /path/to/db_copy.sh
-````
+```bash
+TO_PSW=<destination-db-password> /bin/bash /path/to/db_copy.sh
+```
 
-It will produce some output about **pg_dump** and **psql** progressing.
-When successfully finished you can stop port forwarding.
+Review the dump and restore output, then compare the source and destination databases and application data. For large databases, consider the [documented compression options](https://www.postgresql.org/docs/current/backup-dump.html#BACKUP-DUMP-LARGE). Stop port forwarding after the copy completes.
 
-**NOTE:** In case if your databases are quite big already, you may consider using compression tools as [documented](https://www.postgresql.org/docs/current/backup-dump.html#BACKUP-DUMP-LARGE)
+### Reconfigure the Backstage CR
 
-### Reconfigure Backstage Custom Resource
+Follow [External DB integration](external-db.md) to create the external connection and certificate Secrets. Add them to the CR while retaining the zero-replica patch:
 
-Reconfigure Backstage according to [External DB configuration](external-db.md) i.e.
-* Create external DB connection Secret
-* Create a Secret with certificate
-* Configure CR disabling local DB and adding those 2 Secrets as extraEnv and extraFile accordingly.
-
-At the end your Backstage.spec CR should contain the following:
-````
+```yaml
 spec:
- database:
-   enableLocalDb: false 
- application:
- ... 
-   extraFiles:
-     secrets:
-       - name: <crt-secret> 
-         key: postgres-crt.pem # key name as in <crt-secret> Secret
-   extraEnvs:
-     secrets:
-        - name: <cred-secret> 
- ...        
-````
-Apply these changes.
+  database:
+    enableLocalDb: false
+  application:
+    extraFiles:
+      secrets:
+        - name: <crt-secret>
+          key: postgres-crt.pem
+    extraEnvs:
+      secrets:
+        - name: <cred-secret>
+```
 
-### Clean local Persistence Volume
+Apply these changes, then [restart Backstage](#restart-backstage) and verify it uses the external database.
 
-When Backstage is reconfigured with **spec.database.enableLocalDb: false** it deletes corresponding StatefulSet and Pod(s) but Persistence Volume Claim and associated Persistence Volume retained.
-You need to clean it manually with
+### Clean up the local database
 
-````
- kubectl -n backstage delete pvc <local-psql-pvc-name>
-````
+Setting `spec.database.enableLocalDb: false` retains the old StatefulSet, Pod, and other local database resources, as described in the [Resource Deletion Policy](admin.md#resource-deletion-policy). After verifying the external database and retaining a backup, remove the unused StatefulSet and PVC manually:
 
-Where **local-psql-pvc-name** has format **data-<psql-pod-name**>  (see above)
+```bash
+kubectl -n "$NAMESPACE" delete statefulset "$DB_STATEFULSET"
+kubectl -n "$NAMESPACE" delete pvc "$DB_PVC"
+```
 
+## Restart Backstage
 
-### Troubleshooting
+Restore the original replica count and wait for the application to become ready:
 
-Backstage container may fail with Crash Loop Backoff error and "Can't take lock to run migrations: Migration table is already locked" log error:
+```bash
+kubectl -n "$NAMESPACE" patch backstage "$BACKSTAGE_CR" --type merge \
+  -p "{\"spec\":{\"deployment\":{\"patch\":{\"spec\":{\"replicas\":${BACKSTAGE_REPLICAS}}}}}}"
+kubectl -n "$NAMESPACE" wait "deployment/backstage-${BACKSTAGE_CR}" \
+  --for="jsonpath={.spec.replicas}=${BACKSTAGE_REPLICAS}" --timeout=5m
+kubectl -n "$NAMESPACE" rollout status "deployment/backstage-${BACKSTAGE_CR}" --timeout=15m
+```
 
-````
-2024-06-02T20:37:44.941Z catalog info Performing database migration                                                                                                                                               │
-Can't take lock to run migrations: Migration table is already locked                                                                                                                                              │
-If you are sure migrations are not running you can release the lock manually by running 'knex migrate:unlock'                                                                                                     │
-/opt/app-root/src/node_modules/@backstage/backend-app-api/dist/index.cjs.js:1793                                                                                                                                  │
-          throw new errors.ForwardedError(                                                                                                                                                                        │
-                ^                                                                                                                                                                                                 │
- MigrationLocked: Plugin 'auth' startup failed; caused by MigrationLocked: Migration table is already locked                                                                                                       │
-````                       
+Verify that Backstage starts successfully and the expected plugin data is available.
 
-A way to make it work without knex utility is to delete the data from the **knex_migrations_lock** table for each problematic Backstage plugin's database (in the example above it is **'auth'** plugin, so corresponding database is **backstage_plugin_auth**):
+## Troubleshooting
 
-````
-psql -h <to_host> -U <to_user> -d <database> -c "delete from knex_migrations_lock;"
-````
+### Collation version mismatch after a PostgreSQL image update
 
-**NOTE:** in some DB the table is called differently like: **backstage_backend_tasks__knex_migrations_lock** in the **backstage_plugin_search** database
+Reusing an existing data directory after an image's operating system or collation libraries change can produce collation-version mismatch warnings. Unlike logical restore into a fresh cluster, updating version metadata alone does not rebuild indexes.
 
+[Stop Backstage](#stop-backstage) and rebuild the indexes:
 
+```bash
+kubectl -n "$NAMESPACE" exec "$DB_POD" -- reindexdb -U postgres --all
+```
 
+Only after reindexing succeeds, refresh the recorded version for each database returned by the mismatch check:
 
- 
+```bash
+kubectl -n "$NAMESPACE" exec "$DB_POD" -- psql -X -U postgres -d postgres -v ON_ERROR_STOP=1 -c \
+  'ALTER DATABASE "<database>" REFRESH COLLATION VERSION;'
+```
+
+Verify the mismatch check above returns no rows, then [restart Backstage](#restart-backstage). For explicitly defined collations and other dependent objects, follow PostgreSQL's [ALTER COLLATION notes](https://www.postgresql.org/docs/current/sql-altercollation.html#SQL-ALTERCOLLATION-NOTES).
+
+### Migration table is already locked
+
+If Backstage fails with `Can't take lock to run migrations: Migration table is already locked`, stop Backstage and confirm no migrations are running before releasing the lock in the affected plugin database:
+
+```bash
+psql -h <to_host> -U <to_user> -d <database> -c 'DELETE FROM knex_migrations_lock;'
+```
+
+For example, the `auth` plugin uses `backstage_plugin_auth`. Some plugins use a different lock table, such as `backstage_backend_tasks__knex_migrations_lock` in `backstage_plugin_search`.
