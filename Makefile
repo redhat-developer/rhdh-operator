@@ -44,8 +44,8 @@ ifeq ($(PROFILE), rhdh)
 	# TODO: Changed to 'rhdh-community' at least until 'rhdh' does not support arm64
 	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
 	IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
-	DEFAULT_CHANNEL ?= fast
-	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	DEFAULT_CHANNEL ?= fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	CHANNELS ?= fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
 	CATALOG_INDEX_IMAGE ?= quay.io/rhdh/plugin-catalog-index:$(IMAGE_TAG_VERSION)
 else
@@ -263,7 +263,7 @@ local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-
 LABEL ?= quay.expires-after=14d
 PLATFORM ?= linux/amd64
 # renovate: datasource=docker depName=quay.io/konflux-ci/hermeto
-HERMETO_IMAGE ?= quay.io/konflux-ci/hermeto:0.62.0
+HERMETO_IMAGE ?= quay.io/konflux-ci/hermeto:0.63.0
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.

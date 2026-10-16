@@ -173,11 +173,14 @@ data:
         spec:
           containers:
             - name: lightspeed-core
-              {{- if eq .Rhdh.Runtime.Platform "ocp"}}
               env:
+                # Match the embedding model used by the OKP 1.3 index.
+                - name: SOLR_EMBEDDING_MODEL
+                  value: "ibm-granite/granite-embedding-small-english-r2"
+                {{- if eq .Rhdh.Runtime.Platform "ocp"}}
                 - name: OKP_SERVICE_URL
                   value: "http://ia-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
-              {{- end}}
+                {{- end}}
   dynamic-plugins.yaml: |
     apiVersion: v1
     kind: ConfigMap

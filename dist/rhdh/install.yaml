@@ -3255,6 +3255,13 @@ data:
         - ports:
             - port: 443
               protocol: TCP
+            # Kubernetes API server (e.g., OpenShift uses 6443; some managed platforms
+            # use 443 above). Needed by plugins that query cluster resources: Tekton,
+            # ArgoCD/GitOps, Topology, KServe model catalog, and any catalog provider
+            # or frontend plugin that lists or watches Kubernetes objects.
+            # RBAC on the ServiceAccount is the access-control boundary, not NetworkPolicy.
+            - port: 6443
+              protocol: TCP
 
     ---
     # Redis is part of the recommended checklist for production deployments
@@ -3922,7 +3929,7 @@ data:
           containers:
             # Lightspeed Core Backend
             - name: lightspeed-core
-              image: quay.io/lightspeed-core/lightspeed-stack:0.7.0
+              image: quay.io/lightspeed-core/lightspeed-stack:0.7.1
               imagePullPolicy: Always
               securityContext:
                 allowPrivilegeEscalation: false
@@ -4193,11 +4200,14 @@ data:
         spec:
           containers:
             - name: lightspeed-core
-              {{- if eq .Rhdh.Runtime.Platform "ocp"}}
               env:
+                # Match the embedding model used by the OKP 1.3 index.
+                - name: SOLR_EMBEDDING_MODEL
+                  value: "ibm-granite/granite-embedding-small-english-r2"
+                {{- if eq .Rhdh.Runtime.Platform "ocp"}}
                 - name: OKP_SERVICE_URL
                   value: "http://ia-okp-{{.Rhdh.Name}}-{{.Rhdh.Namespace}}.{{.Rhdh.Runtime.IngressDomain}}"
-              {{- end}}
+                {{- end}}
   dynamic-plugins.yaml: |
     apiVersion: v1
     kind: ConfigMap
@@ -4471,7 +4481,7 @@ data:
           automountServiceAccountToken: false
           containers:
             - name: okp
-              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.12-1788274041
+              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1792010339
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
@@ -4533,7 +4543,7 @@ data:
           automountServiceAccountToken: false
           containers:
             - name: okp
-              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.2.12-1788274041
+              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1792010339
               imagePullPolicy: IfNotPresent
               securityContext:
                 allowPrivilegeEscalation: false
@@ -4903,7 +4913,7 @@ data:
             set -eu
 
             microdnf install -y tar gzip
-            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.38.1/kn-workflow-linux-amd64.tar.gz"
+            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.39.0/kn-workflow-linux-amd64.tar.gz"
             curl -L "$KN_CLI_URL" | tar -xz --no-same-owner && chmod +x kn-workflow-linux-amd64 && mv kn-workflow-linux-amd64 kn-workflow
             ./kn-workflow gen-manifest --namespace ""
     ---
