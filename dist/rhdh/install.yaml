@@ -4278,19 +4278,44 @@ data:
     # (requires Tekton, ArgoCD, Serverless Workflow Operator)
     enabledByDefault: false
   networkpolicy.yaml: |
-    # TODO(asoro): these Orchestrator policies use podSelector: {} (namespace-wide) and conflict with
-    # the ADR's "default deny with selective allow" and "label-scoped policies" principles.
-    # They weaken per-component ingress isolation for RHDH backend and DB pods in the same namespace.
-    # Even though only one Orchestrator-flavoured RHDH instance is supported per namespace (the
-    # SonataFlow Operator enforces one SonataFlowPlatform per namespace), a non-Orchestrator RHDH
-    # instance could coexist in the same namespace; these namespace-wide policies would affect it too.
-    # Review and make stricter by scoping to SonataFlow-specific labels where possible.
+    # Default-deny for SonataFlow Data Index pods created by the operator.
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-infra-ns-to-workflow-ns
+      name: sonataflow-data-index-default-deny
     spec:
-      podSelector: {}
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: data-index-service
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Ingress
+        - Egress
+    ---
+    # Default-deny for SonataFlow Jobs Service pods created by the operator.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: sonataflow-jobs-service-default-deny
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: jobs-service
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Ingress
+        - Egress
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-infra-ns-to-sonataflow
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Ingress
       ingress:
         - from:
             - namespaceSelector:
@@ -4303,69 +4328,253 @@ data:
                   kubernetes.io/metadata.name: knative-serving
             - namespaceSelector:
                 matchLabels:
-                  # Allow openshift serverless logic operator controller pod to access all pods in sonataflow
+                  # Allow openshift serverless logic operator controller pod to access SonataFlow pods
                   kubernetes.io/metadata.name: openshift-serverless-logic
     ---
-    # NetworkPolicy to unblock incoming traffic to the namespace
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-external-communication
+      name: allow-router-ingress-to-sonataflow
     spec:
-      podSelector: {}
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Ingress
       ingress:
         - from:
             - namespaceSelector:
                 matchLabels:
-                  # Allow knative events to be delivered to workflows.
+                  # Allow OpenShift Router / ingress controller to reach SonataFlow pods.
                   policy-group.network.openshift.io/ingress: ""
     ---
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-intra-network
+      name: allow-backstage-to-sonataflow
     spec:
-      # Apply this policy to all pods in the namespace
-      podSelector: {}
-      # Specify policy type as 'Ingress' to control incoming traffic rules
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: sonataflow-operator
       policyTypes:
         - Ingress
       ingress:
         - from:
-            # Allow ingress from any pod within the same namespace
-            - podSelector: {}
+            - podSelector:
+                matchLabels:
+                  # Placeholder that will be replaced with the actual label used by the backstage pod
+                  rhdh.redhat.com/app: backstage
     ---
-    # NetworkPolicy to allow openshift-user-workload-monitoring pods to access all pods within the workflow's namespace
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-monitoring-to-sonataflow-and-workflows
+      name: allow-sonataflow-intra
     spec:
-      # Apply this policy to all pods in the namespace
-      podSelector: {}
-      # Specify policy type as 'Ingress' to control incoming traffic rules
+      podSelector:
+        matchLabels:
+          # Allow SonataFlow pods to communicate with each other
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Ingress
+        - Egress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+            - namespaceSelector: {}
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+            - namespaceSelector: {}
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+    ---
+    # Allow DNS egress from SonataFlow-managed pods.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-sonataflow-dns-egress
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - port: 53
+              protocol: UDP
+            - port: 53
+              protocol: TCP
+            # mDNS; used by some CNI plugins and node-local DNS caches (e.g. on OpenShift)
+            - port: 5353
+              protocol: UDP
+            - port: 5353
+              protocol: TCP
+    ---
+    # Allow HTTPS and Kubernetes API egress from SonataFlow-managed pods.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-sonataflow-https-egress
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Egress
+      egress:
+        - ports:
+            - port: 443
+              protocol: TCP
+            # Kubernetes API server (e.g., OpenShift uses 6443; some managed platforms use 443 above).
+            - port: 6443
+              protocol: TCP
+    ---
+    # Allow SonataFlow-managed pods to reach PostgreSQL.
+    # When local DB is disabled, the 'to' selector is removed at runtime (same as allow-psql-egress), allowing egress on port 5432 to any destination.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-sonataflow-postgresql-egress
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Egress
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+          ports:
+            - port: 5432
+              protocol: TCP
+    ---
+    # Allow SonataFlow-managed pods to call RHDH APIs on port 7007.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-sonataflow-to-backstage-egress
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: sonataflow-operator
+      policyTypes:
+        - Egress
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+          ports:
+            - port: 7007
+              protocol: TCP
+    ---
+    # Allow SonataFlow-managed pods to reach the RHDH backend on port 7007 (matching egress).
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-sonataflow-to-backstage-ingress
+    spec:
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+          ports:
+            - port: 7007
+              protocol: TCP
+    ---
+    # Allow the Orchestrator backend plugin to reach SonataFlow / Data Index services.
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-backstage-to-sonataflow-egress
+    spec:
+      podSelector:
+        matchLabels:
+          # Placeholder that will be replaced with the actual label used by the backstage pod
+          rhdh.redhat.com/app: backstage
+      policyTypes:
+        - Egress
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+    ---
+    apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-monitoring-to-sonataflow
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: sonataflow-operator
       policyTypes:
         - Ingress
       ingress:
         - from:
             - namespaceSelector:
                 matchLabels:
-                  # Allow openshift-user-workload-monitoring pods to access the workflow.
+                  kubernetes.io/metadata.name: openshift-monitoring
+            - namespaceSelector:
+                matchLabels:
                   kubernetes.io/metadata.name: openshift-user-workload-monitoring
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: gmp-system
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: gke-gmp-system
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: monitoring
+          ports:
+            - port: 8080
+              protocol: TCP
     ---
-    # Allow all egress from all pods in the namespace.
-    # The Orchestrator backend plugin needs HTTP egress to reach SonataFlow and Data Index services;
-    # SonataFlow workflows may also need arbitrary outbound access.
+    # Allow SonataFlow services and the DB-creation job to reach the local PostgreSQL used by the Orchestrator.
+    # Filtered out at runtime when local DB is disabled (DB-scoped podSelector).
     apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: allow-all-egress
+      name: allow-sonataflow-to-db-ingress
     spec:
-      podSelector: {}
+      podSelector:
+        matchLabels:
+          rhdh.redhat.com/app: backstage-psql
       policyTypes:
-        - Egress
-      egress:
-        - {}
+        - Ingress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+            - namespaceSelector: {}
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/managed-by: sonataflow-operator
+            - podSelector:
+                matchLabels:
+                  rhdh.redhat.com/app: create-sonataflow-database
+          ports:
+            - port: 5432
+              protocol: TCP
 kind: ConfigMap
 metadata:
   name: rhdh-flavour-orchestrator-config
@@ -4557,6 +4766,9 @@ data:
       ttlSecondsAfterFinished: 30
       activeDeadlineSeconds: 120
       template:
+        metadata:
+          labels:
+            rhdh.redhat.com/app: create-sonataflow-database
         spec:
           containers:
             - name: psql
