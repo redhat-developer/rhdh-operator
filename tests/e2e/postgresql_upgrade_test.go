@@ -185,7 +185,7 @@ func completePostgresqlUpgrade(namespace, crName string, state *postgresqlUpgrad
 	restorePostgresql(namespace, postgresPod, state.dumpPath)
 	restoredDatabaseNames := postgresqlDatabaseNames(namespace, postgresPod)
 	Expect(restoredDatabaseNames).To(Equal(state.databaseNames))
-	refreshPostgresqlCollations(namespace, postgresPod)
+	expectNoPostgresqlCollationMismatches(namespace, postgresPod)
 	Expect(queryPostgresqlUpgradeProof(namespace, postgresPod)).To(Equal(postgresqlProofValue))
 	logPostgresqlUpgradeCheckpoint("restore-verified",
 		fmt.Sprintf("databases=%d", len(restoredDatabaseNames)),
@@ -326,18 +326,18 @@ func postgresqlDatabaseNames(namespace, podName string) []string {
 	return helper.GetNonEmptyLines(strings.TrimSpace(string(out)))
 }
 
-func refreshPostgresqlCollations(namespace, podName string) {
+// expectNoPostgresqlCollationMismatches verifies that no database records a
+// collation version different from the one provided by the target image.
+// A logical restore into a fresh cluster records the target versions, so a
+// collation refresh is not needed. Refreshing here would hide a regression
+// instead of detecting it.
+func expectNoPostgresqlCollationMismatches(namespace, podName string) {
 	out, err := helper.Run(postgresqlSQLCommand(namespace, podName, "postgres",
 		"-tA", "-v", "ON_ERROR_STOP=1", "-c",
-		"SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION;', datname) FROM pg_database WHERE datallowconn AND datname <> 'template0' ORDER BY datname;"))
+		"SELECT datname FROM pg_database WHERE datallowconn AND datcollversion IS DISTINCT FROM pg_database_collation_actual_version(oid) ORDER BY datname;"))
 	Expect(err).NotTo(HaveOccurred())
-
-	statements := helper.GetNonEmptyLines(string(out))
-	for _, statement := range statements {
-		_, err = runPostgresqlSQL(namespace, podName, "postgres", statement)
-		Expect(err).NotTo(HaveOccurred())
-	}
-	logPostgresqlUpgradeCheckpoint("collations-refreshed", fmt.Sprintf("databases=%d", len(statements)))
+	Expect(helper.GetNonEmptyLines(string(out))).To(BeEmpty(), "databases with a collation version mismatch")
+	logPostgresqlUpgradeCheckpoint("collations-verified")
 }
 
 func runCommand(cmd *exec.Cmd, stdin io.Reader, stdout, stderr io.Writer) error {
