@@ -42,9 +42,18 @@ jobs:
           CATALOG_FIX_COMMIT: 252af31f004c85d6ce1e0da823d8011b219db0c9
           E2E_FIX_COMMIT: d64c8371a8b3d25942db5f7788c24727bb34c9db
           COMPATIBILITY_FIX_COMMIT: df467e0083df990b7126ca05aa0d966ec48bb71c
+          PROCESSING_MODE_FIX_COMMIT: c299020c3b3689302cf73e8b77642b59cd3d43d3
+          PROCESSING_MODE_CLEANUP_COMMIT: 5be57f7c2b71454289e2a8856013ac463ad17ad9
+          COLLATION_FIX_COMMIT: 0da23c607eb4cc85c6a60a094b7838a45ec068a7
+          DATABASE_LOCALE_FIX_COMMIT: 23e493386ddc78bfcf01257cd634ac445f26c199
         run: |
-          git fetch --no-tags "https://github.com/$FIX_REPOSITORY.git" "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT" "$COMPATIBILITY_FIX_COMMIT"
-          git cherry-pick --no-commit "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT" "$COMPATIBILITY_FIX_COMMIT"
+          candidate_commits=(
+            "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT" "$COMPATIBILITY_FIX_COMMIT"
+            "$PROCESSING_MODE_FIX_COMMIT" "$PROCESSING_MODE_CLEANUP_COMMIT"
+            "$COLLATION_FIX_COMMIT" "$DATABASE_LOCALE_FIX_COMMIT"
+          )
+          git fetch --no-tags "https://github.com/$FIX_REPOSITORY.git" "${candidate_commits[@]}"
+          git cherry-pick --no-commit "${candidate_commits[@]}"
           git diff --cached --stat
           {
             echo "### PostgreSQL upgrade candidate"
@@ -53,6 +62,10 @@ jobs:
             echo "- Applied catalog fix: $CATALOG_FIX_COMMIT"
             echo "- Applied E2E fix: $E2E_FIX_COMMIT"
             echo "- Applied compatibility fix: $COMPATIBILITY_FIX_COMMIT"
+            echo "- Applied processing mode refactor: $PROCESSING_MODE_FIX_COMMIT"
+            echo "- Applied processing mode cleanup: $PROCESSING_MODE_CLEANUP_COMMIT"
+            echo "- Applied collation assertion: $COLLATION_FIX_COMMIT"
+            echo "- Applied database locale verification: $DATABASE_LOCALE_FIX_COMMIT"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Go
