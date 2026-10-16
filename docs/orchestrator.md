@@ -133,13 +133,13 @@ As for RHDH 1.7 the orchestrator plugin packages are located in **npm.registry.r
 
 The orchestrator plugin instance requires the following dependencies to be installed:
 - A SonataflowPlatform custom resource - created in the namespace of the Backstage CR.
-- - A set of NetworkPolicies created in the Backstage custom resource's namespace, scoped to SonataFlow-managed pods (`app.kubernetes.io/managed-by: sonataflow-operator`) to allow traffic from infra namespaces (Knative Eventing/Serving and OpenShift Serverless Logic), OpenShift Router, monitoring, SonataFlow inter-pod communication, and RHDH backend access to SonataFlow / Data Index on port 80. SonataFlow pods are also granted unrestricted egress.
+- A set of NetworkPolicies created in the Backstage custom resource's namespace. The operator first creates default-deny NetworkPolicies for SonataFlow Data Index and Jobs Service pods, then selective allow policies for pods labeled `app.kubernetes.io/managed-by: sonataflow-operator`. These allow ingress from Knative Eventing/Serving and OpenShift Serverless Logic namespaces, from the OpenShift Router (any port), from other SonataFlow pods in the same or other namespaces (ingress and egress), from RHDH (any port), and from known monitoring namespaces on port 8080. SonataFlow egress is scoped to DNS, HTTPS (443), the Kubernetes API (6443), PostgreSQL (5432), and RHDH on port 7007; additional destinations must be allowed explicitly. Separately, the RHDH backend pod is allowed to reach SonataFlow pods (any port), and SonataFlow pods are allowed to reach RHDH on port 7007. When the local PostgreSQL is enabled, Postgres admits TCP/5432 from SonataFlow-managed pods (same or other namespaces) and from the create-sonataflow-database Job.
 - A PostgreSQL database to store the orchestrator workflows data.
 
 **Note:** If your Orchestrator workflows use an external Kafka broker for CloudEvents, the default NetworkPolicies do not allow Backstage egress to Kafka (typically TCP/9092).
 Create an additive NetworkPolicy in the Backstage CR namespace that allows egress from the Backstage pod (`rhdh.redhat.com/app: backstage-<cr-name>`) to your broker host/port.
 
-**Upgrade note:** Starting in RHDH 2.1, the Orchestrator NetworkPolicies are renamed to SonataFlow-scoped names. The operator creates the new policies but does not delete the old ones. On upgrade, delete the previous namespace-wide policies so they do not continue to allow broad access:
+**Upgrade note:** Starting in RHDH 2.1, the Orchestrator NetworkPolicies are renamed to SonataFlow-scoped names and no longer use namespace-wide `podSelector: {}` or unrestricted SonataFlow egress. The operator creates the new policies but does not delete the old ones. On upgrade, delete the previous policies so they do not continue to allow broad access:
 
 ```bash
 oc delete networkpolicy \
@@ -148,6 +148,7 @@ oc delete networkpolicy \
   backstage-netpol-<cr-name>-allow-intra-network \
   backstage-netpol-<cr-name>-allow-monitoring-to-sonataflow-and-workflows \
   backstage-netpol-<cr-name>-allow-all-egress \
+  backstage-netpol-<cr-name>-allow-sonataflow-all-egress \
   -n <namespace> --ignore-not-found
 ```
 
