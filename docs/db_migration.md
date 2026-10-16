@@ -61,14 +61,14 @@ In disconnected installations, take the backup **before applying the 2.1 `rhdh-i
    kubectl -n "$NAMESPACE" wait --for=delete "pod/$DB_POD" --timeout=5m
    ```
 
-4. Upgrade the Operator from RHDH 1.10 to 2.1 using your installation's normal upgrade procedure. Wait for the upgraded Operator to become ready and reconcile the database StatefulSet. Verify that the StatefulSet still has zero replicas and now selects the PostgreSQL 18 image:
+4. Upgrade the Operator from RHDH 1.10 to 2.1 using your installation's normal upgrade procedure. The Operator can become ready before it reconciles the database StatefulSet. Repeat the following check until the StatefulSet has zero replicas and selects the expected PostgreSQL 18 image:
 
    ```bash
    kubectl -n "$NAMESPACE" get statefulset "$DB_STATEFULSET" \
      -o jsonpath='{.spec.replicas}{" "}{.spec.template.spec.containers[0].image}{"\n"}'
    ```
 
-   The default database template leaves the replica count under your control during this procedure.
+   Do not delete the PVC until both conditions hold. If the image reference uses a digest, compare it with the PostgreSQL 18 image configured for your installation. The default database template leaves the replica count under your control during this procedure.
 
 5. Replace the old data volume and start PostgreSQL 18. Deleting this PVC removes the PostgreSQL 15 data; keep the successful dump and the existing credentials Secret:
 
