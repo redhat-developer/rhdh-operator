@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/api"
@@ -10,6 +11,8 @@ import (
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -249,4 +252,144 @@ func TestNetworkPolicyWithOverlay(t *testing.T) {
 
 	mo := obj.Object().(*multiobject.MultiObject)
 	assert.Equal(t, 1, len(mo.Items))
+}
+
+func TestOrchestratorNetworkPolicies(t *testing.T) {
+	// bin/ is populated by make test (real default-config + local-test plugin catalog).
+	t.Setenv("LOCALBIN", filepath.Join("..", "..", "bin"))
+
+	bs := api.Backstage{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-orchestrator-np", Namespace: "test-ns"},
+		Spec: api.BackstageSpec{
+			Flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant", Enabled: false},
+				{Name: "orchestrator", Enabled: true},
+			},
+		},
+	}
+	testObj := createBackstageTest(bs).withLocalDb(true)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	require.NoError(t, err)
+
+	backendLabel := utils.BackstageAppLabelValue(bs.Name)
+	dbLabel := utils.BackstageDbAppLabelValue(bs.Name)
+	var orchCount int
+	seen := map[string]bool{}
+	for _, item := range model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject).Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[SourceAnnotation] != "flavour-orchestrator" {
+			continue
+		}
+		orchCount++
+		name := np.GetAnnotations()[ConfiguredNameAnnotation]
+		seen[name] = true
+		assert.NotEmpty(t, np.Spec.PodSelector.MatchLabels, "%s uses empty podSelector", name)
+		assert.NotEqual(t, "allow-sonataflow-all-egress", name)
+
+		switch name {
+		case "sonataflow-data-index-default-deny":
+			assert.Equal(t, "data-index-service", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/name"])
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+			assert.Empty(t, np.Spec.Ingress)
+			assert.Empty(t, np.Spec.Egress)
+		case "sonataflow-jobs-service-default-deny":
+			assert.Equal(t, "jobs-service", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/name"])
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+			assert.Empty(t, np.Spec.Ingress)
+			assert.Empty(t, np.Spec.Egress)
+		case "allow-router-ingress-to-sonataflow", "allow-backstage-to-sonataflow":
+			require.NotEmpty(t, np.Spec.Ingress)
+			assert.Empty(t, np.Spec.Ingress[0].Ports, "%s must not restrict ports", name)
+			if name == "allow-backstage-to-sonataflow" {
+				from, ok := findPeerLabel(np.Spec.Ingress[0].From)
+				assert.True(t, ok)
+				assert.Equal(t, backendLabel, from)
+			}
+		case "allow-sonataflow-intra":
+			require.NotEmpty(t, np.Spec.Ingress)
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Empty(t, np.Spec.Ingress[0].Ports)
+			assert.Len(t, np.Spec.Ingress[0].From, 2)
+			assert.Len(t, np.Spec.Egress[0].To, 2)
+		case "allow-sonataflow-dns-egress":
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Len(t, np.Spec.Egress[0].Ports, 4)
+		case "allow-sonataflow-https-egress":
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Len(t, np.Spec.Egress[0].Ports, 2)
+		case "allow-sonataflow-postgresql-egress":
+			require.NotEmpty(t, np.Spec.Egress)
+			require.Len(t, np.Spec.Egress[0].To, 1)
+			assert.Equal(t, dbLabel, np.Spec.Egress[0].To[0].PodSelector.MatchLabels[BackstageAppLabel])
+			assert.Equal(t, int32(5432), np.Spec.Egress[0].Ports[0].Port.IntVal)
+		case "allow-sonataflow-to-backstage-egress":
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Equal(t, backendLabel, np.Spec.Egress[0].To[0].PodSelector.MatchLabels[BackstageAppLabel])
+			assert.Equal(t, int32(7007), np.Spec.Egress[0].Ports[0].Port.IntVal)
+		case "allow-sonataflow-to-backstage-ingress":
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+			require.NotEmpty(t, np.Spec.Ingress)
+			assert.Equal(t, int32(7007), np.Spec.Ingress[0].Ports[0].Port.IntVal)
+		case "allow-backstage-to-sonataflow-egress":
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Empty(t, np.Spec.Egress[0].Ports, "RHDH→SonataFlow egress must not restrict ports")
+		case "allow-monitoring-to-sonataflow":
+			require.NotEmpty(t, np.Spec.Ingress)
+			assert.Len(t, np.Spec.Ingress[0].From, 5)
+			assert.Equal(t, int32(8080), np.Spec.Ingress[0].Ports[0].Port.IntVal)
+		case "allow-sonataflow-to-db-ingress":
+			assert.Equal(t, dbLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+
+			require.Len(t, np.Spec.Ingress, 1)
+			from := np.Spec.Ingress[0].From
+			require.Len(t, from, 3)
+
+			var sawSonataFlow, sawCrossNsSonataFlow, sawDbJob bool
+			for _, peer := range from {
+				require.NotNil(t, peer.PodSelector)
+				if peer.NamespaceSelector != nil &&
+					peer.PodSelector.MatchLabels["app.kubernetes.io/managed-by"] == "sonataflow-operator" {
+					sawCrossNsSonataFlow = true
+				} else if peer.PodSelector.MatchLabels["app.kubernetes.io/managed-by"] == "sonataflow-operator" {
+					sawSonataFlow = true
+				}
+				if peer.PodSelector.MatchLabels[BackstageAppLabel] == "create-sonataflow-database" {
+					sawDbJob = true
+				}
+			}
+			assert.True(t, sawSonataFlow, "expected from peer with sonataflow-operator")
+			assert.True(t, sawCrossNsSonataFlow, "expected cross-namespace sonataflow-operator peer")
+			assert.True(t, sawDbJob, "expected from peer with create-sonataflow-database")
+
+			require.Len(t, np.Spec.Ingress[0].Ports, 1)
+			assert.Equal(t, int32(5432), np.Spec.Ingress[0].Ports[0].Port.IntVal)
+			assert.Equal(t, corev1.ProtocolTCP, *np.Spec.Ingress[0].Ports[0].Protocol)
+		case "allow-infra-ns-to-sonataflow":
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+		default:
+			t.Errorf("unexpected orchestrator NetworkPolicy: %s", name)
+		}
+	}
+	assert.Equal(t, 14, orchCount)
+	for _, want := range []string{
+		"sonataflow-data-index-default-deny",
+		"sonataflow-jobs-service-default-deny",
+		"allow-infra-ns-to-sonataflow",
+		"allow-router-ingress-to-sonataflow",
+		"allow-backstage-to-sonataflow",
+		"allow-sonataflow-intra",
+		"allow-sonataflow-dns-egress",
+		"allow-sonataflow-https-egress",
+		"allow-sonataflow-postgresql-egress",
+		"allow-sonataflow-to-backstage-egress",
+		"allow-sonataflow-to-backstage-ingress",
+		"allow-backstage-to-sonataflow-egress",
+		"allow-monitoring-to-sonataflow",
+		"allow-sonataflow-to-db-ingress",
+	} {
+		assert.True(t, seen[want], "missing orchestrator NetworkPolicy %s", want)
+	}
 }
