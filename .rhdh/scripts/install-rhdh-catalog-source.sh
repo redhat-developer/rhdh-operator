@@ -83,18 +83,15 @@ function errorf() {
 # Run a command. At debug, stream it. Otherwise hide stdout/stderr,
 # and print the captured output only if the command fails.
 function run_cmd() {
-  local out rc
+  local out rc=0
   if [[ "${LOG_LEVEL}" == "debug" ]]; then
     "$@"
     return $?
   fi
   out="$(mktemp)"
-  set +e
-  "$@" >"${out}" 2>&1
-  rc=$?
-  set -e
+  "$@" >"${out}" 2>&1 || rc=$?
   if [[ "${rc}" -ne 0 ]]; then
-    errorf "Command failed (${rc}): $*"
+    errorf "Command failed (${rc})"
     cat "${out}" >&2
   fi
   rm -f "${out}"
@@ -204,8 +201,6 @@ function resolve_olm_version() {
     warnf "--install-plan-approval is only relevant with OLM v0 and will be ignored with OLM v1"
   fi
 }
-
-
 
 function cleanup() {
   rm -fr "${TMPDIR}" || true
@@ -319,11 +314,19 @@ function render_iib() {
 
   mkdir -p "${TMPDIR}/rhdh/rhdh"
   debugf "Rendering IIB $UPSTREAM_IIB as a local file..."
+  local render_err
+  render_err="$(mktemp)"
   if [[ "${LOG_LEVEL}" == "debug" ]]; then
     opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml"
   else
-    opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml" 2>/dev/null
+    if ! opm render "$UPSTREAM_IIB" --output=yaml > "${TMPDIR}/rhdh/rhdh/render.yaml" 2>"${render_err}"; then
+      errorf "opm render failed"
+      cat "${render_err}" >&2
+      rm -f "${render_err}"
+      return 1
+    fi
   fi
+  rm -f "${render_err}"
   if [ ! -s "${TMPDIR}/rhdh/rhdh/render.yaml" ]; then
     errorf "
 [ERROR] 'opm render $UPSTREAM_IIB' returned an empty output, which likely means that this IIB Image does not contain any operators in it.
