@@ -6,6 +6,9 @@ spec:
   ttlSecondsAfterFinished: 30
   activeDeadlineSeconds: 120
   template:
+    metadata:
+      labels:
+        rhdh.redhat.com/app: create-sonataflow-database
     spec:
       containers:
         - name: psql
