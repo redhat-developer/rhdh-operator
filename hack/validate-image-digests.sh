@@ -1,10 +1,11 @@
 #!/bin/bash
 #
-# Validate that FROM statements with digests in Dockerfiles use manifest list digests
-# (multi-architecture) rather than single-architecture manifest digests.
+# Validate that digest-pinned images use manifest list digests (multi-architecture)
+# rather than single-architecture manifest digests.
 #
-# This script validates the current state of Dockerfiles in the repository.
-# It checks specific Dockerfiles that are expected to use multi-arch images.
+# This script validates:
+# - FROM statements with digests in Dockerfiles
+# - Build-tool images referenced in Makefiles (e.g., Hermeto)
 #
 # Usage:
 #   ./hack/validate-image-digests.sh
@@ -29,6 +30,12 @@ DOCKERFILES=(
     "Dockerfile"
     "bundle/rhdh/bundle.Dockerfile"
     "bundle/backstage.io/bundle.Dockerfile"
+)
+
+# Additional files containing image references to validate (e.g., build-tool images).
+# Format: each line is "variable ?= image:tag" (or "image:tag@sha256:digest")
+MAKEFILE_IMAGE_SOURCES=(
+    "Makefile"
 )
 
 # Colors for output
@@ -100,6 +107,40 @@ main() {
         done <<< "$from_lines"
     done
     
+    # Extract image references with digests from Makefile-style sources
+    for makefile in "${MAKEFILE_IMAGE_SOURCES[@]}"; do
+        if [ ! -f "$makefile" ]; then
+            continue
+        fi
+
+        # Find lines preceded by a "# renovate: datasource=docker" comment.
+        # Expected pattern:
+        #   # renovate: datasource=docker depName=quay.io/konflux-ci/hermeto
+        #   HERMETO_IMAGE ?= quay.io/konflux-ci/hermeto:0.62.0
+        mapfile -t makefile_refs < <(
+            awk '
+                /^#\s*renovate:.*datasource=docker/ { found=1; next }
+                found && /\?=/ {
+                    sub(/.*\?=\s*/, "")
+                    sub(/\s*$/, "")
+                    print
+                    found=0
+                }
+                found { found=0 }
+            ' "$makefile"
+        )
+
+        for image_ref in "${makefile_refs[@]}"; do
+            [ -z "$image_ref" ] && continue
+            digests_map["$image_ref"]=1
+            if [ -n "${digests_files_map[$image_ref]:-}" ]; then
+                digests_files_map["$image_ref"]="${digests_files_map[$image_ref]}|$makefile"
+            else
+                digests_files_map["$image_ref"]="$makefile"
+            fi
+        done
+    done
+
     # Check if we have any digests to validate
     if [ ${#digests_map[@]} -eq 0 ]; then
         exit 0
