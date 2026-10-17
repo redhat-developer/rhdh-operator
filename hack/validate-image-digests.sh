@@ -12,7 +12,7 @@
 #
 # Requirements:
 #   - skopeo (for inspecting container image manifests)
-#   - jq (for parsing JSON, optional but recommended)
+#   - jq (for parsing JSON)
 #
 # Exit codes:
 #   0 - All digests are valid manifest lists (or no digests found)
@@ -62,11 +62,16 @@ log_error() {
 main() {
     cd "$REPO_ROOT"
     
-    # Check if skopeo is available
+    # Check if required tools are available
     if ! command -v skopeo &> /dev/null; then
         log_error "skopeo not found in PATH"
         echo "Please install skopeo to run this validation"
         echo "See: https://github.com/containers/skopeo"
+        exit 1
+    fi
+    if ! command -v jq &> /dev/null; then
+        log_error "jq not found in PATH"
+        echo "Please install jq to run this validation"
         exit 1
     fi
     
@@ -164,19 +169,11 @@ main() {
         if echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.docker.distribution.manifest.list.v2+json"' || \
            echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.oci.image.index.v1+json"'; then
             # It's a manifest list — verify it contains the required architectures
-            if command -v jq &> /dev/null; then
-                platforms=$(echo "$manifest_info" | jq -r '[.manifests[] | select(.platform.os == "linux") | .platform.architecture] | join(", ")' 2>/dev/null || echo "")
-            else
-                platforms=""
-            fi
+            platforms=$(echo "$manifest_info" | jq -r '[.manifests[] | select(.platform.os == "linux") | .platform.architecture] | join(", ")' 2>/dev/null || echo "")
 
             missing_arches=()
             for arch in "${REQUIRED_ARCHES[@]}"; do
-                if command -v jq &> /dev/null; then
-                    found=$(echo "$manifest_info" | jq -r --arg arch "$arch" '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch)] | length > 0' 2>/dev/null || echo "false")
-                else
-                    found=$(echo "$manifest_info" | grep -q "\"$arch\"" && echo "true" || echo "false")
-                fi
+                found=$(echo "$manifest_info" | jq -r --arg arch "$arch" '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch)] | length > 0' 2>/dev/null || echo "false")
                 [[ "$found" != "true" ]] && missing_arches+=("$arch")
             done
 
@@ -192,7 +189,7 @@ main() {
                 log_error "Missing required architecture(s): $(IFS=', '; echo "${missing_arches[*]}")"
                 echo "  Image: $image_ref"
                 echo "  Found: ${platforms:-unknown}"
-                echo "  Required: ${REQUIRED_ARCHES[*]}"
+                echo "  Required: $(IFS=', '; echo "${REQUIRED_ARCHES[*]}")"
                 echo "  File(s):"
                 for file in "${source_files[@]}"; do
                     echo "    - $file"
@@ -207,13 +204,9 @@ main() {
         if echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.docker.distribution.manifest.v2+json"' || \
            echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.oci.image.manifest.v1+json"'; then
             # Extract the specific architecture
-            if command -v jq &> /dev/null; then
-                arch_info=$(skopeo inspect "docker://$image_ref_for_inspect" 2>/dev/null | jq -r '"\(.Os)/\(.Architecture)"' 2>/dev/null || echo "")
-                if [[ -n "$arch_info" && "$arch_info" != "/" ]]; then
-                    log_error "Single-architecture manifest: $arch_info"
-                else
-                    log_error "Single-architecture manifest"
-                fi
+            arch_info=$(skopeo inspect "docker://$image_ref_for_inspect" 2>/dev/null | jq -r '"\(.Os)/\(.Architecture)"' 2>/dev/null || echo "")
+            if [[ -n "$arch_info" && "$arch_info" != "/" ]]; then
+                log_error "Single-architecture manifest: $arch_info"
             else
                 log_error "Single-architecture manifest"
             fi
