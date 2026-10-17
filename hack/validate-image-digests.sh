@@ -24,6 +24,8 @@ set -euo pipefail
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Space-separated list of architectures that every image must support.
+REQUIRED_ARCHES=(${REQUIRED_ARCHES:-amd64 arm64})
 
 # Dockerfiles to validate (these are expected to use multi-arch base images)
 DOCKERFILES=(
@@ -32,10 +34,9 @@ DOCKERFILES=(
     "bundle/backstage.io/bundle.Dockerfile"
 )
 
-# Additional files containing image references to validate (e.g., build-tool images).
-# Format: each line is "variable ?= image:tag" (or "image:tag@sha256:digest")
-MAKEFILE_IMAGE_SOURCES=(
-    "Makefile"
+# Makefile variable names whose values are image references to validate.
+MAKEFILE_IMAGE_VARS=(
+    "HERMETO_IMAGE"
 )
 
 # Colors for output
@@ -107,38 +108,16 @@ main() {
         done <<< "$from_lines"
     done
     
-    # Extract image references with digests from Makefile-style sources
-    for makefile in "${MAKEFILE_IMAGE_SOURCES[@]}"; do
-        if [ ! -f "$makefile" ]; then
-            continue
+    # Extract image references from Makefile variables
+    for var_name in "${MAKEFILE_IMAGE_VARS[@]}"; do
+        image_ref=$(grep -E "^\s*${var_name}\s*\?=" Makefile 2>/dev/null | sed -E 's/.*\?=\s*(\S+).*/\1/' || true)
+        [ -z "$image_ref" ] && continue
+        digests_map["$image_ref"]=1
+        if [ -n "${digests_files_map[$image_ref]:-}" ]; then
+            digests_files_map["$image_ref"]="${digests_files_map[$image_ref]}|Makefile"
+        else
+            digests_files_map["$image_ref"]="Makefile"
         fi
-
-        # Find lines preceded by a "# renovate: datasource=docker" comment.
-        # Expected pattern:
-        #   # renovate: datasource=docker depName=quay.io/konflux-ci/hermeto
-        #   HERMETO_IMAGE ?= quay.io/konflux-ci/hermeto:0.62.0
-        mapfile -t makefile_refs < <(
-            awk '
-                /^#\s*renovate:.*datasource=docker/ { found=1; next }
-                found && /\?=/ {
-                    sub(/.*\?=\s*/, "")
-                    sub(/\s*$/, "")
-                    print
-                    found=0
-                }
-                found { found=0 }
-            ' "$makefile"
-        )
-
-        for image_ref in "${makefile_refs[@]}"; do
-            [ -z "$image_ref" ] && continue
-            digests_map["$image_ref"]=1
-            if [ -n "${digests_files_map[$image_ref]:-}" ]; then
-                digests_files_map["$image_ref"]="${digests_files_map[$image_ref]}|$makefile"
-            else
-                digests_files_map["$image_ref"]="$makefile"
-            fi
-        done
     done
 
     # Check if we have any digests to validate
@@ -184,14 +163,43 @@ main() {
         # Check if the manifest is a manifest list (multi-architecture)
         if echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.docker.distribution.manifest.list.v2+json"' || \
            echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.oci.image.index.v1+json"'; then
-            # Valid manifest list
-            log_success "Manifest list (multi-arch): $image_ref"
-            echo "  File(s):"
-            for file in "${source_files[@]}"; do
-                echo "    - $file"
+            # It's a manifest list — verify it contains the required architectures
+            if command -v jq &> /dev/null; then
+                platforms=$(echo "$manifest_info" | jq -r '[.manifests[] | select(.platform.os == "linux") | .platform.architecture] | join(", ")' 2>/dev/null || echo "")
+            else
+                platforms=""
+            fi
+
+            missing_arches=()
+            for arch in "${REQUIRED_ARCHES[@]}"; do
+                if command -v jq &> /dev/null; then
+                    found=$(echo "$manifest_info" | jq -r --arg arch "$arch" '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch)] | length > 0' 2>/dev/null || echo "false")
+                else
+                    found=$(echo "$manifest_info" | grep -q "\"$arch\"" && echo "true" || echo "false")
+                fi
+                [ "$found" != "true" ] && missing_arches+=("$arch")
             done
-            echo
-            validated_count=$((validated_count + 1))
+
+            if [ ${#missing_arches[@]} -eq 0 ]; then
+                log_success "Manifest list (multi-arch: $platforms): $image_ref"
+                echo "  File(s):"
+                for file in "${source_files[@]}"; do
+                    echo "    - $file"
+                done
+                echo
+                validated_count=$((validated_count + 1))
+            else
+                log_error "Missing required architecture(s): $(IFS=', '; echo "${missing_arches[*]}")"
+                echo "  Image: $image_ref"
+                echo "  Found: ${platforms:-unknown}"
+                echo "  Required: ${REQUIRED_ARCHES[*]}"
+                echo "  File(s):"
+                for file in "${source_files[@]}"; do
+                    echo "    - $file"
+                done
+                echo
+                has_errors=1
+            fi
             continue
         fi
 
