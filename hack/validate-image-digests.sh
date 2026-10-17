@@ -25,7 +25,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Space-separated list of architectures that every image must support.
-REQUIRED_ARCHES=(${REQUIRED_ARCHES:-amd64 arm64})
+IFS=' ' read -ra REQUIRED_ARCHES <<< "${REQUIRED_ARCHES:-amd64 arm64}"
 
 # Dockerfiles to validate (these are expected to use multi-arch base images)
 DOCKERFILES=(
