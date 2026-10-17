@@ -1,6 +1,7 @@
 name: Nightly PostgreSQL Upgrade Test
 
 on:
+  pull_request:
   workflow_dispatch:
   schedule:
     - cron: "25 0 * * *"
@@ -18,7 +19,7 @@ jobs:
       matrix:
         include:
           - from_branch: release-1.10
-            to_branch: main
+            to_branch: release-2.1
     permissions:
       contents: read
     env:
@@ -33,6 +34,39 @@ jobs:
           ref: ${{ matrix.to_branch }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Temporarily apply candidate fixes to release-2.1
+        if: github.event_name == 'pull_request'
+        env:
+          FIX_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          CATALOG_FIX_COMMIT: 252af31f004c85d6ce1e0da823d8011b219db0c9
+          E2E_FIX_COMMIT: d64c8371a8b3d25942db5f7788c24727bb34c9db
+          COMPATIBILITY_FIX_COMMIT: df467e0083df990b7126ca05aa0d966ec48bb71c
+          PROCESSING_MODE_FIX_COMMIT: c299020c3b3689302cf73e8b77642b59cd3d43d3
+          PROCESSING_MODE_CLEANUP_COMMIT: 5be57f7c2b71454289e2a8856013ac463ad17ad9
+          COLLATION_FIX_COMMIT: 0da23c607eb4cc85c6a60a094b7838a45ec068a7
+          DATABASE_LOCALE_FIX_COMMIT: 23e493386ddc78bfcf01257cd634ac445f26c199
+        run: |
+          candidate_commits=(
+            "$CATALOG_FIX_COMMIT" "$E2E_FIX_COMMIT" "$COMPATIBILITY_FIX_COMMIT"
+            "$PROCESSING_MODE_FIX_COMMIT" "$PROCESSING_MODE_CLEANUP_COMMIT"
+            "$COLLATION_FIX_COMMIT" "$DATABASE_LOCALE_FIX_COMMIT"
+          )
+          git fetch --no-tags "https://github.com/$FIX_REPOSITORY.git" "${candidate_commits[@]}"
+          git cherry-pick --no-commit "${candidate_commits[@]}"
+          git diff --cached --stat
+          {
+            echo "### PostgreSQL upgrade candidate"
+            echo "- Target branch: ${{ matrix.to_branch }}"
+            echo "- Target commit: $(git rev-parse HEAD)"
+            echo "- Applied catalog fix: $CATALOG_FIX_COMMIT"
+            echo "- Applied E2E fix: $E2E_FIX_COMMIT"
+            echo "- Applied compatibility fix: $COMPATIBILITY_FIX_COMMIT"
+            echo "- Applied processing mode refactor: $PROCESSING_MODE_FIX_COMMIT"
+            echo "- Applied processing mode cleanup: $PROCESSING_MODE_CLEANUP_COMMIT"
+            echo "- Applied collation assertion: $COLLATION_FIX_COMMIT"
+            echo "- Applied database locale verification: $DATABASE_LOCALE_FIX_COMMIT"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -104,6 +138,24 @@ jobs:
             --selector=app.kubernetes.io/component=controller \
             --timeout=90s
 
+      - name: Start temporary diagnostics collection
+        run: |
+          mkdir -p "$RUNNER_TEMP/diag"
+          nohup kubectl get events -A --watch -o wide > "$RUNNER_TEMP/diag/events.log" 2>&1 &
+          cat <<'EOF' > "$RUNNER_TEMP/collect-diagnostics.sh"
+          while true; do
+            echo "===== $(date -u +%FT%TZ)"
+            kubectl get pods -A -o wide
+            df -h /
+            for ns in $(kubectl get ns -o name | sed -n 's|^namespace/\(e2e-test-.*\)|\1|p'); do
+              kubectl -n "$ns" describe pods -l rhdh.redhat.com/app=backstage-my-backstage-app
+              kubectl -n "$ns" logs -l rhdh.redhat.com/app=backstage-my-backstage-app -c install-dynamic-plugins --tail=40 --prefix
+            done
+            sleep 60
+          done
+          EOF
+          nohup bash "$RUNNER_TEMP/collect-diagnostics.sh" > "$RUNNER_TEMP/diag/pods.log" 2>&1 &
+
       - name: Run PostgreSQL upgrade E2E test
         env:
           BACKSTAGE_OPERATOR_TESTS_PLATFORM: kind
@@ -112,3 +164,10 @@ jobs:
           OPERATOR_MANIFEST: ${{ env.TO_OPERATOR_MANIFEST }}
           IMG: ${{ env.TO_OPERATOR_IMAGE }}
         run: make test-e2e-upgrade
+
+      - name: Upload temporary diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: postgresql-upgrade-diagnostics
+          path: ${{ runner.temp }}/diag
