@@ -75,13 +75,13 @@ main() {
     declare -A digests_files_map
     
     for dockerfile in "${DOCKERFILES[@]}"; do
-        if [ ! -f "$dockerfile" ]; then
+        if [[ ! -f "$dockerfile" ]]; then
             continue
         fi
         
         # Get FROM statements with digests, excluding --platform lines
         from_lines=$(grep -E '^\s*FROM\s+.*@sha256:' "$dockerfile" | grep -v -E '^\s*FROM\s+--platform' || true)
-        if [ -z "$from_lines" ]; then
+        if [[ -z "$from_lines" ]]; then
             continue
         fi
         
@@ -94,12 +94,12 @@ main() {
             # Extract the image reference with digest
             image_ref=$(echo "$line" | sed -E 's/^\s*FROM\s+([^ ]+@sha256:[a-f0-9]+).*/\1/')
             
-            if [ -n "$image_ref" ]; then
+            if [[ -n "$image_ref" ]]; then
                 # Mark that we've seen this digest
                 digests_map["$image_ref"]=1
                 
                 # Append this file to the list of files containing this digest
-                if [ -n "${digests_files_map[$image_ref]:-}" ]; then
+                if [[ -n "${digests_files_map[$image_ref]:-}" ]]; then
                     digests_files_map["$image_ref"]="${digests_files_map[$image_ref]}|$dockerfile"
                 else
                     digests_files_map["$image_ref"]="$dockerfile"
@@ -111,9 +111,9 @@ main() {
     # Extract image references from Makefile variables
     for var_name in "${MAKEFILE_IMAGE_VARS[@]}"; do
         image_ref=$(grep -E "^\s*${var_name}\s*\?=" Makefile 2>/dev/null | sed -E 's/.*\?=\s*(\S+).*/\1/' || true)
-        [ -z "$image_ref" ] && continue
+        [[ -z "$image_ref" ]] && continue
         digests_map["$image_ref"]=1
-        if [ -n "${digests_files_map[$image_ref]:-}" ]; then
+        if [[ -n "${digests_files_map[$image_ref]:-}" ]]; then
             digests_files_map["$image_ref"]="${digests_files_map[$image_ref]}|Makefile"
         else
             digests_files_map["$image_ref"]="Makefile"
@@ -121,7 +121,7 @@ main() {
     done
 
     # Check if we have any digests to validate
-    if [ ${#digests_map[@]} -eq 0 ]; then
+    if [[ ${#digests_map[@]} -eq 0 ]]; then
         exit 0
     fi
     
@@ -149,7 +149,7 @@ main() {
         set -e  # Re-enable exit on error
         
         # Check if inspection failed
-        if [ $inspect_status -ne 0 ]; then
+        if [[ $inspect_status -ne 0 ]]; then
             log_error "Failed to inspect: $image_ref"
             echo "  File(s):"
             for file in "${source_files[@]}"; do
@@ -177,10 +177,10 @@ main() {
                 else
                     found=$(echo "$manifest_info" | grep -q "\"$arch\"" && echo "true" || echo "false")
                 fi
-                [ "$found" != "true" ] && missing_arches+=("$arch")
+                [[ "$found" != "true" ]] && missing_arches+=("$arch")
             done
 
-            if [ ${#missing_arches[@]} -eq 0 ]; then
+            if [[ ${#missing_arches[@]} -eq 0 ]]; then
                 log_success "Manifest list (multi-arch: $platforms): $image_ref"
                 echo "  File(s):"
                 for file in "${source_files[@]}"; do
@@ -209,7 +209,7 @@ main() {
             # Extract the specific architecture
             if command -v jq &> /dev/null; then
                 arch_info=$(skopeo inspect "docker://$image_ref_for_inspect" 2>/dev/null | jq -r '"\(.Os)/\(.Architecture)"' 2>/dev/null || echo "")
-                if [ -n "$arch_info" ] && [ "$arch_info" != "/" ]; then
+                if [[ -n "$arch_info" && "$arch_info" != "/" ]]; then
                     log_error "Single-architecture manifest: $arch_info"
                 else
                     log_error "Single-architecture manifest"
@@ -236,7 +236,7 @@ main() {
         echo
     done
 
-    if [ $has_errors -ne 0 ]; then
+    if [[ $has_errors -ne 0 ]]; then
         exit 1
     fi
 
