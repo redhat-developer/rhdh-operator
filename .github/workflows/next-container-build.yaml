@@ -122,7 +122,10 @@ jobs:
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
           : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
 
-          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" make bundle bundle-build bundle-push
+          export DEFAULT_CHANNEL="fast-$(echo "${VERSION}" | cut -d. -f1,2)"
+          export CHANNELS="fast-$(echo "${VERSION}" | cut -d. -f1,2)"
+
+          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" DEFAULT_CHANNEL="${DEFAULT_CHANNEL}" CHANNELS="${CHANNELS}" make bundle bundle-build bundle-push
 
           for tag in "${VERSION}-${SHORT_SHA}" "${LATEST_NEXT}"; do
             podman tag "${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${VERSION}" "${REGISTRY_WITH_ORG}/${OPERATOR_IMAGE_NAME}-bundle:${tag}"
@@ -215,8 +218,11 @@ jobs:
           : "${LATEST_NEXT:?LATEST_NEXT must be set}"
           : "${OPERATOR_IMAGE_NAME:?OPERATOR_IMAGE_NAME must be set}"
 
+          export DEFAULT_CHANNEL="fast-$(echo "${VERSION}" | cut -d. -f1,2)"
+          export CHANNELS="fast-$(echo "${VERSION}" | cut -d. -f1,2)"
+
           # Build the catalog image only (operator was built hermetically above)
-          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" PLATFORM="${PLATFORM}" BUNDLE_IMGS="${BUNDLE_IMGS}" make -o bundle-push catalog-build
+          CONTAINER_TOOL="${CONTAINER_TOOL}" VERSION="${VERSION}" PLATFORM="${PLATFORM}" BUNDLE_IMGS="${BUNDLE_IMGS}" DEFAULT_CHANNEL="${DEFAULT_CHANNEL}" CHANNELS="${CHANNELS}" make -o bundle-push catalog-build
 
           # Push per-arch tagged images
           for image in "${OPERATOR_IMAGE_NAME}" "${OPERATOR_IMAGE_NAME}-catalog"; do
