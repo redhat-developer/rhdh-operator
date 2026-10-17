@@ -113,9 +113,15 @@ main() {
         done <<< "$from_lines"
     done
     
-    # Extract image references from Makefile variables
+    # Check image references from Makefile variables.
+    # When invoked via `make validate-image-digests`, the Makefile passes the
+    # resolved value as an env var, honoring command-line and env overrides.
+    # Fall back to parsing the Makefile when running the script directly.
     for var_name in "${MAKEFILE_IMAGE_VARS[@]}"; do
-        image_ref=$(grep -E "^\s*${var_name}\s*\?=" Makefile 2>/dev/null | sed -E 's/.*\?=\s*(\S+).*/\1/' || true)
+        image_ref="${!var_name:-}"
+        if [[ -z "$image_ref" ]]; then
+            image_ref=$(grep -E "^\s*${var_name}\s*\?=" Makefile 2>/dev/null | sed -E 's/.*\?=\s*(\S+).*/\1/' || true)
+        fi
         [[ -z "$image_ref" ]] && continue
         digests_map["$image_ref"]=1
         if [[ -n "${digests_files_map[$image_ref]:-}" ]]; then

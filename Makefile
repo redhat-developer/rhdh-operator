@@ -226,7 +226,7 @@ vet: ## Run go vet against code.
 validate-image-digests: ## Validate that Dockerfile digests are manifest lists (multi-arch)
 	@echo "Validating manifest list digests in Dockerfiles..."
 	@echo
-	@hack/validate-image-digests.sh
+	@HERMETO_IMAGE="$(HERMETO_IMAGE)" hack/validate-image-digests.sh
 
 CRD_BASELINE_REF ?= main
 
