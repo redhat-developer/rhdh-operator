@@ -5,10 +5,10 @@
 #
 # This script validates:
 # - FROM statements with digests in Dockerfiles
-# - Build-tool images referenced in Makefiles (e.g., Hermeto)
+# - Additional image references passed as arguments
 #
 # Usage:
-#   ./hack/validate-image-digests.sh
+#   ./hack/validate-image-digests.sh [IMAGE...]
 #
 # Requirements:
 #   - skopeo (for inspecting container image manifests)
@@ -32,11 +32,6 @@ DOCKERFILES=(
     "Dockerfile"
     "bundle/rhdh/bundle.Dockerfile"
     "bundle/backstage.io/bundle.Dockerfile"
-)
-
-# Makefile variable names whose values are image references to validate.
-MAKEFILE_IMAGE_VARS=(
-    "HERMETO_IMAGE"
 )
 
 # Colors for output
@@ -113,22 +108,11 @@ main() {
         done <<< "$from_lines"
     done
     
-    # Check image references from Makefile variables.
-    # When invoked via `make validate-image-digests`, the Makefile passes the
-    # resolved value as an env var, honoring command-line and env overrides.
-    # Fall back to parsing the Makefile when running the script directly.
-    for var_name in "${MAKEFILE_IMAGE_VARS[@]}"; do
-        image_ref="${!var_name:-}"
-        if [[ -z "$image_ref" ]]; then
-            image_ref=$(grep -E "^\s*${var_name}\s*\?=" Makefile 2>/dev/null | sed -E 's/.*\?=\s*(\S+).*/\1/' || true)
-        fi
+    # Additional image references passed as arguments
+    for image_ref in "$@"; do
         [[ -z "$image_ref" ]] && continue
         digests_map["$image_ref"]=1
-        if [[ -n "${digests_files_map[$image_ref]:-}" ]]; then
-            digests_files_map["$image_ref"]="${digests_files_map[$image_ref]}|Makefile"
-        else
-            digests_files_map["$image_ref"]="Makefile"
-        fi
+        digests_files_map["$image_ref"]="(argument)"
     done
 
     # Check if we have any digests to validate
