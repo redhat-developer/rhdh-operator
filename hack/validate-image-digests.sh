@@ -1,17 +1,18 @@
 #!/bin/bash
 #
-# Validate that FROM statements with digests in Dockerfiles use manifest list digests
-# (multi-architecture) rather than single-architecture manifest digests.
+# Validate that digest-pinned images use manifest list digests (multi-architecture)
+# rather than single-architecture manifest digests.
 #
-# This script validates the current state of Dockerfiles in the repository.
-# It checks specific Dockerfiles that are expected to use multi-arch images.
+# This script validates:
+# - FROM statements with digests in Dockerfiles
+# - Additional image references passed as arguments
 #
 # Usage:
-#   ./hack/validate-image-digests.sh
+#   ./hack/validate-image-digests.sh [IMAGE...]
 #
 # Requirements:
 #   - skopeo (for inspecting container image manifests)
-#   - jq (for parsing JSON, optional but recommended)
+#   - jq (for parsing JSON)
 #
 # Exit codes:
 #   0 - All digests are valid manifest lists (or no digests found)
@@ -23,6 +24,8 @@ set -euo pipefail
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Space-separated list of architectures that every image must support.
+IFS=' ' read -ra REQUIRED_ARCHES <<< "${REQUIRED_ARCHES:-amd64 arm64}"
 
 # Dockerfiles to validate (these are expected to use multi-arch base images)
 DOCKERFILES=(
@@ -54,11 +57,16 @@ log_error() {
 main() {
     cd "$REPO_ROOT"
     
-    # Check if skopeo is available
+    # Check if required tools are available
     if ! command -v skopeo &> /dev/null; then
         log_error "skopeo not found in PATH"
         echo "Please install skopeo to run this validation"
         echo "See: https://github.com/containers/skopeo"
+        exit 1
+    fi
+    if ! command -v jq &> /dev/null; then
+        log_error "jq not found in PATH"
+        echo "Please install jq to run this validation"
         exit 1
     fi
     
@@ -67,13 +75,13 @@ main() {
     declare -A digests_files_map
     
     for dockerfile in "${DOCKERFILES[@]}"; do
-        if [ ! -f "$dockerfile" ]; then
+        if [[ ! -f "$dockerfile" ]]; then
             continue
         fi
         
         # Get FROM statements with digests, excluding --platform lines
         from_lines=$(grep -E '^\s*FROM\s+.*@sha256:' "$dockerfile" | grep -v -E '^\s*FROM\s+--platform' || true)
-        if [ -z "$from_lines" ]; then
+        if [[ -z "$from_lines" ]]; then
             continue
         fi
         
@@ -86,12 +94,12 @@ main() {
             # Extract the image reference with digest
             image_ref=$(echo "$line" | sed -E 's/^\s*FROM\s+([^ ]+@sha256:[a-f0-9]+).*/\1/')
             
-            if [ -n "$image_ref" ]; then
+            if [[ -n "$image_ref" ]]; then
                 # Mark that we've seen this digest
                 digests_map["$image_ref"]=1
                 
                 # Append this file to the list of files containing this digest
-                if [ -n "${digests_files_map[$image_ref]:-}" ]; then
+                if [[ -n "${digests_files_map[$image_ref]:-}" ]]; then
                     digests_files_map["$image_ref"]="${digests_files_map[$image_ref]}|$dockerfile"
                 else
                     digests_files_map["$image_ref"]="$dockerfile"
@@ -100,8 +108,15 @@ main() {
         done <<< "$from_lines"
     done
     
+    # Additional image references passed as arguments
+    for image_ref in "$@"; do
+        [[ -z "$image_ref" ]] && continue
+        digests_map["$image_ref"]=1
+        digests_files_map["$image_ref"]="(argument)"
+    done
+
     # Check if we have any digests to validate
-    if [ ${#digests_map[@]} -eq 0 ]; then
+    if [[ ${#digests_map[@]} -eq 0 ]]; then
         exit 0
     fi
     
@@ -129,7 +144,7 @@ main() {
         set -e  # Re-enable exit on error
         
         # Check if inspection failed
-        if [ $inspect_status -ne 0 ]; then
+        if [[ $inspect_status -ne 0 ]]; then
             log_error "Failed to inspect: $image_ref"
             echo "  File(s):"
             for file in "${source_files[@]}"; do
@@ -143,14 +158,35 @@ main() {
         # Check if the manifest is a manifest list (multi-architecture)
         if echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.docker.distribution.manifest.list.v2+json"' || \
            echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.oci.image.index.v1+json"'; then
-            # Valid manifest list
-            log_success "Manifest list (multi-arch): $image_ref"
-            echo "  File(s):"
-            for file in "${source_files[@]}"; do
-                echo "    - $file"
+            # It's a manifest list — verify it contains the required architectures
+            platforms=$(echo "$manifest_info" | jq -r '[.manifests[] | select(.platform.os == "linux") | .platform.architecture] | join(", ")' 2>/dev/null || echo "")
+
+            missing_arches=()
+            for arch in "${REQUIRED_ARCHES[@]}"; do
+                found=$(echo "$manifest_info" | jq -r --arg arch "$arch" '[.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch)] | length > 0' 2>/dev/null || echo "false")
+                [[ "$found" != "true" ]] && missing_arches+=("$arch")
             done
-            echo
-            validated_count=$((validated_count + 1))
+
+            if [[ ${#missing_arches[@]} -eq 0 ]]; then
+                log_success "Manifest list (multi-arch: $platforms): $image_ref"
+                echo "  File(s):"
+                for file in "${source_files[@]}"; do
+                    echo "    - $file"
+                done
+                echo
+                validated_count=$((validated_count + 1))
+            else
+                log_error "Missing required architecture(s): $(IFS=', '; echo "${missing_arches[*]}")"
+                echo "  Image: $image_ref"
+                echo "  Found: ${platforms:-unknown}"
+                echo "  Required: $(IFS=', '; echo "${REQUIRED_ARCHES[*]}")"
+                echo "  File(s):"
+                for file in "${source_files[@]}"; do
+                    echo "    - $file"
+                done
+                echo
+                has_errors=1
+            fi
             continue
         fi
 
@@ -158,13 +194,9 @@ main() {
         if echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.docker.distribution.manifest.v2+json"' || \
            echo "$manifest_info" | grep -q '"mediaType".*"application/vnd.oci.image.manifest.v1+json"'; then
             # Extract the specific architecture
-            if command -v jq &> /dev/null; then
-                arch_info=$(skopeo inspect "docker://$image_ref_for_inspect" 2>/dev/null | jq -r '"\(.Os)/\(.Architecture)"' 2>/dev/null || echo "")
-                if [ -n "$arch_info" ] && [ "$arch_info" != "/" ]; then
-                    log_error "Single-architecture manifest: $arch_info"
-                else
-                    log_error "Single-architecture manifest"
-                fi
+            arch_info=$(skopeo inspect "docker://$image_ref_for_inspect" 2>/dev/null | jq -r '"\(.Os)/\(.Architecture)"' 2>/dev/null || echo "")
+            if [[ -n "$arch_info" && "$arch_info" != "/" ]]; then
+                log_error "Single-architecture manifest: $arch_info"
             else
                 log_error "Single-architecture manifest"
             fi
@@ -187,7 +219,7 @@ main() {
         echo
     done
 
-    if [ $has_errors -ne 0 ]; then
+    if [[ $has_errors -ne 0 ]]; then
         exit 1
     fi
 

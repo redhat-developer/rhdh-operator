@@ -2,21 +2,33 @@ name: Validate Image Digests
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/validate-image-digests.yaml'
-      - 'Makefile'
-      - 'hack/validate-image-digests.sh'
-      - 'Dockerfile'
-      - '**/*bundle.Dockerfile'
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - 'release-[0-9]+.[0-9]+'
 
 jobs:
   validate-image-digests:
     name: Validate Image Digests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        with:
+          files: |
+            .github/workflows/validate-image-digests.yaml
+            Makefile
+            hack/validate-image-digests.sh
+            Dockerfile
+            **/*bundle.Dockerfile
 
       - name: Run validation script
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: make validate-image-digests
