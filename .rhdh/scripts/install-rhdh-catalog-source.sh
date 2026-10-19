@@ -445,6 +445,30 @@ function update_refs_in_iib_bundles() {
   opm generate dockerfile rhdh/rhdh
 }
 
+# Enabling the route does not mean that the router and registry backends are ready.
+# Probe with the actual login so we also wait for authentication to become available.
+function wait_for_ocp_registry() {
+  local registry
+  local deadline=$((SECONDS + 300))
+
+  while ((SECONDS < deadline)); do
+    if registry=$(oc get route default-route -n openshift-image-registry --request-timeout=10s --template='{{ .spec.host }}' 2>/dev/null) && \
+      [[ -n "${registry}" ]] && \
+      skopeo --command-timeout=15s login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "${registry}" >&2; then
+      printf "%s" "${registry}"
+      return 0
+    fi
+    debugf "Waiting for the OpenShift image registry to accept logins; retrying in 5s..." >&2
+    sleep 5
+  done
+
+  errorf "Timed out waiting for the OpenShift image registry to accept logins (300s)" >&2
+  oc get clusteroperator image-registry --request-timeout=10s >&2 || true
+  oc get deployment,pods,service,endpointslice -n openshift-image-registry --request-timeout=10s >&2 || true
+  oc describe route default-route -n openshift-image-registry --request-timeout=10s >&2 || true
+  return 1
+}
+
 function ocp_install() {
   # Clusters with an hosted control plane do not propagate ImageContentSourcePolicy/ImageDigestMirrorSet resources
   # to the underlying nodes, causing an issue mirroring internal images effectively.
@@ -467,8 +491,9 @@ function ocp_install() {
   internal_registry_url="image-registry.openshift-image-registry.svc:5000"
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge >&2
   oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"disableRedirect":true}}' --type=merge >&2
-  my_registry=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
-  skopeo login -u kubeadmin -p "$(oc whoami -t)" --tls-verify=false "$my_registry" >&2
+  if ! my_registry=$(wait_for_ocp_registry); then
+    return 1
+  fi
   oc -n openshift-marketplace delete secret internal-reg-auth-for-rhdh --ignore-not-found >&2
   oc -n openshift-marketplace delete secret internal-reg-ext-auth-for-rhdh --ignore-not-found >&2
   oc -n openshift-marketplace create secret docker-registry internal-reg-ext-auth-for-rhdh \
