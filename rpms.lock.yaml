@@ -74,34 +74,34 @@ arches:
     name: findutils
     evr: 1:4.10.0-5.el10
     sourcerpm: findutils-4.10.0-5.el10.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/glibc-2.39-142.el10_2.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/glibc-2.39-145.el10_2.aarch64.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
-    size: 1862897
-    checksum: sha256:693942398cdc3433088d5430cc995950f3fbaa6effa167a5f943fdcf5239cd40
+    size: 1863175
+    checksum: sha256:c7dec6a139df15937e0dbc972cd172427b9100cbdc5ceef69cfe30bf1aa82fce
     name: glibc
-    evr: 2.39-142.el10_2
-    sourcerpm: glibc-2.39-142.el10_2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/glibc-common-2.39-142.el10_2.aarch64.rpm
+    evr: 2.39-145.el10_2
+    sourcerpm: glibc-2.39-145.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/glibc-common-2.39-145.el10_2.aarch64.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
-    size: 320930
-    checksum: sha256:56082749290cadbbb493c55bd4aa1188e9d1edc1d530f740f6f4f975ae0e6186
+    size: 321286
+    checksum: sha256:3a00fd4de4f9d1791876b13299e933f44d861415000d307bae966020e145a75c
     name: glibc-common
-    evr: 2.39-142.el10_2
-    sourcerpm: glibc-2.39-142.el10_2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/glibc-gconv-extra-2.39-142.el10_2.aarch64.rpm
+    evr: 2.39-145.el10_2
+    sourcerpm: glibc-2.39-145.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/glibc-gconv-extra-2.39-145.el10_2.aarch64.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
-    size: 1833682
-    checksum: sha256:094f4b0051fc40e45e1f527e6a4ae5e9f3be6ff0cbbbcab716800cd8623ffb4f
+    size: 1833434
+    checksum: sha256:7fae901a1b4f93c4ea150ecf610a2b2cf7b03cda66875e170a6c20eedc58c394
     name: glibc-gconv-extra
-    evr: 2.39-142.el10_2
-    sourcerpm: glibc-2.39-142.el10_2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/glibc-minimal-langpack-2.39-142.el10_2.aarch64.rpm
+    evr: 2.39-145.el10_2
+    sourcerpm: glibc-2.39-145.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/glibc-minimal-langpack-2.39-145.el10_2.aarch64.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
-    size: 31969
-    checksum: sha256:97b6d0e3bc69f29c2b86307b61a508682a8b7d93182861ace87dd13ecd906fbb
+    size: 32349
+    checksum: sha256:77dc287f4b089716353f80dacb6a82d97a2ff0de33523ac495ee1a4ec1908580
     name: glibc-minimal-langpack
-    evr: 2.39-142.el10_2
-    sourcerpm: glibc-2.39-142.el10_2.src.rpm
+    evr: 2.39-145.el10_2
+    sourcerpm: glibc-2.39-145.el10_2.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/g/gmp-6.2.1-12.el10.aarch64.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
     size: 274278
@@ -371,12 +371,12 @@ arches:
     checksum: sha256:57b9c819079c6ee835f87d3e8d3a25e314d5ca54ffe1868f09a52b37a923155d
     name: gcc
     evr: 14.3.1-4.4.el10
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/g/glibc-2.39-142.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/g/glibc-2.39-145.el10_2.src.rpm
     repoid: ubi-10-for-aarch64-baseos-source-rpms
-    size: 21728691
-    checksum: sha256:f622cc7edfa1eebcd0e602e7960b1fedb31b79ee8b6589eef941e0f5c99f845f
+    size: 21738783
+    checksum: sha256:cd1dece432452947ab6a3b19b1d94b4292fdb65a2f3e59a4df65473ce1312b10
     name: glibc
-    evr: 2.39-142.el10_2
+    evr: 2.39-145.el10_2
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/g/gmp-6.2.1-12.el10.src.rpm
     repoid: ubi-10-for-aarch64-baseos-source-rpms
     size: 2107182
@@ -570,34 +570,34 @@ arches:
     name: findutils
     evr: 1:4.10.0-5.el10
     sourcerpm: findutils-4.10.0-5.el10.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/glibc-2.39-142.el10_2.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/glibc-2.39-145.el10_2.x86_64.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
-    size: 2206058
-    checksum: sha256:4883eb444fc4bba504e31ea230a3720aa76341e580c661ef8200673adc1175e1
+    size: 2206293
+    checksum: sha256:58c3395be80343739e06e1b35f0aa95adc767d69d37d5dfbd9ab31bb3f8a3a7b
     name: glibc
-    evr: 2.39-142.el10_2
-    sourcerpm: glibc-2.39-142.el10_2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/glibc-common-2.39-142.el10_2.x86_64.rpm
+    evr: 2.39-145.el10_2
+    sourcerpm: glibc-2.39-145.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/glibc-common-2.39-145.el10_2.x86_64.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
-    size: 333467
-    checksum: sha256:8069e55929d8e3b2e51b8393fc1d3bf016ac4043e09dcbab5012b539be7deb4a
+    size: 334108
+    checksum: sha256:475a7bec99ece4f629afc0ce490bc1eabdee143eb4ddad606b7e28bccecf744d
     name: glibc-common
-    evr: 2.39-142.el10_2
-    sourcerpm: glibc-2.39-142.el10_2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/glibc-gconv-extra-2.39-142.el10_2.x86_64.rpm
+    evr: 2.39-145.el10_2
+    sourcerpm: glibc-2.39-145.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/glibc-gconv-extra-2.39-145.el10_2.x86_64.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
-    size: 1745415
-    checksum: sha256:db522b2a4146ba8b9a9af02c4c59c66270f96048576de03f866486304521e11e
+    size: 1745191
+    checksum: sha256:284c8ee044b2943e1306ab11884b068d7dde011df1a7742d88b7677391461cd3
     name: glibc-gconv-extra
-    evr: 2.39-142.el10_2
-    sourcerpm: glibc-2.39-142.el10_2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/glibc-minimal-langpack-2.39-142.el10_2.x86_64.rpm
+    evr: 2.39-145.el10_2
+    sourcerpm: glibc-2.39-145.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/glibc-minimal-langpack-2.39-145.el10_2.x86_64.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
-    size: 32001
-    checksum: sha256:43b64bab6c6e3c257c3e6a77abefdbf5f8ba908094b80a4438ca56a482feb47c
+    size: 32385
+    checksum: sha256:76d27e5e92d5024a7419f26fa48840314d8b8df8207cbc8a2e8aeb54ad84582a
     name: glibc-minimal-langpack
-    evr: 2.39-142.el10_2
-    sourcerpm: glibc-2.39-142.el10_2.src.rpm
+    evr: 2.39-145.el10_2
+    sourcerpm: glibc-2.39-145.el10_2.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/g/gmp-6.2.1-12.el10.x86_64.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
     size: 326101
@@ -867,12 +867,12 @@ arches:
     checksum: sha256:57b9c819079c6ee835f87d3e8d3a25e314d5ca54ffe1868f09a52b37a923155d
     name: gcc
     evr: 14.3.1-4.4.el10
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/g/glibc-2.39-142.el10_2.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/g/glibc-2.39-145.el10_2.src.rpm
     repoid: ubi-10-for-x86_64-baseos-source-rpms
-    size: 21728691
-    checksum: sha256:f622cc7edfa1eebcd0e602e7960b1fedb31b79ee8b6589eef941e0f5c99f845f
+    size: 21738783
+    checksum: sha256:cd1dece432452947ab6a3b19b1d94b4292fdb65a2f3e59a4df65473ce1312b10
     name: glibc
-    evr: 2.39-142.el10_2
+    evr: 2.39-145.el10_2
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/g/gmp-6.2.1-12.el10.src.rpm
     repoid: ubi-10-for-x86_64-baseos-source-rpms
     size: 2107182
