@@ -3,7 +3,7 @@
 
 #@follow_tag(registry.redhat.io/rhel10/go-toolset:latest)
 # https://registry.access.redhat.com/ubi10/go-toolset
-FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1792425924@sha256:ba35f850304db898e9ffa5c602e6e0bde6ee859d986a3e2808dbc2cf4d2e4ab3 AS builder
+FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1792512688@sha256:93ae1289310acbf92b3b4ac443210b61e113daffb766bc91deb6dea4d502cb01 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # Build as the go-toolset default user (non-root). Hermeto prefetch must chmod the
