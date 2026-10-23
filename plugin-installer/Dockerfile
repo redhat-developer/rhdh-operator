@@ -1,5 +1,5 @@
 # Build stage
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:1.26.7-1792512688@sha256:93ae1289310acbf92b3b4ac443210b61e113daffb766bc91deb6dea4d502cb01 AS builder
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/go-toolset:1.26.10-1792583413@sha256:321516119f1b2487e114ee09a8ae29cfa81c959449a0fc63c8c94e1a2dcf69f5 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -22,7 +22,7 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o plugin-fetch ./cmd/plugin-fetch/
 
 # CA certificates stage - install ca-certificates package the Red Hat way
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/ubi:10.2-1792456870@sha256:4debe04be3b15ff2861e3428cbfa42379a183b16787ca2b8cf124d7afd6e84a5 AS certs
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi10/ubi:10.2-1792744468@sha256:7495bfa53ae7a81a58aeface0bb4858d12741832c542c29dc690d67b183b73b0 AS certs
 
 RUN dnf install ca-certificates --releasever 10 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
     dnf clean all && \
