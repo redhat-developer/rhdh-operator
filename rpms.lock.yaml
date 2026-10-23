@@ -32,13 +32,13 @@ arches:
     name: bash
     evr: 5.2.26-6.el10
     sourcerpm: bash-5.2.26-6.el10.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/c/ca-certificates-2025.2.80_v9.0.305-102.el10_1.noarch.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/c/ca-certificates-2026.2.92_v9.0.319-100.3.el10_2.noarch.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
-    size: 1168767
-    checksum: sha256:34af1f6e677a37aa3f5900bf0af701dd652cd4e47f2a3f5abf5adba41b6c3949
+    size: 1151022
+    checksum: sha256:efc9301eeeb3ab4be7481ae2a05107b0ac33077df6a9b5a7581f830c4e1d81c6
     name: ca-certificates
-    evr: 2025.2.80_v9.0.305-102.el10_1
-    sourcerpm: ca-certificates-2025.2.80_v9.0.305-102.el10_1.src.rpm
+    evr: 2026.2.92_v9.0.319-100.3.el10_2
+    sourcerpm: ca-certificates-2026.2.92_v9.0.319-100.3.el10_2.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/os/Packages/c/coreutils-9.5-8.el10_2.1.aarch64.rpm
     repoid: ubi-10-for-aarch64-baseos-rpms
     size: 1141992
@@ -329,12 +329,12 @@ arches:
     checksum: sha256:247764e4d0f04040de5289564ae606e294ff0a97e09c837fdc8658c42776c0a8
     name: bash
     evr: 5.2.26-6.el10
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/c/ca-certificates-2025.2.80_v9.0.305-102.el10_1.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/c/ca-certificates-2026.2.92_v9.0.319-100.3.el10_2.src.rpm
     repoid: ubi-10-for-aarch64-baseos-source-rpms
-    size: 778019
-    checksum: sha256:07c888ec237a8410b558b339fd94cf2cac1181e88e9ca37d8fd5710cb3544ae0
+    size: 812088
+    checksum: sha256:11a085883271d13cbe072aee1d573a5ad5a337bb6c84c488815ba427306183f3
     name: ca-certificates
-    evr: 2025.2.80_v9.0.305-102.el10_1
+    evr: 2026.2.92_v9.0.319-100.3.el10_2
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/aarch64/baseos/source/SRPMS/Packages/c/chkconfig-1.30-2.el10.src.rpm
     repoid: ubi-10-for-aarch64-baseos-source-rpms
     size: 249867
@@ -528,13 +528,13 @@ arches:
     name: bash
     evr: 5.2.26-6.el10
     sourcerpm: bash-5.2.26-6.el10.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/c/ca-certificates-2025.2.80_v9.0.305-102.el10_1.noarch.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/c/ca-certificates-2026.2.92_v9.0.319-100.3.el10_2.noarch.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
-    size: 1168767
-    checksum: sha256:34af1f6e677a37aa3f5900bf0af701dd652cd4e47f2a3f5abf5adba41b6c3949
+    size: 1151022
+    checksum: sha256:efc9301eeeb3ab4be7481ae2a05107b0ac33077df6a9b5a7581f830c4e1d81c6
     name: ca-certificates
-    evr: 2025.2.80_v9.0.305-102.el10_1
-    sourcerpm: ca-certificates-2025.2.80_v9.0.305-102.el10_1.src.rpm
+    evr: 2026.2.92_v9.0.319-100.3.el10_2
+    sourcerpm: ca-certificates-2026.2.92_v9.0.319-100.3.el10_2.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/c/coreutils-9.5-8.el10_2.1.x86_64.rpm
     repoid: ubi-10-for-x86_64-baseos-rpms
     size: 1182809
@@ -825,12 +825,12 @@ arches:
     checksum: sha256:247764e4d0f04040de5289564ae606e294ff0a97e09c837fdc8658c42776c0a8
     name: bash
     evr: 5.2.26-6.el10
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/c/ca-certificates-2025.2.80_v9.0.305-102.el10_1.src.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/c/ca-certificates-2026.2.92_v9.0.319-100.3.el10_2.src.rpm
     repoid: ubi-10-for-x86_64-baseos-source-rpms
-    size: 778019
-    checksum: sha256:07c888ec237a8410b558b339fd94cf2cac1181e88e9ca37d8fd5710cb3544ae0
+    size: 812088
+    checksum: sha256:11a085883271d13cbe072aee1d573a5ad5a337bb6c84c488815ba427306183f3
     name: ca-certificates
-    evr: 2025.2.80_v9.0.305-102.el10_1
+    evr: 2026.2.92_v9.0.319-100.3.el10_2
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/source/SRPMS/Packages/c/chkconfig-1.30-2.el10.src.rpm
     repoid: ubi-10-for-x86_64-baseos-source-rpms
     size: 249867
