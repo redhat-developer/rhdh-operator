@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -31,7 +32,15 @@ type postgresqlUpgradeState struct {
 	pvcUID          string
 	secretUID       string
 	backstagePodUID string
-	databaseNames   []string
+	databases       []postgresqlDatabase
+}
+
+type postgresqlDatabase struct {
+	Name           string `json:"name"`
+	Encoding       string `json:"encoding"`
+	LocaleProvider string `json:"locale_provider"`
+	Collate        string `json:"collate"`
+	Ctype          string `json:"ctype"`
 }
 
 func logPostgresqlUpgradeCheckpoint(name string, fields ...string) {
@@ -48,19 +57,54 @@ func postgresqlUpgradeDiagnostics(namespace, crName string) string {
 	return fmt.Sprintf(
 		"=== PostgreSQL upgrade diagnostics ===\n"+
 			"=== Operator and operand logs ===\n%s"+
+			"=== Backstage description ===\n%s"+
+			"=== Backstage init container logs ===\n%s"+
 			"=== PostgreSQL logs ===\n%s"+
 			"=== PostgreSQL description ===\n%s",
 		fetchOperatorAndOperandLogs(managerPodLabel, namespace, crLabel),
+		describePod(namespace, crLabel),
+		postgresqlUpgradeInitContainerLogs(namespace, crLabel),
 		getPodLogs(namespace, "", postgresqlLabel),
 		describePod(namespace, postgresqlLabel),
 	)
 }
 
+func postgresqlUpgradeInitContainerLogs(namespace, label string) string {
+	out, err := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "get", "pods", "-l", label,
+		"-o", `jsonpath={range .items[*]}{.metadata.name}{" "}{range .spec.initContainers[*]}{.name}{" "}{end}{"\n"}{end}`))
+	if err != nil {
+		return fmt.Sprintf("Failed to list Backstage init containers: %v\n%s\n", err, out)
+	}
+
+	var logs strings.Builder
+	for _, line := range helper.GetNonEmptyLines(string(out)) {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		for _, container := range fields[1:] {
+			for _, previous := range []bool{false, true} {
+				fmt.Fprintf(&logs, "=== %s/%s (previous=%t) ===\n", fields[0], container, previous)
+				output, logErr := helper.Run(exec.Command(helper.GetPlatformTool(), "-n", namespace, "logs", fields[0],
+					"-c", container, "--tail=100", fmt.Sprintf("--previous=%t", previous)))
+				logs.Write(output)
+				if logErr != nil {
+					fmt.Fprintf(&logs, "\nFailed to collect container logs: %v\n", logErr)
+				}
+			}
+		}
+	}
+	return logs.String()
+}
+
 func preparePostgresqlUpgrade(namespace, crName string) *postgresqlUpgradeState {
 	state := &postgresqlUpgradeState{}
 	postgresPod := waitForPostgresql(namespace, crName, postgresqlSourceImage, postgresqlSourceVersion)
-	state.databaseNames = postgresqlDatabaseNames(namespace, postgresPod)
-	Expect(state.databaseNames).To(ContainElement(postgresqlProofDatabase))
+	By("waiting for source Backstage readiness before inspecting application databases")
+	state.backstagePodUID = readyPodUID(namespace, fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName))
+	state.databases = postgresqlDatabases(namespace, postgresPod)
+	Expect(state.databases).To(ContainElement(HaveField("Name", postgresqlProofDatabase)))
+	logPostgresqlUpgradeCheckpoint("database-locales-recorded", fmt.Sprintf("databases=%+v", state.databases))
 
 	By("seeding data that must survive the PostgreSQL upgrade")
 	_, err := runPostgresqlSQL(namespace, postgresPod, postgresqlProofDatabase, `
@@ -72,14 +116,13 @@ INSERT INTO public.rhdh_postgresql_upgrade_test VALUES ('`+postgresqlProofValue+
 	state.postgresPodUID = resourceUID(namespace, "pod", postgresPod)
 	state.pvcUID = resourceUID(namespace, "pvc", postgresqlPVCName(crName))
 	state.secretUID = resourceUID(namespace, "secret", postgresqlSecretName(crName))
-	state.backstagePodUID = readyPodUID(namespace, fmt.Sprintf("rhdh.redhat.com/app=backstage-%s", crName))
 	logPostgresqlUpgradeCheckpoint("source-ready",
 		fmt.Sprintf("pod=%s", postgresPod),
 		fmt.Sprintf("podUID=%s", state.postgresPodUID),
 		fmt.Sprintf("pvcUID=%s", state.pvcUID),
 		fmt.Sprintf("secretUID=%s", state.secretUID),
 		fmt.Sprintf("backstagePodUID=%s", state.backstagePodUID),
-		fmt.Sprintf("databases=%d", len(state.databaseNames)),
+		fmt.Sprintf("databases=%d", len(state.databases)),
 		fmt.Sprintf("proofDatabase=%s", postgresqlProofDatabase),
 		fmt.Sprintf("proofValue=%s", postgresqlProofValue),
 	)
@@ -150,12 +193,13 @@ func completePostgresqlUpgrade(namespace, crName string, state *postgresqlUpgrad
 
 	By("restoring the PostgreSQL 15 dump into PostgreSQL 18")
 	restorePostgresql(namespace, postgresPod, state.dumpPath)
-	restoredDatabaseNames := postgresqlDatabaseNames(namespace, postgresPod)
-	Expect(restoredDatabaseNames).To(Equal(state.databaseNames))
-	refreshPostgresqlCollations(namespace, postgresPod)
+	restoredDatabases := postgresqlDatabases(namespace, postgresPod)
+	Expect(restoredDatabases).To(Equal(state.databases), "restored database names, encodings, and locales must match the source")
+	logPostgresqlUpgradeCheckpoint("database-locales-verified", fmt.Sprintf("databases=%d", len(restoredDatabases)))
+	expectNoPostgresqlCollationMismatches(namespace, postgresPod)
 	Expect(queryPostgresqlUpgradeProof(namespace, postgresPod)).To(Equal(postgresqlProofValue))
 	logPostgresqlUpgradeCheckpoint("restore-verified",
-		fmt.Sprintf("databases=%d", len(restoredDatabaseNames)),
+		fmt.Sprintf("databases=%d", len(restoredDatabases)),
 		fmt.Sprintf("proofDatabase=%s", postgresqlProofDatabase),
 		fmt.Sprintf("proofValue=%s", postgresqlProofValue),
 	)
@@ -285,26 +329,32 @@ func validatePostgresqlRestoreErrors(stderr string) error {
 	return nil
 }
 
-func postgresqlDatabaseNames(namespace, podName string) []string {
+func postgresqlDatabases(namespace, podName string) []postgresqlDatabase {
 	out, err := helper.Run(postgresqlSQLCommand(namespace, podName, "postgres",
-		"-tA", "-v", "ON_ERROR_STOP=1", "-c",
-		"SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname;"))
+		"-tA", "-v", "ON_ERROR_STOP=1", "-c", `
+SELECT json_agg(database_metadata ORDER BY name)
+FROM (
+  SELECT datname AS name, pg_encoding_to_char(encoding) AS encoding,
+         datlocprovider AS locale_provider, datcollate AS collate, datctype AS ctype
+  FROM pg_database
+  WHERE NOT datistemplate
+) AS database_metadata;`))
 	Expect(err).NotTo(HaveOccurred())
-	return helper.GetNonEmptyLines(strings.TrimSpace(string(out)))
+	var databases []postgresqlDatabase
+	Expect(json.Unmarshal(out, &databases)).To(Succeed())
+	return databases
 }
 
-func refreshPostgresqlCollations(namespace, podName string) {
+// A logical restore rebuilds indexes and records the target collation versions.
+// Refreshing here would hide a mismatch instead of detecting it.
+func expectNoPostgresqlCollationMismatches(namespace, podName string) {
 	out, err := helper.Run(postgresqlSQLCommand(namespace, podName, "postgres",
 		"-tA", "-v", "ON_ERROR_STOP=1", "-c",
-		"SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION;', datname) FROM pg_database WHERE datallowconn AND datname <> 'template0' ORDER BY datname;"))
+		"SELECT datname FROM pg_database WHERE datallowconn AND datcollversion IS DISTINCT FROM pg_database_collation_actual_version(oid) ORDER BY datname;"))
 	Expect(err).NotTo(HaveOccurred())
-
-	statements := helper.GetNonEmptyLines(string(out))
-	for _, statement := range statements {
-		_, err = runPostgresqlSQL(namespace, podName, "postgres", statement)
-		Expect(err).NotTo(HaveOccurred())
-	}
-	logPostgresqlUpgradeCheckpoint("collations-refreshed", fmt.Sprintf("databases=%d", len(statements)))
+	Expect(helper.GetNonEmptyLines(string(out))).To(BeEmpty(),
+		"databases with a collation version mismatch; rebuild affected indexes, then run ALTER DATABASE ... REFRESH COLLATION VERSION")
+	logPostgresqlUpgradeCheckpoint("collations-verified")
 }
 
 func runCommand(cmd *exec.Cmd, stdin io.Reader, stdout, stderr io.Writer) error {

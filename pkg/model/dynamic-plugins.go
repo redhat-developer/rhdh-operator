@@ -387,14 +387,24 @@ func MergePluginsData(firstData, secondData string) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal second ConfigMap data: %w", err)
 	}
 
-	// Resolve references ({{inherit}}, ref://, etc.) in secondPluginsConfig using firstPluginsConfig as base
+	// Resolve references against inline OCI catalog entries before merging, even
+	// when the installation script handles plugin installation. References without
+	// a matching inline OCI package are left for the script to resolve from included files.
+	var (
+		resolvedPlugins []DynaPlugin
+		err             error
+	)
 	if IsOperatorDPProcessing() {
-		resolvedPlugins, err := resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins)
-		if err != nil {
-			return "", err
-		}
-		secondPluginsConfig.Plugins = resolvedPlugins
+		// Operator processing requires all references to resolve here.
+		resolvedPlugins, err = resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins, false)
+	} else {
+		// The init container can resolve references from included files.
+		resolvedPlugins, err = resolveReferences(secondPluginsConfig.Plugins, firstPluginsConfig.Plugins, true)
 	}
+	if err != nil {
+		return "", err
+	}
+	secondPluginsConfig.Plugins = resolvedPlugins
 
 	// Merge Plugins by package field
 	pluginMap := make(map[string]DynaPlugin)
