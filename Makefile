@@ -228,6 +228,10 @@ validate-image-digests: ## Validate that Dockerfile digests are manifest lists (
 	@echo
 	@hack/validate-image-digests.sh
 
+.PHONY: check-installer-rbac
+check-installer-rbac: ## Verify the OLM v1 installer ClusterRole can grant the bundle RBAC
+	@hack/check-installer-rbac.sh
+
 CRD_BASELINE_REF ?= main
 
 .PHONY: crd-upgrade-check
