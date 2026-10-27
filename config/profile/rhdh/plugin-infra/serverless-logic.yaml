@@ -16,9 +16,12 @@ metadata:
   name: logic-operator
   namespace: openshift-serverless-logic
 spec:
-  channel: stable  #  channel of an operator package to subscribe to
+  channel: stable-1.37  #  channel of an operator package to subscribe to
   installPlanApproval: Automatic #  whether the update should be installed automatically
   name: logic-operator  #  name of the operator package
   source: redhat-operators  #  name of the catalog source
   sourceNamespace: openshift-marketplace
-  startingCSV: logic-operator.v1.37.3  # The initial version of the operator
+  # The CSV version tracks the operator bundle, not the OSL product version:
+  # OSL 1.37.3 ships logic-operator.v1.37.4 because CVP requires a new bundle
+  # version for every container image rebuild.
+  startingCSV: logic-operator.v1.37.4  # The initial version of the operator
