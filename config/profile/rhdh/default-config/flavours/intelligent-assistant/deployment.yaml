@@ -6,7 +6,7 @@ spec:
       containers:
         # Lightspeed Core Backend
         - name: lightspeed-core
-          image: quay.io/lightspeed-core/lightspeed-stack:0.7.1
+          image: quay.io/lightspeed-core/lightspeed-stack:0.7.2
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
