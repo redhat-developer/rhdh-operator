@@ -876,7 +876,6 @@ if [[ "$#" -lt 1 ]]; then
   exit 0
 fi
 
-# if logged in, this should return something like latest-v4.12-x86_64
 IIB_STREAM="latest"
 TO_INSTALL=""
 
@@ -887,7 +886,6 @@ while [[ "$#" -gt 0 ]]; do
       shift 1
       ;;
     '--next'|'--latest')
-      # if logged in, this should return something like latest-v4.12-x86_64 or next-v4.12-x86_64
       IIB_STREAM="${1/--/}"
       ;;
     '-v')
@@ -1016,6 +1014,7 @@ if [[ "${IS_OPENSHIFT}" = "true" ]]; then
   fi
 fi
 
+# if logged in, this should return something like latest-v4.22-x86_64
 IIB_TAG="${IIB_STREAM}-${OCP_VER}-${OCP_ARCH}"
 
 if [[ $UPSTREAM_IIB_OVERRIDE ]]; then
