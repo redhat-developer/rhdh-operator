@@ -22,7 +22,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: okp
-          image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1792687969
+          image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -84,7 +84,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: okp
-          image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1792687969
+          image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
