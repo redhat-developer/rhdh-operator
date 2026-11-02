@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -119,7 +120,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers := getTLSProfileConfig(ctx, restConfig, plf.IsOpenshift())
+	tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers, err := getTLSProfileConfig(ctx, restConfig, plf.IsOpenshift())
+	if err != nil {
+		setupLog.Error(err, "unable to get TLS profile config")
+		os.Exit(1)
+	}
 	if len(unsupportedCiphers) > 0 {
 		setupLog.Info("TLS profile contains ciphers unsupported by Go that will be ignored", "ciphers", unsupportedCiphers)
 	}
@@ -360,7 +365,7 @@ func getTLSProfileConfig(
 	ctx context.Context,
 	restConfig *rest.Config,
 	isOpenshift bool,
-) (configv1.TLSProfileSpec, configv1.TLSAdherencePolicy, func(*tls.Config), []string) {
+) (configv1.TLSProfileSpec, configv1.TLSAdherencePolicy, func(*tls.Config), []string, error) {
 	tlsSecurityProfileSpec := *configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
 	tlsAdherence := configv1.TLSAdherencePolicyNoOpinion
 
@@ -383,8 +388,11 @@ func getTLSProfileConfig(
 		}
 	}
 
-	tlsConfig, unsupportedCiphers := tlspkg.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
-	return tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers
+	tlsConfig, unsupportedCiphers, err := tlspkg.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	if err != nil {
+		return configv1.TLSProfileSpec{}, "", nil, nil, fmt.Errorf("unable to create TLS config from profile: %w", err)
+	}
+	return tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers, nil
 }
 
 func setupTLSProfileWatcher(
