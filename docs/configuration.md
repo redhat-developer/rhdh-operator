@@ -1133,3 +1133,5 @@ If local DB is enabled (which is simpler but not recommended for production), th
 If local DB is disabled (`enableLocalDb: false`), then the secret with DB connection information must be created manually and specified in either **spec.database.authSecretName** or one of **spec.application.extraEnvs.secrets**.
   
 For more information, refer to the [External DB Integration](external-db.md) manual.
+
+To upgrade the local PostgreSQL database or move its data to an external server, see [Local database migration](db_migration.md).
