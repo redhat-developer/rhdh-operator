@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -11,6 +12,11 @@ const ociPrefix = "oci://"
 const httpsPrefix = "https://"
 const httpPrefix = "http://"
 const localPrefix = "./"
+
+var (
+	errPluginReferenceNotFound = errors.New("plugin not found in default plugins")
+	errPluginReferenceNonOCI   = errors.New("only OCI references are supported")
+)
 
 // resolveReferences resolves all reference types in plugin package URLs.
 //
@@ -30,8 +36,10 @@ const localPrefix = "./"
 //   - http://...: HTTP URL to plugin archive
 //   - ./path: Local filesystem path
 //
-// Any other prefix returns an error.
-func resolveReferences(plugins []DynaPlugin, basePlugins []DynaPlugin) ([]DynaPlugin, error) {
+// When allowUnresolved is true, references without a matching inline OCI package
+// are left for the script to resolve from included files. Formats supported only
+// by the installation script are also left unchanged.
+func resolveReferences(plugins []DynaPlugin, basePlugins []DynaPlugin, allowUnresolved bool) ([]DynaPlugin, error) {
 	resolved := make([]DynaPlugin, len(plugins))
 	copy(resolved, plugins)
 
@@ -42,24 +50,32 @@ func resolveReferences(plugins []DynaPlugin, basePlugins []DynaPlugin) ([]DynaPl
 		}
 
 		var err error
+		var packageURL string
 
 		switch {
 		case strings.HasPrefix(plugin.Package, refPrefix):
 			// Catalog search by name
-			resolved[i].Package, err = resolveRefReference(plugin.Package, basePlugins)
+			packageURL, err = resolveRefReference(plugin.Package, basePlugins)
 		case strings.Contains(plugin.Package, inheritSuffix):
 			// Catalog search by name, inherit version/digest
-			resolved[i].Package, err = resolveInheritReference(plugin.Package, basePlugins)
+			packageURL, err = resolveInheritReference(plugin.Package, basePlugins)
 		case plugin.IsDirectLink():
 			// Direct link - no resolution needed
 			continue
 		default:
+			if allowUnresolved {
+				continue
+			}
 			return nil, fmt.Errorf("unsupported package URL format %q: must start with oci://, https://, http://, ./ or use ref:// for catalog lookup", plugin.Package)
 		}
 
 		if err != nil {
+			if allowUnresolved && (errors.Is(err, errPluginReferenceNotFound) || errors.Is(err, errPluginReferenceNonOCI)) {
+				continue
+			}
 			return nil, err
 		}
+		plugin.Package = packageURL
 	}
 
 	return resolved, nil
@@ -105,7 +121,7 @@ func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (strin
 		}
 		if plugin.Name() == pluginName {
 			if !strings.HasPrefix(plugin.Package, ociPrefix) {
-				return "", fmt.Errorf("cannot resolve {{inherit}} reference: plugin %q has non-OCI package URL %q; {{inherit}} only supports OCI references", pluginName, plugin.Package)
+				return "", fmt.Errorf("cannot resolve {{inherit}} reference: plugin %q has non-OCI package URL %q: %w", pluginName, plugin.Package, errPluginReferenceNonOCI)
 			}
 			fullURL := plugin.Package
 
@@ -123,7 +139,7 @@ func resolveInheritReference(packageURL string, basePlugins []DynaPlugin) (strin
 		}
 	}
 
-	return "", fmt.Errorf("cannot resolve {{inherit}} reference: no plugin named %q found in default plugins", pluginName)
+	return "", fmt.Errorf("cannot resolve {{inherit}} reference %q: %w", pluginName, errPluginReferenceNotFound)
 }
 
 // resolveRefReference resolves a ref:// reference by looking up plugin by name.
@@ -145,13 +161,13 @@ func resolveRefReference(packageURL string, basePlugins []DynaPlugin) (string, e
 		}
 		if plugin.Name() == refName {
 			if !strings.HasPrefix(plugin.Package, ociPrefix) {
-				return "", fmt.Errorf("cannot resolve ref:// reference: plugin %q has non-OCI package URL %q; ref:// only supports OCI references", refName, plugin.Package)
+				return "", fmt.Errorf("cannot resolve ref:// reference: plugin %q has non-OCI package URL %q: %w", refName, plugin.Package, errPluginReferenceNonOCI)
 			}
 			return plugin.Package, nil
 		}
 	}
 
-	return "", fmt.Errorf("cannot resolve ref:// reference: no plugin named %q found in default plugins", refName)
+	return "", fmt.Errorf("cannot resolve ref:// reference %q: %w", refName, errPluginReferenceNotFound)
 }
 
 // Name extracts the plugin name from the package URL.
