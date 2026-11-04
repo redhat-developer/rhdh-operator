@@ -230,7 +230,12 @@ spec:
 
 For full documentation and examples, see [Plugin References](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#plugin-references).
 
-**Operator-specific behavior:** The operator resolves all references during ConfigMap merge (before passing to the init container). If a reference cannot be resolved, the operator returns an error and the Backstage CR will not reconcile.
+**Operator-specific behavior:** Reference resolution depends on the processing mode:
+
+- With `OPERATOR_DP_PROCESSING=true`, the operator resolves all references during ConfigMap merge. Missing references, malformed references, and non-OCI reference targets cause an error and prevent the Backstage CR from reconciling.
+- With `OPERATOR_DP_PROCESSING=false`, the operator resolves references that match inline OCI catalog entries before merging. References without a matching inline OCI package remain unchanged for the init container to resolve from included files. A same-name HTTP or local inline entry does not block this fallback. Malformed references still cause an error.
+
+Catalog references require OCI targets in both modes. HTTP and local packages remain supported as direct links.
 
 ## Dynamic plugins dependency management
 
