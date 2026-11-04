@@ -1,0 +1,161 @@
+name: Nightly checks
+
+on:
+  # workflow_dispatch so that it can be triggered manually if needed
+  workflow_dispatch:
+  schedule:
+    - cron: "34 23 * * *"
+
+jobs:
+  nightly-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch:
+          - main
+          - release-2.1
+          - release-1.10
+          - release-1.9
+    name: 'Nightly Tests on ${{ matrix.branch }}'
+    concurrency:
+      group: '${{ github.workflow }}-${{ matrix.branch }}'
+      cancel-in-progress: true
+    env:
+      CONTAINER_TOOL: podman
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.branch }}
+          fetch-depth: 0
+
+      - name: Set env vars
+        run: |
+          echo "COMMIT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+          OPERATOR_MANIFEST="${{ github.workspace }}/dist/rhdh/install.yaml"
+          echo "OPERATOR_MANIFEST=${OPERATOR_MANIFEST}" >> $GITHUB_ENV
+          OPERATOR_IMAGE=$(curl -s "file://${OPERATOR_MANIFEST}" | yq 'select(.kind == "Deployment" and .metadata.labels.app == "rhdh-operator") | .spec.template.spec.containers[0].image')
+          echo "OPERATOR_IMAGE=${OPERATOR_IMAGE}" >> $GITHUB_ENV
+
+      - name: Check if operator image exists in remote registry
+        id: operator-image-existence-checker
+        run: |
+          echo "OPERATOR_IMAGE_EXISTS=$(skopeo inspect "docker://${{ env.OPERATOR_IMAGE }}" > /dev/null && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+
+      - name: Display warning if image was not found
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'false' }}
+        run: |
+          echo "::warning ::Operator Image ${{ env.OPERATOR_IMAGE }} not found for testing the ${{ matrix.branch }} branch. It might have expired. E2E tests will be skipped for ${{ matrix.branch }}."
+
+      - name: Remove unnecessary files to free up disk space
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: endersonmenezes/free-disk-space@8b8cd4e2277836962939a8f3b4ea0ee4bc006156 # v4
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          rm_cmd: "rmz"
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: 'go.mod'
+
+      # gosec needs a "build" stage so connect it to the lint step which we always do
+      - name: Build
+        run: make lint
+
+      - name: Test
+        run: |
+          make local-dynamic-plugins
+          make test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: cover.out
+          flags: unittests,nightly
+          fail_ci_if_error: false
+          override_commit: ${{ env.COMMIT_SHA }}
+          override_branch: ${{ matrix.branch }}
+
+      - name: Create Kind cluster (integration tests)
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: integration-test-cluster
+          ignore_failed_clean: true
+
+      - name: Run Controller
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        # run this stage only if there are changes that match the includes and not the excludes
+        run: |
+          # Need to 'make install' first, so that the necessary tool binaries (like controller-gen) can be downloaded locally.
+          # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
+          # but the `make test` command tries to use it.
+          make manifests generate fmt vet install
+          make local-dynamic-plugins
+          make run &
+          MAKE_RUN_BG_PID=$!
+          echo "MAKE_RUN_BG_PID=${MAKE_RUN_BG_PID}" | tee -a $GITHUB_ENV
+
+      - name: Generic Integration test
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        # run this stage only if there are changes that match the includes and not the excludes
+        # perform it on backstage.io for speed
+        run: |
+          make integration-test PROFILE=backstage.io USE_EXISTING_CLUSTER=true USE_EXISTING_CONTROLLER=true
+          kill "${{ env.MAKE_RUN_BG_PID }}" || true
+          make uninstall || true
+
+      - name: Delete integration test cluster
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          kind delete cluster --name integration-test-cluster || true
+
+      - name: Generate Kind Config
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          cat <<EOF > /tmp/kind-config.yaml
+          apiVersion: kind.x-k8s.io/v1alpha4
+          kind: Cluster
+          nodes:
+            - role: control-plane
+              extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+                - containerPort: 443
+                  hostPort: 443
+                  protocol: TCP
+          EOF
+
+      - name: Create Kind cluster (E2E)
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          cluster_name: e2e-test-cluster
+          config: /tmp/kind-config.yaml
+          ignore_failed_clean: true
+
+      - name: Install Ingress Controller
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: |
+          kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=90s
+
+      - name: Run E2E tests
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        env:
+          BACKSTAGE_OPERATOR_TESTS_PLATFORM: kind
+          BACKSTAGE_OPERATOR_TESTS_KIND_CLUSTER: e2e-test-cluster
+          BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS: 'true'
+          BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN: '127.0.0.1.sslip.io'
+          BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT: ${{ vars.BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT }}
+          OPERATOR_MANIFEST: ${{ env.OPERATOR_MANIFEST }}
+          IMG: ${{ env.OPERATOR_IMAGE }}
+        run: make test-e2e
