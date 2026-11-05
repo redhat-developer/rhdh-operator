@@ -46,7 +46,7 @@ RUN echo "backstage:x:1001:0:backstage user:/:/sbin/nologin" >> /mnt/rootfs/etc/
 # Final minimal image using UBI micro
 #@follow_tag(registry.redhat.io/ubi10/ubi-micro:latest)
 # https://registry.access.redhat.com/ubi10/ubi-micro
-FROM registry.access.redhat.com/ubi10/ubi-micro:10.2-1792455530@sha256:1c105e547de5d9e0bc20d06ebabee73b20bc6bba994c50ae3e207684fd8bef2b
+FROM registry.access.redhat.com/ubi10/ubi-micro:10.2-1793858790@sha256:8488f5ec082768a01d1ce4e0ef3878f782a40ff6d233afa74bc23d4e740620a4
 
 COPY --from=rpm-builder /mnt/rootfs /
 
