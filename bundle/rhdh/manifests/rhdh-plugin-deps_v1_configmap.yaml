@@ -470,7 +470,7 @@ data:
             set -eu
 
             microdnf install -y tar gzip
-            # Purposely pinned to 1.39.0. OSL Operator needed to be bumped to 1.39.1 during the OSL 1.39 rebuilds (https://redhat.atlassian.net/browse/SRVLOGIC-1303), but the other images/tools were only rebuilt.
+            # Purposely pinned to 1.39.0. OSL Operator needed to be bumped to 1.39.2 during the OSL 1.39 rebuilds (https://redhat.atlassian.net/browse/SRVLOGIC-1303), but the other images/tools were only rebuilt.
             KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.39.0/kn-workflow-linux-amd64.tar.gz"
             curl -L "$KN_CLI_URL" | tar -xz --no-same-owner && chmod +x kn-workflow-linux-amd64 && mv kn-workflow-linux-amd64 kn-workflow
             ./kn-workflow gen-manifest --namespace ""
