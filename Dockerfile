@@ -3,7 +3,7 @@
 
 #@follow_tag(registry.redhat.io/rhel10/go-toolset:latest)
 # https://registry.access.redhat.com/ubi10/go-toolset
-FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1793860208@sha256:fc4a3dfb8f562065cd3e31e2b4544fe1144baef84529adaf3245fac68d7a193d AS builder
+FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1793908205@sha256:cb712e78c45e429142e846c1b8b91894970eab3b66fd5a95d336b65b4f7bb877 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 # hadolint ignore=DL3002
@@ -34,7 +34,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Install openssl for FIPS support into an isolated rootfs
 #@follow_tag(registry.redhat.io/ubi10/ubi:latest)
 # https://registry.access.redhat.com/ubi10/ubi
-FROM registry.access.redhat.com/ubi10/ubi:10.2-1793697573@sha256:b0a29d36a12733acd937b3f857678539d7ce2dab63bd048cfae8685247b4365c AS rpm-builder
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1793860810@sha256:0e8ccad7d35f5fd756f4f2202f018b8d3c3e8bb9af8e627d874239381a00ab41 AS rpm-builder
 RUN mkdir -p /mnt/rootfs
 RUN dnf install --installroot /mnt/rootfs \
     openssl \
