@@ -234,6 +234,10 @@ check-installer-rbac: ## Verify the OLM v1 installer ClusterRole can grant the b
 
 CRD_BASELINE_REF ?= main
 
+.PHONY: eol-release
+eol-release: ## Drop the EOL release branch from nightly, upgrade, and Renovate
+	go run ./hack/eol-release --tag "$(TAG)" --write
+
 .PHONY: crd-upgrade-check
 crd-upgrade-check: crdify kustomize ## Check CRD upgrade safety against the base branch.
 	@echo "Checking CRD upgrade safety: $(CRD_BASELINE_REF) -> current working tree"

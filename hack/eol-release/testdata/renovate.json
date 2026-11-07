@@ -1,0 +1,158 @@
+{
+  "extends": [
+    "config:best-practices",
+    ":gitSignOff",
+    ":rebaseStalePrs",
+    "docker:disableMajor",
+    "default:pinDigestsDisabled",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "labels": [
+    "kind/dependency upgrade"
+  ],
+  "baseBranchPatterns": [
+    "main",
+    "/^release-1\\.(9|\\d{2,}).*/",
+    "/^release-([2-9]|\\d{2,})\\..*/"
+  ],
+  "constraints": {
+    "go": "1.26"
+  },
+  "kustomize": {
+    "enabled": false
+  },
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "enabled": false,
+      "groupName": "all minor dependencies",
+      "groupSlug": "all-minor",
+      "matchPackageNames": [
+        "*"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ]
+    },
+    {
+      "groupName": "all patch dependencies",
+      "groupSlug": "all-patch",
+      "matchPackageNames": [
+        "*"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ]
+    },
+    {
+      "description": "Do NOT generate PRs to pin or apply digests to dockerfiles",
+      "enabled": false,
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "pin",
+        "pinDigest",
+        "digest"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Do generate PRs for minor dockerfile updates in 1.y ",
+      "enabled": true,
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "matchBaseBranches": [
+        "main",
+        "/^release-1\\.(9|\\d{2,}).*/",
+        "/^release-([2-9]|\\d{2,})\\..*/"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Do automerge patch updates to dockerfiles",
+      "enabled": true,
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "additionalBranchPrefix": "dockerfile ",
+      "groupName": "All dockerfile images",
+      "automerge": true,
+      "pinDigests": false
+    },
+    {
+      "description": "Do NOT generate PRs for major go dependency updates ",
+      "enabled": false,
+      "matchDatasources": [
+        "go"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Do automerge go dependency patch updates, except for versions starting with 0",
+      "enabled": true,
+      "matchDatasources": [
+        "go"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
+    },
+    {
+      "description": "Do generate PRs for golang version patch bumps, keeping x.yy version the same",
+      "enabled": true,
+      "matchDatasources": [
+        "golang-version"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "Do automerge and pin actions in GH workflows, except for versions starting with 0",
+      "enabled": true,
+      "matchDatasources": [
+        "github-runners"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "addLabels": [
+      "kind/security"
+    ]
+  },
+  "osvVulnerabilityAlerts": true,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": [
+        "# renovate: datasource=docker depName=(?<depName>\\S+)\\nHERMETO_IMAGE \\?= \\S+:(?<currentValue>\\S+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ]
+}
