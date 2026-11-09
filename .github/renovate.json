@@ -136,6 +136,12 @@
       ],
       "matchCurrentVersion": "!/^0/",
       "automerge": true
+    },
+    {
+      "description": "Disable routine updates for indirect Go deps; vulnerability alerts handle CVE-only updates separately",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": false
     }
   ],
   "vulnerabilityAlerts": {
