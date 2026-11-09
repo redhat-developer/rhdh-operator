@@ -5,7 +5,8 @@
     ":rebaseStalePrs",
     "docker:disableMajor",
     "default:pinDigestsDisabled",
-    "helpers:pinGitHubActionDigests"
+    "helpers:pinGitHubActionDigests",
+    "security:gomodIndirectSecurityUpdates"
   ],
   "labels": [
     "kind/dependency upgrade"
@@ -135,6 +136,13 @@
       ],
       "matchCurrentVersion": "!/^0/",
       "automerge": true
+    },
+    {
+      "description": "Disable routine updates for indirect Go deps; vulnerability alerts handle CVE-only updates separately",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "matchUpdateTypes": ["major", "minor", "patch", "pin", "pinDigest", "digest", "lockFileMaintenance", "rollback", "replacement", "bump"],
+      "enabled": false
     }
   ],
   "vulnerabilityAlerts": {
