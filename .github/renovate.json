@@ -141,6 +141,7 @@
       "description": "Disable routine updates for indirect Go deps; vulnerability alerts handle CVE-only updates separately",
       "matchManagers": ["gomod"],
       "matchDepTypes": ["indirect"],
+      "matchUpdateTypes": ["major", "minor", "patch", "pin", "pinDigest", "digest", "lockFileMaintenance", "rollback", "replacement", "bump"],
       "enabled": false
     }
   ],
