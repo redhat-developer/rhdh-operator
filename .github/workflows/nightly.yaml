@@ -14,9 +14,9 @@ jobs:
       matrix:
         branch:
           - main
+          - release-2.1
           - release-1.10
           - release-1.9
-          - release-1.8
     name: 'Nightly Tests on ${{ matrix.branch }}'
     concurrency:
       group: '${{ github.workflow }}-${{ matrix.branch }}'
@@ -24,7 +24,7 @@ jobs:
     env:
       CONTAINER_TOOL: podman
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ matrix.branch }}
           fetch-depth: 0
@@ -49,7 +49,7 @@ jobs:
 
       - name: Remove unnecessary files to free up disk space
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
-        uses: endersonmenezes/free-disk-space@7901478139cff6e9d44df5972fd8ab8fcade4db1 # v3
+        uses: endersonmenezes/free-disk-space@8b8cd4e2277836962939a8f3b4ea0ee4bc006156 # v4
         with:
           remove_android: true
           remove_dotnet: true
@@ -57,7 +57,7 @@ jobs:
           rm_cmd: "rmz"
 
       - name: Setup Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: 'go.mod'
 
@@ -66,10 +66,12 @@ jobs:
         run: make lint
 
       - name: Test
-        run: make test
+        run: |
+          make local-dynamic-plugins
+          make test
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: cover.out
@@ -93,6 +95,7 @@ jobs:
           # Otherwise, we might end up with a race condition where the tool binary is not yet downloaded,
           # but the `make test` command tries to use it.
           make manifests generate fmt vet install
+          make local-dynamic-plugins
           make run &
           MAKE_RUN_BG_PID=$!
           echo "MAKE_RUN_BG_PID=${MAKE_RUN_BG_PID}" | tee -a $GITHUB_ENV

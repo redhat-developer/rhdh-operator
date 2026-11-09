@@ -66,8 +66,8 @@ func TestFlavoursWithDefaultsEnabled(t *testing.T) {
 	dynamicPlugins := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
 	err = yaml.Unmarshal([]byte(dynamicPlugins.ConfigMap.Data[DynamicPluginsFile]), &dpConfig)
 	assert.NoError(t, err)
-	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "plugin-base"))
-	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "plugin-flavor1"))
+	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-base"))
+	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-flavor1"))
 }
 
 func TestFlavoursWithExplicitEnabled(t *testing.T) {
@@ -115,9 +115,9 @@ func TestFlavoursWithExplicitEnabled(t *testing.T) {
 	var dpConfig DynaPluginsConfig
 	err = yaml.Unmarshal([]byte(model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).ConfigMap.Data[DynamicPluginsFile]), &dpConfig)
 	assert.NoError(t, err)
-	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "plugin-base"))
-	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "plugin-flavor2"))
-	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "plugin-flavor1"))
+	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-base"))
+	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-flavor2"))
+	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-flavor1"))
 }
 
 func TestFlavoursWithDefaultDisabled(t *testing.T) {
@@ -159,8 +159,8 @@ func TestFlavoursWithDefaultDisabled(t *testing.T) {
 	var dpConfig DynaPluginsConfig
 	err = yaml.Unmarshal([]byte(model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).ConfigMap.Data[DynamicPluginsFile]), &dpConfig)
 	assert.NoError(t, err)
-	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "plugin-base"))
-	assert.Nil(t, findPluginByPackage(dpConfig.Plugins, "plugin-flavor1"))
+	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-base"))
+	assert.Nil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-flavor1"))
 }
 
 func TestFlavoursOnlyNoBase(t *testing.T) {
@@ -196,8 +196,8 @@ func TestFlavoursOnlyNoBase(t *testing.T) {
 	var dpConfig DynaPluginsConfig
 	err = yaml.Unmarshal([]byte(model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins).ConfigMap.Data[DynamicPluginsFile]), &dpConfig)
 	assert.NoError(t, err)
-	assert.Nil(t, findPluginByPackage(dpConfig.Plugins, "plugin-base"), "base plugin should NOT exist")
-	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "plugin-flavor3"), "flavor3 plugin should exist")
+	assert.Nil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-base"), "base plugin should NOT exist")
+	assert.NotNil(t, findPluginByPackage(dpConfig.Plugins, "./plugin-flavor3"), "flavor3 plugin should exist")
 }
 
 func TestFlavoursWithEmptyArray(t *testing.T) {

@@ -28,11 +28,11 @@ type DbStatefulSet struct {
 }
 
 func init() {
-	registerConfig(DbStatefulSetKey, DbStatefulSetFactory{}, false, nil)
+	registerConfig(DbStatefulSetKey, DbStatefulSetFactory{}, false, noMerge)
 }
 
 func DbStatefulSetName(backstageName string) string {
-	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql")
+	return utils.GenerateRuntimeObjectName(backstageName, utils.BackstageDBAppName)
 }
 
 func (b *DbStatefulSet) Object() runtime.Object {
@@ -95,6 +95,11 @@ func (b *DbStatefulSet) updateAndValidate(backstage api.Backstage, scheme *runti
 			b.setDbSecretEnvVar(b.container(), secret.Name)
 		}
 	}
+
+	if backstage.GetAnnotations()[IdleAnnotation] == "true" {
+		b.statefulSet.Spec.Replicas = new(int32)
+	}
+
 	return nil
 }
 

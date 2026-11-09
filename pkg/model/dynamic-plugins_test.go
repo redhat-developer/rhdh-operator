@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -13,8 +14,10 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -206,7 +209,7 @@ func TestWithDynamicPluginsDeps(t *testing.T) {
 
 	yamlData := `"dynamic-plugins.yaml": |
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     disabled: false
     dependencies:
       - ref: "dependency-1"
@@ -298,7 +301,7 @@ plugins:
 	pluginA := config.Plugins[0]
 	assert.Equal(t, "plugin-a", pluginA.Package)
 	assert.Equal(t, "sha256-abc123", pluginA.Integrity)
-	assert.False(t, pluginA.Disabled)
+	assert.False(t, pluginA.IsDisabled())
 	assert.Equal(t, "value1", pluginA.PluginConfig["key1"])
 	assert.Equal(t, "value2", pluginA.PluginConfig["key2"])
 	assert.Equal(t, 2, len(pluginA.Dependencies))
@@ -309,7 +312,7 @@ plugins:
 	pluginB := config.Plugins[1]
 	assert.Equal(t, "plugin-b", pluginB.Package)
 	assert.Equal(t, "sha256-def456", pluginB.Integrity)
-	assert.True(t, pluginB.Disabled)
+	assert.True(t, pluginB.IsDisabled())
 	assert.Equal(t, "value3", pluginB.PluginConfig["key3"])
 	assert.Empty(t, pluginB.Dependencies)
 }
@@ -384,25 +387,25 @@ func TestMergeDynamicPlugins(t *testing.T) {
 	// Sample model ConfigMap
 	modelData := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     integrity: "sha256-abc123"
     disabled: false
     pluginConfig:
       key1: "value1"
     dependencies:
       - ref: "dependency-1"
-  - package: "plugin-b"
+  - package: "./plugin-b"
     integrity: "sha256-def456"
     disabled: true
     pluginConfig:
       key2: "value2"
     dependencies:
       - ref: "dependency-2"
-  - package: "plugin-c"
+  - package: "./plugin-c"
     integrity: "sha256-ghi789"
     pluginConfig:
       key3: "value3"
-  - package: "plugin-d"
+  - package: "./plugin-d"
     disabled: true
     integrity: "sha256-ddd"
     pluginConfig:
@@ -425,14 +428,14 @@ includes:
 	// Sample spec data
 	specData := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
     integrity: "sha256-overridden"
     pluginConfig:
       key1: "overridden"
     dependencies:
       - ref: "dependency-3"
-  - package: "plugin-d"
-  - package: "plugin-e"
+  - package: "./plugin-d"
+  - package: "./plugin-e"
 includes:
   - "include-2"
 
@@ -454,46 +457,205 @@ includes:
 	assert.Equal(t, 5, len(mergedConfig.Plugins))
 
 	// Validate plugin-a (overridden by specData)
-	//pluginA := mergedConfig.Plugins[0]
-	//assert.Equal(t, "plugin-a", pluginA.Package)
-	pluginA := findPluginByPackage(mergedConfig.Plugins, "plugin-a")
+	pluginA := findPluginByPackage(mergedConfig.Plugins, "./plugin-a")
 	assert.NotNil(t, pluginA)
 	assert.Equal(t, "sha256-overridden", pluginA.Integrity)
-	assert.Equal(t, false, pluginA.Disabled)
+	assert.False(t, pluginA.IsDisabled())
 	assert.Equal(t, "overridden", pluginA.PluginConfig["key1"])
 	assert.Equal(t, 1, len(pluginA.Dependencies))
 	assert.Equal(t, "dependency-3", pluginA.Dependencies[0].Ref)
 
 	// Validate plugin-b (disabled, from modelDp)
-	pluginB := findPluginByPackage(mergedConfig.Plugins, "plugin-b")
+	pluginB := findPluginByPackage(mergedConfig.Plugins, "./plugin-b")
 	assert.NotNil(t, pluginB)
-	assert.Equal(t, true, pluginB.Disabled)
+	assert.True(t, pluginB.IsDisabled())
 
 	// Validate plugin-c (from modelDp, as plugin-b is disabled)
-	//pluginC := mergedConfig.Plugins[1]
-	pluginC := findPluginByPackage(mergedConfig.Plugins, "plugin-c")
+	pluginC := findPluginByPackage(mergedConfig.Plugins, "./plugin-c")
 	assert.NotNil(t, pluginC)
-	//assert.Equal(t, "plugin-c", pluginC.Package)
 	assert.Equal(t, "sha256-ghi789", pluginC.Integrity)
 	assert.Equal(t, "value3", pluginC.PluginConfig["key3"])
 
-	//pluginD := mergedConfig.Plugins[2]
-	pluginD := findPluginByPackage(mergedConfig.Plugins, "plugin-d")
+	pluginD := findPluginByPackage(mergedConfig.Plugins, "./plugin-d")
 	assert.NotNil(t, pluginD)
-	//assert.Equal(t, "plugin-d", pluginD.Package)
 	assert.Equal(t, "sha256-ddd", pluginD.Integrity)
 
 	// Validate merged includes
 	assert.ElementsMatch(t, []string{"include-1", "include-2"}, mergedConfig.Includes)
 
 	// Marshal the merged configuration into YAML
-	marshalledE, err := yaml.Marshal(findPluginByPackage(mergedConfig.Plugins, "plugin-e"))
+	marshalledE, err := yaml.Marshal(findPluginByPackage(mergedConfig.Plugins, "./plugin-e"))
 
 	assert.NoError(t, err)
 	// Validate that the marshalled string omits empty fields
 	assert.NotContains(t, string(marshalledE), "integrity", "The string should not contain 'integrity:'")
-	// Validate that the marshalled string always includes disabled field
-	assert.Contains(t, string(marshalledE), "disabled", "The string should not contain 'disabled:'")
+	// Do not generate deprecated disabled: false for entries without that key.
+	assert.NotContains(t, string(marshalledE), "disabled:")
+}
+
+func TestDynaPluginDisabledYAMLRoundTrip(t *testing.T) {
+	for _, input := range []string{
+		"package: p\n",
+		"package: p\nenabled: true\n",
+		"package: p\ndisabled: false\n",
+		"package: p\ndisabled: true\n",
+		"package: p\nenabled: true\ndisabled: true\n",
+	} {
+		var plugin DynaPlugin
+		assert.NoError(t, yaml.Unmarshal([]byte(input), &plugin))
+		output, err := yaml.Marshal(plugin)
+		assert.NoError(t, err)
+		assert.YAMLEq(t, input, string(output))
+	}
+}
+
+func TestIsDisabled(t *testing.T) {
+	true_ := true
+	false_ := false
+
+	tests := []struct {
+		name     string
+		plugin   DynaPlugin
+		expected bool
+	}{
+		{"neither set defaults to enabled", DynaPlugin{Package: "p"}, false},
+		{"disabled: true", DynaPlugin{Package: "p", Disabled: &true_}, true},
+		{"disabled: false", DynaPlugin{Package: "p", Disabled: &false_}, false},
+		{"enabled: true", DynaPlugin{Package: "p", Enabled: &true_}, false},
+		{"enabled: false", DynaPlugin{Package: "p", Enabled: &false_}, true},
+		{"enabled takes precedence over disabled", DynaPlugin{Package: "p", Enabled: &true_, Disabled: &true_}, false},
+		{"enabled: false takes precedence over disabled: false", DynaPlugin{Package: "p", Enabled: &false_, Disabled: &false_}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.plugin.IsDisabled())
+		})
+	}
+}
+
+func TestMergePluginsEnabledDisabledBackwardCompat(t *testing.T) {
+	// Base has enabled: true, overlay disables with legacy disabled: true
+	t.Run("legacy disabled overlay overrides enabled base", func(t *testing.T) {
+		base := `
+plugins:
+  - package: "./plugin-a"
+    enabled: true
+`
+		overlay := `
+plugins:
+  - package: "./plugin-a"
+    disabled: true
+`
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(merged), &config)
+		assert.NoError(t, err)
+
+		plugin := findPluginByPackage(config.Plugins, "./plugin-a")
+		assert.NotNil(t, plugin)
+		assert.True(t, plugin.IsDisabled(), "legacy disabled: true should override enabled: true")
+	})
+
+	// Base has disabled: true, overlay enables with enabled: true
+	t.Run("enabled overlay overrides disabled base", func(t *testing.T) {
+		base := `
+plugins:
+  - package: "./plugin-a"
+    disabled: true
+`
+		overlay := `
+plugins:
+  - package: "./plugin-a"
+    enabled: true
+`
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(merged), &config)
+		assert.NoError(t, err)
+
+		plugin := findPluginByPackage(config.Plugins, "./plugin-a")
+		assert.NotNil(t, plugin)
+		assert.False(t, plugin.IsDisabled(), "enabled: true should override disabled: true")
+		assert.NotContains(t, merged, "disabled:", "do not emit a synthetic legacy key alongside enabled")
+	})
+
+	// Overlay omits both fields — enabled by default
+	t.Run("overlay without activation fields preserves base", func(t *testing.T) {
+		base := `
+plugins:
+  - package: "./plugin-a"
+    disabled: true
+    integrity: "sha256-abc"
+`
+		overlay := `
+plugins:
+  - package: "./plugin-a"
+    integrity: "sha256-overridden"
+`
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(merged), &config)
+		assert.NoError(t, err)
+
+		plugin := findPluginByPackage(config.Plugins, "./plugin-a")
+		assert.NotNil(t, plugin)
+		assert.False(t, plugin.IsDisabled(), "enabled by default")
+		assert.Equal(t, "sha256-overridden", plugin.Integrity)
+	})
+
+	t.Run("explicit both-key overlay survives the merge", func(t *testing.T) {
+		base := "plugins:\n  - package: ./plugin-a\n    disabled: true\n"
+		overlay := "plugins:\n  - package: ./plugin-a\n    enabled: false\n    disabled: false\n"
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+		assert.Contains(t, merged, "enabled: false")
+		assert.Contains(t, merged, "disabled: false")
+		var config DynaPluginsConfig
+		assert.NoError(t, yaml.Unmarshal([]byte(merged), &config))
+		assert.True(t, config.Plugins[0].IsDisabled(), "enabled still wins")
+	})
+
+	t.Run("explicit disabled false overlay survives the merge", func(t *testing.T) {
+		base := "plugins:\n  - package: ./plugin-a\n    enabled: false\n"
+		overlay := "plugins:\n  - package: ./plugin-a\n    disabled: false\n"
+		merged, err := MergePluginsData(base, overlay)
+		assert.NoError(t, err)
+		assert.Contains(t, merged, "disabled: false")
+		assert.NotContains(t, merged, "enabled:")
+		var config DynaPluginsConfig
+		assert.NoError(t, yaml.Unmarshal([]byte(merged), &config))
+		assert.False(t, config.Plugins[0].IsDisabled())
+	})
+
+	// Pure legacy config still works
+	t.Run("legacy disabled-only config works", func(t *testing.T) {
+		base := `
+plugins:
+  - package: "./plugin-a"
+    disabled: false
+  - package: "./plugin-b"
+    disabled: true
+`
+		merged, err := MergePluginsData(base, "")
+		assert.NoError(t, err)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(merged), &config)
+		assert.NoError(t, err)
+
+		pluginA := findPluginByPackage(config.Plugins, "./plugin-a")
+		assert.False(t, pluginA.IsDisabled())
+		assert.Contains(t, merged, "disabled: false", "preserve explicit legacy input")
+		pluginB := findPluginByPackage(config.Plugins, "./plugin-b")
+		assert.True(t, pluginB.IsDisabled())
+	})
 }
 
 func TestRemoveDefaultInclude(t *testing.T) {
@@ -514,7 +676,7 @@ includes:
 
 	specData := `
 plugins:
-  - package: "plugin-a"
+  - package: "./plugin-a"
 includes: []
 `
 	mergedData, err := MergePluginsData(defDynamicPlugins.ConfigMap.Data[DynamicPluginsFile], specData)
@@ -529,11 +691,38 @@ includes: []
 	assert.Equal(t, 0, len(mergedConfig.Includes))
 }
 
+func TestOverlayPluginDefaultsToEnabled(t *testing.T) {
+	// When user adds a plugin to overlay without specifying enabled/disabled,
+	// it should default to enabled even if it was disabled in base
+	base := `
+plugins:
+  - package: "./plugin-a"
+    disabled: true
+`
+	overlay := `
+plugins:
+  - package: "./plugin-a"
+    pluginConfig:
+      key: "value"
+`
+	merged, err := MergePluginsData(base, overlay)
+	assert.NoError(t, err)
+
+	var config DynaPluginsConfig
+	err = yaml.Unmarshal([]byte(merged), &config)
+	assert.NoError(t, err)
+
+	plugin := findPluginByPackage(config.Plugins, "./plugin-a")
+	assert.NotNil(t, plugin)
+	assert.False(t, plugin.IsDisabled(), "plugin should be enabled by default when added to overlay")
+	assert.Equal(t, "value", plugin.PluginConfig["key"])
+}
+
 func TestClearDeps(t *testing.T) {
 	// Sample model (default) ConfigMap
 	modelData := `
 plugins:
- - package: "plugin-a"
+ - package: "./plugin-a"
    disabled: true
    pluginConfig:
      key1: "value1"
@@ -555,7 +744,7 @@ plugins:
 	// Sample spec data, remove default deps and override plugin-a to be enabled
 	specData := `
 plugins:
- - package: "plugin-a"
+ - package: "./plugin-a"
    pluginConfig:
      key1: "overridden"
    dependencies: []
@@ -620,4 +809,280 @@ func TestExternalConfigMapMetadataNotReused(t *testing.T) {
 
 	// Verify the name is set to the operator-managed name (not the external name)
 	assert.Equal(t, DynamicPluginsDefaultName(bs.Name), dp.ConfigMap.Name, "Name should be set to operator-managed name")
+}
+
+// TestConvertInlinePlugins tests the conversion of inline plugin configurations to YAML
+func TestConvertInlinePlugins(t *testing.T) {
+	t.Run("happy path - multiple plugins with different fields", func(t *testing.T) {
+		pluginConfigJSON, _ := json.Marshal(map[string]interface{}{
+			"github": map[string]interface{}{
+				"host":  "github.com",
+				"token": "${GITHUB_TOKEN}",
+			},
+		})
+
+		inlinePlugins := []v1alpha5.DynamicPluginConfig{
+			{
+				Package: "ref://backstage-plugin-basic",
+			},
+			{
+				Package: "ref://backstage-plugin-with-config",
+				Enabled: ptr.To(true),
+				PluginConfig: &apiextensionsv1.JSON{
+					Raw: pluginConfigJSON,
+				},
+			},
+			{
+				Package:   "oci://quay.io/rhdh/plugin-foo@sha256:abc123",
+				Enabled:   ptr.To(false),
+				Integrity: "sha256-abc123",
+			},
+		}
+
+		data, err := convertInlinePlugins(inlinePlugins)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, data)
+
+		var config DynaPluginsConfig
+		err = yaml.Unmarshal([]byte(data), &config)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(config.Plugins))
+
+		// Verify basic plugin
+		assert.Equal(t, "ref://backstage-plugin-basic", config.Plugins[0].Package)
+		assert.Nil(t, config.Plugins[0].Enabled)
+
+		// Verify plugin with config
+		assert.Equal(t, "ref://backstage-plugin-with-config", config.Plugins[1].Package)
+		assert.NotNil(t, config.Plugins[1].Enabled)
+		assert.True(t, *config.Plugins[1].Enabled)
+		assert.NotNil(t, config.Plugins[1].PluginConfig)
+		assert.Contains(t, config.Plugins[1].PluginConfig, "github")
+
+		// Verify plugin with integrity and disabled
+		assert.Equal(t, "oci://quay.io/rhdh/plugin-foo@sha256:abc123", config.Plugins[2].Package)
+		assert.NotNil(t, config.Plugins[2].Enabled)
+		assert.False(t, *config.Plugins[2].Enabled)
+		assert.Equal(t, "sha256-abc123", config.Plugins[2].Integrity)
+	})
+
+	t.Run("empty list", func(t *testing.T) {
+		data, err := convertInlinePlugins([]v1alpha5.DynamicPluginConfig{})
+		assert.NoError(t, err)
+		assert.Empty(t, data)
+	})
+}
+
+// TestInlineDynamicPluginsEndToEnd tests the full flow of inline dynamic plugins
+// from CR to packages.txt when OPERATOR_DP_PROCESSING=true
+func TestInlineDynamicPluginsEndToEnd(t *testing.T) {
+	// Enable operator DP processing for this test
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	// Add inline plugins to the CR
+	pluginConfigJSON, err := json.Marshal(map[string]interface{}{
+		"testKey": "testValue",
+	})
+	assert.NoError(t, err)
+
+	bs.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{
+		{
+			// Enable a plugin using ref:// that's disabled in default catalog
+			// Add pluginConfig to verify app-config generation
+			Package: "ref://backstage-plugin-kubernetes",
+			PluginConfig: &apiextensionsv1.JSON{
+				Raw: pluginConfigJSON,
+			},
+		},
+		{
+			// Enable another plugin using ref://
+			Package: "ref://backstage-plugin-scaffolder-backend-module-github",
+		},
+		{
+			// Add a direct OCI plugin (not in default catalog)
+			Package: "oci://quay.io/external/my-custom-plugin@sha256:abc123",
+		},
+		{
+			// Disable a plugin that's enabled in the default catalog
+			Package: "ref://backstage-plugin-techdocs",
+			Enabled: ptr.To(false),
+		},
+	}
+
+	// Use minimal catalog that only contains the plugins we're referencing
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("dynamic-plugins.yaml", "minimal-dynamic-plugins.yaml").
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	// Get the dynamic plugins object
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
+	assert.NotNil(t, dpObj)
+
+	// Verify the enabledPluginsCM was created with packages.txt
+	assert.NotNil(t, dpObj.enabledPluginsCM, "enabledPluginsCM should be created when OPERATOR_DP_PROCESSING=true")
+	assert.NotNil(t, dpObj.enabledPluginsCM.Data)
+
+	packagesData, ok := dpObj.enabledPluginsCM.Data["packages.txt"]
+	assert.True(t, ok, "packages.txt should exist in enabledPluginsCM")
+	assert.NotEmpty(t, packagesData, "packages.txt should not be empty")
+
+	// Verify that our inline plugins are in the packages.txt
+	// They should be resolved to OCI URLs, not ref://
+	assert.Contains(t, packagesData, "kubernetes", "kubernetes plugin should be in packages.txt (enabled via ref://)")
+	assert.Contains(t, packagesData, "scaffolder-backend-module-github", "scaffolder plugin should be in packages.txt (enabled via ref://)")
+	assert.Contains(t, packagesData, "my-custom-plugin", "custom OCI plugin should be in packages.txt")
+	assert.NotContains(t, packagesData, "techdocs", "techdocs plugin should NOT be in packages.txt (disabled by user)")
+	assert.NotContains(t, packagesData, "ref://", "ref:// URLs should be resolved to OCI URLs")
+
+	// Verify pluginConfig is merged into plugins-appconfig ConfigMap
+	appConfigObj := model.GetRuntimeObject(AppConfigKey).(*AppConfig)
+	assert.NotNil(t, appConfigObj)
+	assert.NotNil(t, appConfigObj.ConfigMaps)
+
+	// Find the plugins-appconfig ConfigMap
+	// Full name is: backstage-appconfig-{backstageName}-plugins-appconfig
+	expectedName := DefaultMultiObjectName("appconfig", bs.Name, PluginsAppConfigName)
+	var pluginsAppConfig *corev1.ConfigMap
+	for _, obj := range appConfigObj.ConfigMaps.Items {
+		cm, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			continue
+		}
+		if cm.Name == expectedName {
+			pluginsAppConfig = cm
+			break
+		}
+	}
+	assert.NotNil(t, pluginsAppConfig, "plugins-appconfig ConfigMap should exist with name: "+expectedName)
+
+	// Verify the pluginConfig is in the plugins-appconfig file
+	pluginConfigData, ok := pluginsAppConfig.Data[PluginsAppConfigFile]
+	assert.True(t, ok, "app-config.dynamic-plugins.yaml should exist in plugins-appconfig")
+
+	// Verify the pluginConfig content is present (converted to YAML format)
+	assert.Contains(t, pluginConfigData, "testKey: testValue", "pluginConfig should be in app-config as YAML")
+}
+
+// TestOperatorModeWithoutDefaultPlugins verifies that operator DP processing mode
+// works correctly when no dynamic-plugins.yaml is provided in default config.
+// This simulates testing mode where config/profile/rhdh/local-test/dynamic-plugins.yaml
+// doesn't exist - only plugins specified in the CR should be used.
+func TestOperatorModeWithoutDefaultPlugins(t *testing.T) {
+	// Enable operator DP processing for this test
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+
+	// Specify only inline plugins in CR - no defaults
+	bs.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{
+		{
+			Package: "oci://quay.io/custom/my-plugin:1.0.0",
+		},
+		{
+			Package: "https://example.com/another-plugin.tgz",
+		},
+	}
+
+	// Create test WITHOUT adding dynamic-plugins.yaml to default config
+	// This simulates the case where local-test/dynamic-plugins.yaml doesn't exist
+	// Note: deployment.yaml is needed to provide the init container definition
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+
+	// Should succeed without errors
+	assert.NoError(t, err, "should successfully initialize with no default dynamic-plugins.yaml")
+	assert.NotNil(t, model)
+
+	// Verify the packages.txt contains only CR-specified plugins
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
+	assert.NotNil(t, dpObj)
+	assert.NotNil(t, dpObj.enabledPluginsCM, "enabledPluginsCM should be created")
+
+	packagesData, ok := dpObj.enabledPluginsCM.Data["packages.txt"]
+	assert.True(t, ok, "packages.txt should exist")
+	assert.NotEmpty(t, packagesData, "packages.txt should not be empty")
+
+	// Verify only CR-specified plugins are present
+	assert.Contains(t, packagesData, "my-plugin", "CR-specified OCI plugin should be in packages.txt")
+	assert.Contains(t, packagesData, "another-plugin", "CR-specified URL plugin should be in packages.txt")
+}
+
+// TestPackagesIntegrity verifies integrity checksums are included in packages.txt
+func TestPackagesIntegrity(t *testing.T) {
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	bs.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{
+		{Package: "https://example.com/plugin.tgz", Integrity: "sha512-abc"},
+		{Package: "@scope/plugin@1.0.0", Integrity: "sha256-xyz"},
+	}
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
+	packagesData := dpObj.enabledPluginsCM.Data["packages.txt"]
+
+	assert.Contains(t, packagesData, "https://example.com/plugin.tgz sha512-abc")
+	assert.Contains(t, packagesData, "@scope/plugin@1.0.0 sha256-xyz")
+}
+
+func TestMultiPluginPackageSyntax(t *testing.T) {
+	t.Setenv(OperatorDPProcessingEnvVar, "true")
+
+	bs := testDynamicPluginsBackstage.DeepCopy()
+	bs.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{
+		{
+			Package: "oci://quay.io/rhdh/multi-plugin:1.0!plugin-a",
+		},
+	}
+
+	testObj := createBackstageTest(*bs).withDefaultConfig(true).
+		addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+	model, err := InitObjects(context.TODO(), *bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	dpObj := model.GetRuntimeObject(DynamicPluginsKey).(*DynamicPlugins)
+	packagesData := dpObj.enabledPluginsCM.Data["packages.txt"]
+
+	// Verify the "!plugin-a" suffix is preserved (multi-plugin package support)
+	assert.Contains(t, packagesData, "oci://quay.io/rhdh/multi-plugin:1.0!plugin-a", "!plugin-path syntax should be preserved for multi-plugin packages")
+}
+
+func TestDynamicPluginsMutualExclusivity(t *testing.T) {
+	// Both specified - invalid
+	bs3 := testDynamicPluginsBackstage.DeepCopy()
+	bs3.Spec.Application.DynamicPlugins = []v1alpha5.DynamicPluginConfig{{Package: "plugin1"}}
+	bs3.Spec.Application.DynamicPluginsConfigMapName = "my-config"
+	testObj3 := createBackstageTest(*bs3).withDefaultConfig(true)
+	_, err := InitObjects(context.TODO(), *bs3, testObj3.externalConfig, platform.Default, testObj3.scheme)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestNoDynamicPluginsSpec(t *testing.T) {
+	// Spec nil - valid, no plugins
+	bs1 := testDynamicPluginsBackstage.DeepCopy()
+	bs1.Spec.Application = nil
+	testObj1 := createBackstageTest(*bs1).withDefaultConfig(true)
+	m, err := InitObjects(context.TODO(), *bs1, testObj1.externalConfig, platform.Default, testObj1.scheme)
+	assert.NoError(t, err)
+	assert.Nil(t, m.GetEnabledPlugins())
+
+	// Spec empty - valid, no plugins
+	bs2 := testDynamicPluginsBackstage.DeepCopy()
+	testObj2 := createBackstageTest(*bs2).withDefaultConfig(true)
+	m, err = InitObjects(context.TODO(), *bs2, testObj2.externalConfig, platform.Default, testObj2.scheme)
+	assert.NoError(t, err)
+	assert.Nil(t, m.GetEnabledPlugins())
 }

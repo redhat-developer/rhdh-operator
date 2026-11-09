@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-dynamic-plugins
+data:
+  dynamic-plugins.yaml: |
+    plugins:
+      # Intelligent Assistant Plugins
+      - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant
+        enabled: true
+        pluginConfig:
+          dynamicPlugins:
+            frontend:
+              red-hat-developer-hub.backstage-plugin-intelligent-assistant:
+                translationResources:
+                  - importName: lightspeedTranslations
+                    module: Alpha
+                    ref: intelligentAssistantTranslationRef
+                dynamicRoutes:
+                  - path: /intelligent-assistant
+                    importName: LightspeedPage
+                    module: Legacy
+                mountPoints:
+                  - mountPoint: application/listener
+                    importName: LightspeedFAB
+                    module: Legacy
+                  - mountPoint: application/provider
+                    importName: LightspeedDrawerProvider
+                    module: Legacy
+                  - mountPoint: application/internal/drawer-state
+                    importName: LightspeedDrawerStateExposer
+                    module: Legacy
+                    config:
+                      id: intelligent-assistant
+                  - mountPoint: application/internal/drawer-content
+                    importName: LightspeedChatContainer
+                    module: Legacy
+                    config:
+                      id: intelligent-assistant
+                      priority: 100
+
+      - package: ref://red-hat-developer-hub-backstage-plugin-intelligent-assistant-backend
+        enabled: true

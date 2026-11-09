@@ -1,18 +1,15 @@
-# THIS IS USED BY Konflux builds >= 1.4 with Cachi2 enabled
+# Unified Dockerfile for hermetic builds (Hermeto upstream, Cachi2/Konflux downstream)
+# and standard non-hermetic builds (make image-build)
 
-#@follow_tag(registry.redhat.io/rhel9/go-toolset:latest)
-# https://registry.access.redhat.com/ubi9/go-toolset
-FROM registry.access.redhat.com/ubi9/go-toolset:1781595344@sha256:ebcc3560ec892af7c081bcfbef9959fe54c4b1603dc1f6c6e1494992f6c71f89 AS builder
+#@follow_tag(registry.redhat.io/rhel10/go-toolset:latest)
+# https://registry.access.redhat.com/ubi10/go-toolset
+FROM registry.access.redhat.com/ubi10/go-toolset:10.2-1793908205@sha256:cb712e78c45e429142e846c1b8b91894970eab3b66fd5a95d336b65b4f7bb877 AS builder
 ARG TARGETOS
 ARG TARGETARCH
-# hadolint ignore=DL3002
-USER 0
+# Build as the go-toolset default user (non-root). Hermeto prefetch must chmod the
+# /cachi2 cache (see hack/local-hermeto-build.sh and CI) so this user can use gomod offline.
 ENV GOPATH=/go/
-
-# '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
-# Downstream comment
-RUN dnf -q -y update
-#/ Downstream comment
+ENV GOCACHE=/tmp/go-build-cache
 
 ENV EXTERNAL_SOURCE=.
 ENV CONTAINER_SOURCE=/opt/app-root/src
@@ -35,39 +32,33 @@ COPY $EXTERNAL_SOURCE $CONTAINER_SOURCE
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
-# Install openssl for FIPS support
-#@follow_tag(registry.redhat.io/ubi9/ubi-minimal:latest)
-# https://registry.access.redhat.com/ubi9-minimal
-FROM registry.access.redhat.com/ubi9-minimal:1781496842@sha256:1bc3c5c15720506a0cf48adfdf8b623dfe704377e007d7bbae8d14876392ca6a AS runtime
+# Install openssl for FIPS support into an isolated rootfs
+#@follow_tag(registry.redhat.io/ubi10/ubi:latest)
+# https://registry.access.redhat.com/ubi10/ubi
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1793860810@sha256:0e8ccad7d35f5fd756f4f2202f018b8d3c3e8bb9af8e627d874239381a00ab41 AS rpm-builder
+RUN mkdir -p /mnt/rootfs
+RUN dnf install --installroot /mnt/rootfs \
+    openssl \
+    --releasever 10 --setopt=install_weak_deps=0 --nogpgcheck --nodocs -y && \
+    dnf --installroot /mnt/rootfs clean all && \
+    rm -rf /mnt/rootfs/var/cache/* /mnt/rootfs/var/log/* /mnt/rootfs/tmp/*
+RUN echo "backstage:x:1001:0:backstage user:/:/sbin/nologin" >> /mnt/rootfs/etc/passwd
 
-# Downstream uncomment
-# RUN cat /cachi2/cachi2.env
-#/ Downstream uncomment
+# Final minimal image using UBI micro
+#@follow_tag(registry.redhat.io/ubi10/ubi-micro:latest)
+# https://registry.access.redhat.com/ubi10/ubi-micro
+FROM registry.access.redhat.com/ubi10/ubi-micro:10.2-1793858790@sha256:8488f5ec082768a01d1ce4e0ef3878f782a40ff6d233afa74bc23d4e740620a4
 
-# '(micro)dnf update -y' not allowed in Konflux+Cachi2: instead use renovate or https://github.com/konflux-ci/rpm-lockfile-prototype to update the rpms.lock.yaml file
-# Downstream comment
-RUN microdnf update --setopt=install_weak_deps=0 -y
-#/ Downstream comment
-
-RUN microdnf install -y openssl; microdnf clean -y all
-
-ENV EXTERNAL_SOURCE=.
-ENV CONTAINER_SOURCE=/opt/app-root/src
+COPY --from=rpm-builder /mnt/rootfs /
 
 # RHIDP-4220 - make Konflux preflight and EC checks happy - [check-container] Create a directory named /licenses and include all relevant licensing
-COPY $EXTERNAL_SOURCE/LICENSE /licenses/
-
-ENV HOME=/ \
-    USER_NAME=backstage \
-    USER_UID=1001
-
-RUN echo "${USER_NAME}:x:${USER_UID}:0:${USER_NAME} user:${HOME}:/sbin/nologin" >> /etc/passwd
+COPY LICENSE /licenses/
 
 # Copy manager binary
-COPY --from=builder $CONTAINER_SOURCE/manager .
+COPY --from=builder /opt/app-root/src/manager /manager
 
-USER ${USER_UID}
+USER 1001
 
-WORKDIR ${HOME}
+WORKDIR /
 
 ENTRYPOINT ["/manager"]

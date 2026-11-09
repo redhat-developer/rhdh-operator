@@ -48,12 +48,23 @@ func installRhdhOperatorManifest(operatorManifest string) {
 
 	cmd := exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
 	_, err := helper.Run(cmd)
+	if err != nil {
+		GinkgoWriter.Printf("Initial manifest apply failed; waiting for CRDs before retrying: %v\n", err)
+		cmd = exec.Command(helper.GetPlatformTool(), "wait", "--for=condition=Established", "crd", "--all", "--timeout=2m")
+		_, waitErr := helper.Run(cmd)
+		Expect(waitErr).ShouldNot(HaveOccurred())
+
+		cmd = exec.Command(helper.GetPlatformTool(), "apply", "-f", p)
+		_, err = helper.Run(cmd)
+	}
 	Expect(err).ShouldNot(HaveOccurred())
 }
 
 func installRhdhOperator(flavor string) (podLabel string) {
 	Expect(helper.IsOpenShift()).Should(BeTrue(), "install RHDH script works only on OpenShift clusters!")
-	cmd := exec.Command(filepath.Join(".rhdh", "scripts", "install-rhdh-catalog-source.sh"), "--"+flavor, "--install-operator", "rhdh")
+	cmd := exec.Command(
+		filepath.Join(".rhdh", "scripts", "install-rhdh-catalog-source.sh"),
+		"--"+flavor, "--install-operator", "rhdh")
 	_, err := helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	podLabel = "app=rhdh-operator"
@@ -64,7 +75,7 @@ func installRhdhOperatorAirgapped() (podLabel string) {
 	Expect(helper.IsOpenShift()).Should(BeTrue(), "airgap preparation script for RHDH works only on OpenShift clusters!")
 	indexImg, ok := os.LookupEnv("BACKSTAGE_OPERATOR_TESTS_AIRGAP_INDEX_IMAGE")
 	if !ok {
-		//TODO(rm3l): find a way to pass the right OCP version and arch
+		// TODO(rm3l): find a way to pass the right OCP version and arch
 		indexImg = "quay.io/rhdh/iib:latest-v4.14-x86_64"
 	}
 	operatorVersion, ok := os.LookupEnv("BACKSTAGE_OPERATOR_TESTS_AIRGAP_OPERATOR_VERSION")
@@ -83,6 +94,10 @@ func installRhdhOperatorAirgapped() (podLabel string) {
 	cmd := exec.Command(filepath.Join(".rhdh", "scripts", "prepare-restricted-environment.sh"), args...)
 	_, err := helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+	// Derive the OLM channel from the operator version (e.g., v1.1.0 -> fast-1.1)
+	verParts := strings.SplitN(strings.TrimPrefix(operatorVersion, "v"), ".", 3)
+	olmChannel := fmt.Sprintf("fast-%s.%s", verParts[0], verParts[1])
 
 	// Create a subscription in the rhdh-operator namespace
 	helper.CreateNamespace(_namespace)
@@ -103,12 +118,12 @@ metadata:
   name: rhdh
   namespace: %s
 spec:
-  channel: fast
+  channel: %s
   installPlanApproval: Automatic
   name: rhdh
   source: rhdh-disconnected-install
   sourceNamespace: openshift-marketplace
-`, _namespace))
+`, _namespace, olmChannel))
 	}()
 	_, err = helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
@@ -117,20 +132,24 @@ spec:
 	return podLabel
 }
 
+func isEnvEnabled(env string) bool {
+	return os.Getenv(env) == "true"
+}
+
 func installOperatorWithMakeDeploy(withOlm bool) {
 	img, err := helper.Run(exec.Command("make", "--no-print-directory", "show-img"))
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	operatorImage := strings.TrimSpace(string(img))
 	imgArg := fmt.Sprintf("IMG=%s", operatorImage)
 
-	if os.Getenv("BACKSTAGE_OPERATOR_TESTS_BUILD_IMAGES") == "true" {
+	if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_BUILD_IMAGES") {
 		By("building the manager(Operator) image")
 		cmd := exec.Command("make", "image-build", imgArg)
 		_, err = helper.Run(cmd)
 		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	}
 
-	if os.Getenv("BACKSTAGE_OPERATOR_TESTS_PUSH_IMAGES") == "true" {
+	if isEnvEnabled("BACKSTAGE_OPERATOR_TESTS_PUSH_IMAGES") {
 		By("building the manager(Operator) image")
 		cmd := exec.Command("make", "image-push", imgArg)
 		_, err = helper.Run(cmd)
@@ -170,7 +189,7 @@ func installOperatorWithMakeDeploy(withOlm bool) {
 }
 
 var _ = SynchronizedBeforeSuite(func() []byte {
-	//runs *only* on process #1
+	// runs *only* on process #1
 	_start = time.Now()
 	GinkgoWriter.Println("isOpenshift:", helper.IsOpenShift())
 
@@ -192,19 +211,24 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 
 	By("validating that the controller-manager pod is running as expected")
-	EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).WithArguments(managerPodLabel).Should(Succeed())
+	EventuallyWithOffset(1, verifyControllerUp, 5*time.Minute, time.Second).
+		WithArguments(managerPodLabel).Should(Succeed())
 
 	return nil
 }, func(_ []byte) {
-	//runs on *all* processes
+	// runs on *all* processes
 })
 
 var _ = SynchronizedAfterSuite(func() {
-	//runs on *all* processes
+	// runs on *all* processes
 },
 	// the function below *only* on process #1
 	func() {
-		defer uninstallOperator()
+		defer func() {
+			uninstallOperator()
+			deleteOperatorManifest(os.Getenv("FROM_OPERATOR_MANIFEST"))
+			deleteOperatorManifest(os.Getenv("TO_OPERATOR_MANIFEST"))
+		}()
 		fmt.Println(fetchOperatorLogs(managerPodLabel, false)())
 	},
 )
@@ -317,16 +341,39 @@ func uninstallOperator() {
 	}
 }
 
+func deleteOperatorManifest(operatorManifest string) {
+	if operatorManifest == "" {
+		return
+	}
+	cmd := exec.Command(helper.GetPlatformTool(), "delete", "-f", operatorManifest, "--ignore-not-found=true")
+	_, _ = helper.Run(cmd)
+}
+
 func uninstallRhdhOperator(withAirgap bool) {
-	cmd := exec.Command(helper.GetPlatformTool(), "delete", "subscription", "rhdh", "-n", _namespace, "--ignore-not-found=true")
+	cmd := exec.Command(
+		helper.GetPlatformTool(), "delete", "subscription", "rhdh", "-n", _namespace, "--ignore-not-found=true")
 	_, err := helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	cs := "rhdh-fast"
+	var cs string
 	if withAirgap {
 		cs = "rhdh-disconnected-install"
+	} else {
+		olmChannel := os.Getenv("OLM_CHANNEL")
+		if olmChannel == "" {
+			xVer := os.Getenv("CI_X_VERSION")
+			yVer := os.Getenv("CI_Y_VERSION")
+			if xVer != "" && yVer != "" {
+				olmChannel = fmt.Sprintf("fast-%s.%s", xVer, yVer)
+			} else {
+				olmChannel = "fast"
+			}
+		}
+		cs = "rhdh-" + olmChannel
 	}
-	cmd = exec.Command(helper.GetPlatformTool(), "delete", "catalogsource", cs, "-n", "openshift-marketplace", "--ignore-not-found=true")
+	cmd = exec.Command(
+		helper.GetPlatformTool(), "delete", "catalogsource", cs,
+		"-n", "openshift-marketplace", "--ignore-not-found=true")
 	_, err = helper.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 

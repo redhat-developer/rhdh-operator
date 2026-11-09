@@ -7,6 +7,12 @@ PROFILES := $(shell find config/manifests -mindepth 1 -maxdepth 1 -type d -exec 
 # to use other config - add a directory with config,
 # use it as following commands: 'PROFILE=<dir-name> make test|integration-test|run|deploy|deployment-manifest'
 PROFILE ?= rhdh
+OLM_VERSION ?= auto
+
+# Enable operator dynamic plugins processing (default: true)
+OPERATOR_DP_PROCESSING ?= true
+# Install dynamic plugins image (required when OPERATOR_DP_PROCESSING=true)
+RELATED_IMAGE_plugin_installer ?= quay.io/rhdh-community/rhdh-plugin-installer:latest
 PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 
 # VERSION defines the project version for the bundle.
@@ -16,32 +22,32 @@ PROFILE_SHORT := $(shell echo $(PROFILE) | cut -d. -f1)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
 # Set a default VERSION if it is not defined
 ifeq ($(origin VERSION), undefined)
-VERSION ?= 0.11.0
+VERSION ?= 2.2.0
 DEFAULT_VERSION := true
 else
 DEFAULT_VERSION := false
 endif
 
 # IMAGE_TAG_VERSION is the image tag, which might be different from VERSION.
-# For example, the RHDH profile uses 1.y as image tags if VERSION is 1.y.z
+# For example, the RHDH profile uses x.y as image tags if VERSION is x.y.z
 IMAGE_TAG_VERSION = $(VERSION)
 
 ifeq ($(PROFILE), rhdh)
 	# Profile-specific settings
-	ifeq ($(DEFAULT_VERSION), true)
-		# transforming: 0.y.z => 1.y.z. Only if VERSION was not explicitly overridden by the user
-		MAJOR := $(shell echo $(VERSION) | cut -d. -f1)
-		INCREMENTED_MAJOR := $(shell expr $(MAJOR) + 1)
-		MINOR_PATCH := $(shell echo $(VERSION) | cut -d. -f2-)
-		VERSION := $(INCREMENTED_MAJOR).$(MINOR_PATCH)
-		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
-	endif
+#	ifeq ($(DEFAULT_VERSION), true)
+#		# Keep the same major version as VERSION (community and RHDH are aligned).
+#		# Strip the patch for IMAGE_TAG_VERSION (x.y.z => x.y) to match downstream
+#		# quay.io/rhdh image tags. Only if VERSION was not explicitly overridden.
+#		IMAGE_TAG_VERSION := $(shell echo $(VERSION) | cut -d. -f1,2)
+#	endif
 
+	# TODO: Changed to 'rhdh-community' at least until 'rhdh' does not support arm64
 	# IMAGE_TAG_BASE ?= registry.redhat.io/rhdh/rhdh-rhel9-operator
-	IMAGE_TAG_BASE ?= quay.io/rhdh/rhdh-rhel9-operator
-	DEFAULT_CHANNEL ?= fast
-	CHANNELS ?= fast,fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	IMAGE_TAG_BASE ?= quay.io/rhdh-community/operator
+	DEFAULT_CHANNEL ?= fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
+	CHANNELS ?= fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
+	CATALOG_INDEX_IMAGE ?= quay.io/rhdh/plugin-catalog-index:$(IMAGE_TAG_VERSION)
 else
 	# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
     # This variable is used to construct full image tags for bundle and catalog images.
@@ -92,13 +98,12 @@ endif
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.37.0
-OPM_VERSION ?= v1.23.0
+OPERATOR_SDK_VERSION ?= v1.42.2
+OPM_VERSION ?= v1.72.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(IMAGE_TAG_VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -127,8 +132,8 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-# Source packages outside of tests
-PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|api/v1alpha([1-2]))')
+# Source packages outside of tests and unserved API versions (v1alpha1-3)
+PKGS := $(shell go list ./... | grep -vE 'github.com/redhat-developer/rhdh-operator/(tests/|api/v1alpha[1-3]$$)')
 
 .PHONY: all
 all: build
@@ -162,19 +167,17 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 .PHONY: fmt
 fmt: goimports ## Format the code using goimports
-	find . -not -path '*/\.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
+	find . -not -path '*/\.*' -not -name 'zz_generated.*' -name '*.go' -exec $(GOIMPORTS) -w {} \;
 
 .PHONY: test
-test: manifests generate fmt vet envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
-	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps 2>/dev/null || :
-	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
+test: manifests generate fmt vet setup-envtest $(LOCALBIN) ## Run tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
+	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(PKGS) -coverprofile cover.out
 
 .PHONY: integration-test
 integration-test: ginkgo manifests generate fmt vet envtest $(LOCALBIN) ## Run integration_tests. We need LOCALBIN=$(LOCALBIN) to get correct default-config path
-	mkdir -p $(LOCALBIN)/default-config && rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config
-	mkdir -p $(LOCALBIN)/plugin-deps && rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps 2>/dev/null || :
-	LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
+	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) LOCALBIN=$(LOCALBIN) KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" $(GINKGO) -v -r $(ARGS) integration_tests
 
 # After this time, Ginkgo will emit progress reports, so we can get visibility into long-running tests.
 POLL_PROGRESS_INTERVAL := 600s
@@ -201,7 +204,7 @@ test-e2e-upgrade: ginkgo ## Run end-to-end tests dedicated to the operator upgra
 .PHONY: gosec
 gosec: addgosec ## run the gosec scanner for non-test files in this repo
   	# we let the report content trigger a failure using the GitHub Security features.
-	$(GOSEC) -no-fail -fmt $(GOSEC_FMT) -out $(GOSEC_OUTPUT_FILE)  ./...
+	$(GOSEC) -no-fail -exclude-generated -fmt $(GOSEC_FMT) -out $(GOSEC_OUTPUT_FILE) ./...
 
 .PHONY: lint
 lint: golangci-lint vet ## Run golangci-lint linter & yamllint & go vet
@@ -211,6 +214,10 @@ lint: golangci-lint vet ## Run golangci-lint linter & yamllint & go vet
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix --timeout 15m
 
+.PHONY: lint-config
+lint-config: golangci-lint ## Verify golangci-lint linter configuration
+	$(GOLANGCI_LINT) config verify
+
 .PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
@@ -219,7 +226,25 @@ vet: ## Run go vet against code.
 validate-image-digests: ## Validate that Dockerfile digests are manifest lists (multi-arch)
 	@echo "Validating manifest list digests in Dockerfiles..."
 	@echo
-	@hack/validate-image-digests.sh
+	@hack/validate-image-digests.sh "$(HERMETO_IMAGE)"
+
+.PHONY: check-installer-rbac
+check-installer-rbac: ## Verify the OLM v1 installer ClusterRole can grant the bundle RBAC
+	@hack/check-installer-rbac.sh
+
+CRD_BASELINE_REF ?= main
+
+.PHONY: crd-upgrade-check
+crd-upgrade-check: crdify kustomize ## Check CRD upgrade safety against the base branch.
+	@echo "Checking CRD upgrade safety: $(CRD_BASELINE_REF) -> current working tree"
+	@tmpdir=$$(mktemp -d); \
+	set -e; \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	$(KUSTOMIZE) build config/crd > "$$tmpdir/current.yaml"; \
+	mkdir -p "$$tmpdir/baseline"; \
+	git archive "$(CRD_BASELINE_REF)" config/crd | tar -x -C "$$tmpdir/baseline"; \
+	$(KUSTOMIZE) build "$$tmpdir/baseline/config/crd" > "$$tmpdir/baseline.yaml"; \
+	$(CRDIFY) --config crdify.yaml "file://$$tmpdir/baseline.yaml" "file://$$tmpdir/current.yaml"
 
 ##@ Build
 
@@ -229,14 +254,20 @@ build: manifests generate fmt vet ## Build manager binary.
 
 .PHONY: run
 run: manifests generate fmt vet $(LOCALBIN) ## Run a controller from your host.
-	mkdir -p $(LOCALBIN)/default-config/ &&	rm -fr $(LOCALBIN)/default-config/* && cp -r config/profile/$(PROFILE)/default-config/* $(LOCALBIN)/default-config/
-	mkdir -p $(LOCALBIN)/plugin-deps/ &&	rm -fr $(LOCALBIN)/plugin-deps/* && cp -r config/profile/$(PROFILE)/plugin-deps/* $(LOCALBIN)/plugin-deps/ 2>/dev/null || :
-	go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+	@OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) ./hack/copy-local-dynamic-plugins.sh $(PROFILE) $(LOCALBIN)
+	DISABLE_CATALOG_CONTROLLER=true OPERATOR_DP_PROCESSING=$(OPERATOR_DP_PROCESSING) RELATED_IMAGE_plugin_installer=$(RELATED_IMAGE_plugin_installer) go run -C $(LOCALBIN) ../cmd/main.go $(ARGS)
+
+.PHONY: local-dynamic-plugins
+local-dynamic-plugins: ## Generate local-test dynamic-plugins.yaml from catalog-index image for local testing
+	@echo "Generating local-test dynamic-plugins.yaml from catalog-index image..."
+	IMAGE=$(CATALOG_INDEX_IMAGE) ./hack/create-local-dynamic-plugins.sh
 
 # by default images expire from quay registry after 14 days
 # set a longer timeout (or set no label to keep images forever)
 LABEL ?= quay.expires-after=14d
 PLATFORM ?= linux/amd64
+# renovate: datasource=docker depName=quay.io/konflux-ci/hermeto
+HERMETO_IMAGE ?= quay.io/konflux-ci/hermeto:0.62.0
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
@@ -245,9 +276,26 @@ PLATFORM ?= linux/amd64
 image-build: ## Build container image with the manager.
 	$(CONTAINER_TOOL) build --platform $(PLATFORM) -t $(IMG) --label $(LABEL) .
 
+.PHONY: hermetic-build
+hermetic-build: ## Build operator image hermetically using Hermeto (local simulation of Konflux)
+	HERMETO_IMAGE="$(HERMETO_IMAGE)" hack/local-hermeto-build.sh -d . -i $(IMG)
+
+.PHONY: dp-installer-hermetic-build
+dp-installer-hermetic-build: ## Build plugin installer image hermetically using Hermeto
+	HERMETO_IMAGE="$(HERMETO_IMAGE)" CONTAINERFILE=plugin-installer/Dockerfile hack/local-hermeto-build.sh -d . -i $(RELATED_IMAGE_plugin_installer)
+
 .PHONY: image-push
 image-push: ## Push container image with the manager.
 	$(CONTAINER_TOOL) push $(IMG)
+
+.PHONY: dp-installer-buildx
+dp-installer-buildx: ## Build and push multiplatform plugin installer image
+	$(CONTAINER_TOOL) buildx build --push --platform=$(MIN_PLATFORMS) -t $(RELATED_IMAGE_plugin_installer) --label $(LABEL) -f plugin-installer/Dockerfile .
+
+.PHONY: dp-installer-test
+dp-installer-test: ## Run plugin installer tests (unit + integration)
+	go test ./pkg/fetcher/... -v
+	go test ./cmd/plugin-fetch/... -v
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -256,6 +304,7 @@ image-push: ## Push container image with the manager.
 # - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
 # To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+MIN_PLATFORMS ?= linux/amd64,linux/arm64
 .PHONY: docker-buildx
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
@@ -277,6 +326,9 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	mkdir -p dist/$(PROFILE)
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/profile/$(PROFILE) > dist/$(PROFILE)/install.yaml
+	@sed $(SED_I) 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' dist/$(PROFILE)/install.yaml
+	@sed $(SED_I) 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' dist/$(PROFILE)/install.yaml
+	@sed $(SED_I) 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' dist/$(PROFILE)/install.yaml
 	@echo "Generated operator installer manifest: dist/$(PROFILE)/install.yaml"
 
 .PHONY: deployment-manifest
@@ -292,11 +344,6 @@ BUNDLE_IMGS ?= $(BUNDLE_IMG)
 # The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
 CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:$(IMAGE_TAG_VERSION)
 
-# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
-
 .PHONY: bundles
 bundles: ## Generate bundle manifests and metadata, then validate generated files for all available profiles.
 	@for profile in $(PROFILES); do \
@@ -310,7 +357,11 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 		--input-dir ./config/manifests/$(PROFILE)/ \
 		--output-dir ./config/manifests/$(PROFILE)/
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests/$(PROFILE) | $(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
+	$(KUSTOMIZE) build config/manifests/$(PROFILE) | \
+		sed 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' | \
+		sed 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' | \
+		sed 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' | \
+		$(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 	@sed $(SED_I) 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
 	@sed $(SED_I) 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
@@ -329,15 +380,19 @@ bundle-build: ## Build the bundle image.
 bundle-push: ## Push bundle image to registry
 	$(MAKE) image-push IMG=$(BUNDLE_IMG)
 
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
-# bundle-push is needed because 'opm index add' always pulls from the remote registry and never uses the local image.
-# See https://github.com/operator-framework/operator-registry/issues/885
+# Build an FBC (File-Based Catalog) image using opm.
+# Produces a catalog with the operators.operatorframework.io.index.configs.v1 label required by OLM v1.
+# FBC catalogs are also backward-compatible with OLM v0 on OCP 4.17+.
+# NOTE: currently supports a single BUNDLE_IMG. Multi-bundle catalogs need additional channel entries.
 .PHONY: catalog-build
-catalog-build: bundle-push opm ## Generate operator-catalog dockerfile using the operator-bundle image built and published above; then build catalog image
-	$(OPM) index add --container-tool $(CONTAINER_TOOL) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT) --generate -d ./index.Dockerfile
-	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f index.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) .
+catalog-build: bundle-push opm ## Build an FBC catalog image from the operator-bundle image
+	rm -rf catalog-fbc && mkdir -p catalog-fbc
+	$(OPM) init $(BUNDLE_METADATA_PACKAGE_NAME) --default-channel=$(DEFAULT_CHANNEL) --output yaml > catalog-fbc/catalog.yaml
+	OPM=$(OPM) BUNDLE_IMGS="$(BUNDLE_IMGS)" OUTPUT_FILE=catalog-fbc/catalog.yaml hack/opm-render.sh
+	@printf -- '---\nschema: olm.channel\npackage: $(BUNDLE_METADATA_PACKAGE_NAME)\nname: $(DEFAULT_CHANNEL)\nentries:\n  - name: $(PROFILE_SHORT)-operator.v$(VERSION)\n' >> catalog-fbc/catalog.yaml
+	$(OPM) validate catalog-fbc
+	@printf 'FROM scratch\nADD catalog.yaml /configs/catalog.yaml\nLABEL operators.operatorframework.io.index.configs.v1=/configs/\n' > catalog-fbc/catalog.Dockerfile
+	$(CONTAINER_TOOL) build --platform $(PLATFORM) -f catalog-fbc/catalog.Dockerfile -t $(CATALOG_IMG) --label $(LABEL) catalog-fbc/
 
 # Push the catalog image.
 .PHONY: catalog-push
@@ -367,7 +422,11 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/profile/$(PROFILE) && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/profile/$(PROFILE) | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/profile/$(PROFILE) | \
+		sed 's|quay.io/rhdh/plugin-catalog-index:next|$(CATALOG_INDEX_IMAGE)|g' | \
+		sed 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' | \
+		sed 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' | \
+		$(KUBECTL) apply -f -
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
@@ -376,7 +435,7 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 .PHONY: plugin-infra
 plugin-infra:
 	@if [ -f "config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh" ]; then \
-		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh; \
+		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh --olm-version $(OLM_VERSION); \
 	else \
 		echo "File config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh does not exist."; \
 	fi
@@ -384,7 +443,7 @@ plugin-infra:
 .PHONY: plugin-infra-undeploy
 plugin-infra-undeploy:
 	@if [ -f "config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh" ]; then \
-		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh delete; \
+		config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh delete --olm-version $(OLM_VERSION); \
 	else \
 		echo "File config/profile/$(PROFILE)/plugin-infra/plugin-infra.sh does not exist."; \
 	fi
@@ -424,6 +483,20 @@ undeploy-olm: ## Un-deploy the operator with OLM
 	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete operatorgroup $(PROFILE_SHORT)-operator-group
 	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete clusterserviceversion $(PROFILE_SHORT)-operator.v$(VERSION)
 
+.PHONY: deploy-olmv1
+deploy-olmv1: ## Deploy the operator with OLM v1 (ClusterCatalog + ClusterExtension)
+	sed "s/{{BUNDLE_METADATA_PACKAGE_NAME}}/$(subst /,\/,$(BUNDLE_METADATA_PACKAGE_NAME))/g" config/samples/catalog-cluster-extension-template.yaml | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		sed "s/{{OPERATOR_NAMESPACE}}/$(subst /,\/,$(OPERATOR_NAMESPACE))/g" | \
+		$(KUBECTL) apply -f -
+
+.PHONY: undeploy-olmv1
+undeploy-olmv1: ## Un-deploy the operator with OLM v1
+	-$(KUBECTL) delete clusterextension $(PROFILE_SHORT)-operator --ignore-not-found
+	-$(KUBECTL) delete clustercatalog $(PROFILE_SHORT)-operator --ignore-not-found
+	-$(KUBECTL) delete clusterrolebinding $(PROFILE_SHORT)-operator-installer-binding --ignore-not-found
+	-$(KUBECTL) -n ${OPERATOR_NAMESPACE} delete serviceaccount $(PROFILE_SHORT)-operator-installer --ignore-not-found
+
 .PHONY: catalog-update
 catalog-update: ## Update catalog source in the default namespace for catalogsource
 	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OLM_NAMESPACE)
@@ -432,7 +505,7 @@ catalog-update: ## Update catalog source in the default namespace for catalogsou
 		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
 		$(KUBECTL) apply -n $(OLM_NAMESPACE) -f -
 
-.PHONY: catalog-update
+.PHONY: catalog-update-openshift
 catalog-update-openshift: ## Update catalog source in the default namespace for catalogsource
 	-$(KUBECTL) delete catalogsource $(PROFILE_SHORT)-operator -n $(OPENSHIFT_OLM_NAMESPACE)
 	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-source-template.yaml | \
@@ -440,9 +513,29 @@ catalog-update-openshift: ## Update catalog source in the default namespace for 
 		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
 		$(KUBECTL) apply -n $(OPENSHIFT_OLM_NAMESPACE) -f -
 
-# Deploy on Openshift cluster using OLM (by default installed on Openshift)
+.PHONY: catalog-update-olmv1
+catalog-update-olmv1: ## Update ClusterCatalog for OLM v1
+	-$(KUBECTL) delete clustercatalog $(PROFILE_SHORT)-operator --ignore-not-found
+	sed "s/{{CATALOG_IMG}}/$(subst /,\/,$(CATALOG_IMG))/g" config/samples/catalog-cluster-catalog-template.yaml | \
+		sed "s/{{PROFILE_SHORT}}/$(subst /,\/,$(PROFILE_SHORT))/g" | \
+		$(KUBECTL) apply -f -
+
+# Deploy on Openshift cluster using OLM (auto-detects v0 or v1)
 .PHONY: deploy-openshift
-deploy-openshift: release-build release-push catalog-update-openshift create-operator-namespace deploy-olm-openshift ## Deploy the operator on openshift cluster
+deploy-openshift: release-build release-push create-operator-namespace ## Deploy the operator on OpenShift, auto-detecting OLM version
+	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
+		$(MAKE) catalog-update-olmv1 deploy-olmv1; \
+	else \
+		$(MAKE) catalog-update-openshift deploy-olm-openshift; \
+	fi
+
+.PHONY: undeploy-openshift
+undeploy-openshift: ## Un-deploy the operator from OpenShift, auto-detecting OLM version
+	@if $(KUBECTL) get crd clusterextensions.olm.operatorframework.io &>/dev/null; then \
+		$(MAKE) undeploy-olmv1; \
+	else \
+		$(MAKE) undeploy-olm; \
+	fi
 
 .PHONY: install-olm
 install-olm: operator-sdk ## Install the Operator Lifecycle Manager.
@@ -464,22 +557,24 @@ $(LOCALBIN):
 
 ## Tool Binaries
 KUBECTL ?= kubectl
-KUSTOMIZE ?= $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen-$(CONTROLLER_TOOLS_VERSION)
-ENVTEST ?= $(LOCALBIN)/setup-envtest-$(ENVTEST_VERSION)
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
-GOIMPORTS ?= $(LOCALBIN)/goimports-$(GOIMPORTS_VERSION)
-GOSEC ?= $(LOCALBIN)/gosec-$(GOSEC_VERSION)
-GINKGO ?= $(LOCALBIN)/ginkgo-$(GINKGO_VERSION)
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+GOIMPORTS ?= $(LOCALBIN)/goimports
+GOSEC ?= $(LOCALBIN)/gosec
+GINKGO ?= $(LOCALBIN)/ginkgo
+CRDIFY ?= $(LOCALBIN)/crdify
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.2
-CONTROLLER_TOOLS_VERSION ?= v0.20.0
+KUSTOMIZE_VERSION ?= v5.8.1
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
 ENVTEST_VERSION ?= $(shell go list -m -f '{{if .Replace}}{{.Replace.Version}}{{else}}{{.Version}}{{end}}' sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
-GOLANGCI_LINT_VERSION ?= v2.6.2
-GOIMPORTS_VERSION ?= v0.16.1
-GOSEC_VERSION ?= v2.22.8
-GINKGO_VERSION ?= v2.22.2
+GOLANGCI_LINT_VERSION ?= v2.12.2
+GOIMPORTS_VERSION ?= v0.46.0
+GOSEC_VERSION ?= v2.27.1
+GINKGO_VERSION ?= v2.28.1
+CRDIFY_VERSION ?= v0.6.0
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
@@ -495,6 +590,14 @@ controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessar
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
 
+.PHONY: setup-envtest
+setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.
+	@echo "Setting up envtest binaries for Kubernetes version $(ENVTEST_K8S_VERSION)..."
+	@$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path || { \
+		echo "Error: Failed to set up envtest binaries for version $(ENVTEST_K8S_VERSION)."; \
+		exit 1; \
+	}
+
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
 $(ENVTEST): $(LOCALBIN)
@@ -503,62 +606,73 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,${GOLANGCI_LINT_VERSION})
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 .PHONY: goimports
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
 $(GOIMPORTS): $(LOCALBIN)
-	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,${GOIMPORTS_VERSION})
+	$(call go-install-tool,$(GOIMPORTS),golang.org/x/tools/cmd/goimports,$(GOIMPORTS_VERSION))
 
 .PHONY: addgosec
 addgosec: $(GOSEC) ## Download gosec locally if necessary.
 $(GOSEC): $(LOCALBIN)
-	$(call go-install-tool,$(GOSEC),github.com/securego/gosec/v2/cmd/gosec,${GOSEC_VERSION})
+	$(call go-install-tool,$(GOSEC),github.com/securego/gosec/v2/cmd/gosec,$(GOSEC_VERSION))
 
 .PHONY: ginkgo
 ginkgo: $(GINKGO) ## Download Ginkgo locally if necessary.
 $(GINKGO): $(LOCALBIN)
-	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,${GINKGO_VERSION})
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo,$(GINKGO_VERSION))
+
+.PHONY: crdify
+crdify: $(CRDIFY) ## Download crdify locally if necessary.
+$(CRDIFY): $(LOCALBIN)
+	$(call go-install-tool,$(CRDIFY),sigs.k8s.io/crdify,$(CRDIFY_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)
 # $2 - package url which can be installed
 # $3 - specific version of package
 define go-install-tool
-@[ -f $(1) ] || { \
+@[ -f "$(1)-$(3)" ] || { \
 set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
+rm -f $(1) || true ;\
 GOBIN=$(LOCALBIN) go install $${package} ;\
-mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
-}
+mv $(1) $(1)-$(3) ;\
+} ;\
+ln -sf $(1)-$(3) $(1)
 endef
 
 .PHONY: operator-sdk
-OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
+OPERATOR_SDK_WITH_VER ?= $(LOCALBIN)/operator-sdk-$(OPERATOR_SDK_VERSION)
+OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
-ifeq (,$(wildcard $(OPERATOR_SDK)))
+ifeq (,$(wildcard $(OPERATOR_SDK_WITH_VER)))
 	@{ \
 	set -e ;\
-	mkdir -p $(dir $(OPERATOR_SDK)) ;\
+	mkdir -p $(dir $(OPERATOR_SDK_WITH_VER)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
-	chmod +x $(OPERATOR_SDK) ;\
+	curl -sSLo $(OPERATOR_SDK_WITH_VER) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
+	chmod +x $(OPERATOR_SDK_WITH_VER) ;\
 	}
 endif
+	ln -sf $(OPERATOR_SDK_WITH_VER) $(OPERATOR_SDK)
 
 .PHONY: opm
-OPM ?= $(LOCALBIN)/opm-$(OPM_VERSION)
+OPM_WITH_VER ?= $(LOCALBIN)/opm-$(OPM_VERSION)
+OPM ?= $(LOCALBIN)/opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(wildcard $(OPM)))
+ifeq (,$(wildcard $(OPM_WITH_VER)))
 	@{ \
 	set -e ;\
-	mkdir -p $(dir $(OPM)) ;\
+	mkdir -p $(dir $(OPM_WITH_VER)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
-	chmod +x $(OPM) ;\
+	curl -sSLo $(OPM_WITH_VER) https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$${OS}-$${ARCH}-opm ;\
+	chmod +x $(OPM_WITH_VER) ;\
 	}
 endif
+	ln -sf $(OPM_WITH_VER) $(OPM)
 
 ##@ Misc.
 

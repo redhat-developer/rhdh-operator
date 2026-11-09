@@ -68,9 +68,59 @@ func TestOverrideBackstageImage(t *testing.T) {
 	deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
 	assert.Equal(t, 2, len(deployment.podSpec().Containers))
 	assert.Equal(t, "dummy", deployment.container().Image)
-	assert.Equal(t, "dummy", deployment.podSpec().InitContainers[0].Image)
+	// With OPERATOR_DP_PROCESSING=true, init container uses RELATED_IMAGE_plugin_installer (set in model_tests.go)
+	// With OPERATOR_DP_PROCESSING=false, init container uses RELATED_IMAGE_backstage
+	if IsOperatorDPProcessing() {
+		assert.Equal(t, "test-install-dp-image", deployment.podSpec().InitContainers[0].Image)
+	} else {
+		assert.Equal(t, "dummy", deployment.podSpec().InitContainers[0].Image)
+	}
 	assert.Equal(t, "busybox", deployment.podSpec().Containers[1].Image)
 
+}
+
+// TestInstallerImagePullPolicy verifies pull policy is removed to let Kubernetes apply defaults
+func TestInstallerImagePullPolicy(t *testing.T) {
+	if !IsOperatorDPProcessing() {
+		t.Skip("Test only runs when OPERATOR_DP_PROCESSING=true")
+	}
+
+	tests := []struct {
+		name           string
+		installerImage string
+	}{
+		{
+			name:           "latest tag",
+			installerImage: "quay.io/rhdh/plugin-installer:latest",
+		},
+		{
+			name:           "digest",
+			installerImage: "quay.io/rhdh/plugin-installer@sha256:abc123",
+		},
+		{
+			name:           "version tag",
+			installerImage: "quay.io/rhdh/plugin-installer:2.0.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bs := *deploymentTestBackstage.DeepCopy()
+			testObj := createBackstageTest(bs).withDefaultConfig(true).
+				addToDefaultConfig("deployment.yaml", "rhdh-deployment.yaml")
+
+			t.Setenv(InstallDpImageEnvVar, tt.installerImage)
+
+			model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+			assert.NoError(t, err)
+
+			deployment := model.GetRuntimeObject(DeploymentKey).(*BackstageDeployment)
+			assert.Equal(t, tt.installerImage, deployment.podSpec().InitContainers[0].Image)
+			// ImagePullPolicy should be empty - Kubernetes will apply defaults
+			assert.Empty(t, deployment.podSpec().InitContainers[0].ImagePullPolicy,
+				"ImagePullPolicy should be empty to let Kubernetes apply defaults (latest→Always, digest→IfNotPresent)")
+		})
+	}
 }
 
 func TestSpecImagePullSecrets(t *testing.T) {
@@ -383,6 +433,44 @@ func TestDeploymentKind(t *testing.T) {
 
 	ssPodSpec := deployment.podSpec()
 	assert.Equal(t, depPodSpec, ssPodSpec)
+}
+
+func TestIdleAnnotationSetsReplicasToZero(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(true)}
+	bs.Annotations = map[string]string{
+		IdleAnnotation: "true",
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.NotNil(t, deployment)
+	assert.Equal(t, int32(0), *deployment.deployable.SpecReplicas())
+
+	dbSS := model.GetRuntimeObject(DbStatefulSetKey).(*DbStatefulSet)
+	assert.NotNil(t, dbSS)
+	assert.NotNil(t, dbSS.statefulSet)
+	assert.Equal(t, int32(0), *dbSS.statefulSet.Spec.Replicas)
+}
+
+func TestIdleWithExternalDb(t *testing.T) {
+	bs := *deploymentTestBackstage.DeepCopy()
+	bs.Spec.Database = &api.Database{EnableLocalDb: ptr.To(false)}
+	bs.Annotations = map[string]string{
+		IdleAnnotation: "true",
+	}
+
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	deployment := model.getDeployment()
+	assert.Equal(t, int32(0), *deployment.deployable.SpecReplicas())
 }
 
 func TestPatchedStatefulSet(t *testing.T) {

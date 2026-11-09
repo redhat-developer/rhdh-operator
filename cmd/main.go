@@ -1,15 +1,21 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
+	"path/filepath"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,12 +30,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+
 	bsv1 "github.com/redhat-developer/rhdh-operator/api/v1alpha5"
 
 	"github.com/redhat-developer/rhdh-operator/internal/controller"
+	"github.com/redhat-developer/rhdh-operator/pkg/catalog"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 
+	configv1 "github.com/openshift/api/config/v1"
 	openshift "github.com/openshift/api/route/v1"
-	//+kubebuilder:scaffold:imports
+	tlspkg "github.com/openshift/controller-runtime-common/pkg/tls"
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -45,7 +56,9 @@ func init() {
 	utilruntime.Must(openshift.Install(scheme))
 
 	utilruntime.Must(monitoringv1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+
+	utilruntime.Must(configv1.Install(scheme))
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
@@ -54,19 +67,34 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var metricsCertPath, metricsCertName, metricsCertKey string
+	var webhookCertPath, webhookCertName, webhookCertKey string
 	var enableCacheLabelFilter bool
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
-		"The address the metrics endpoint binds to. Use 0 to disable the metrics service.")
+	var disableCatalogController bool
+
+	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
+		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", false,
-		"If set, the metrics endpoint is served securely over HTTPS and requires authentication and authorization.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", true,
+		"If set, the metrics endpoint is served securely via HTTPS and requires authentication and authorization. "+
+			"Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
+	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
+	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
+	flag.StringVar(&metricsCertPath, "metrics-cert-path", "",
+		"The directory that contains the metrics server certificate.")
+	flag.StringVar(&metricsCertName, "metrics-cert-name", "tls.crt",
+		"The name of the metrics server certificate file.")
+	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableCacheLabelFilter, "enable-cache-label-filter", os.Getenv("ENABLE_CACHE_LABEL_FILTER") == "true",
 		"If set, the cache will only store Secrets and ConfigMaps with the label 'rhdh.redhat.com/external-config=true'. This reduces memory consumption. Can also be set via ENABLE_CACHE_LABEL_FILTER env var.")
+	flag.BoolVar(&disableCatalogController, "disable-catalog-controller", os.Getenv("DISABLE_CATALOG_CONTROLLER") == "true",
+		"If set, the DevHubPluginCatalog controller will not be started. Useful for local development. Can also be set via DISABLE_CATALOG_CONTROLLER env var.")
 
 	opts := zap.Options{
 		Development: true,
@@ -76,8 +104,29 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// Cancel this context when the TLS profile changes so the pod restarts with the new config.
+	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	defer cancel()
+
 	if metricsAddr != "0" && !secureMetrics {
 		setupLog.Info("Metrics are served over plaintext HTTP. This is only intended for local development.")
+	}
+
+	restConfig := ctrl.GetConfigOrDie()
+
+	plf, err := controller.DetectPlatform()
+	if err != nil {
+		setupLog.Error(err, "unable to detect platform. Make sure your cluster is running and accessible")
+		os.Exit(1)
+	}
+
+	tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers, err := getTLSProfileConfig(ctx, restConfig, plf.IsOpenshift())
+	if err != nil {
+		setupLog.Error(err, "unable to get TLS profile config")
+		os.Exit(1)
+	}
+	if len(unsupportedCiphers) > 0 {
+		setupLog.Info("TLS profile contains ciphers unsupported by Go that will be ignored", "ciphers", unsupportedCiphers)
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -91,12 +140,41 @@ func main() {
 		c.NextProtos = []string{"http/1.1"}
 	}
 
-	var tlsOpts []func(*tls.Config)
+	tlsOpts := []func(*tls.Config){tlsConfig}
 	if !enableHTTP2 {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
-	metricsServerOpts := metricsserver.Options{
+	// Create watchers for metrics and webhooks certificates
+	var metricsCertWatcher, webhookCertWatcher *certwatcher.CertWatcher
+
+	// Initial webhook TLS options
+	webhookTLSOpts := tlsOpts
+
+	if len(webhookCertPath) > 0 {
+		setupLog.Info("Initializing webhook certificate watcher using provided certificates",
+			"webhook-cert-path", webhookCertPath, "webhook-cert-name", webhookCertName, "webhook-cert-key", webhookCertKey)
+
+		var err error
+		webhookCertWatcher, err = certwatcher.New(
+			filepath.Join(webhookCertPath, webhookCertName),
+			filepath.Join(webhookCertPath, webhookCertKey),
+		)
+		if err != nil {
+			setupLog.Error(err, "Failed to initialize webhook certificate watcher")
+			os.Exit(1)
+		}
+
+		webhookTLSOpts = append(webhookTLSOpts, func(config *tls.Config) {
+			config.GetCertificate = webhookCertWatcher.GetCertificate
+		})
+	}
+
+	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
+	// More info:
+	// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/metrics/server
+	// - https://book.kubebuilder.io/reference/metrics.html
+	metricsServerOptions := metricsserver.Options{
 		BindAddress:   metricsAddr,
 		SecureServing: secureMetrics,
 		TLSOpts:       tlsOpts,
@@ -105,17 +183,44 @@ func main() {
 		// FilterProvider is used to protect the metrics endpoint with authn/authz.
 		// These configurations ensure that only authorized users and service accounts
 		// can access the metrics endpoint. The RBAC are configured in 'config/rbac/kustomization.yaml'. More info:
-		// https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/metrics/filters#WithAuthenticationAndAuthorization
-		metricsServerOpts.FilterProvider = filters.WithAuthenticationAndAuthorization
+		// https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/metrics/filters#WithAuthenticationAndAuthorization
+		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
 	webhookServer := webhook.NewServer(webhook.Options{
-		TLSOpts: tlsOpts,
+		TLSOpts: webhookTLSOpts,
 	})
+
+	// If the certificate is not specified, controller-runtime will automatically
+	// generate self-signed certificates for the metrics server. While convenient for development and testing,
+	// this setup is not recommended for production.
+	//
+	// TODO(user): If you enable certManager, uncomment the following lines:
+	// - [METRICS-WITH-CERTS] at config/default/kustomization.yaml to generate and use certificates
+	// managed by cert-manager for the metrics server.
+	// - [PROMETHEUS-WITH-CERTS] at config/prometheus/kustomization.yaml for TLS certification.
+	if len(metricsCertPath) > 0 {
+		setupLog.Info("Initializing metrics certificate watcher using provided certificates",
+			"metrics-cert-path", metricsCertPath, "metrics-cert-name", metricsCertName, "metrics-cert-key", metricsCertKey)
+
+		var err error
+		metricsCertWatcher, err = certwatcher.New(
+			filepath.Join(metricsCertPath, metricsCertName),
+			filepath.Join(metricsCertPath, metricsCertKey),
+		)
+		if err != nil {
+			setupLog.Error(err, "Failed to initialize metrics certificate watcher")
+			os.Exit(1)
+		}
+
+		metricsServerOptions.TLSOpts = append(metricsServerOptions.TLSOpts, func(config *tls.Config) {
+			config.GetCertificate = metricsCertWatcher.GetCertificate
+		})
+	}
 
 	mgrOpts := ctrl.Options{
 		Scheme:                 scheme,
-		Metrics:                metricsServerOpts,
+		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
@@ -133,10 +238,38 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 	}
 
-	// Configure cache to only watch labeled Secrets and ConfigMaps if flag is enabled
+	// Strip useless managedFields from all cached objects to reduce memory usage.
+	// With many resources, managedFields can consume 70%+ of the informer cache heap.
+	mgrOpts.Cache.DefaultTransform = cache.TransformStripManagedFields()
+
+	// Restrict Deployment/StatefulSet cache to operator-managed objects only.
+	// The operator only needs Deployments/StatefulSets it creates, and those always
+	// carry app.kubernetes.io/name=backstage. Without this filter, the metadata
+	// informers cache every Deployment and StatefulSet cluster-wide, which on
+	// large multi-tenant clusters consumes hundreds of MB of heap.
+	backstageLabelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			utils.BackstageAppLabel: utils.BackstageAppName,
+		},
+	})
+	if err != nil {
+		setupLog.Error(err, "failed to create backstage label selector")
+		os.Exit(1)
+	}
+
+	mgrOpts.Cache.ByObject = map[client.Object]cache.ByObject{
+		&appsv1.Deployment{}: {
+			Label: backstageLabelSelector,
+		},
+		&appsv1.StatefulSet{}: {
+			Label: backstageLabelSelector,
+		},
+	}
+
+	// Optionally restrict Secret/ConfigMap cache to labeled objects.
 	if enableCacheLabelFilter {
 		setupLog.Info("Enabling cache label filter for Secrets and ConfigMaps")
-		labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		extConfigLabelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"rhdh.redhat.com/external-config": "true",
 			},
@@ -146,39 +279,68 @@ func main() {
 			os.Exit(1)
 		}
 
-		mgrOpts.Cache = cache.Options{
-			ByObject: map[client.Object]cache.ByObject{
-				&corev1.Secret{}: {
-					Label: labelSelector,
-				},
-				&corev1.ConfigMap{}: {
-					Label: labelSelector,
-				},
-			},
+		mgrOpts.Cache.ByObject[&corev1.Secret{}] = cache.ByObject{
+			Label: extConfigLabelSelector,
+		}
+		mgrOpts.Cache.ByObject[&corev1.ConfigMap{}] = cache.ByObject{
+			Label: extConfigLabelSelector,
 		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
+	mgr, err := ctrl.NewManager(restConfig, mgrOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	plf, err := controller.DetectPlatform()
-	if err != nil {
-		setupLog.Error(err, "unable to detect platform. Make sure your cluster is running and accessible")
-		os.Exit(1)
-	}
-
 	if err = (&controller.BackstageReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Platform: plf,
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Platform:          plf,
+		OperatorNamespace: getOperatorNamespace(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Backstage")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+
+	// Setup DevHubPluginCatalog controller
+	if !disableCatalogController {
+		if err = (&controller.DevHubPluginCatalogReconciler{
+			Client:            mgr.GetClient(),
+			Scheme:            mgr.GetScheme(),
+			OperatorNamespace: getOperatorNamespace(),
+			Processor:         catalog.NewProcessor(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "DevHubPluginCatalog")
+			os.Exit(1)
+		}
+	} else {
+		setupLog.Info("DevHubPluginCatalog controller disabled")
+	}
+	// +kubebuilder:scaffold:builder
+
+	if plf.IsOpenshift() {
+		if err := setupTLSProfileWatcher(mgr, tlsSecurityProfileSpec, tlsAdherence, cancel); err != nil {
+			setupLog.Error(err, "unable to create TLS profile watcher")
+			os.Exit(1)
+		}
+	}
+
+	if metricsCertWatcher != nil {
+		setupLog.Info("Adding metrics certificate watcher to manager")
+		if err := mgr.Add(metricsCertWatcher); err != nil {
+			setupLog.Error(err, "unable to add metrics certificate watcher to manager")
+			os.Exit(1)
+		}
+	}
+
+	if webhookCertWatcher != nil {
+		setupLog.Info("Adding webhook certificate watcher to manager")
+		if err := mgr.Add(webhookCertWatcher); err != nil {
+			setupLog.Error(err, "unable to add webhook certificate watcher to manager")
+			os.Exit(1)
+		}
+	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
@@ -193,8 +355,74 @@ func main() {
 		"env.LOCALBIN", os.Getenv("LOCALBIN"),
 		"platform", plf.Name,
 	)
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func getTLSProfileConfig(
+	ctx context.Context,
+	restConfig *rest.Config,
+	isOpenshift bool,
+) (configv1.TLSProfileSpec, configv1.TLSAdherencePolicy, func(*tls.Config), []string, error) {
+	tlsSecurityProfileSpec := *configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
+	tlsAdherence := configv1.TLSAdherencePolicyNoOpinion
+
+	if isOpenshift {
+		k8sClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+		if err != nil {
+			setupLog.Info("unable to create client for TLS profile fetch, using Intermediate fallback", "error", err)
+		} else {
+			if profile, err := tlspkg.FetchAPIServerTLSProfile(ctx, k8sClient); err != nil {
+				setupLog.Info("unable to get TLS profile from API server, using Intermediate fallback", "error", err)
+			} else {
+				tlsSecurityProfileSpec = profile
+			}
+
+			if adherence, err := tlspkg.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient); err != nil {
+				setupLog.Info("unable to get TLS adherence policy from API server", "error", err)
+			} else {
+				tlsAdherence = adherence
+			}
+		}
+	}
+
+	tlsConfig, unsupportedCiphers, err := tlspkg.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	if err != nil {
+		return configv1.TLSProfileSpec{}, "", nil, nil, fmt.Errorf("unable to create TLS config from profile: %w", err)
+	}
+	return tlsSecurityProfileSpec, tlsAdherence, tlsConfig, unsupportedCiphers, nil
+}
+
+func setupTLSProfileWatcher(
+	mgr ctrl.Manager,
+	tlsSecurityProfileSpec configv1.TLSProfileSpec,
+	tlsAdherence configv1.TLSAdherencePolicy,
+	cancel context.CancelFunc,
+) error {
+	return (&tlspkg.SecurityProfileWatcher{
+		Client:                    mgr.GetClient(),
+		InitialTLSProfileSpec:     tlsSecurityProfileSpec,
+		InitialTLSAdherencePolicy: tlsAdherence,
+		OnProfileChange: func(_ context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
+			setupLog.Info("TLS profile changed, shutting down to reload", "old", oldTLSProfileSpec, "new", newTLSProfileSpec)
+			cancel()
+		},
+		OnAdherencePolicyChange: func(_ context.Context, oldTLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
+			setupLog.Info("TLS adherence policy changed, shutting down to reload", "old", oldTLSAdherencePolicy, "new", newTLSAdherencePolicy)
+			cancel()
+		},
+	}).SetupWithManager(mgr)
+}
+
+// getOperatorNamespace returns the namespace the operator is running in
+func getOperatorNamespace() string {
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns
+	}
+	if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		return string(data)
+	}
+	return "rhdh-operator"
 }

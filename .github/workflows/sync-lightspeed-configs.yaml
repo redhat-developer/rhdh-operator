@@ -14,8 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         branch:
-          - main
           - release-1.10
+          - release-2.1
 
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.branch }}
@@ -27,18 +27,18 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ matrix.branch }}
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: 'go.mod'
 
       - name: Set up yq
-        uses: mikefarah/yq@1b9b4ac5187171d2e5e3129be0cfa827c7f9d53d # v4.53.3
+        uses: mikefarah/yq@c14f446382944492701b16c1ddb48bb9dbe683e3 # v4.53.6
         with:
           cmd: yq --version
 
@@ -47,13 +47,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Sync Lightspeed config files
-        run: ./hack/sync-lightspeed-configs.sh --ref ${{ matrix.branch }}
-
-      - name: Check for changes
+      - name: Sync Lightspeed Core config files and check for changes
         id: changes
         run: |
-          if git diff --quiet config/profile/rhdh/default-config/flavours/lightspeed/ examples/lightspeed.yaml; then
+          ./hack/sync-lightspeed-configs.sh --ref ${{ matrix.branch }}
+
+          if [[ "${{ matrix.branch }}" == "release-1.10" ]]; then
+            CHANGE_PATHS=(config/profile/rhdh/default-config/flavours/lightspeed/ examples/lightspeed.yaml)
+          else
+            CHANGE_PATHS=(config/profile/rhdh/default-config/flavours/intelligent-assistant/ config/profile/rhdh/default-config/flavours/intelligent-assistant-okp/ examples/intelligent-assistant.yaml)
+          fi
+
+          if git diff --quiet -- "${CHANGE_PATHS[@]}"; then
             echo "No changes from upstream."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           else
@@ -73,6 +78,19 @@ jobs:
         run: |
           TITLE="chore(lightspeed): sync config files from upstream"
           BRANCH="chore/sync-lightspeed-configs-${TARGET_BRANCH}"
+          TARGET_REPO="redhat-developer/rhdh-intelligent-assistant-configs"
+          
+          if [[ "${TARGET_BRANCH}" == "release-1.10" ]]; then
+            TARGET_REPO="redhat-ai-dev/lightspeed-configs"
+            SYNCED_FILES=$(printf '%s\n' \
+              '- `config/profile/rhdh/default-config/flavours/lightspeed/configmap-files.yaml`' \
+              '- `examples/lightspeed.yaml`')
+          else
+            SYNCED_FILES=$(printf '%s\n' \
+              '- `config/profile/rhdh/default-config/flavours/intelligent-assistant/configmap-files.yaml`' \
+              '- `config/profile/rhdh/default-config/flavours/intelligent-assistant-okp/configmap-files.yaml`' \
+              '- `examples/intelligent-assistant.yaml`')
+          fi
 
           EXISTING_PR=$(gh pr list --head "${BRANCH}" --base "${TARGET_BRANCH}" --state open --json number --jq '.[0].number // empty')
 
@@ -92,11 +110,10 @@ jobs:
             git push origin "${BRANCH}"
 
             BODY=$(cat <<EOF
-          Automated nightly sync of Lightspeed config files from [redhat-ai-dev/lightspeed-configs @ ${TARGET_BRANCH}](https://github.com/redhat-ai-dev/lightspeed-configs/tree/${TARGET_BRANCH}).
+          Automated nightly sync of Lightspeed Core config files from [${TARGET_REPO} @ ${TARGET_BRANCH}](https://github.com/${TARGET_REPO}/tree/${TARGET_BRANCH}).
 
           ### Synced files
-          - \`config/profile/rhdh/default-config/flavours/lightspeed/configmap-files.yaml\`
-          - \`examples/lightspeed.yaml\`
+          ${SYNCED_FILES}
 
           > [!CAUTION]
           > Please review the upstream changes carefully before merging.

@@ -1,17 +1,12 @@
 package utils
 
 import (
-	//"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
-
-	//"io"
 	"os"
 	"path/filepath"
-
-	//"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -37,6 +32,7 @@ const maxK8sResourceNameLength = 63
 const (
 	BackstageAppLabel      = "app.kubernetes.io/name"
 	BackstageAppName       = "backstage"
+	BackstageDBAppName     = "backstage-psql"
 	BackstageInstanceLabel = "app.kubernetes.io/instance"
 )
 
@@ -81,11 +77,11 @@ func GenerateVolumeNameFromCmOrSecret(cmOrSecretName string) string {
 }
 
 func BackstageAppLabelValue(backstageName string) string {
-	return fmt.Sprintf("backstage-%s", backstageName)
+	return fmt.Sprintf("%s-%s", BackstageAppName, backstageName)
 }
 
 func BackstageDbAppLabelValue(backstageName string) string {
-	return fmt.Sprintf("backstage-psql-%s", backstageName)
+	return fmt.Sprintf("%s-%s", BackstageDBAppName, backstageName)
 }
 
 // ReadYamls reads and unmarshalls yaml with potentially multiple objects of the same type
@@ -142,24 +138,6 @@ func ReadYamls(manifest []byte, platformPatch []byte, scheme runtime.Scheme) ([]
 	}
 
 	return objects, nil
-}
-
-func ReadYamlFiles(path string, scheme runtime.Scheme, platformExt string) ([]client.Object, error) {
-	fpath := filepath.Clean(path)
-	if _, err := os.Stat(fpath); err != nil {
-		return nil, err
-	}
-	conf, err := os.ReadFile(fpath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read YAML file: %w", err)
-	}
-
-	// Read platform patch if exists
-	pp, err := ReadPlatformPatch(fpath, platformExt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read platform patch: %w", err)
-	}
-	return ReadYamls(conf, pp, scheme)
 }
 
 // ReadPlatformPatch reads the platform-specific patch file if it exists
@@ -253,6 +231,22 @@ func BoolEnvVar(envvar string, def bool) bool {
 		if ret, err := strconv.ParseBool(envValue); err == nil {
 			return ret
 		}
+	}
+	return def
+}
+
+func IntEnvVar(envvar string, def int) int {
+	if envValue, ok := os.LookupEnv(envvar); ok {
+		if ret, err := strconv.Atoi(envValue); err == nil {
+			return ret
+		}
+	}
+	return def
+}
+
+func StringEnvVar(envvar string, def string) string {
+	if envValue, ok := os.LookupEnv(envvar); ok {
+		return envValue
 	}
 	return def
 }

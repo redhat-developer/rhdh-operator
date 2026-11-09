@@ -88,7 +88,8 @@ var _ = Describe("Backstage Operator E2E", func() {
 								return false, fmt.Errorf("invalid json: %q", respBody)
 							}
 							return gjson.Get(respBody, "#").Int() > 0, nil
-						}).WithMessage("be a valid and non-empty JSON array. This is the response from the 'GET /api/extensions/loaded-plugins' endpoint, using the guest user."),
+						}).WithMessage("be a valid and non-empty JSON array. " +
+							"This is the response from the 'GET /api/extensions/loaded-plugins' endpoint, using the guest user."),
 					},
 				},
 			},
@@ -108,7 +109,6 @@ var _ = Describe("Backstage Operator E2E", func() {
 				crName:     "bs-raw-runtime-config",
 			},
 		} {
-			tt := tt
 			When(fmt.Sprintf("applying %s (%s)", tt.name, tt.crFilePath), func() {
 				var crPath string
 				var crLabel string
@@ -125,7 +125,7 @@ var _ = Describe("Backstage Operator E2E", func() {
 
 				It("should handle CR as expected", func() {
 					By("validating that the status of the custom resource created is updated or not", func() {
-						// [{"lastTransitionTime":"2025-04-09T09:02:06Z","message":"","reason":"Deployed","status":"True","type":"Deployed"}]
+						// [{"lastTransitionTime":"2025-04-09T09:02:06Z",...,"type":"Deployed"}]
 						Eventually(helper.VerifyBackstageCRStatus, time.Minute, 10*time.Second).
 							WithArguments(ns, tt.crName, ContainSubstring(`"type":"Deployed"`)).
 							Should(Succeed(), func() string {
@@ -213,13 +213,14 @@ spec:
 								_, err = helper.Run(cmd)
 								Expect(err).ShouldNot(HaveOccurred())
 							})
-							appUrlProvider = func(g Gomega) (context.CancelFunc, string) {
-								return nil, "http://" + appUrl
+							appUrlProvider = func(_ Gomega) (context.CancelFunc, string) {
+								return func() {}, "http://" + appUrl
 							}
 						} else {
 							// Expose the service and reach localhost:7007
 							appUrlProvider = func(g Gomega) (context.CancelFunc, string) {
-								localPort, cancelFunc, err := helper.StartPortForward(context.Background(), fmt.Sprintf("backstage-%s", tt.crName), ns, 80)
+								localPort, cancelFunc, err := helper.StartPortForward(
+									context.Background(), fmt.Sprintf("backstage-%s", tt.crName), ns, 80)
 								g.Expect(err).ShouldNot(HaveOccurred())
 								g.Expect(localPort).ShouldNot(BeZero())
 								return cancelFunc, fmt.Sprintf("http://127.0.0.1:%d", localPort)
@@ -239,7 +240,9 @@ spec:
 					}
 
 					var isRouteEnabledNow bool
+					var routeExisted bool
 					if helper.IsOpenShift() {
+						routeExisted = !tt.isRouteDisabled
 						By("updating route spec in CR", func() {
 							// enables route that was previously disabled, and disables route that was previously enabled.
 							isRouteEnabledNow = tt.isRouteDisabled
@@ -257,18 +260,13 @@ spec:
 							Expect(err).ShouldNot(HaveOccurred())
 						})
 						if isRouteEnabledNow {
+							routeExisted = true
 							By("ensuring the route is reachable", func() {
 								ensureRouteIsReachable(appReachabilityTimeout, ns, tt.crName, crLabel, tt.additionalApiEndpointTests)
 							})
-						} else {
-							By("ensuring route no longer exists eventually", func() {
-								Eventually(func(g Gomega, crName string) {
-									exists, err := helper.DoesBackstageRouteExist(ns, tt.crName)
-									g.Expect(err).ShouldNot(HaveOccurred())
-									g.Expect(exists).Should(BeFalse())
-								}, time.Minute, time.Second).WithArguments(tt.crName).Should(Succeed())
-							})
 						}
+						// When route is disabled (enabled: false), the operator stops managing it but does not
+						// delete the existing route. Cleanup happens via owner reference GC when the CR is deleted.
 					}
 
 					By("deleting CR", func() {
@@ -277,8 +275,8 @@ spec:
 						Expect(err).ShouldNot(HaveOccurred())
 					})
 
-					if helper.IsOpenShift() && isRouteEnabledNow {
-						By("ensuring application is no longer reachable", func() {
+					if helper.IsOpenShift() && routeExisted {
+						By("ensuring route no longer exists after CR deletion", func() {
 							Eventually(func(g Gomega, crName string) {
 								exists, err := helper.DoesBackstageRouteExist(ns, tt.crName)
 								g.Expect(err).ShouldNot(HaveOccurred())
@@ -292,7 +290,10 @@ spec:
 	})
 })
 
-func ensureRouteIsReachable(reachabilityTimeoutMinutes time.Duration, ns string, crName string, crLabel string, additionalApiEndpointTests []helper.ApiEndpointTest) {
+func ensureRouteIsReachable(
+	reachabilityTimeoutMinutes time.Duration, ns, crName, crLabel string,
+	additionalApiEndpointTests []helper.ApiEndpointTest,
+) {
 	Eventually(helper.VerifyBackstageRoute, reachabilityTimeoutMinutes, 10*time.Second).
 		WithArguments(ns, crName, additionalApiEndpointTests).
 		Should(Succeed(), func() string {

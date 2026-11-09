@@ -13,75 +13,169 @@ data:
         server: '*'
       sourceRepos:
       - '*'
+  okp.yaml: |
+    # OKP (Offline Knowledge Portal) standalone Deployment.
+    # name/labels/selector are set by the operator at runtime (per Backstage CR); the values
+    # below are placeholders. The image ref is intentionally declared here (not in Go source)
+    # so midstream digest-pinning can resolve it in the generated bundle ConfigMap.
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ia-okp-{{backstage-name}}
+      annotations:
+        rhdh.redhat.com/platform: ocp
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: ia-okp-{{backstage-name}}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: ia-okp-{{backstage-name}}
+        spec:
+          # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
+          automountServiceAccountToken: false
+          containers:
+            - name: okp
+              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+              ports:
+                - name: httpd
+                  containerPort: 8080
+                  protocol: TCP
+                - name: solr
+                  containerPort: 8983
+                  protocol: TCP
+              env:
+                - name: SOLR_JAVA_MEM
+                  value: "-Xms1g -Xmx1g"
+                - name: SOLR_HOST_BIND
+                  value: "0.0.0.0"
+                # The OKP image's httpd config reads these exact names
+                # (config/httpd conf.d: ServerName ${MIMIR_HTTPD_SERVER_NAME},
+                # Define compressed_${COMPRESSED}_encrypt_${ENCRYPT}); the
+                # HTTPD_-prefixed names are ignored. Matches rhdh-chart.
+                - name: MIMIR_HTTPD_SERVER_NAME
+                  value: "localhost"
+                - name: COMPRESSED
+                  value: "true"
+                - name: ENCRYPT
+                  value: "false"
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 2Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+    ---
+    # Kubernetes requires a numeric UID when runAsNonRoot is set and the image
+    # declares a named user. UID 1001 is the image's `default` user.
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ia-okp-{{backstage-name}}
+      annotations:
+        rhdh.redhat.com/platform: k8s
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app.kubernetes.io/name: ia-okp-{{backstage-name}}
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: ia-okp-{{backstage-name}}
+        spec:
+          # OKP serves docs (Solr + httpd) and needs no Kubernetes API access.
+          automountServiceAccountToken: false
+          containers:
+            - name: okp
+              image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                runAsUser: 1001
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+              ports:
+                - name: httpd
+                  containerPort: 8080
+                  protocol: TCP
+                - name: solr
+                  containerPort: 8983
+                  protocol: TCP
+              env:
+                - name: SOLR_JAVA_MEM
+                  value: "-Xms1g -Xmx1g"
+                - name: SOLR_HOST_BIND
+                  value: "0.0.0.0"
+                - name: MIMIR_HTTPD_SERVER_NAME
+                  value: "localhost"
+                - name: COMPRESSED
+                  value: "true"
+                - name: ENCRYPT
+                  value: "false"
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 2Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+    ---
+    # OKP (Offline Knowledge Portal) standalone OpenShift Route.
+    # name/labels and spec.to.name are set by the operator at runtime (per Backstage CR).
+    # Applied on OpenShift only.
+    apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name: ia-okp-{{backstage-name}}
+      annotations:
+        rhdh.redhat.com/platform: ocp
+    spec:
+      to:
+        kind: Service
+        name: ia-okp-{{backstage-name}}
+      port:
+        targetPort: httpd
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Allow
+    ---
+    # OKP (Offline Knowledge Portal) standalone ClusterIP Service.
+    # name/labels/selector are set by the operator at runtime (per Backstage CR).
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: ia-okp-{{backstage-name}}
+    spec:
+      type: ClusterIP
+      selector:
+        app.kubernetes.io/name: ia-okp-{{backstage-name}}
+      ports:
+        - name: httpd
+          port: 8080
+          targetPort: httpd
+          protocol: TCP
+        - name: solr
+          port: 8983
+          targetPort: solr
+          protocol: TCP
   sonataflow.yaml: |
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: allow-infra-ns-to-workflow-ns # hardcoded
-    spec:
-      podSelector: {}
-      ingress:
-        - from:
-            - namespaceSelector:
-                matchLabels:
-                  # Allow knative events to be delivered to workflows.
-                  kubernetes.io/metadata.name: knative-eventing
-            - namespaceSelector:
-                matchLabels:
-                  # Allow auxiliary knative function for workflow (such as m2k-save-transformation)
-                  kubernetes.io/metadata.name: knative-serving
-            - namespaceSelector:
-                matchLabels:
-                  # Allow openshift serverless logic operator controller pod to access all pods in sonataflow
-                  kubernetes.io/metadata.name: openshift-serverless-logic
-    ---
-    # NetworkPolicy to unblock incoming traffic to the namespace
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: allow-external-communication # hardcoded
-    spec:
-      podSelector: {}
-      ingress:
-        - from:
-            - namespaceSelector:
-                matchLabels:
-                  # Allow knative events to be delivered to workflows.
-                  policy-group.network.openshift.io/ingress: ""
-    ---
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: allow-intra-network # hardcoded
-    spec:
-      # Apply this policy to all pods in the namespace
-      podSelector: {}
-      # Specify policy type as 'Ingress' to control incoming traffic rules
-      policyTypes:
-        - Ingress
-      ingress:
-        - from:
-            # Allow ingress from any pod within the same namespace
-            - podSelector: {}
-    ---
-    # NetworkPolicy to allow openshift-user-workload-monitoring pods to access all pods within the workflow's namespace
-    apiVersion: networking.k8s.io/v1
-    kind: NetworkPolicy
-    metadata:
-      name: allow-monitoring-to-sonataflow-and-workflows # hardcoded
-    spec:
-      # Apply this policy to all pods in the namespace
-      podSelector: {}
-      # Specify policy type as 'Ingress' to control incoming traffic rules
-      policyTypes:
-        - Ingress
-      ingress:
-        - from:
-            - namespaceSelector:
-                matchLabels:
-                  # Allow openshift-user-workload-monitoring pods to access the workflow.
-                  kubernetes.io/metadata.name: openshift-user-workload-monitoring
-    ---
     apiVersion: batch/v1
     kind: Job
     metadata:
@@ -90,10 +184,13 @@ data:
       ttlSecondsAfterFinished: 30
       activeDeadlineSeconds: 120
       template:
+        metadata:
+          labels:
+            rhdh.redhat.com/app: create-sonataflow-database
         spec:
           containers:
             - name: psql
-              image: quay.io/fedora/postgresql-15:latest
+              image: quay.io/fedora/postgresql-18:latest
               resources:
                 limits:
                   cpu: "100m"
@@ -327,11 +424,12 @@ data:
           default: "true"
       steps:
         - name: flatten
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-source.path)
           script: |
-            ROOT=/workspace/workflow
-            TARGET=flat
+            #!/usr/bin/env sh
+            set -eu
+
             mkdir -p flat
 
             if [ -d "workflow/$(params.workflowId)" ]; then
@@ -342,7 +440,7 @@ data:
               cp workflow/LICENSE flat/$(params.workflowId)
             fi
 
-            if [ "$(params.convertToFlat)" == "false" ]; then
+            if [ "$(params.convertToFlat)" = "false" ]; then
               rm -rf workflow/src/main/resources
               mv workflow/src flat/$(params.workflowId)/
             fi
@@ -365,11 +463,15 @@ data:
           type: string
       steps:
         - name: build-manifests
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-source.path)/flat/$(params.workflowId)
           script: |
+            #!/usr/bin/env sh
+            set -eu
+
             microdnf install -y tar gzip
-            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.38.0/kn-workflow-linux-amd64.tar.gz"
+            # Purposely pinned to 1.39.0. OSL Operator needed to be bumped to 1.39.2 during the OSL 1.39 rebuilds (https://redhat.atlassian.net/browse/SRVLOGIC-1303), but the other images/tools were only rebuilt.
+            KN_CLI_URL="https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.39.0/kn-workflow-linux-amd64.tar.gz"
             curl -L "$KN_CLI_URL" | tar -xz --no-same-owner && chmod +x kn-workflow-linux-amd64 && mv kn-workflow-linux-amd64 kn-workflow
             ./kn-workflow gen-manifest --namespace ""
     ---
@@ -390,13 +492,16 @@ data:
           type: string
       steps:
         - name: build-gitops
-          image: registry.access.redhat.com/ubi9-minimal
+          image: registry.access.redhat.com/ubi10-minimal
           workingDir: $(workspaces.workflow-gitops.path)/workflow-gitops
           script: |
-            cp $(workspaces.workflow-source.path)/flat/$(params.workflowId)/manifests/* kustomize/base
+            #!/usr/bin/env sh
+            set -eu
+
+            cp "$(workspaces.workflow-source.path)/flat/$(params.workflowId)/manifests/"* kustomize/base
             microdnf install -y findutils && microdnf clean all
-            cd kustomize
-            ./updater.sh $(params.workflowId) $(params.imageTag)
+            cd kustomize || exit
+            ./updater.sh "$(params.workflowId)" "$(params.imageTag)"
     ---
     apiVersion: tekton.dev/v1
     kind: Pipeline

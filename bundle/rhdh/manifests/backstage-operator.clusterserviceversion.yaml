@@ -23,13 +23,26 @@ metadata:
             },
             "name": "developer-hub"
           }
+        },
+        {
+          "apiVersion": "rhdh.redhat.com/v1alpha5",
+          "kind": "DevHubPluginCatalog",
+          "metadata": {
+            "name": "rhdh-primary-catalog",
+            "namespace": "rhdh-operator"
+          },
+          "spec": {
+            "source": {
+              "ref": "oci://quay.io/rhdh/plugin-catalog-index:2.2.0"
+            }
+          }
         }
       ]
     capabilities: Seamless Upgrades
     categories: Developer Tools
     certified: "true"
-    containerImage: registry.redhat.io/rhdh/rhdh-rhel9-operator:1.11
-    createdAt: "2026-06-12T18:42:24Z"
+    containerImage: registry.redhat.io/rhdh/rhdh-rhel10-operator:2.2
+    createdAt: "2026-10-16T18:09:25Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -40,21 +53,21 @@ metadata:
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "false"
     features.operators.openshift.io/proxy-aware: "false"
-    features.operators.openshift.io/tls-profiles: "false"
+    features.operators.openshift.io/tls-profiles: "true"
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
     operatorframework.io/suggested-namespace: rhdh-operator
     operators.openshift.io/valid-subscription: '["Red Hat Developer Hub"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.37.0
+    operators.operatorframework.io/builder: operator-sdk-v1.42.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://gitlab.cee.redhat.com/rhidp/rhdh/
-    skipRange: '>=1.0.0 <1.11.0'
+    skipRange: '>=2.1.0 <2.2.0'
     support: Red Hat
   labels:
     operatorframework.io/arch.amd64: supported
     operatorframework.io/arch.arm64: supported
-  name: rhdh-operator.v1.11.0
+  name: rhdh-operator.v2.2.0
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -78,6 +91,9 @@ spec:
       kind: Backstage
       name: backstages.rhdh.redhat.com
       version: v1alpha5
+    - kind: DevHubPluginCatalog
+      name: devhubplugincatalogs.rhdh.redhat.com
+      version: v1alpha5
   description: |
     Red Hat Developer Hub is an enterprise-grade platform for building developer portals, containing a supported and opinionated framework. It comes with pre-built plug-ins and configuration settings, supports use of an external database, and can help streamline the process of setting up a self-managed internal developer portal for adopters who are just starting out. By implementing a unified and open platform designed to maximize developer skills, ease onboarding, and increase development productivity, focus can be centered on what really matters: writing great code. Red Hat Developer Hub also offers Software Templates to simplify the development process, which can reduce friction and frustration for development teams, boosting their productivity and increasing an organization's competitive advantage.
 
@@ -85,7 +101,7 @@ spec:
 
     ## Telemetry data collection
 
-    The telemetry data collection feature is enabled by default. Red Hat Developer Hub sends telemetry data to Red Hat by using the `backstage-plugin-analytics-provider-segment` plugin. To disable this and to learn what data is being collected, see [Red Hat Developer Hub documentation on telemetry data collection](https://access.redhat.com/documentation/en-us/red_hat_developer_hub/1.11/html-single/administration_guide_for_red_hat_developer_hub/index#assembly-rhdh-telemetry_admin-rhdh).
+    The telemetry data collection feature is enabled by default. Red Hat Developer Hub sends telemetry data to Red Hat by using the `backstage-plugin-analytics-provider-segment` plugin. To disable this and to learn what data is being collected, see [Red Hat Developer Hub documentation on telemetry data collection](https://access.redhat.com/documentation/en-us/red_hat_developer_hub/2.2/html-single/administration_guide_for_red_hat_developer_hub/index#assembly-rhdh-telemetry_admin-rhdh).
 
     ## More Information
 
@@ -121,6 +137,7 @@ spec:
           - ""
           resources:
           - persistentvolumes
+          - pods
           verbs:
           - get
           - list
@@ -150,13 +167,28 @@ spec:
         - apiGroups:
           - config.openshift.io
           resources:
+          - apiservers
           - ingresses
           verbs:
           - get
+          - list
+          - watch
         - apiGroups:
           - monitoring.coreos.com
           resources:
           - servicemonitors
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
           verbs:
           - create
           - delete
@@ -187,10 +219,19 @@ spec:
           - rhdh.redhat.com
           resources:
           - backstages/status
+          - devhubplugincatalogs/status
           verbs:
           - get
           - patch
           - update
+        - apiGroups:
+          - rhdh.redhat.com
+          resources:
+          - devhubplugincatalogs
+          verbs:
+          - get
+          - list
+          - watch
         - apiGroups:
           - route.openshift.io
           resources:
@@ -209,18 +250,6 @@ spec:
           resources:
           - sonataflowplatforms
           - sonataflows
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - networking.k8s.io
-          resources:
-          - networkpolicies
           verbs:
           - create
           - delete
@@ -303,23 +332,28 @@ spec:
               containers:
               - args:
                 - --health-probe-bind-address=:8081
-                - --metrics-bind-address=:8443
-                - --metrics-secure=true
                 - --leader-elect
+                - --metrics-bind-address=:8443
                 command:
                 - /manager
                 env:
                 - name: OPERATOR_NAME
                   value: rhdh-operator
+                - name: OPERATOR_DP_PROCESSING
+                  value: "false"
+                - name: RELATED_IMAGE_postgresql
+                  value: quay.io/fedora/postgresql-18:latest
+                - name: RELATED_IMAGE_backstage
+                  value: quay.io/rhdh-community/rhdh:next
                 - name: POD_NAME
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.name
-                - name: RELATED_IMAGE_postgresql
-                  value: quay.io/fedora/postgresql-15:latest
-                - name: RELATED_IMAGE_backstage
-                  value: quay.io/rhdh-community/rhdh:next
-                image: quay.io/rhdh/rhdh-rhel9-operator:1.11
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                image: quay.io/rhdh-community/operator:2.2.0
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -353,22 +387,32 @@ spec:
                     - ALL
                   readOnlyRootFilesystem: true
                 volumeMounts:
-                - mountPath: /default-config/flavours/lightspeed
-                  name: flavour-lightspeed-config
+                - mountPath: /default-config/flavours/intelligent-assistant
+                  name: flavour-intelligent-assistant-config
+                - mountPath: /default-config/flavours/intelligent-assistant-okp
+                  name: flavour-intelligent-assistant-okp-config
                 - mountPath: /default-config/flavours/orchestrator
                   name: flavour-orchestrator-config
                 - mountPath: /default-config
                   name: default-config
                 - mountPath: /plugin-deps
                   name: plugin-deps
+                - mountPath: /plugins-mirror
+                  name: mirror-config
+                  readOnly: true
+                - mountPath: /tmp
+                  name: tmp
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: rhdh-controller-manager
               terminationGracePeriodSeconds: 10
               volumes:
               - configMap:
-                  name: rhdh-flavour-lightspeed-config
-                name: flavour-lightspeed-config
+                  name: rhdh-flavour-intelligent-assistant-config
+                name: flavour-intelligent-assistant-config
+              - configMap:
+                  name: rhdh-flavour-intelligent-assistant-okp-config
+                name: flavour-intelligent-assistant-okp-config
               - configMap:
                   name: rhdh-flavour-orchestrator-config
                 name: flavour-orchestrator-config
@@ -379,6 +423,12 @@ spec:
                   name: rhdh-plugin-deps
                   optional: true
                 name: plugin-deps
+              - configMap:
+                  name: plugin-registry-mirror
+                  optional: true
+                name: mirror-config
+              - emptyDir: {}
+                name: tmp
       permissions:
       - rules:
         - apiGroups:
@@ -446,9 +496,9 @@ spec:
     name: Red Hat Inc.
     url: https://www.redhat.com/
   relatedImages:
-  - image: quay.io/fedora/postgresql-15:latest
+  - image: quay.io/fedora/postgresql-18:latest
     name: postgresql
   - image: quay.io/rhdh-community/rhdh:next
     name: backstage
-  replaces: rhdh-operator.v1.10.0
-  version: 1.11.0
+  replaces: rhdh-operator.v2.1.0
+  version: 2.2.0

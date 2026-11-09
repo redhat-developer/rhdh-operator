@@ -1,0 +1,395 @@
+package model
+
+import (
+	"context"
+	"path/filepath"
+	"testing"
+
+	"github.com/redhat-developer/rhdh-operator/api"
+	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
+	"github.com/redhat-developer/rhdh-operator/pkg/platform"
+	"github.com/redhat-developer/rhdh-operator/pkg/utils"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var networkPolicyTestBackstage = api.Backstage{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "test-netpol",
+		Namespace: "test-ns",
+	},
+}
+
+func TestDefaultNetworkPolicies(t *testing.T) {
+	bs := *networkPolicyTestBackstage.DeepCopy()
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+	assert.NotNil(t, model)
+
+	obj := model.GetRuntimeObject(NetworkPolicyKey)
+	assert.NotNil(t, obj)
+
+	mo := obj.Object().(*multiobject.MultiObject)
+	assert.Equal(t, 10, len(mo.Items), "expected 7 backend + 3 DB NPs")
+
+	backendLabel := utils.BackstageAppLabelValue(bs.Name)
+	dbLabel := utils.BackstageDbAppLabelValue(bs.Name)
+	var backendCount, dbCount int
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		assert.Equal(t, bs.Namespace, np.GetNamespace())
+		if np.Spec.PodSelector.MatchLabels[BackstageAppLabel] == dbLabel {
+			dbCount++
+		} else {
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+			backendCount++
+		}
+	}
+	assert.Equal(t, 7, backendCount, "expected 7 backend NPs")
+	assert.Equal(t, 3, dbCount, "expected 3 DB NPs")
+}
+
+func TestNetworkPoliciesWithoutLocalDb(t *testing.T) {
+	bs := *networkPolicyTestBackstage.DeepCopy()
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(false)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	obj := model.GetRuntimeObject(NetworkPolicyKey)
+	assert.NotNil(t, obj)
+
+	mo := obj.Object().(*multiobject.MultiObject)
+	assert.Equal(t, 7, len(mo.Items), "expected only 7 backend NPs when localDb is disabled")
+
+	backendLabel := utils.BackstageAppLabelValue(testObj.backstage.Name)
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel],
+			"all NPs should have backend label when localDb is disabled")
+	}
+
+	var psqlEgress *networkingv1.NetworkPolicy
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-psql-egress" {
+			psqlEgress = np
+			break
+		}
+	}
+	assert.NotNil(t, psqlEgress, "allow-psql-egress should still exist when localDb is disabled")
+	assert.Len(t, psqlEgress.Spec.Egress, 1)
+	assert.Nil(t, psqlEgress.Spec.Egress[0].To,
+		"psql egress should allow port 5432 to any destination when localDb is disabled")
+}
+
+func findPeerLabel(peers []networkingv1.NetworkPolicyPeer) (string, bool) {
+	for _, peer := range peers {
+		if peer.PodSelector == nil {
+			continue
+		}
+		if val, ok := peer.PodSelector.MatchLabels[BackstageAppLabel]; ok {
+			return val, true
+		}
+	}
+	return "", false
+}
+
+func TestNetworkPolicyPodSelectors(t *testing.T) {
+	bs := *networkPolicyTestBackstage.DeepCopy()
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	mo := model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject)
+	dbLabel := utils.BackstageDbAppLabelValue(bs.Name)
+	backendLabel := utils.BackstageAppLabelValue(bs.Name)
+
+	var foundEgressToDb, foundIngressFromBackend bool
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		for _, egress := range np.Spec.Egress {
+			if val, ok := findPeerLabel(egress.To); ok {
+				assert.Equal(t, dbLabel, val)
+				foundEgressToDb = true
+			}
+		}
+		for _, ingress := range np.Spec.Ingress {
+			if val, ok := findPeerLabel(ingress.From); ok {
+				assert.Equal(t, backendLabel, val)
+				foundIngressFromBackend = true
+			}
+		}
+	}
+	assert.True(t, foundEgressToDb, "expected to find a psql egress rule targeting DB-labeled pods")
+	assert.True(t, foundIngressFromBackend, "expected to find a backend ingress rule in DB policies")
+}
+
+func TestNetworkPolicyNaming(t *testing.T) {
+	bs := *networkPolicyTestBackstage.DeepCopy()
+	testObj := createBackstageTest(bs).withDefaultConfig(true).withLocalDb(true)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	mo := model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject)
+
+	var foundBackendNaming, foundDbNaming bool
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		ann := np.GetAnnotations()[ConfiguredNameAnnotation]
+		if ann == "default-deny" && np.GetName() == DefaultMultiObjectName("netpol", bs.Name, "default-deny") {
+			foundBackendNaming = true
+		}
+		if ann == "db-default-deny" && np.GetName() == DefaultMultiObjectName("db-netpol", bs.Name, "db-default-deny") {
+			foundDbNaming = true
+		}
+	}
+	assert.True(t, foundBackendNaming, "backend NP should use 'netpol' name prefix")
+	assert.True(t, foundDbNaming, "DB NP should use 'db-netpol' name prefix")
+}
+
+func TestNetworkPolicyRouterIngressOnOpenShift(t *testing.T) {
+	bs := *networkPolicyTestBackstage.DeepCopy()
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	mo := model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject)
+
+	var routerPolicy *networkingv1.NetworkPolicy
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-router-ingress" {
+			routerPolicy = np
+			break
+		}
+	}
+	assert.NotNil(t, routerPolicy, "expected allow-router-ingress policy")
+	assert.Len(t, routerPolicy.Spec.Ingress, 1)
+	assert.Len(t, routerPolicy.Spec.Ingress[0].From, 1)
+	assert.NotNil(t, routerPolicy.Spec.Ingress[0].From[0].NamespaceSelector)
+	assert.Equal(t, "", routerPolicy.Spec.Ingress[0].From[0].NamespaceSelector.MatchLabels["policy-group.network.openshift.io/ingress"])
+}
+
+func TestNetworkPolicyRouterIngressOnKubernetes(t *testing.T) {
+	bs := *networkPolicyTestBackstage.DeepCopy()
+	testObj := createBackstageTest(bs).withDefaultConfig(true)
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.Default, testObj.scheme)
+	assert.NoError(t, err)
+
+	mo := model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject)
+
+	var routerPolicy *networkingv1.NetworkPolicy
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-router-ingress" {
+			routerPolicy = np
+			break
+		}
+	}
+	assert.NotNil(t, routerPolicy, "expected allow-router-ingress policy")
+	assert.Len(t, routerPolicy.Spec.Ingress, 1)
+	assert.Len(t, routerPolicy.Spec.Ingress[0].From, 1)
+	ns := routerPolicy.Spec.Ingress[0].From[0].NamespaceSelector
+	assert.NotNil(t, ns)
+	assert.Empty(t, ns.MatchLabels, "non-OCP should use empty namespaceSelector (match all)")
+}
+
+func TestNetworkPolicyFlavourMergePreservesNamespaceWidePodSelector(t *testing.T) {
+	bs := api.Backstage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-flavour-np",
+			Namespace: "test-ns",
+		},
+	}
+	testObj := createBackstageTest(bs).withConfigPath("./testdata/testflavours").withLocalDb(false)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	obj := model.GetRuntimeObject(NetworkPolicyKey)
+	assert.NotNil(t, obj)
+
+	mo := obj.Object().(*multiobject.MultiObject)
+	assert.Equal(t, 8, len(mo.Items), "expected 7 backend + 1 flavour NP (DB NPs filtered out)")
+
+	backendLabel := utils.BackstageAppLabelValue(testObj.backstage.Name)
+	var foundNamespaceWide bool
+	for _, item := range mo.Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[ConfiguredNameAnnotation] == "allow-intra-network" &&
+			np.GetAnnotations()[SourceAnnotation] == "flavour-flavor1" {
+			foundNamespaceWide = true
+			_, hasLabel := np.Spec.PodSelector.MatchLabels[BackstageAppLabel]
+			assert.False(t, hasLabel, "flavour NP with podSelector: {} should NOT have rhdh.redhat.com/app in podSelector")
+		} else {
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel],
+				"base NP %s should have backend label in podSelector", np.GetAnnotations()[ConfiguredNameAnnotation])
+		}
+	}
+	assert.True(t, foundNamespaceWide, "expected to find the namespace-wide flavour NP")
+}
+
+func TestNetworkPolicyWithOverlay(t *testing.T) {
+	bs := *networkPolicyTestBackstage.DeepCopy()
+	testObj := createBackstageTest(bs).withDefaultConfig(true).addToDefaultConfig("networkpolicy.yaml", "raw-networkpolicy.yaml")
+
+	model, err := InitObjects(context.TODO(), bs, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	assert.NoError(t, err)
+
+	obj := model.GetRuntimeObject(NetworkPolicyKey)
+	assert.NotNil(t, obj)
+
+	mo := obj.Object().(*multiobject.MultiObject)
+	assert.Equal(t, 1, len(mo.Items))
+}
+
+func TestOrchestratorNetworkPolicies(t *testing.T) {
+	// bin/ is populated by make test (real default-config + local-test plugin catalog).
+	t.Setenv("LOCALBIN", filepath.Join("..", "..", "bin"))
+
+	bs := api.Backstage{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-orchestrator-np", Namespace: "test-ns"},
+		Spec: api.BackstageSpec{
+			Flavours: &[]api.Flavour{
+				{Name: "intelligent-assistant", Enabled: false},
+				{Name: "orchestrator", Enabled: true},
+			},
+		},
+	}
+	testObj := createBackstageTest(bs).withLocalDb(true)
+
+	model, err := InitObjects(context.TODO(), testObj.backstage, testObj.externalConfig, platform.OpenShift, testObj.scheme)
+	require.NoError(t, err)
+
+	backendLabel := utils.BackstageAppLabelValue(bs.Name)
+	dbLabel := utils.BackstageDbAppLabelValue(bs.Name)
+	var orchCount int
+	seen := map[string]bool{}
+	for _, item := range model.GetRuntimeObject(NetworkPolicyKey).Object().(*multiobject.MultiObject).Items {
+		np := item.(*networkingv1.NetworkPolicy)
+		if np.GetAnnotations()[SourceAnnotation] != "flavour-orchestrator" {
+			continue
+		}
+		orchCount++
+		name := np.GetAnnotations()[ConfiguredNameAnnotation]
+		seen[name] = true
+		assert.NotEmpty(t, np.Spec.PodSelector.MatchLabels, "%s uses empty podSelector", name)
+		assert.NotEqual(t, "allow-sonataflow-all-egress", name)
+
+		switch name {
+		case "sonataflow-data-index-default-deny":
+			assert.Equal(t, "data-index-service", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/name"])
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+			assert.Empty(t, np.Spec.Ingress)
+			assert.Empty(t, np.Spec.Egress)
+		case "sonataflow-jobs-service-default-deny":
+			assert.Equal(t, "jobs-service", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/name"])
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+			assert.Empty(t, np.Spec.Ingress)
+			assert.Empty(t, np.Spec.Egress)
+		case "allow-router-ingress-to-sonataflow", "allow-backstage-to-sonataflow":
+			require.NotEmpty(t, np.Spec.Ingress)
+			assert.Empty(t, np.Spec.Ingress[0].Ports, "%s must not restrict ports", name)
+			if name == "allow-backstage-to-sonataflow" {
+				from, ok := findPeerLabel(np.Spec.Ingress[0].From)
+				assert.True(t, ok)
+				assert.Equal(t, backendLabel, from)
+			}
+		case "allow-sonataflow-intra":
+			require.NotEmpty(t, np.Spec.Ingress)
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Empty(t, np.Spec.Ingress[0].Ports)
+			assert.Len(t, np.Spec.Ingress[0].From, 2)
+			assert.Len(t, np.Spec.Egress[0].To, 2)
+		case "allow-sonataflow-dns-egress":
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Len(t, np.Spec.Egress[0].Ports, 4)
+		case "allow-sonataflow-https-egress":
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Len(t, np.Spec.Egress[0].Ports, 2)
+		case "allow-sonataflow-postgresql-egress":
+			require.NotEmpty(t, np.Spec.Egress)
+			require.Len(t, np.Spec.Egress[0].To, 1)
+			assert.Equal(t, dbLabel, np.Spec.Egress[0].To[0].PodSelector.MatchLabels[BackstageAppLabel])
+			assert.Equal(t, int32(5432), np.Spec.Egress[0].Ports[0].Port.IntVal)
+		case "allow-sonataflow-to-backstage-egress":
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Equal(t, backendLabel, np.Spec.Egress[0].To[0].PodSelector.MatchLabels[BackstageAppLabel])
+			assert.Equal(t, int32(7007), np.Spec.Egress[0].Ports[0].Port.IntVal)
+		case "allow-sonataflow-to-backstage-ingress":
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+			require.NotEmpty(t, np.Spec.Ingress)
+			assert.Equal(t, int32(7007), np.Spec.Ingress[0].Ports[0].Port.IntVal)
+		case "allow-backstage-to-sonataflow-egress":
+			assert.Equal(t, backendLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+			require.NotEmpty(t, np.Spec.Egress)
+			assert.Empty(t, np.Spec.Egress[0].Ports, "RHDH→SonataFlow egress must not restrict ports")
+		case "allow-monitoring-to-sonataflow":
+			require.NotEmpty(t, np.Spec.Ingress)
+			assert.Len(t, np.Spec.Ingress[0].From, 5)
+			assert.Equal(t, int32(8080), np.Spec.Ingress[0].Ports[0].Port.IntVal)
+		case "allow-sonataflow-to-db-ingress":
+			assert.Equal(t, dbLabel, np.Spec.PodSelector.MatchLabels[BackstageAppLabel])
+
+			require.Len(t, np.Spec.Ingress, 1)
+			from := np.Spec.Ingress[0].From
+			require.Len(t, from, 3)
+
+			var sawSonataFlow, sawCrossNsSonataFlow, sawDbJob bool
+			for _, peer := range from {
+				require.NotNil(t, peer.PodSelector)
+				if peer.NamespaceSelector != nil &&
+					peer.PodSelector.MatchLabels["app.kubernetes.io/managed-by"] == "sonataflow-operator" {
+					sawCrossNsSonataFlow = true
+				} else if peer.PodSelector.MatchLabels["app.kubernetes.io/managed-by"] == "sonataflow-operator" {
+					sawSonataFlow = true
+				}
+				if peer.PodSelector.MatchLabels[BackstageAppLabel] == "create-sonataflow-database" {
+					sawDbJob = true
+				}
+			}
+			assert.True(t, sawSonataFlow, "expected from peer with sonataflow-operator")
+			assert.True(t, sawCrossNsSonataFlow, "expected cross-namespace sonataflow-operator peer")
+			assert.True(t, sawDbJob, "expected from peer with create-sonataflow-database")
+
+			require.Len(t, np.Spec.Ingress[0].Ports, 1)
+			assert.Equal(t, int32(5432), np.Spec.Ingress[0].Ports[0].Port.IntVal)
+			assert.Equal(t, corev1.ProtocolTCP, *np.Spec.Ingress[0].Ports[0].Protocol)
+		case "allow-infra-ns-to-sonataflow":
+			assert.Equal(t, "sonataflow-operator", np.Spec.PodSelector.MatchLabels["app.kubernetes.io/managed-by"])
+		default:
+			t.Errorf("unexpected orchestrator NetworkPolicy: %s", name)
+		}
+	}
+	assert.Equal(t, 14, orchCount)
+	for _, want := range []string{
+		"sonataflow-data-index-default-deny",
+		"sonataflow-jobs-service-default-deny",
+		"allow-infra-ns-to-sonataflow",
+		"allow-router-ingress-to-sonataflow",
+		"allow-backstage-to-sonataflow",
+		"allow-sonataflow-intra",
+		"allow-sonataflow-dns-egress",
+		"allow-sonataflow-https-egress",
+		"allow-sonataflow-postgresql-egress",
+		"allow-sonataflow-to-backstage-egress",
+		"allow-sonataflow-to-backstage-ingress",
+		"allow-backstage-to-sonataflow-egress",
+		"allow-monitoring-to-sonataflow",
+		"allow-sonataflow-to-db-ingress",
+	} {
+		assert.True(t, seen[want], "missing orchestrator NetworkPolicy %s", want)
+	}
+}

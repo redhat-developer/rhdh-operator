@@ -4,7 +4,7 @@ metadata:
   name: openshift-pipelines-operator
   namespace: openshift-operators
 spec:
-  channel:  pipelines-1.17
+  channel: pipelines-1.21
   installPlanApproval: Automatic
   name: openshift-pipelines-operator-rh
   source: redhat-operators

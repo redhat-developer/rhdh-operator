@@ -20,3 +20,8 @@ Please explain the changes you made here.
 <!--
 Detailed instructions may help reviewers test this PR quickly and provide quicker feedback.
 -->
+
+## Container Images
+
+Container images are built and pushed to Quay automatically when relevant files change.
+Image links will be posted in a PR comment once the push completes.

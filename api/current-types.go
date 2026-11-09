@@ -30,6 +30,7 @@ type (
 	Application         = bsv1.Application
 	Database            = bsv1.Database
 	AppConfig           = bsv1.AppConfig
+	DynamicPluginConfig = bsv1.DynamicPluginConfig
 	ExtraEnvs           = bsv1.ExtraEnvs
 	ExtraFiles          = bsv1.ExtraFiles
 	Route               = bsv1.Route
@@ -45,14 +46,34 @@ type (
 
 	// Other types
 	TLS = bsv1.TLS
+
+	// DevHubPluginCatalog types
+	DevHubPluginCatalog     = bsv1.DevHubPluginCatalog
+	DevHubPluginCatalogSpec = bsv1.DevHubPluginCatalogSpec
+	DevHubPluginCatalogList = bsv1.DevHubPluginCatalogList
+	CatalogSource           = bsv1.CatalogSource
 )
 
 // Condition constants
 const (
-	BackstageConditionTypeDeployed     BackstageConditionType   = bsv1.BackstageConditionTypeDeployed
-	BackstageConditionReasonDeployed   BackstageConditionReason = bsv1.BackstageConditionReasonDeployed
-	BackstageConditionReasonFailed     BackstageConditionReason = bsv1.BackstageConditionReasonFailed
-	BackstageConditionReasonInProgress BackstageConditionReason = bsv1.BackstageConditionReasonInProgress
+	// Condition types
+	BackstageConditionTypeDeployed BackstageConditionType = bsv1.BackstageConditionTypeDeployed
+	BackstageConditionTypeRuntime  BackstageConditionType = bsv1.BackstageConditionTypeRuntime
+	BackstageConditionTypeConfig   BackstageConditionType = bsv1.BackstageConditionTypeConfig
+
+	// Deployed condition reasons
+	BackstageConditionReasonDeployed       BackstageConditionReason = bsv1.BackstageConditionReasonDeployed
+	BackstageConditionReasonFailed         BackstageConditionReason = bsv1.BackstageConditionReasonFailed
+	BackstageConditionReasonInProgress     BackstageConditionReason = bsv1.BackstageConditionReasonInProgress
+	BackstageConditionReasonRolloutStalled BackstageConditionReason = bsv1.BackstageConditionReasonRolloutStalled
+
+	// Runtime condition reasons
+	BackstageConditionReasonRunning         BackstageConditionReason = bsv1.BackstageConditionReasonRunning
+	BackstageConditionReasonContainerFailed BackstageConditionReason = bsv1.BackstageConditionReasonContainerFailed
+	BackstageConditionReasonPending         BackstageConditionReason = bsv1.BackstageConditionReasonPending
+
+	// Config condition reasons
+	BackstageConditionReasonInvalid BackstageConditionReason = bsv1.BackstageConditionReasonInvalid
 )
 
 // AddToScheme adds the current API version's types to the scheme.

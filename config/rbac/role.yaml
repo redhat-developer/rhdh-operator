@@ -23,6 +23,7 @@ rules:
   - ""
   resources:
   - persistentvolumes
+  - pods
   verbs:
   - get
   - list
@@ -52,13 +53,28 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - apiservers
   - ingresses
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
   - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
   verbs:
   - create
   - delete
@@ -89,10 +105,19 @@ rules:
   - rhdh.redhat.com
   resources:
   - backstages/status
+  - devhubplugincatalogs/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - rhdh.redhat.com
+  resources:
+  - devhubplugincatalogs
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - route.openshift.io
   resources:

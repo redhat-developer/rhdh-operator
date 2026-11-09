@@ -3,17 +3,20 @@ package model
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/redhat-developer/rhdh-operator/api"
-	"k8s.io/apimachinery/pkg/runtime"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/ptr"
 )
 
 func TestReadPluginDeps(t *testing.T) {
@@ -34,7 +37,7 @@ func TestReadPluginDeps(t *testing.T) {
 	err = os.WriteFile(file4, []byte("some unrelated content"), 0644)
 	assert.NoError(t, err)
 
-	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"})
+	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"}, "")
 	assert.NoError(t, err)
 	assert.Len(t, objects, 2)
 
@@ -60,7 +63,7 @@ metadata:
 
 	bsName := "test-name"
 	bsNamespace := "test-namespace"
-	objects, err := ReadPluginDeps(dir, bsName, bsNamespace, []string{"file1"})
+	objects, err := ReadPluginDeps(dir, bsName, bsNamespace, []string{"file1"}, "")
 	assert.NoError(t, err)
 	assert.Len(t, objects, 1)
 
@@ -126,7 +129,7 @@ plugins:
 	}
 	sc := runtime.NewScheme()
 	utilruntime.Must(api.AddToScheme(sc))
-	objects, err := GetPluginDeps(bs, dynaPlugins, sc)
+	objects, err := GetPluginDeps(bs, dynaPlugins, sc, "")
 	assert.NoError(t, err)
 	assert.Len(t, objects, 2)
 
@@ -148,7 +151,209 @@ func TestReadPluginDepsNoFiles(t *testing.T) {
 	dir := t.TempDir()
 
 	// Call ReadPluginDeps with an empty directory
-	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"})
+	objects, err := ReadPluginDeps(dir, "", "", []string{"sonata"}, "")
 	assert.NoError(t, err)
 	assert.Len(t, objects, 0)
+}
+
+func TestReadPluginDepsPlatformGating(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create files with different platform annotations
+	ocpOnly := filepath.Join(dir, "plugin-ocp.yaml")
+	k8sOnly := filepath.Join(dir, "plugin-k8s.yaml")
+	allPlatforms := filepath.Join(dir, "plugin-all.yaml")
+
+	// OCP-only resource
+	err := os.WriteFile(ocpOnly, []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocp-config
+  annotations:
+    rhdh.redhat.com/platform: ocp
+`), 0644)
+	assert.NoError(t, err)
+
+	// K8s-only resource
+	err = os.WriteFile(k8sOnly, []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-config
+  annotations:
+    rhdh.redhat.com/platform: k8s
+`), 0644)
+	assert.NoError(t, err)
+
+	// All platforms (no annotation)
+	err = os.WriteFile(allPlatforms, []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: all-config
+`), 0644)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		platformExt string
+		wantNames   []string
+	}{
+		{
+			name:        "ocp platform gets ocp and all",
+			platformExt: "ocp",
+			wantNames:   []string{"ocp-config", "all-config"},
+		},
+		{
+			name:        "k8s platform gets k8s and all",
+			platformExt: "k8s",
+			wantNames:   []string{"k8s-config", "all-config"},
+		},
+		{
+			name:        "empty platform gets all resources",
+			platformExt: "",
+			wantNames:   []string{"ocp-config", "k8s-config", "all-config"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objects, err := ReadPluginDeps(dir, "", "", []string{"plugin"}, tt.platformExt)
+			assert.NoError(t, err)
+
+			var gotNames []string
+			for _, obj := range objects {
+				gotNames = append(gotNames, obj.GetName())
+			}
+			assert.ElementsMatch(t, tt.wantNames, gotNames)
+		})
+	}
+}
+
+func TestReadOkpPluginDepsPlatformSecurityContext(t *testing.T) {
+	pluginDepsDir := filepath.Join("..", "..", "config", "profile", "rhdh", "plugin-deps")
+
+	tests := []struct {
+		name          string
+		platform      string
+		wantRunAsUser *int64
+	}{
+		{
+			name:     "OpenShift uses the cluster-assigned UID",
+			platform: "ocp",
+		},
+		{
+			name:          "Kubernetes uses the OKP image UID",
+			platform:      "k8s",
+			wantRunAsUser: ptr.To(int64(1001)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objects, err := ReadPluginDeps(pluginDepsDir, "developer-hub", "rhdh-test", []string{"okp"}, tt.platform)
+			assert.NoError(t, err)
+
+			var deployments []appsv1.Deployment
+			for _, obj := range objects {
+				if obj.GetKind() != "Deployment" {
+					continue
+				}
+
+				var deployment appsv1.Deployment
+				err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &deployment)
+				assert.NoError(t, err)
+				deployments = append(deployments, deployment)
+			}
+
+			if assert.Len(t, deployments, 1) && assert.Len(t, deployments[0].Spec.Template.Spec.Containers, 1) {
+				assert.Equal(t, tt.wantRunAsUser, deployments[0].Spec.Template.Spec.Containers[0].SecurityContext.RunAsUser)
+			}
+		})
+	}
+}
+
+func TestReadOkpPluginDepsNamesFitKubernetesLimits(t *testing.T) {
+	pluginDepsDir := filepath.Join("..", "..", "config", "profile", "rhdh", "plugin-deps")
+	// A Backstage Deployment uses the longer "backstage-" prefix, so a
+	// 53-character CR name can already be valid for the base installation.
+	backstageName := strings.Repeat("a", 53)
+
+	objects, err := ReadPluginDeps(pluginDepsDir, backstageName, "rhdh-test", []string{"okp"}, "k8s")
+	assert.NoError(t, err)
+
+	for _, obj := range objects {
+		assert.LessOrEqual(t, len(obj.GetName()), 63, "%s name exceeds the Kubernetes DNS label limit", obj.GetKind())
+		if value := obj.GetLabels()["app.kubernetes.io/name"]; value != "" {
+			assert.LessOrEqual(t, len(value), 63, "%s app.kubernetes.io/name exceeds the label limit", obj.GetKind())
+		}
+
+		if obj.GetKind() == "Deployment" {
+			selector, found, nestedErr := unstructured.NestedString(
+				obj.Object,
+				"spec", "selector", "matchLabels", "app.kubernetes.io/name",
+			)
+			assert.NoError(t, nestedErr)
+			assert.True(t, found)
+			assert.LessOrEqual(t, len(selector), 63)
+		}
+	}
+}
+
+func TestMatchesPlatform(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		platformExt string
+		want        bool
+	}{
+		{
+			name:        "no annotations - matches all",
+			annotations: nil,
+			platformExt: "ocp",
+			want:        true,
+		},
+		{
+			name:        "no platform annotation - matches all",
+			annotations: map[string]string{"other": "value"},
+			platformExt: "ocp",
+			want:        true,
+		},
+		{
+			name:        "ocp annotation matches ocp platform",
+			annotations: map[string]string{PlatformAnnotation: "ocp"},
+			platformExt: "ocp",
+			want:        true,
+		},
+		{
+			name:        "k8s annotation matches k8s platform",
+			annotations: map[string]string{PlatformAnnotation: "k8s"},
+			platformExt: "k8s",
+			want:        true,
+		},
+		{
+			name:        "ocp annotation does not match k8s platform",
+			annotations: map[string]string{PlatformAnnotation: "ocp"},
+			platformExt: "k8s",
+			want:        false,
+		},
+		{
+			name:        "k8s annotation does not match ocp platform",
+			annotations: map[string]string{PlatformAnnotation: "k8s"},
+			platformExt: "ocp",
+			want:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{}
+			if tt.annotations != nil {
+				obj.SetAnnotations(tt.annotations)
+			}
+			got := matchesPlatform(obj, tt.platformExt)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

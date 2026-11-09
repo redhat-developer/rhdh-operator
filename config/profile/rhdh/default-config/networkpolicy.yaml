@@ -1,0 +1,228 @@
+# These policies cover the network requirements of a base RHDH deployment with all enabled-by-default RHDH plugins.
+# See https://github.com/redhat-developer/rhdh-plugin-export-overlays/blob/main/default.packages.yaml
+# Disabled plugins (e.g. LDAP catalog, email notifications, scaffolder HTTP requests) may need
+# additional user-created additive NetworkPolicies for ports not covered here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+        # mDNS; used by some CNI plugins and node-local DNS caches (e.g. on OpenShift)
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-https-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 443
+          protocol: TCP
+        # Kubernetes API server (e.g., OpenShift uses 6443; some managed platforms
+        # use 443 above). Needed by plugins that query cluster resources: Tekton,
+        # ArgoCD/GitOps, Topology, KServe model catalog, and any catalog provider
+        # or frontend plugin that lists or watches Kubernetes objects.
+        # RBAC on the ServiceAccount is the access-control boundary, not NetworkPolicy.
+        - port: 6443
+          protocol: TCP
+
+---
+# Redis is part of the recommended checklist for production deployments
+# (see https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.10/html/setting_up_and_configuring_your_first_red_hat_developer_hub_instance/checklist-to-run-your-first-rhdh-instance-in-production_setting-up-and-configuring-your-first-red-hat-developer-hub-instance).
+# RHDH does not deploy Redis OOTB; users bring their own, which could be in the same
+# namespace, a different namespace, or an external managed service. The rule therefore
+# has no pod or namespace selector.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 6379
+          protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-psql-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        # When local DB is disabled (external DB), this 'to' selector is removed at runtime,
+        # allowing egress on port 5432 to any destination.
+        - podSelector:
+            matchLabels:
+              rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+      ports:
+        - port: 5432
+          protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-metrics-ingress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              # OpenShift platform monitoring
+              kubernetes.io/metadata.name: openshift-monitoring
+        - namespaceSelector:
+            matchLabels:
+              # OpenShift user workload monitoring (scrapes user-deployed ServiceMonitors)
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring
+        - namespaceSelector:
+            matchLabels:
+              # GKE Standard: Google Managed Prometheus
+              kubernetes.io/metadata.name: gmp-system
+        - namespaceSelector:
+            matchLabels:
+              # GKE Autopilot: Google Managed Prometheus
+              kubernetes.io/metadata.name: gke-gmp-system
+        - namespaceSelector:
+            matchLabels:
+              # kube-prometheus-stack convention
+              kubernetes.io/metadata.name: monitoring
+        # AKS runs its monitoring agent in kube-system, but allowing all of kube-system
+        # is too broad; it contains many non-monitoring system components.
+        # AKS users should create an additive NetworkPolicy targeting kube-system if needed.
+        #- namespaceSelector:
+        #    matchLabels:
+        #      kubernetes.io/metadata.name: kube-system
+        # EKS (Amazon Managed Prometheus) has no fixed in-cluster collector namespace;
+        # users deploy their own collector (e.g. ADOT) and should create an additive
+        # NetworkPolicy targeting their collector namespace if needed.
+      ports:
+        - port: 9464
+          protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-router-ingress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {} # on OCP, replaced with policy-group.network.openshift.io/ingress selector
+      ports:
+        - port: 7007
+          protocol: TCP
+
+---
+# The following db-* policies are only created when the local DB is enabled in the CR.
+# They are filtered out at runtime when spec.database.enableLocalDb is false,
+# based on the 'rhdh.redhat.com/app' podSelector matchLabel placeholder.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-default-deny
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-dns-egress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+        # mDNS; used by some CNI plugins and node-local DNS caches (e.g. on OpenShift)
+        - port: 5353
+          protocol: UDP
+        - port: 5353
+          protocol: TCP
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-backend-ingress
+spec:
+  podSelector:
+    matchLabels:
+      rhdh.redhat.com/app: backstage-psql # replaced at runtime with 'backstage-psql-<cr-name>'
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              rhdh.redhat.com/app: backstage # replaced at runtime with 'backstage-<cr-name>'
+      ports:
+        - port: 5432
+          protocol: TCP

@@ -23,11 +23,11 @@ type DbService struct {
 }
 
 func init() {
-	registerConfig(DbServiceKey, DbServiceFactory{}, false, nil)
+	registerConfig(DbServiceKey, DbServiceFactory{}, false, noMerge)
 }
 
 func DbServiceName(backstageName string) string {
-	return utils.GenerateRuntimeObjectName(backstageName, "backstage-psql")
+	return utils.GenerateRuntimeObjectName(backstageName, utils.BackstageDBAppName)
 }
 
 func (b *DbService) Object() runtime.Object {

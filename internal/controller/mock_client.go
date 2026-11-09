@@ -36,7 +36,7 @@ type NameKind struct {
 func kind(obj runtime.Object) string {
 	str := reflect.TypeOf(obj).String()
 	return str[strings.LastIndex(str, ".")+1:]
-	//return reflect.TypeOf(obj).String()
+	// return reflect.TypeOf(obj).String()
 }
 
 func (m MockClient) Get(_ context.Context, key client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
@@ -123,6 +123,11 @@ func (m MockClient) Patch(_ context.Context, obj client.Object, patch client.Pat
 	}
 	m.objects[NameKind{Name: obj.GetName(), Kind: objKind}] = dat
 	return nil
+}
+
+// Apply was added to client.Writer in controller-runtime v0.23.
+func (m MockClient) Apply(_ context.Context, _ runtime.ApplyConfiguration, _ ...client.ApplyOption) error {
+	panic(implementMe)
 }
 
 func (m MockClient) DeleteAllOf(_ context.Context, _ client.Object, _ ...client.DeleteAllOfOption) error {

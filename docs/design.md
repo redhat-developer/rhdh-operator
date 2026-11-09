@@ -86,9 +86,94 @@ Kubernetes doesn’t allow you to change environment variables after a Pod has b
 
 ## Status
 
-Backstage Custom Resource contains **Deployed** condition in the Status field. 
-It is updated by the Operator and can have the following values:
-- **DeployInProgress** - Backstage Deployment is not available yet. The current state of Deployment can be seen in the message field
-- **Deployed** - Backstage Deployment is being created and application is available
-- **DeployFailed** - Backstage Deployment creation failed. The actual error can be seen in the message field 
+The Backstage Custom Resource contains status conditions that reflect the current state of the deployment.
+The Operator maintains two primary condition types: **Deployed** and **Runtime**.
+
+### Deployed Condition
+
+The **Deployed** condition reflects the Deployment (or StatefulSet) level status:
+
+| Reason | Status | Description |
+|--------|--------|-------------|
+| `Deployed` | True | All replicas are ready and running the current spec. Message shows "X/X replicas ready" |
+| `DeployInProgress` | False | Rollout in progress. Message shows "X/X replicas ready, X/X updated" |
+| `DeployFailed` | False | Deployment failed. Message contains the error details |
+| `RolloutStalled` | False | Rolling update stalled - old pods healthy, new pods failing. Message shows "X/X replicas ready, X/X updated (rollout stalled)" |
+
+**RolloutStalled:** This reason indicates a failed rolling update where old pods continue serving traffic while new pods fail to start. This occurs when Kubernetes' `progressDeadlineSeconds` (default: 600s) is exceeded. To recover, either fix the issue in the Backstage CR or run `kubectl rollout undo deployment/backstage-<cr-name>`.
+
+**Idled instances:** When the `rhdh.redhat.com/idle: true` annotation is set, the deployment scales to 0 replicas. The Deployed condition shows `Deployed` with message "0/0 replicas ready (Idled)".
+
+### Runtime Condition
+
+The **Runtime** condition provides Pod and container-level status, offering more immediate feedback about application health:
+
+| Reason | Status | Description |
+|--------|--------|-------------|
+| `Running` | True | All containers are running and healthy |
+| `ContainerFailed` | False | A container has failed. See table below for specific scenarios |
+| `Pending` | False | Containers not yet ready (e.g., still starting, init container running) |
+
+**ContainerFailed scenarios:**
+
+| Scenario | Example Message |
+|----------|-----------------|
+| Image pull failure | `container "backstage-backend": ImagePullBackOff` |
+| Crash loop | `container "backstage-backend" crashed (restart #3), last exit code 1: connection refused` |
+| Container terminated | `container "backstage-backend" failed with exit code 137: OOMKilled` |
+| Init container failure | `init container "install-plugins" failed with exit code 1: plugin download failed` |
+
+**Note:** Crash loop detection is smart about recovery. If a container has restart history but is currently Ready, it is considered healthy and will not be reported as crashed.
+
+### Example Status
+
+```yaml
+status:
+  conditions:
+    - type: Deployed
+      status: "True"
+      reason: Deployed
+      message: "1/1 replicas ready"
+    - type: Runtime
+      status: "True"
+      reason: Running
+      message: ""
+  plugins:
+    - "@backstage/plugin-catalog"
+    - "@backstage/plugin-techdocs"
+```
+
+### Rollout Stalled Example
+
+When a rolling update fails (e.g., bad image, missing config):
+
+```yaml
+status:
+  conditions:
+    - type: Deployed
+      status: "False"
+      reason: RolloutStalled
+      message: "2/2 replicas ready, 0/2 updated (rollout stalled)"
+    - type: Runtime
+      status: "False"
+      reason: ContainerFailed
+      message: 'container "backstage": ImagePullBackOff'
+```
+
+### Idled Example
+
+When idled via annotation `rhdh.redhat.com/idle: true`:
+
+```yaml
+status:
+  conditions:
+    - type: Deployed
+      status: "True"
+      reason: Deployed
+      message: "0/0 replicas ready (Idled)"
+```
+
+### Plugins Status
+
+When the deployment is healthy (both Deployed and Runtime conditions are True), the status includes a list of enabled dynamic plugins in the `plugins` field. This field is cleared when the deployment is not healthy or idled.
 

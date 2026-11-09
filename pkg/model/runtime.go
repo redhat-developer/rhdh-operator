@@ -20,10 +20,12 @@ import (
 
 	"github.com/redhat-developer/rhdh-operator/api"
 
+	"github.com/redhat-developer/rhdh-operator/pkg/template"
 	"github.com/redhat-developer/rhdh-operator/pkg/utils"
 )
 
 const BackstageAppLabel = "rhdh.redhat.com/app"
+const IdleAnnotation = "rhdh.redhat.com/idle"
 const ConfiguredNameAnnotation = "rhdh.redhat.com/configured-name"
 const DefaultMountPathAnnotation = "rhdh.redhat.com/mount-path"
 const DefaultSubPathAnnotation = "rhdh.redhat.com/sub-path"
@@ -45,6 +47,7 @@ const (
 	ConfigMapEnvsKey  = "configmap-envs.yaml"
 	ConfigMapFilesKey = "configmap-files.yaml"
 	PvcsKey           = "pvcs.yaml"
+	NetworkPolicyKey  = "networkpolicy.yaml"
 )
 
 // Backstage configuration scaffolding with empty BackstageObjects.
@@ -104,6 +107,17 @@ func (m *BackstageModel) GetDeploymentGVK() schema.GroupVersionKind {
 	return deployment.deployable.GetObject().GetObjectKind().GroupVersionKind()
 }
 
+// GetEnabledPlugins returns enabled plugins from the model.
+// Returns empty slice if dynamic plugins don't exist in the model.
+func (m *BackstageModel) GetEnabledPlugins() []DynaPlugin {
+	for _, obj := range m.RuntimeObjects {
+		if obj.GetKey() == DynamicPluginsKey {
+			return obj.(*DynamicPlugins).enabledPlugins
+		}
+	}
+	return []DynaPlugin{}
+}
+
 // Registers config object
 func registerConfig(key string, factory ObjectFactory, multiple bool, mergeFunc MergeConfigFunc) {
 	for _, obj := range runtimeConfig {
@@ -149,6 +163,10 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 		}
 	}
 
+	// Create template data for config file substitution ({{.Rhdh.Name}}, {{.Rhdh.Namespace}}, etc.)
+	// Each reconciliation gets its own isolated instance to avoid race conditions
+	templateData := template.NewTemplateData(&backstage, &platform, &externalConfig)
+
 	// looping through the registered runtimeConfig objects initializing the model
 	for _, conf := range runtimeConfig {
 
@@ -176,7 +194,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 
 		// If no overlay, use default config
 		if chosenConfig == nil {
-			if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension); err != nil {
+			if objs, err := ReadDefaultConfig(conf, flavours, *scheme, platform.Extension, templateData); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
 					return nil, fmt.Errorf("failed to read default value for the key %s, reason: %w", conf.Key, err)
 				}
@@ -199,8 +217,7 @@ func InitObjects(ctx context.Context, backstage api.Backstage, externalConfig Ex
 	// All objects are now in model, so cross-references are safe
 	// Iterate over RuntimeObjects in their registration order (deterministic)
 	for _, obj := range model.RuntimeObjects {
-		err := obj.updateAndValidate(backstage, scheme)
-		if err != nil {
+		if err := obj.updateAndValidate(backstage, scheme); err != nil {
 			return nil, fmt.Errorf("failed object validation, reason: %w", err)
 		}
 	}

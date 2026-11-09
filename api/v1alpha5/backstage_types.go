@@ -3,6 +3,7 @@ package v1alpha5
 import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 )
 
@@ -11,11 +12,24 @@ type BackstageConditionReason string
 type BackstageConditionType string
 
 const (
+	// Condition types
 	BackstageConditionTypeDeployed BackstageConditionType = "Deployed"
+	BackstageConditionTypeRuntime  BackstageConditionType = "Runtime"
+	BackstageConditionTypeConfig   BackstageConditionType = "Config"
 
-	BackstageConditionReasonDeployed   BackstageConditionReason = "Deployed"
-	BackstageConditionReasonFailed     BackstageConditionReason = "DeployFailed"
-	BackstageConditionReasonInProgress BackstageConditionReason = "DeployInProgress"
+	// Deployed condition reasons
+	BackstageConditionReasonDeployed       BackstageConditionReason = "Deployed"
+	BackstageConditionReasonFailed         BackstageConditionReason = "DeployFailed"
+	BackstageConditionReasonInProgress     BackstageConditionReason = "DeployInProgress"
+	BackstageConditionReasonRolloutStalled BackstageConditionReason = "RolloutStalled"
+
+	// Runtime condition reasons
+	BackstageConditionReasonRunning         BackstageConditionReason = "Running"
+	BackstageConditionReasonContainerFailed BackstageConditionReason = "ContainerFailed"
+	BackstageConditionReasonPending         BackstageConditionReason = "Pending"
+
+	// Config condition reasons
+	BackstageConditionReasonInvalid BackstageConditionReason = "Invalid"
 )
 
 // BackstageSpec defines the desired state of Backstage
@@ -76,7 +90,7 @@ type RuntimeConfig struct {
 type Database struct {
 	// Control the creation of a local PostgreSQL DB. Set to false if using for example an external Database for Backstage.
 	// +optional
-	//+kubebuilder:default=true
+	// +kubebuilder:default=true
 	EnableLocalDb *bool `json:"enableLocalDb,omitempty"`
 
 	// Name of the secret for database authentication. Optional.
@@ -98,6 +112,7 @@ type Monitoring struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
+// Application defines configuration for the Backstage application.
 type Application struct {
 	// References to existing app-configs ConfigMap objects, that will be mounted as files in the specified mount path.
 	// Each element can be a reference to any ConfigMap or Secret,
@@ -113,8 +128,16 @@ type Application struct {
 	// Reference to an existing ConfigMap for Dynamic Plugins.
 	// A new one will be generated with the default config if not set.
 	// The ConfigMap object must have an existing key named: 'dynamic-plugins.yaml'.
+	// Mutually exclusive with DynamicPlugins field.
 	// +optional
 	DynamicPluginsConfigMapName string `json:"dynamicPluginsConfigMapName,omitempty"`
+
+	// Inline dynamic plugins configuration.
+	// Allows configuring dynamic plugins directly in the Backstage CR without requiring a separate ConfigMap.
+	// Each plugin can specify its package reference, enabled state, plugin-specific configuration, and integrity checksum.
+	// Mutually exclusive with DynamicPluginsConfigMapName field.
+	// +optional
+	DynamicPlugins []DynamicPluginConfig `json:"dynamicPlugins,omitempty"`
 
 	// References to existing Config objects to use as extra config files.
 	// They will be mounted as files in the specified mount path.
@@ -190,7 +213,7 @@ type ExtraEnvs struct {
 type EnvObjectRef struct {
 	// Name of the object
 	// We support only ConfigMaps and Secrets.
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Key in the object
@@ -208,7 +231,7 @@ type EnvObjectRef struct {
 type FileObjectRef struct {
 	// Name of the object
 	// Supported ConfigMaps and Secrets
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Key in the object
@@ -229,7 +252,7 @@ type FileObjectRef struct {
 
 type PvcRef struct {
 	// Name of the object
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Path to mount PVC. If not specified default-path/Name will be used
@@ -246,11 +269,11 @@ type PvcRef struct {
 
 type Env struct {
 	// Name of the environment variable
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Value of the environment variable
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	Value string `json:"value"`
 
 	// If set, the env variable will be injected only in the specified containers, otherwise in backstage container only.
@@ -261,16 +284,49 @@ type Env struct {
 	Containers []string `json:"containers,omitempty"`
 }
 
+// DynamicPluginConfig defines configuration for a single dynamic plugin.
+// Dynamic plugins can be configured inline within the Backstage CR instead of using a separate ConfigMap.
+type DynamicPluginConfig struct {
+	// Package reference for the plugin.
+	// Supported formats:
+	// - ref://plugin-name (references a plugin from the default catalog)
+	// - oci://registry/image@digest or oci://registry/image:tag
+	// - npm package name
+	// - ./relative/path or /absolute/path
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	Package string `json:"package"`
+
+	// Enable or disable the plugin. Defaults to true if not specified.
+	// Takes precedence over the Disabled field if both are set.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Plugin-specific configuration as arbitrary YAML.
+	// This configuration will be merged into the app-config under the plugin's namespace.
+	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	PluginConfig *apiextensionsv1.JSON `json:"pluginConfig,omitempty"`
+
+	// Integrity checksum for the plugin package (e.g., sha256, sha512).
+	// Used to verify the integrity of the downloaded plugin.
+	// +optional
+	Integrity string `json:"integrity,omitempty"`
+}
+
 // BackstageStatus defines the observed state of Backstage
 type BackstageStatus struct {
 	// Conditions is the list of conditions describing the state of the runtime
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	// Plugins is the list of enabled dynamic plugin names, sorted alphabetically
+	// +optional
+	Plugins []string `json:"plugins,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:storageversion
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 // +operator-sdk:csv:customresourcedefinitions:displayName="Red Hat Developer Hub"
 
 // Backstage is the Schema for the Red Hat Developer Hub backstages API.
@@ -285,7 +341,7 @@ type Backstage struct {
 	Status BackstageStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackstageList contains a list of Backstage
 type BackstageList struct {
@@ -299,7 +355,7 @@ type BackstageList struct {
 type Route struct {
 	// Control the creation of a Route on OpenShift.
 	// +optional
-	//+kubebuilder:default=true
+	// +kubebuilder:default=true
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// Host is an alias/DNS that points to the service. Optional.
@@ -350,10 +406,10 @@ type TLS struct {
 }
 
 // Flavour represents a pre-configured template that extends the default configuration.
-// Flavours provide domain-specific customizations (e.g., Orchestrator, Lightspeed)
+// Flavours provide domain-specific customizations (e.g., Orchestrator, Intelligent Assistant)
 // while falling back to base defaults for everything else.
 type Flavour struct {
-	// Name of the flavour to enable (e.g., "orchestrator", "lightspeed")
+	// Name of the flavour to enable (e.g., "orchestrator", "intelligent-assistant")
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
@@ -363,10 +419,6 @@ type Flavour struct {
 	// +optional
 	// +kubebuilder:default=true
 	Enabled bool `json:"enabled,omitempty"`
-}
-
-func init() {
-	SchemeBuilder.Register(&Backstage{}, &BackstageList{})
 }
 
 // IsLocalDbEnabled returns true if Local database is configured and enabled
@@ -394,4 +446,11 @@ func (s *BackstageSpec) IsAuthSecretSpecified() bool {
 // Returns true only when spec.monitoring.enabled is set to true in the CR
 func (s *BackstageSpec) IsMonitoringEnabled() bool {
 	return s.Monitoring.Enabled
+}
+
+func init() {
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &Backstage{}, &BackstageList{})
+		return nil
+	})
 }

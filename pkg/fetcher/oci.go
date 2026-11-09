@@ -1,0 +1,399 @@
+package fetcher
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/remote"
+)
+
+// PluginAnnotation is the annotation key that identifies valid plugin artifacts
+const PluginAnnotation = "io.backstage.dynamic-packages"
+
+// OCIFetcher fetches artifacts from OCI registries
+type OCIFetcher struct {
+	transport  http.RoundTripper
+	keychain   authn.Keychain
+	pluginMode bool // if true, validate io.backstage.dynamic-packages annotation
+	insecure   bool // if true, use HTTP protocol and skip TLS verification
+}
+
+// NewOCIFetcher creates a new OCI fetcher
+func NewOCIFetcher(opts ...OCIOption) *OCIFetcher {
+	c := &OCIFetcher{
+		transport: http.DefaultTransport,
+		keychain:  authn.DefaultKeychain,
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+// ----------------------------------------------------------------------------
+// Options
+// ----------------------------------------------------------------------------
+
+// OCIOption configures the OCIFetcher
+type OCIOption func(*OCIFetcher)
+
+// WithSkipTLSVerify skips TLS certificate verification while keeping HTTPS protocol.
+// Use this for HTTPS registries with self-signed or untrusted certificates.
+// The connection remains encrypted (HTTPS), only certificate validation is skipped.
+// Not recommended for production use.
+func WithSkipTLSVerify() OCIOption {
+	return func(c *OCIFetcher) {
+		c.transport = &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		}
+	}
+}
+
+// WithInsecure enables plain HTTP protocol and disables TLS certificate verification.
+// This applies to ALL registries accessed by this fetcher.
+// WARNING: Exposes credentials over plain text. Use only for HTTP-only registries.
+// When enabled:
+// - Uses HTTP protocol instead of HTTPS
+// - Skips TLS certificate verification for any HTTPS fallback
+func WithInsecure() OCIOption {
+	return func(c *OCIFetcher) {
+		c.insecure = true
+		c.transport = &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		}
+	}
+}
+
+// WithCACert adds a custom CA certificate
+func WithCACert(caCert []byte) OCIOption {
+	return func(c *OCIFetcher) {
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caCert) {
+			// Invalid CA cert - log error but don't configure custom transport
+			// This will fall back to system CA pool, preventing silent failures
+			// The fetch will fail with a clear TLS verification error if needed
+			return
+		}
+		c.transport = &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{RootCAs: pool},
+		}
+	}
+}
+
+// WithDockerConfig sets authentication from dockerconfigjson
+func WithDockerConfig(dockerConfig []byte) OCIOption {
+	return func(c *OCIFetcher) {
+		kc, err := newDockerConfigKeychain(dockerConfig)
+		if err != nil {
+			// Invalid docker config - fall back to default keychain
+			// This prevents silent failures; fetch will fail with clear auth error if credentials are needed
+			return
+		}
+		c.keychain = kc
+	}
+}
+
+// WithPluginMode enables plugin artifact handling.
+// When enabled:
+// - Validates the io.backstage.dynamic-packages annotation exists
+// - Extracts the plugin subdirectory (not raw layer content)
+// Use this for plugin artifacts; skip for catalog index images.
+func WithPluginMode() OCIOption {
+	return func(c *OCIFetcher) {
+		c.pluginMode = true
+	}
+}
+
+// ----------------------------------------------------------------------------
+// Fetch methods
+// ----------------------------------------------------------------------------
+
+// Fetch downloads an OCI artifact and extracts it to destDir.
+// Streams directly to extraction without buffering the entire layer in memory.
+// For plugin artifacts, extracts the plugin subdirectory content to destDir.
+// Supports multi-plugin packages via !pluginPath suffix (e.g., oci://reg/pkg:1.0!plugin-A).
+func (c *OCIFetcher) Fetch(ctx context.Context, ref string, destDir string) error {
+	// 1. Parse pluginPath from ref (only in plugin mode)
+	// Use first ! to split, in case selector itself contains !
+	pluginPath := ""
+	if c.pluginMode {
+		if idx := strings.Index(ref, "!"); idx != -1 {
+			pluginPath = ref[idx+1:]
+			ref = ref[:idx] // Strip !pluginPath for download
+
+			// Validate pluginPath to prevent path traversal
+			if err := validatePluginSelector(pluginPath); err != nil {
+				return fmt.Errorf("invalid plugin selector in %q: %w", ref+"!"+pluginPath, err)
+			}
+		}
+	}
+
+	// 2. Parse reference
+	var imgRef name.Reference
+	var err error
+	if c.insecure {
+		// Use HTTP protocol and allow insecure registries
+		imgRef, err = name.ParseReference(ref, name.Insecure)
+	} else {
+		imgRef, err = name.ParseReference(ref)
+	}
+	if err != nil {
+		return fmt.Errorf("invalid OCI reference %q: %w", ref, err)
+	}
+
+	// 2. Configure remote options
+	remoteOpts := []remote.Option{
+		remote.WithContext(ctx),
+		remote.WithAuthFromKeychain(c.keychain),
+	}
+	if c.transport != nil {
+		remoteOpts = append(remoteOpts, remote.WithTransport(c.transport))
+	}
+
+	// 3. Fetch artifact
+	desc, err := remote.Get(imgRef, remoteOpts...)
+	if err != nil {
+		return fmt.Errorf("failed to fetch %q: %w", ref, err)
+	}
+
+	// 4. Get image
+	img, err := desc.Image()
+	if err != nil {
+		return fmt.Errorf("failed to get image: %w", err)
+	}
+
+	// 5. Validate plugin artifact (optional)
+	if c.pluginMode {
+		if err := pluginModeArtifact(img); err != nil {
+			return fmt.Errorf("validation failed for %q: %w", ref, err)
+		}
+	}
+
+	// 6. Get first layer
+	layers, err := img.Layers()
+	if err != nil {
+		return fmt.Errorf("failed to get layers: %w", err)
+	}
+	if len(layers) == 0 {
+		return fmt.Errorf("artifact has no layers")
+	}
+
+	// 7. Stream layer directly to extraction (no buffering)
+	reader, err := layers[0].Uncompressed()
+	if err != nil {
+		return fmt.Errorf("failed to uncompress layer: %w", err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	// 8. For non-plugin artifacts (e.g., catalog index), extract directly
+	if !c.pluginMode {
+		return extractTar(reader, destDir)
+	}
+
+	// 9. For plugin artifacts, extract to temp first then move plugin subdirectory
+	// Use same filesystem as destDir for atomic rename
+	tmpDir, err := os.MkdirTemp(filepath.Dir(destDir), ".oci-extract-")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	if err := extractTar(reader, tmpDir); err != nil {
+		return err
+	}
+
+	// 10. Determine expected plugin directory name
+	// Either from !pluginPath (already validated) or from OCI image name (last path segment)
+	expectedDir := pluginPath
+	if expectedDir == "" {
+		// Extract image name from OCI reference (last path component)
+		repo := imgRef.Context().RepositoryStr()
+		if idx := strings.LastIndex(repo, "/"); idx != -1 {
+			expectedDir = repo[idx+1:]
+		} else {
+			expectedDir = repo
+		}
+
+		// Validate extracted image name to prevent path traversal
+		if err := validatePluginSelector(expectedDir); err != nil {
+			return fmt.Errorf("invalid OCI image name for plugin extraction: %w", err)
+		}
+	}
+
+	// 11. Move the plugin subdirectory
+	return movePluginContent(tmpDir, destDir, expectedDir)
+}
+
+// ----------------------------------------------------------------------------
+// Internal helpers
+// ----------------------------------------------------------------------------
+
+// pluginModeArtifact checks that the image has the required plugin annotation.
+// Returns nil if valid, error if the annotation is missing.
+func pluginModeArtifact(img v1.Image) error {
+	manifest, err := img.Manifest()
+	if err != nil {
+		return fmt.Errorf("failed to get manifest: %w", err)
+	}
+
+	// Check manifest annotations
+	if manifest.Annotations != nil {
+		if _, ok := manifest.Annotations[PluginAnnotation]; ok {
+			return nil
+		}
+	}
+
+	// Check config labels (some builders put annotations there)
+	configFile, err := img.ConfigFile()
+	if err == nil && configFile != nil && configFile.Config.Labels != nil {
+		if _, ok := configFile.Config.Labels[PluginAnnotation]; ok {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("not a valid plugin artifact (missing %s annotation)", PluginAnnotation)
+}
+
+// dockerConfigKeychain implements authn.Keychain using dockerconfigjson
+type dockerConfigKeychain struct {
+	auths map[string]dockerAuthConfig
+}
+
+type dockerAuthConfig struct {
+	Auth     string `json:"auth"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type dockerConfig struct {
+	Auths map[string]dockerAuthConfig `json:"auths"`
+}
+
+func newDockerConfigKeychain(data []byte) (*dockerConfigKeychain, error) {
+	var cfg dockerConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return &dockerConfigKeychain{auths: cfg.Auths}, nil
+}
+
+func (k *dockerConfigKeychain) Resolve(target authn.Resource) (authn.Authenticator, error) {
+	registry := target.RegistryStr()
+
+	// Try exact match first
+	if auth, ok := k.auths[registry]; ok {
+		return authToAuthenticator(auth)
+	}
+
+	// Try with https:// prefix
+	if auth, ok := k.auths["https://"+registry]; ok {
+		return authToAuthenticator(auth)
+	}
+
+	// Try with /v1/ suffix (Docker Hub style)
+	if auth, ok := k.auths["https://"+registry+"/v1/"]; ok {
+		return authToAuthenticator(auth)
+	}
+
+	return authn.Anonymous, nil
+}
+
+func authToAuthenticator(auth dockerAuthConfig) (authn.Authenticator, error) {
+	if auth.Username != "" && auth.Password != "" {
+		return authn.FromConfig(authn.AuthConfig{
+			Username: auth.Username,
+			Password: auth.Password,
+		}), nil
+	}
+
+	if auth.Auth != "" {
+		decoded, err := base64.StdEncoding.DecodeString(auth.Auth)
+		if err != nil {
+			return nil, err
+		}
+		parts := strings.SplitN(string(decoded), ":", 2)
+		if len(parts) == 2 {
+			return authn.FromConfig(authn.AuthConfig{
+				Username: parts[0],
+				Password: parts[1],
+			}), nil
+		}
+	}
+
+	return authn.Anonymous, nil
+}
+
+// validatePluginSelector validates that a plugin selector is safe for use as a directory name.
+// Rejects empty, absolute, dot, traversal, and separator-containing selectors to prevent path traversal.
+func validatePluginSelector(selector string) error {
+	if selector == "" {
+		return fmt.Errorf("selector cannot be empty")
+	}
+
+	// Reject absolute paths
+	if filepath.IsAbs(selector) {
+		return fmt.Errorf("selector cannot be an absolute path: %q", selector)
+	}
+
+	// Reject . and ..
+	if selector == "." || selector == ".." {
+		return fmt.Errorf("selector cannot be %q", selector)
+	}
+
+	// Reject any path containing separators (/, \)
+	if strings.ContainsAny(selector, `/\`) {
+		return fmt.Errorf("selector cannot contain path separators: %q", selector)
+	}
+
+	// Additional check: after cleaning, must be a single component
+	cleaned := filepath.Clean(selector)
+	if cleaned != selector || strings.Contains(cleaned, string(filepath.Separator)) {
+		return fmt.Errorf("selector must be a single path component: %q", selector)
+	}
+
+	return nil
+}
+
+// movePluginContent moves the plugin subdirectory from srcDir to destDir.
+// expectedDir is the name of the subdirectory to extract (derived from OCI image name or !pluginPath).
+// Validates that the directory exists and contains package.json.
+func movePluginContent(srcDir, destDir, expectedDir string) error {
+	targetDir := filepath.Join(srcDir, expectedDir)
+
+	// Check if the expected subdirectory exists
+	stat, err := os.Stat(targetDir)
+	if err != nil {
+		// Directory doesn't exist - check if content is at root level
+		if _, rootErr := os.Stat(filepath.Join(srcDir, "package.json")); rootErr == nil {
+			// Content is at root level, just rename
+			return os.Rename(srcDir, destDir)
+		}
+		return fmt.Errorf("plugin subdirectory %q not found in extracted content", expectedDir)
+	}
+
+	if !stat.IsDir() {
+		return fmt.Errorf("expected %q to be a directory, but it's a file", expectedDir)
+	}
+
+	// Verify package.json exists in the subdirectory
+	if _, err := os.Stat(filepath.Join(targetDir, "package.json")); err != nil {
+		return fmt.Errorf("plugin subdirectory %q is missing package.json", expectedDir)
+	}
+
+	// Move the plugin directory to destination
+	return os.Rename(targetDir, destDir)
+}

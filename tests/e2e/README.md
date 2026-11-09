@@ -22,7 +22,7 @@ The behavior is configurable using the following environment variables:
 | Name                                                                                           | Type   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                   | Default value                                     | Example                                                 |
 |------------------------------------------------------------------------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------|---------------------------------------------------------|
 | `BACKSTAGE_OPERATOR_TEST_MODE`                                                                 | string | The test mode:<br>- if not set, it will call `make deploy`<br>- `olm`: it will call `make deploy-olm`<br>- `rhdh-latest` or `rhdh-next`: it will install the operator using the [`install-rhdh-catalog-source.sh`](../../.rhdh/scripts/install-rhdh-catalog-source.sh) script<br>- `rhdh-airgap`: it will install the operator using the [`prepare-restricted-environment.sh`](../../.rhdh/scripts/prepare-restricted-environment.sh) script. |                                                   | `rhdh-latest`                                           |
-| `IMG` (or any variables from the Makefile that are used by `make deploy` or `make deploy-olm`) | string | The image to use. Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is not set or set to `olm`                                                                                                                                                                                                                                                                                                                                                       | `VERSION` defined in [`Makefile`](../../Makefile) | `quay.io/rhdh/rhdh-rhel9-operator:0.0.1-latest`         |
+| `IMG` (or any variables from the Makefile that are used by `make deploy` or `make deploy-olm`) | string | The image to use. Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is not set or set to `olm`                                                                                                                                                                                                                                                                                                                                                       | `VERSION` defined in [`Makefile`](../../Makefile) | `quay.io/rhdh/rhdh-rhel10-operator:0.0.1-latest`         |
 | `BACKSTAGE_OPERATOR_TESTS_BUILD_IMAGES`                                                        | bool   | If set to `true`, it will build the operator image with `make image-build`.<br>Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is not set or set to `olm`.                                                                                                                                                                                                                                                                                         |                                                   | `false`                                                 |
 | `BACKSTAGE_OPERATOR_TESTS_PUSH_IMAGES`                                                         | bool   | If set to `true`, it will push the operator image with `make image-push`.<br>Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is not set or set to `olm`.                                                                                                                                                                                                                                                                                           |                                                   | `false`                                                 |
 | `BACKSTAGE_OPERATOR_TESTS_PLATFORM`                                                            | string | The platform type, to directly load the operator image if supported instead of pushing it.<br>Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is not set or set to `olm`.br>Supported values: [`kind`](#building-and-testing-local-changes-on-kind), [`k3d`](#building-and-testing-local-changes-on-k3d), [`minikube`](#building-and-testing-local-changes-on-minikube)                                                                            |                                                   | `kind`                                                  |
@@ -33,12 +33,13 @@ The behavior is configurable using the following environment variables:
 | `BACKSTAGE_OPERATOR_TESTS_AIRGAP_MIRROR_REGISTRY`                                              | string | Existing mirror registry to use in the airgap scenario.<br>Relevant if `BACKSTAGE_OPERATOR_TEST_MODE` is `rhdh-airgap`.                                                                                                                                                                                                                                                                                                                       |                                                   | `my-registry.example.com`                               |
 | `BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS`                                                  | bool   | Whether to test access using an Ingress resource on K8s                                                                                                                                                                                                                                                                                                                                                                                       |                                                   | `true`                                                  |
 | `BACKSTAGE_OPERATOR_TESTS_K8S_INGRESS_DOMAIN`                                                  | string | Ingress domain. Relevant only if `BACKSTAGE_OPERATOR_TESTS_K8S_CREATE_INGRESS` is `true`.                                                                                                                                                                                                                                                                                                                                                     |                                                   | `$(minikube ip).nip.io`                                 |
+| `BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE`                                                  | bool   | Enables the PostgreSQL 15 to 18 dump, volume replacement, and restore flow in the Operator upgrade test. Requires `FROM_OPERATOR_MANIFEST` and `TO_OPERATOR_MANIFEST`.                                                                                                                                                                                                                                                                          | `false`                                           | `true`                                                  |
 
 ### Examples
 
 #### Testing the operator available for the VERSION (default)
 
-In this scenario, you want to run the E2E test suite against the operator image corresponding to the `VERSION` declared in the project [`Makefile`](../../Makefile), which should be publicly available at `quay.io/rhdh/rhdh-rhel9-operator:<VERSION>`.
+In this scenario, you want to run the E2E test suite against the operator image corresponding to the `VERSION` declared in the project [`Makefile`](../../Makefile), which should be publicly available at `quay.io/rhdh/rhdh-rhel10-operator:<VERSION>` on `main` (or `quay.io/rhdh/rhdh-rhel9-operator:<VERSION>` on RHDH 1.y maintenance branches).
 
 This is the default behavior.
 
@@ -55,7 +56,7 @@ In this scenario, you want to run the E2E test suite against an existing operato
 This should work on any Kubernetes or OpenShift cluster:
 
 ```shell
-# if the tag is already published and available at the default location: quay.io/rhdh/rhdh-rhel9-operator
+# if the tag is already published and available at the default location: quay.io/rhdh/rhdh-rhel10-operator (main) or quay.io/rhdh/rhdh-rhel9-operator (RHDH 1.y maintenance branches)
 $ make test-e2e VERSION=0.3.0-3d1c1e0
 
 # or you can override the full image repo name
@@ -109,6 +110,26 @@ This requires OLM to be installed in the cluster.
 $ make test-e2e BACKSTAGE_OPERATOR_TEST_MODE=olm
 ```
 
+#### Testing the PostgreSQL 15 to 18 Operator upgrade
+
+The upgrade test can validate the local PostgreSQL major-version migration while upgrading an existing Operator installation. It stops Backstage, creates a logical dump with `pg_dumpall`, deletes the test instance's generated PostgreSQL StatefulSet and PVC, restores the dump into PostgreSQL 18, and verifies that the test data remains available. The generated PostgreSQL Secret is preserved.
+
+The [Nightly PostgreSQL Upgrade Test](../../.github/workflows/nightly-postgresql-upgrade-test.yaml) runs the `release-1.10` to `release-2.1` path, covering the PostgreSQL 15 to 18 major-version migration.
+
+To reproduce this path locally, run the command below with `release-2.1` checked out, using its built Operator image and generated manifest as the PostgreSQL 18 target. RHDH 1.10 provides the PostgreSQL 15 source:
+
+```shell
+$ BACKSTAGE_OPERATOR_TESTS_PLATFORM=kind \
+    BACKSTAGE_OPERATOR_TESTS_POSTGRESQL_UPGRADE=true \
+    PROFILE=rhdh \
+    FROM_OPERATOR_MANIFEST=https://raw.githubusercontent.com/redhat-developer/rhdh-operator/refs/heads/release-1.10/dist/rhdh/install.yaml \
+    TO_OPERATOR_MANIFEST="$(pwd)/dist/rhdh/install.yaml" \
+    OPERATOR_MANIFEST="$(pwd)/dist/rhdh/install.yaml" \
+    make test-e2e-upgrade
+```
+
+Run this only against a disposable cluster. The upgrade suite replaces the Operator installation and its cluster-scoped resources, and this test permanently deletes the generated PVC in its temporary namespace.
+
 #### Testing a downstream build of Red Hat Developer Hub (RHDH)
 
 In this scenario, you want to run the E2E tests against a downstream build of RHDH.
@@ -145,4 +166,16 @@ $ make test-e2e BACKSTAGE_OPERATOR_TEST_MODE=rhdh-airgap
 $ make test-e2e \
     BACKSTAGE_OPERATOR_TEST_MODE=rhdh-airgap \
     BACKSTAGE_OPERATOR_TESTS_AIRGAP_MIRROR_REGISTRY=my-registry.example.com
+```
+
+#### Testing against an existing cluster with OLM v1
+
+In this scenario, you want to run E2E tests against an existing OpenShift cluster with OLM v1 (ClusterExtension). The install script auto-detects OLM v1 and deploys via `ClusterCatalog` + `ClusterExtension`.
+
+On clusters with `WaitForFirstConsumer` storage classes, the `raw-runtime-config` test may need a longer reachability timeout while generic ephemeral volume PVCs are provisioned:
+
+```shell
+$ make test-e2e \
+    BACKSTAGE_OPERATOR_TEST_MODE=rhdh-latest \
+    BACKSTAGE_OPERATOR_TESTS_APP_REACHABILITY_TIMEOUT=15m
 ```

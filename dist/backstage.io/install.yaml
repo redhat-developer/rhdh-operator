@@ -15,7 +15,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.0
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: backstages.rhdh.redhat.com
 spec:
   group: rhdh.redhat.com
@@ -1749,11 +1749,52 @@ spec:
                           the ConfigMapRefs field
                         type: string
                     type: object
+                  dynamicPlugins:
+                    description: |-
+                      Inline dynamic plugins configuration.
+                      Allows configuring dynamic plugins directly in the Backstage CR without requiring a separate ConfigMap.
+                      Each plugin can specify its package reference, enabled state, plugin-specific configuration, and integrity checksum.
+                      Mutually exclusive with DynamicPluginsConfigMapName field.
+                    items:
+                      description: |-
+                        DynamicPluginConfig defines configuration for a single dynamic plugin.
+                        Dynamic plugins can be configured inline within the Backstage CR instead of using a separate ConfigMap.
+                      properties:
+                        enabled:
+                          description: |-
+                            Enable or disable the plugin. Defaults to true if not specified.
+                            Takes precedence over the Disabled field if both are set.
+                          type: boolean
+                        integrity:
+                          description: |-
+                            Integrity checksum for the plugin package (e.g., sha256, sha512).
+                            Used to verify the integrity of the downloaded plugin.
+                          type: string
+                        package:
+                          description: |-
+                            Package reference for the plugin.
+                            Supported formats:
+                            - ref://plugin-name (references a plugin from the default catalog)
+                            - oci://registry/image@digest or oci://registry/image:tag
+                            - npm package name
+                            - ./relative/path or /absolute/path
+                          minLength: 1
+                          type: string
+                        pluginConfig:
+                          description: |-
+                            Plugin-specific configuration as arbitrary YAML.
+                            This configuration will be merged into the app-config under the plugin's namespace.
+                          x-kubernetes-preserve-unknown-fields: true
+                      required:
+                      - package
+                      type: object
+                    type: array
                   dynamicPluginsConfigMapName:
                     description: |-
                       Reference to an existing ConfigMap for Dynamic Plugins.
                       A new one will be generated with the default config if not set.
                       The ConfigMap object must have an existing key named: 'dynamic-plugins.yaml'.
+                      Mutually exclusive with DynamicPlugins field.
                     type: string
                   extraEnvs:
                     description: Extra environment variables
@@ -2070,7 +2111,7 @@ spec:
                 items:
                   description: |-
                     Flavour represents a pre-configured template that extends the default configuration.
-                    Flavours provide domain-specific customizations (e.g., Orchestrator, Lightspeed)
+                    Flavours provide domain-specific customizations (e.g., Orchestrator, Intelligent Assistant)
                     while falling back to base defaults for everything else.
                   properties:
                     enabled:
@@ -2082,7 +2123,7 @@ spec:
                       type: boolean
                     name:
                       description: Name of the flavour to enable (e.g., "orchestrator",
-                        "lightspeed")
+                        "intelligent-assistant")
                       type: string
                   required:
                   - name
@@ -2118,6 +2159,194 @@ spec:
               conditions:
                 description: Conditions is the list of conditions describing the state
                   of the runtime
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              plugins:
+                description: Plugins is the list of enabled dynamic plugin names,
+                  sorted alphabetically
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: devhubplugincatalogs.rhdh.redhat.com
+spec:
+  group: rhdh.redhat.com
+  names:
+    kind: DevHubPluginCatalog
+    listKind: DevHubPluginCatalogList
+    plural: devhubplugincatalogs
+    shortNames:
+    - dhpc
+    singular: devhubplugincatalog
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.source.ref
+      name: Ref
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha5
+    schema:
+      openAPIV3Schema:
+        description: |-
+          DevHubPluginCatalog is the Schema for the devhubplugincatalogs API.
+          It defines a source for plugin catalogs that can be fetched from OCI registries.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DevHubPluginCatalogSpec defines the desired state of DevHubPluginCatalog
+            properties:
+              source:
+                description: Source defines where to fetch the catalog from
+                properties:
+                  certificateAuthority:
+                    description: CertificateAuthority is a reference to a ConfigMap
+                      key containing CA certificate
+                    properties:
+                      key:
+                        description: |-
+                          The key to select from the ConfigMap's Data field.
+                          Keys in the BinaryData field are not currently propagated to container env vars.
+                        type: string
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      optional:
+                        description: Specify whether the ConfigMap or its key must
+                          be defined
+                        type: boolean
+                    required:
+                    - key
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  pullSecret:
+                    description: PullSecret is a reference to a Secret containing
+                      registry credentials
+                    properties:
+                      name:
+                        default: ""
+                        description: |-
+                          Name of the referent.
+                          This field is effectively required, but due to backwards compatibility is
+                          allowed to be empty. Instances of this type with an empty value here are
+                          almost certainly wrong.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  ref:
+                    description: |-
+                      Ref is the OCI artifact reference containing the catalog
+                      Example: oci://registry.redhat.io/rhdh/plugin-catalog:1.5
+                    type: string
+                  skipTLSVerify:
+                    default: false
+                    description: SkipTLSVerify skips TLS certificate verification
+                      (not recommended for production)
+                    type: boolean
+                required:
+                - ref
+                type: object
+            required:
+            - source
+            type: object
+          status:
+            description: DevHubPluginCatalogStatus defines the observed state of DevHubPluginCatalog
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the catalog's state
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -2320,6 +2549,7 @@ rules:
   - ""
   resources:
   - persistentvolumes
+  - pods
   verbs:
   - get
   - list
@@ -2349,13 +2579,28 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - apiservers
   - ingresses
   verbs:
   - get
+  - list
+  - watch
 - apiGroups:
   - monitoring.coreos.com
   resources:
   - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
   verbs:
   - create
   - delete
@@ -2386,10 +2631,19 @@ rules:
   - rhdh.redhat.com
   resources:
   - backstages/status
+  - devhubplugincatalogs/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - rhdh.redhat.com
+  resources:
+  - devhubplugincatalogs
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - route.openshift.io
   resources:
@@ -2592,7 +2846,7 @@ data:
                   value: /var/lib/pgsql/data
                 - name: PGDATA
                   value: /var/lib/pgsql/data/userdata
-              image: quay.io/fedora/postgresql-15:latest # will be replaced with the actual image
+              image: quay.io/fedora/postgresql-18:latest # will be replaced with the actual image
               imagePullPolicy: IfNotPresent
               securityContext:
                 # runAsUser:26 does not work for Openshift but looks work for AKS/EKS
@@ -2792,12 +3046,20 @@ spec:
       containers:
       - args:
         - --health-probe-bind-address=:8081
-        - --metrics-bind-address=:8443
-        - --metrics-secure=true
         - --leader-elect
+        - --metrics-bind-address=:8443
         command:
         - /manager
-        image: quay.io/rhdh-community/operator:0.11.0
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: quay.io/rhdh-community/operator:2.2.0
         livenessProbe:
           httpGet:
             path: /healthz
@@ -2835,6 +3097,11 @@ spec:
           name: default-config
         - mountPath: /plugin-deps
           name: plugin-deps
+        - mountPath: /plugins-mirror
+          name: mirror-config
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
       securityContext:
         runAsNonRoot: true
       serviceAccountName: backstage-controller-manager
@@ -2847,3 +3114,9 @@ spec:
           name: plugin-deps
           optional: true
         name: plugin-deps
+      - configMap:
+          name: plugin-registry-mirror
+          optional: true
+        name: mirror-config
+      - emptyDir: {}
+        name: tmp

@@ -33,7 +33,7 @@ Besides the prerequisites listed above, you will also need:
 
 ==== Procedure
 
-. Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate or GA version (from the `release-1.yy` branch), but the `--next` option allows to install the current development build (from the `main` branch). For example:
+. Run the link:../scripts/install-rhdh-catalog-source.sh[installation script] to create the RHDH Operator CatalogSource in your cluster. By default, it installs the Release Candidate or GA version (from the `release-1.yy` branch), but the `--next` option allows to install the current development build (from the `main` branch). The script auto-detects OLM v0 or v1 and, with `--install-operator`, waits for catalog Serving, extension Installed, and the Backstage CRD Established before exiting. For example:
 +
 [source,console]
 ----
@@ -43,6 +43,8 @@ chmod +x install-rhdh-catalog-source.sh
 
 # install catalog source and operator subscription, for the latest downstream stable, RC or GA build from the release-1.yy branch
 ./install-rhdh-catalog-source.sh --latest --install-operator rhdh  
+
+# add --log-level debug for verbose output 
 
 # OR, install catalog source and operator subscription, for the next donwstream CI build from the main branch
 ./install-rhdh-catalog-source.sh --next --install-operator rhdh  

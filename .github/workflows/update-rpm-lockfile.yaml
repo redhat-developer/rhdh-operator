@@ -7,27 +7,36 @@ on:
     - cron: '0 3 * * 1'
   push:
     branches:
-      - main
-      - release-1.**
+      - 'main'
+      - 'release-[0-9]+.[0-9]+'
     paths:
       - 'rpms.in.yaml'
-      - '.rhdh/docker/Dockerfile'
+      - 'Dockerfile'
       - '.github/workflows/update-rpm-lockfile.yaml'
 
 permissions:
   contents: write
 
 env:
-  DOCKERFILE_PATH: .rhdh/docker/Dockerfile
+  DOCKERFILE_PATH: Dockerfile
 
 jobs:
   update-lockfile:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Require RHDH_BOT_TOKEN
+        env:
+          RHDH_BOT_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+        run: |
+          if [[ -z "${RHDH_BOT_TOKEN}" ]]; then
+            echo "::error::RHDH_BOT_TOKEN must be configured as a repo secret (rhdh-bot PAT). There is no GITHUB_TOKEN fallback."
+            exit 1
+          fi
 
       - name: Check if hermetic Dockerfile exists
         run: |
@@ -60,8 +69,8 @@ jobs:
 
       - name: Run rpm-lockfile-prototype
         run: |
-          echo "Running '${HOME}/.local/bin/rpm-lockfile-prototype -f ${{ env.DOCKERFILE_PATH }} rpms.in.yaml' in $(pwd)"
-          ${HOME}/.local/bin/rpm-lockfile-prototype -f ${{ env.DOCKERFILE_PATH }} rpms.in.yaml
+          echo "Running '${HOME}/.local/bin/rpm-lockfile-prototype --bare rpms.in.yaml' in $(pwd)"
+          ${HOME}/.local/bin/rpm-lockfile-prototype --bare rpms.in.yaml
 
       - name: Check for lockfile changes
         id: check-lockfile-changes

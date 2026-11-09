@@ -108,8 +108,27 @@ func (b *BackstageDeployment) addToModel(model *BackstageModel, backstage api.Ba
 		b.deployable.PodObjectMeta().Annotations[ExtConfigHashAnnotation] = model.ExternalConfig.WatchingHash
 
 		// override image with env var
+		i, _ := DynamicPluginsInitContainer(b.podSpec().InitContainers)
 		if os.Getenv(BackstageImageEnvVar) != "" {
-			b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)))
+			b.setImage(ptr.To(os.Getenv(BackstageImageEnvVar)), i)
+		}
+
+		// if Operator dynamic plugins processing - put dedicated image
+		// Only apply if the deployment has the install-dynamic-plugins init container
+		dpProcessing := IsOperatorDPProcessing()
+		idpImage := os.Getenv(InstallDpImageEnvVar)
+		if dpProcessing && i >= 0 {
+			if idpImage == "" {
+				return fmt.Errorf("%s environment variable is required when operator dynamic plugins processing is enabled", InstallDpImageEnvVar)
+			}
+			b.podSpec().InitContainers[i].Image = idpImage
+			b.podSpec().InitContainers[i].Command = []string{}
+			b.container().Args = []string{}
+
+			// Remove imagePullPolicy to let Kubernetes apply its defaults:
+			// - :latest tag → Always (ensures fresh images in dev)
+			// - @sha256:... digest → IfNotPresent (efficient in prod)
+			b.podSpec().InitContainers[i].ImagePullPolicy = ""
 		}
 
 		if err := b.setDeployment(backstage); err != nil {
@@ -138,7 +157,20 @@ func (b *BackstageDeployment) updateAndValidate(backstage api.Backstage, _ *runt
 		return fmt.Errorf("can not add env vars from db secret: %w", err)
 	}
 
+	if backstage.GetAnnotations()[IdleAnnotation] == "true" {
+		b.idle()
+	}
+
 	return nil
+}
+
+func (b *BackstageDeployment) idle() {
+	switch d := b.deployable.(type) {
+	case *DeploymentObj:
+		d.Obj.Spec.Replicas = new(int32)
+	case *StatefulSetObj:
+		d.Obj.Spec.Replicas = new(int32)
+	}
 }
 
 func (b *BackstageDeployment) setMetaInfo(backstage api.Backstage, scheme *runtime.Scheme) {
@@ -297,7 +329,7 @@ func (b *BackstageDeployment) getDefConfigMountPath(obj client.Object) (mountPat
 }
 
 // sets container image name of Backstage Container
-func (b *BackstageDeployment) setImage(image *string) {
+func (b *BackstageDeployment) setImage(image *string, initContainerIndex int) {
 	if image != nil {
 		b.container().Image = *image
 		// this is a workaround for RHDH configuration
@@ -305,9 +337,8 @@ func (b *BackstageDeployment) setImage(image *string) {
 		// in general case need something smarter
 		// to mark/recognize containers for update
 		if len(b.podSpec().InitContainers) > 0 {
-			i, ic := DynamicPluginsInitContainer(b.podSpec().InitContainers)
-			if ic != nil {
-				b.podSpec().InitContainers[i].Image = *image
+			if initContainerIndex >= 0 {
+				b.podSpec().InitContainers[initContainerIndex].Image = *image
 			}
 		}
 	}

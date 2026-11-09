@@ -1,0 +1,8 @@
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: intelligent-assistant-disabled
+spec:
+  flavours:
+    - name: intelligent-assistant
+      enabled: false

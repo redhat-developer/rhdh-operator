@@ -1,22 +1,26 @@
 # RHDH Operator RPM dependencies
 # after editing, run (https://github.com/konflux-ci/rpm-lockfile-prototype):
-#   rpm-lockfile-prototype -f .rhdh/docker/Dockerfile rpms.in.yaml
+#   rpm-lockfile-prototype --bare rpms.in.yaml
 # to regenerate rpms.lock.yaml
 #
 # Note that the repoid values are special, and must be from here:
 # https://github.com/release-engineering/rhtap-ec-policy/blob/main/data/known_rpm_repositories.yml
 
+arches:
+  - x86_64
+  - aarch64
+
 allowerasing: true
 contentOrigin:
   repos:
-    - repoid: ubi-9-for-$basearch-appstream-rpms
-      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/os/
-    - repoid: ubi-9-for-$basearch-appstream-source-rpms
-      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/source/SRPMS
-    - repoid: ubi-9-for-$basearch-baseos-rpms
-      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/os/
-    - repoid: ubi-9-for-$basearch-baseos-source-rpms
-      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/source/SRPMS
+    - repoid: ubi-10-for-$basearch-appstream-rpms
+      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/$basearch/appstream/os/
+    - repoid: ubi-10-for-$basearch-appstream-source-rpms
+      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/$basearch/appstream/source/SRPMS
+    - repoid: ubi-10-for-$basearch-baseos-rpms
+      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/$basearch/baseos/os/
+    - repoid: ubi-10-for-$basearch-baseos-source-rpms
+      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/$basearch/baseos/source/SRPMS
 
 packages:
   # Required for FIPS support in the operator runtime

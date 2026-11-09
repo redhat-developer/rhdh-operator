@@ -1,0 +1,43 @@
+name: Check Installer RBAC
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - 'release-[0-9]+.[0-9]+'
+
+jobs:
+  check-installer-rbac:
+    name: Check Installer RBAC
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        with:
+          files: |
+            .github/workflows/installer-rbac-check.yaml
+            Makefile
+            hack/check-installer-rbac.sh
+            .rhdh/scripts/prepare-restricted-environment.sh
+            bundle/**/*.clusterserviceversion.yaml
+            config/rbac/**
+
+      - name: Install yq
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          YQ_VERSION=v4.54.1
+          curl -fsSL --proto '=https' --tlsv1.2 -o "${RUNNER_TEMP}/yq" "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          chmod +x "${RUNNER_TEMP}/yq"
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+      - name: Run installer RBAC check
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: make check-installer-rbac

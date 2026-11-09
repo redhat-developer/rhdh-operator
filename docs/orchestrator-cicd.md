@@ -11,7 +11,7 @@ There are three methods to install GitOps/Pipelines Operator
 ### Method 1: Install the Operators using Scripts
 
 Refer to the `RHDH helper script` section in [orchestrator guide](orchestrator.md) and set the `--with-cicd` flag to
-true when running the script.
+true when running the script. GitOps and Pipelines are installed via OLM v0 Subscriptions; only OpenShift Serverless and Serverless Logic follow the script's OLM version selection (`--olm-version` or auto-detect).
 
 ### Method 2: Install the Operators from Demo Charts
 
@@ -37,7 +37,7 @@ this [discussion](https://github.com/argoproj/argo-cd/discussions/8674#discussio
 3. Install the OpenShift Pipelines operator:
 
     ```bash
-    helm upgrade --install orchestrator-pipelines pipelines-operator/ -f pipelines-operator/values.yaml -n orchestrator-gitops --create-namespace --set operator.channel=pipelines-1.17
+    helm upgrade --install orchestrator-pipelines pipelines-operator/ -f pipelines-operator/values.yaml -n orchestrator-gitops --create-namespace --set operator.channel=pipelines-1.21
     ```
 
 #### Install OpenShift GitOps Operator
@@ -286,17 +286,17 @@ To enable the ArgoCD and tekton plugins, update your Dynamic Plugins ConfigMap b
     plugins:
        ......
        - package: ./dynamic-plugins/dist/backstage-community-plugin-redhat-argocd
-         disabled: false
+         enabled: true
          dependencies:
             - ref: argocd
        - package: ./dynamic-plugins/dist/backstage-community-plugin-tekton
-         disabled: false
+         enabled: true
          dependencies:
             - ref: tekton
        - package: ./dynamic-plugins/dist/roadiehq-backstage-plugin-argo-cd-backend-dynamic
-         disabled: false
+         enabled: true
        - package: ./dynamic-plugins/dist/roadiehq-scaffolder-backend-argocd-dynamic
-         disabled: false
+         enabled: true
 ```
 
 This should create the ArgoCD AppProject resource and Tekton pipeline called `workflow-deployment`, for RHDH

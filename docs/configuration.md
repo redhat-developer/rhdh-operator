@@ -55,6 +55,7 @@ The Default Configuration defines the structure of all Backstage instances withi
 | secret-envs.yaml                         | []corev1.Secret                         | backstage-envs-<cr-name>            | No           | Yes   | >=0.2.x  | Backstage environment variables from Secret          |
 | [dynamic-plugins.yaml](#dynamic-plugins) | corev1.ConfigMap                        | backstage-dynamic-plugins-<cr-name> | No           | No    | >=0.2.x  | Dynamic plugins configuration                        |
 | pvcs.yaml                                | []corev1.PersistentVolumeClaim          | backstage-<cr-name>-<pvc-name>      | No           | Yes   | >=0.4.x  | List of PVC objects to be mounted to containers      |
+| networkpolicy.yaml                       | []networkingv1.NetworkPolicy            | backstage-netpol-<cr-name>-<np-name>, backstage-db-netpol-<cr-name>-<np-name>| No           | Yes   | >=2.0.x | NetworkPolicies for backend and PostgreSQL pods      |
 
 **Meanings of "Mandatory" Column:**
 - **Yes** - Must be configured; deployment will fail otherwise.
@@ -222,6 +223,16 @@ For example, Backstage CR named **mybackstage** will create K8s Deployment resou
     - `spec.template.metadata.labels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
 * db-service.yaml
     - `spec.selector[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
+* networkpolicy.yaml
+    - Backend policies: `spec.podSelector.matchLabels[rhdh.redhat.com/app] = backstage-<cr-name>`
+    - DB policies (when local DB is enabled): `spec.podSelector.matchLabels[rhdh.redhat.com/app] = backstage-psql-<cr-name>`
+    - The placeholder value in `podSelector.matchLabels` (`backstage` vs `backstage-psql`) determines whether a policy targets the backend or the database at runtime
+    - DB-scoped policies are filtered out when `spec.database.enableLocalDb` is `false`
+    - When local DB is disabled, the `allow-psql-egress` policy allows egress on port 5432 to any destination (for external databases)
+    - The `allow-redis-egress` policy allows egress on port 6379 TCP to any destination (Redis is not deployed by the operator; users bring their own)
+    - The `allow-https-egress` policy also allows egress on port 6443 TCP (Kubernetes API server) — needed by plugins that query cluster resources (Tekton, ArgoCD/GitOps, Topology, KServe model catalog, etc.). On some managed platforms (GKE, EKS) the API server listens on port 443 instead.
+    - The `allow-metrics-ingress` policy allows ingress on port 9464 from `openshift-monitoring`, `openshift-user-workload-monitoring`, GKE GMP namespaces (`gmp-system`, `gke-gmp-system`), and `monitoring` (kube-prometheus-stack convention)
+    - On OpenShift, the `allow-router-ingress` policy's `namespaceSelector` is set to `policy-group.network.openshift.io/ingress: ""`
 
 ### Multi objects
 
@@ -233,7 +244,8 @@ The following configuration files support multi-object definitions:
 - **configmap-envs.yaml** (since 0.10.0)
 - **secret-files.yaml** 
 - **secret-envs.yaml** 
-- **pvcs.yaml** 
+- **pvcs.yaml**
+- **networkpolicy.yaml** (since 2.1.0)
 
 For example, adding the following to **pvcs.yaml** will create 2 PVCs and mount them to the Backstage container:
 
@@ -317,8 +329,8 @@ These configuration variations extend the base default configuration, allowing t
 ##### Orchestrator
 Workflow orchestration capabilities powered by Serverless Workflow. Disabled by default. See [Orchestrator documentation](orchestrator.md) for details.
 
-##### Lightspeed
-AI-powered developer assistance with chat interface and Model Context Protocol (MCP) tools. Enabled by default. See [Lightspeed documentation](lightspeed.md) for details.
+##### Intelligent Assistant
+AI-powered developer assistance with chat interface and Model Context Protocol (MCP) tools. Enabled by default. See [Intelligent Assistant documentation](intelligent-assistant.md) for details.
 
 #### Usage
 
@@ -342,7 +354,7 @@ spec:
   flavours:
     - name: orchestrator
       enabled: true
-    - name: lightspeed
+    - name: intelligent-assistant
       enabled: true
 ```
 
@@ -358,13 +370,54 @@ spec:
 
 #### Technical Details
 
-Flavours extend the default configuration system by organizing pre-configured settings in `/default-config/flavours/<flavour-name>/`. Each flavour includes a `metadata.yaml` file controlling default enablement behavior. When multiple flavours are specified, configurations merge additively in the order specified, with later entries overriding earlier ones when conflicts occur.
+##### Configuration Merging with Base
 
-Different file types use appropriate merge strategies:
-- Kubernetes objects use kyaml deep merge
-- Dynamic plugins merge by package name
-- App configs mount as multiple files for Backstage's internal merging
-- Extra configs maintain multiple ConfigMaps/Secrets
+Flavours extend the default configuration system by organizing pre-configured settings in `/default-config/flavours/<flavour-name>/`. Each flavour includes a `metadata.yaml` file controlling default enablement behavior.
+
+**Merge Order Guarantee:**
+- Base configuration is **always applied first**
+- Enabled flavours are applied in **the exact order specified** in `spec.flavours`
+- Each configuration merge is additive — later sources can override earlier ones per field
+- This order is deterministic and guaranteed across all reconciliation cycles
+
+##### Supported Objects and Merge Policies
+
+The following table shows which configuration objects support flavours and their merge behavior:
+
+| Configuration File | Kubernetes Kind | Flavour Support | Merge Strategy |
+|---|---|---|---|
+| **app-config.yaml** | ConfigMap | ✅ Yes | Multi-object |
+| **configmap-files.yaml** | ConfigMap | ✅ Yes | Multi-object |
+| **configmap-envs.yaml** | ConfigMap | ✅ Yes | Multi-object |
+| **dynamic-plugins.yaml** | ConfigMap | ✅ Yes | Package-based merge |
+| **deployment.yaml** | Deployment/StatefulSet | ✅ Yes | Deployment merge |
+| **secret-files.yaml** | Secret | ❌ No | Base only |
+| **secret-envs.yaml** | Secret | ❌ No | Base only |
+| **pvcs.yaml** | PersistentVolumeClaim | ❌ No | Base only |
+| **service.yaml** | Service | ❌ No | Base only |
+| **route.yaml** | Route (OpenShift) | ❌ No | Base only |
+| **db-statefulset.yaml** | StatefulSet | ❌ No | Base only |
+| **db-service.yaml** | Service | ❌ No | Base only |
+| **db-secret.yaml** | Secret | ❌ No | Base only |
+
+##### Merge Strategy Details
+
+**Multi-object Strategy (ConfigMaps/Secrets):**
+- Each configuration source creates its own Kubernetes object (base + each enabled flavour)
+- **If base and flavour use the same object name:** Kubernetes Server-Side Apply merges them field-by-field; for duplicate fields, last-applied-wins (last source in order wins)
+- **If base and flavour use different object names:** separate Kubernetes objects are created
+
+**Package-based Merge (Dynamic Plugins):**
+- Plugins from all sources are merged by their `package` field
+- For the same package name, later sources override earlier plugin configuration
+
+**Deployment Merge:**
+- Deployment/StatefulSet configurations from base and flavours are merged
+- Flavour patches are applied sequentially to the base deployment
+
+**Base Only:**
+- Only the base configuration from `/default-config/` is used
+- Flavour-specific versions of these files (if present) are ignored
 
 ## Deployment kind
 
@@ -704,10 +757,61 @@ MY_VAR = my-value - to install-dynamic-plugins container only
 
 #### Dynamic Plugins
 
-The Operator can configure [Dynamic Plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/deployment.yaml)). To enable the Operator to configure Dynamic Plugins for a specific Backstage instance (CR), the user must create a ConfigMap with an entry called **dynamic-plugins.yaml**.
+The Operator can configure [Dynamic Plugins](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/index.md). To support Dynamic Plugins, the Backstage deployment should contain a dedicated initContainer called **install-dynamic-plugins** (see [RHDH deployment.yaml](../config/manager/deployment.yaml)).
+
+**Plugin Configuration Fields:**
+
+Each plugin can be configured with the following fields:
+- `package` (required): Plugin package reference. Supported formats:
+  - `ref://plugin-name` - Reference from the default catalog
+  - `oci://registry/image@digest` or `oci://registry/image:tag` - OCI image
+  - `@scope/package-name` - npm package
+  - `https://example.com/plugin.tgz` - HTTP/HTTPS URL
+  - `file://path/to/plugin` - File path
+- `enabled` (optional): Enable/disable the plugin. Defaults to `true` if not specified.
+- `pluginConfig` (optional): Plugin-specific configuration as arbitrary YAML.
+- `integrity` (optional): Integrity checksum for the plugin package.
+- `includes` (optional, ConfigMap only): Array of local dynamic plugin files to include (e.g., `dynamic-plugins.default.yaml`). Only supported in init container processing mode. Not supported when using operator-processed dynamic plugins (`OPERATOR_DP_PROCESSING=true`).
+
+**Note:** The legacy per-plugin `disabled` key in `dynamic-plugins.yaml` remains supported but is deprecated. Use `enabled` for new or updated entries.
+
+**Configuration Options:**
+
+There are two mutually exclusive ways to configure Dynamic Plugins in the Backstage CR:
+
+1. **Inline Configuration** (`spec.application.dynamicPlugins`) - Configure plugins directly in the CR
+2. **ConfigMap Reference** (`spec.application.dynamicPluginsConfigMapName`) - Reference an external ConfigMap
+
+You must choose one approach - using both fields simultaneously is not supported.
+
+##### Option 1: Inline Configuration
+
+Configure plugins directly in the Backstage CR:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    dynamicPlugins:
+      - package: 'ref://backstage-community-plugin-catalog-backend-module-keycloak-dynamic'
+      - package: 'oci://quay.io/rhdh/backstage-plugin-github-actions:1.0.0'
+        pluginConfig:
+        ...
+```
+
+**Note:** The inline `dynamicPlugins` field is mutually exclusive with `dynamicPluginsConfigMapName`.
+
+See [examples/inline-dynamic-plugins.yaml](../examples/inline-dynamic-plugins.yaml) for a complete example.
+
+##### Option 2: ConfigMap Reference
+
+Reference an external ConfigMap containing the Dynamic Plugins configuration.
 
 For example, the **dynamic-plugins-config** ConfigMap contains a simple Dynamic Plugins configuration, which includes predefined default plugins in **dynamic-plugins.default.yaml** and the GitHub plugin provided in the package located at `./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic`.
-  
+
 ```yaml
 kind: ConfigMap
 apiVersion: v1
@@ -718,20 +822,13 @@ data:
     includes:
       - dynamic-plugins.default.yaml
     plugins:
-      - package: './dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-dynamic'
-        disabled: false
+      - package: 'oci://quay.io/rhdh/backstage-plugin-catalog-backend-module-github:1.0.0'
+        enabled: true
         pluginConfig:
-          catalog:
-            providers:
-              github:
-                organization: "${GITHUB_ORG}"
-                schedule:
-                  frequency: { minutes: 1 }
-                  timeout: { minutes: 1 }
-                  initialDelay: { seconds: 100 }
+        ... 
 ```
 
-To configure it with the Backstage CR, the following spec should be included:
+To configure it with the Backstage CR:
 
 ```yaml
 spec:
@@ -739,19 +836,119 @@ spec:
     dynamicPluginsConfigMapName: "dynamic-plugins-config"
 ```
 
-In order to configure plugins without defaults, initialize **includes** with empty array:
+##### Default Plugin Configuration
+
+The Operator provides default plugins that are automatically merged with your configuration. The source of these defaults depends on the plugin processing mode:
+
+**Init Container Processing (Default Mode):**
+- Defaults are read from `config/profile/rhdh/default-config/dynamic-plugins.yaml`
+- The `includes` field is respected and processed by the init container
+
+**Operator Processing Mode (`OPERATOR_DP_PROCESSING=true`):**
+- **Production**: Defaults come from `DevHubPluginCatalog` Custom Resources (overrides `default-config/dynamic-plugins.yaml`)
+- **Testing**: Defaults come from `config/profile/rhdh/local-test/dynamic-plugins.yaml`
+
+##### Configuring Plugins Without Defaults (testing only)
+
+To disable default plugins:
+
+**Init Container Processing:**
+- Set `includes: []` in your ConfigMap's `dynamic-plugins.yaml`
+
+**Operator Processing Mode:**
+- **Testing**: Remove or empty the `config/profile/rhdh/local-test/dynamic-plugins.yaml` file
+- **Production (not recommended)**: Delete all `DevHubPluginCatalog` CRs: `kubectl delete devhubplugincatalog --all -n rhdh-operator`
+
+The Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
+
+##### Private Plugin Registry Authentication
+
+To install plugins from private OCI registries, you need to provide authentication credentials and optionally custom CA certificates to the `install-dynamic-plugins` init container.
+
+**1. Create a Secret with registry credentials:**
+
 ```yaml
-...
+apiVersion: v1
+kind: Secret
+metadata:
+  name: plugin-registry-auth
+type: kubernetes.io/dockerconfigjson
 data:
-  dynamic-plugins.yaml: |
-    includes: []
+  .dockerconfigjson: <base64-encoded-docker-config>
 ```
 
-**NOTE:**
-Before version **0.8.0**, the Operator overrode the default Dynamic Plugins configuration with the one specified in Custom Resource. This meant that the user had to specify all the default plugins in the Custom Resource.
-From version **0.8.0**, the Operator merges the default Dynamic Plugins configuration with the one specified in the Custom Resource. This allows users to override only the parts they want to change, while still keeping the default plugins. Note, merging is performed on plugins top-level fields only, so the complex fields like 'pluginConfig' or 'dependencies' are not merged deeply and will be replaced by the ones specified in the Custom Resource.
+The docker config.json format:
+```json
+{
+  "auths": {
+    "registry.example.com": {
+      "auth": "dXNlcm5hbWU6cGFzc3dvcmQ="
+    }
+  }
+}
+```
 
-Starting from version **0.7.0**, the Operator supports dynamic plugins dependencies. For more details, refer to [Dynamic Plugins Dependencies](dynamic-plugins.md).
+**2. (Optional) Create a ConfigMap with CA certificate:**
+
+For registries using self-signed or private CA certificates:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: plugin-registry-ca
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+```
+
+**3. Configure the Backstage CR:**
+
+Mount the credentials and set environment variables for the `install-dynamic-plugins` init container:
+
+```yaml
+apiVersion: rhdh.redhat.com/v1alpha5
+kind: Backstage
+metadata:
+  name: my-backstage
+spec:
+  application:
+    # Mount credentials and CA cert
+    extraFiles:
+      secrets:
+        - name: plugin-registry-auth
+          key: .dockerconfigjson
+          mountPath: /run/secrets/plugin-registry
+          containers:
+            - install-dynamic-plugins
+      configMaps:
+        - name: plugin-registry-ca
+          key: ca.crt
+          mountPath: /run/secrets/plugin-registry-ca
+          containers:
+            - install-dynamic-plugins
+    # Set environment variables pointing to mounted files
+    extraEnvs:
+      envs:
+        - name: DOCKER_CONFIG
+          value: /run/secrets/plugin-registry
+          containers:
+            - install-dynamic-plugins
+        - name: CA_FILE
+          value: /run/secrets/plugin-registry-ca/ca.crt
+          containers:
+            - install-dynamic-plugins
+```
+
+**Environment Variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `DOCKER_CONFIG` | Path to directory containing docker config.json (or auth.json) |
+| `CA_FILE` | Path to CA certificate file for TLS verification |
+| `INSECURE` | Set to `true` to skip TLS verification (not recommended for production) |
 
 #### Route
 
@@ -936,3 +1133,5 @@ If local DB is enabled (which is simpler but not recommended for production), th
 If local DB is disabled (`enableLocalDb: false`), then the secret with DB connection information must be created manually and specified in either **spec.database.authSecretName** or one of **spec.application.extraEnvs.secrets**.
   
 For more information, refer to the [External DB Integration](external-db.md) manual.
+
+To upgrade the local PostgreSQL database or move its data to an external server, see [Local database migration](db_migration.md).

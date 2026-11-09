@@ -23,7 +23,7 @@ type SecretEnvs struct {
 }
 
 func init() {
-	registerConfig(SecretEnvsKey, SecretEnvsFactory{}, true, nil)
+	registerConfig(SecretEnvsKey, SecretEnvsFactory{}, true, noMerge)
 }
 
 func (p *SecretEnvs) Object() runtime.Object {

@@ -3,7 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
+	"time"
 
 	"github.com/redhat-developer/rhdh-operator/pkg/model/multiobject"
 	"github.com/redhat-developer/rhdh-operator/pkg/platform"
@@ -39,20 +41,23 @@ const (
 // BackstageReconciler reconciles a Backstage object
 type BackstageReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Platform platform.Platform
+	Scheme            *runtime.Scheme
+	Platform          platform.Platform
+	OperatorNamespace string
 }
 
-//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=configmaps;secrets;services;persistentvolumeclaims,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch
-//+kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
-//+kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get
-//+kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;update;patch;delete
+// +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=rhdh.redhat.com,resources=backstages/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=configmaps;secrets;services;persistentvolumeclaims,verbs=get;watch;create;update;list;delete;patch
+// +kubebuilder:rbac:groups="",resources=pods;persistentvolumes,verbs=get;list;watch
+// +kubebuilder:rbac:groups="apps",resources=deployments;statefulsets,verbs=get;watch;create;update;list;delete;patch
+// +kubebuilder:rbac:groups="networking.k8s.io",resources=networkpolicies,verbs=get;watch;create;update;list;delete;patch
+// +kubebuilder:rbac:groups="route.openshift.io",resources=routes;routes/custom-host,verbs=get;watch;create;update;list;delete;patch
+// +kubebuilder:rbac:groups="config.openshift.io",resources=ingresses,verbs=get;list;watch
+// +kubebuilder:rbac:groups="config.openshift.io",resources=apiservers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -85,41 +90,55 @@ func (r *BackstageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Deployment process started")
 	}
 
+	// Check if plugin catalogs are ready before proceeding
+	if !r.areCatalogsReady(ctx) {
+		lg.Info("Waiting for plugin catalogs to be ready")
+		setStatusCondition(&backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonInProgress, "Waiting for DevHubPluginCatalog resources to be ready")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
 	// 1. Preliminary read and prepare external config objects from the specs (configMaps, Secrets)
 	// 2. Make some validation to fail fast
 	externalConfig, err := r.preprocessSpec(ctx, backstage)
 	if err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to preprocess backstage spec", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeConfig, api.BackstageConditionReasonInvalid, "failed to preprocess backstage spec", err)
 	}
 
 	// Apply the ServiceMonitor if monitoring is enabled
 	if err := r.applyServiceMonitor(ctx, &backstage); err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply ServiceMonitor", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeDeployed, api.BackstageConditionReasonFailed, "failed to apply ServiceMonitor", err)
 	}
 
 	// This creates array of model objects to be reconciled
 	bsModel, err := model.InitObjects(ctx, backstage, externalConfig, r.Platform, r.Scheme)
 	if err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to initialize backstage model", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeConfig, api.BackstageConditionReasonInvalid, "failed to initialize backstage model", err)
 	}
+
+	// Config is valid - remove any stale Config condition from previous failures
+	removeStatusCondition(&backstage, api.BackstageConditionTypeConfig)
 
 	// Apply the plugin dependencies
 	if err := r.applyPluginDeps(ctx, backstage, bsModel); err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply plugin dependencies", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeDeployed, api.BackstageConditionReasonFailed, "failed to apply plugin dependencies", err)
 	}
 
 	// Apply the runtime objects
 	err = r.applyObjects(ctx, bsModel.GetRuntimeObjects())
 	if err != nil {
-		return ctrl.Result{}, errorAndStatus(&backstage, "failed to apply backstage objects", err)
+		return ctrl.Result{}, errorAndStatus(&backstage, api.BackstageConditionTypeDeployed, api.BackstageConditionReasonFailed, "failed to apply backstage objects", err)
 	}
 
-	r.setDeploymentStatus(ctx, &backstage, *bsModel)
+	isReady := r.reconcileStatus(ctx, &backstage, *bsModel)
+	if !isReady {
+		// Requeue to check pod status again (for init container failures, etc.)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
 	return ctrl.Result{}, nil
 }
 
-func errorAndStatus(backstage *api.Backstage, msg string, err error) error {
-	setStatusCondition(backstage, api.BackstageConditionTypeDeployed, metav1.ConditionFalse, api.BackstageConditionReasonFailed, fmt.Sprintf("%s %s", msg, err))
+func errorAndStatus(backstage *api.Backstage, condType api.BackstageConditionType, reason api.BackstageConditionReason, msg string, err error) error {
+	setStatusCondition(backstage, condType, metav1.ConditionFalse, reason, fmt.Sprintf("%s: %s", msg, err))
 	return fmt.Errorf("%s: %w", msg, err)
 }
 
@@ -169,7 +188,7 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 		return nil
 	}
 
-	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil {
+	if err := r.Patch(ctx, obj, client.Apply, &client.PatchOptions{FieldManager: BackstageFieldManager, Force: ptr.To(true)}); err != nil { //nolint:staticcheck // SA1019: client.Apply is deprecated: Further investigation needed
 		return fmt.Errorf("failed to apply object: %w", err)
 	}
 	lg.V(1).Info("apply object ", objDispKind(obj, r.Scheme), obj.GetName())
@@ -180,11 +199,57 @@ func (r *BackstageReconciler) applyPayload(ctx context.Context, obj client.Objec
 func (r *BackstageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	b := ctrl.NewControllerManagedBy(mgr).
-		For(&api.Backstage{})
+		For(&api.Backstage{}).
+		Named("backstage")
 
 	if err := r.addWatchers(b); err != nil {
 		return err
 	}
 
 	return b.Complete(r)
+}
+
+// areCatalogsReady checks if plugin catalogs are ready by checking DevHubPluginCatalog status.
+// Returns true if:
+// - Catalog controller is disabled (DISABLE_CATALOG_CONTROLLER=true)
+// - No DevHubPluginCatalog resources exist
+// - All DevHubPluginCatalog resources have Ready=True condition
+// Returns false if any catalog is not ready.
+func (r *BackstageReconciler) areCatalogsReady(ctx context.Context) bool {
+	if isCatalogControllerDisabled() {
+		return true
+	}
+
+	catalogList := &api.DevHubPluginCatalogList{}
+	if err := r.List(ctx, catalogList, client.InNamespace(r.OperatorNamespace)); err != nil {
+		// Can't list catalogs, assume not ready
+		return false
+	}
+
+	if len(catalogList.Items) == 0 {
+		// No catalogs defined, nothing to wait for
+		return true
+	}
+
+	// Check if all catalogs have Ready=True
+	for i := range catalogList.Items {
+		catalog := &catalogList.Items[i]
+		ready := false
+		for _, cond := range catalog.Status.Conditions {
+			if cond.Type == "Ready" && cond.Status == "True" {
+				ready = true
+				break
+			}
+		}
+		if !ready {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isCatalogControllerDisabled returns true if DISABLE_CATALOG_CONTROLLER env var is set to "true"
+func isCatalogControllerDisabled() bool {
+	return os.Getenv("DISABLE_CATALOG_CONTROLLER") == "true"
 }
