@@ -47,7 +47,13 @@ ifeq ($(PROFILE), rhdh)
 	DEFAULT_CHANNEL ?= fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	CHANNELS ?= fast-\$${CI_X_VERSION}.\$${CI_Y_VERSION}
 	BUNDLE_METADATA_PACKAGE_NAME ?= rhdh
-	CATALOG_INDEX_IMAGE ?= quay.io/rhdh/plugin-catalog-index:$(IMAGE_TAG_VERSION)
+	CATALOG_INDEX_TAG ?= $(IMAGE_TAG_VERSION)
+	ifeq ($(DEFAULT_VERSION), true)
+		# x.y.z => x.y so we don't need to wait for catalog index x.y.z to be available when
+		# we bump the operator to x.y.z
+		CATALOG_INDEX_TAG := $(shell echo $(VERSION) | cut -d. -f1,2)
+	endif
+	CATALOG_INDEX_IMAGE ?= quay.io/rhdh/plugin-catalog-index:$(CATALOG_INDEX_TAG)
 else
 	# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
     # This variable is used to construct full image tags for bundle and catalog images.
