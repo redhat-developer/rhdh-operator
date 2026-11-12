@@ -161,6 +161,14 @@
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/.github/workflows/update-rpm-lockfile.yaml/"],
+      "matchStrings": [
+        "# renovate: datasource=github-releases depName=(?<depName>\\S+)\\n\\s+RPM_LOCKFILE_PROTOTYPE_VERSION:\\s*(?<currentValue>v\\S+)"
+      ],
+      "datasourceTemplate": "github-releases"
     }
   ]
 }
