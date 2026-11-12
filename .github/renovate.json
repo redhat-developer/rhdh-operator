@@ -61,6 +61,24 @@
       "automerge": false
     },
     {
+      "description": "Do generate PRs for minor dockerfile updates in 1.y ",
+      "enabled": true,
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "groupName": "All dockerfile images (minor)",
+      "groupSlug": "dockerfile-minor",
+      "matchBaseBranches": [
+        "main",
+        "/^release-1\\.(9|\\d{2,}).*/",
+        "/^release-([2-9]|\\d{2,})\\..*/"
+      ],
+      "automerge": false
+    },
+    {
       "description": "Separate Hermeto image into its own PR to avoid blocking other docker updates",
       "enabled": true,
       "matchDatasources": [
@@ -74,24 +92,6 @@
       ],
       "groupName": "hermeto",
       "groupSlug": "hermeto",
-      "matchBaseBranches": [
-        "main",
-        "/^release-1\\.(9|\\d{2,}).*/",
-        "/^release-([2-9]|\\d{2,})\\..*/"
-      ],
-      "automerge": false
-    },
-    {
-      "description": "Do generate PRs for minor dockerfile updates in 1.y ",
-      "enabled": true,
-      "matchDatasources": [
-        "docker"
-      ],
-      "matchUpdateTypes": [
-        "minor"
-      ],
-      "groupName": "All dockerfile images (minor)",
-      "groupSlug": "dockerfile-minor",
       "matchBaseBranches": [
         "main",
         "/^release-1\\.(9|\\d{2,}).*/",
