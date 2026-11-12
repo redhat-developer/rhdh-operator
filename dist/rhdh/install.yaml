@@ -4890,7 +4890,7 @@ data:
           description: |
             The base image for the task.
           type: string
-          default: registry.access.redhat.com/hi/git:2.56.0
+          default: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9:v1.24.3-1793414738
 
         - name: GIT_USER_NAME
           type: string
@@ -5337,7 +5337,7 @@ spec:
         - name: RELATED_IMAGE_ubi_minimal
           value: registry.access.redhat.com/ubi10-minimal:10.1
         - name: RELATED_IMAGE_tekton_git
-          value: registry.access.redhat.com/hi/git:2.56.0
+          value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9:v1.24.3-1793414738
         - name: POD_NAME
           valueFrom:
             fieldRef:

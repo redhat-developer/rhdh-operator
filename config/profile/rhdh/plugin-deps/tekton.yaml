@@ -55,7 +55,7 @@ spec:
       description: |
         The base image for the task.
       type: string
-      default: registry.access.redhat.com/hi/git:2.56.0
+      default: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9:v1.24.3-1793414738
 
     - name: GIT_USER_NAME
       type: string

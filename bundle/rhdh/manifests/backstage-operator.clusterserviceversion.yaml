@@ -42,7 +42,7 @@ metadata:
     categories: Developer Tools
     certified: "true"
     containerImage: registry.redhat.io/rhdh/rhdh-rhel10-operator:2.2
-    createdAt: "2026-11-12T13:36:13Z"
+    createdAt: "2026-11-12T14:40:27Z"
     description: Red Hat Developer Hub is a Red Hat supported version of Backstage.
       It comes with pre-built plug-ins and configuration settings, supports use of
       an external database, and can help streamline the process of setting up a self-managed
@@ -352,7 +352,7 @@ spec:
                 - name: RELATED_IMAGE_ubi_minimal
                   value: registry.access.redhat.com/ubi10-minimal:10.1
                 - name: RELATED_IMAGE_tekton_git
-                  value: registry.access.redhat.com/hi/git:2.56.0
+                  value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9:v1.24.3-1793414738
                 - name: POD_NAME
                   valueFrom:
                     fieldRef:
@@ -514,7 +514,7 @@ spec:
     name: plugin-dep-okp
   - image: registry.access.redhat.com/ubi10-minimal:10.1
     name: ubi-minimal
-  - image: registry.access.redhat.com/hi/git:2.56.0
+  - image: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9:v1.24.3-1793414738
     name: tekton-git
   replaces: rhdh-operator.v2.1.0
   version: 2.2.0
