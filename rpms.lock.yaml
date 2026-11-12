@@ -11,13 +11,6 @@ arches:
     name: openssl
     evr: 1:3.5.9-1.el9_9
     sourcerpm: openssl-3.5.9-1.el9_9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/o/openssl-libs-3.5.9-1.el9_9.x86_64.rpm
-    repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 2433313
-    checksum: sha256:9dfcbcd7ae9f4cb076315411077e25077a6d492d8391b8ef8584c3e9b0c3446b
-    name: openssl-libs
-    evr: 1:3.5.9-1.el9_9
-    sourcerpm: openssl-3.5.9-1.el9_9.src.rpm
   source:
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/o/openssl-3.5.9-1.el9_9.src.rpm
     repoid: ubi-9-for-x86_64-baseos-source-rpms
