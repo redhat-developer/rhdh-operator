@@ -4890,8 +4890,7 @@ data:
           description: |
             The base image for the task.
           type: string
-          # TODO: Deprecate use of root image.
-          default: cgr.dev/chainguard/git:root-2.39@sha256:7759f87050dd8bacabe61354d75ccd7f864d6b6f8ec42697db7159eccd491139
+          default: registry.access.redhat.com/hi/git:2.56.0
 
         - name: GIT_USER_NAME
           type: string
@@ -4916,7 +4915,7 @@ data:
             Absolute path to the user's home directory. Set this explicitly if you are running the image as a non-root user or have overridden
             the gitInitImage param with an image containing custom user configuration.
           type: string
-          default: "/root"
+          default: "/tmp"
 
         - name: VERBOSE
           description: Log the commands that are executed during `git-clone`'s operation.
@@ -5006,7 +5005,7 @@ data:
           default: "true"
       steps:
         - name: flatten
-          image: registry.access.redhat.com/ubi10-minimal
+          image: registry.access.redhat.com/ubi10-minimal:10.1
           workingDir: $(workspaces.workflow-source.path)
           script: |
             #!/usr/bin/env sh
@@ -5045,7 +5044,7 @@ data:
           type: string
       steps:
         - name: build-manifests
-          image: registry.access.redhat.com/ubi10-minimal
+          image: registry.access.redhat.com/ubi10-minimal:10.1
           workingDir: $(workspaces.workflow-source.path)/flat/$(params.workflowId)
           script: |
             #!/usr/bin/env sh
@@ -5074,7 +5073,7 @@ data:
           type: string
       steps:
         - name: build-gitops
-          image: registry.access.redhat.com/ubi10-minimal
+          image: registry.access.redhat.com/ubi10-minimal:10.1
           workingDir: $(workspaces.workflow-gitops.path)/workflow-gitops
           script: |
             #!/usr/bin/env sh
@@ -5134,7 +5133,7 @@ data:
             - name: GIT_USER_EMAIL
               value: rhdhorchestrator@redhat.com
             - name: USER_HOME
-              value: /home/git
+              value: /tmp
             - name: GIT_SCRIPT
               value: |
                 eval "$(ssh-agent -s)"
@@ -5155,7 +5154,7 @@ data:
             - name: GIT_USER_EMAIL
               value: rhdhorchestrator@redhat.com
             - name: USER_HOME
-              value: /home/git
+              value: /tmp
             - name: GIT_SCRIPT
               value: |
                 eval "$(ssh-agent -s)"
@@ -5237,7 +5236,7 @@ data:
             - name: GIT_USER_EMAIL
               value: rhdhorchestrator@redhat.com
             - name: USER_HOME
-              value: /home/git
+              value: /tmp
             - name: GIT_SCRIPT
               value: |
                 WORKFLOW_COMMIT=$(tasks.fetch-workflow.results.commit)
@@ -5331,6 +5330,14 @@ spec:
           value: quay.io/fedora/postgresql-18:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
+        - name: RELATED_IMAGE_lightspeed_core
+          value: quay.io/lightspeed-core/lightspeed-stack:0.7.3
+        - name: RELATED_IMAGE_plugin_dep_okp
+          value: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
+        - name: RELATED_IMAGE_ubi_minimal
+          value: registry.access.redhat.com/ubi10-minimal:10.1
+        - name: RELATED_IMAGE_tekton_git
+          value: registry.access.redhat.com/hi/git:2.56.0
         - name: POD_NAME
           valueFrom:
             fieldRef:

@@ -5,7 +5,9 @@ A disconnected or restricted environment is an environment that does not have fu
 Deploying the RHDH Operator and running RHDH requires the following public resources:
 
 * Operator images (bundle, operator, catalog)
-* Operands images (RHDH, PostgreSQL)
+* Operand images (RHDH, PostgreSQL, and the images used by the default configuration flavours and plugin dependencies)
+
+The complete list of operand images is published in the `spec.relatedImages` section of the Operator bundle.
 
 To make these resources available, you will need to replace them with their copies in a mirror registry accessible by the cluster.
 
