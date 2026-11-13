@@ -2,11 +2,10 @@
 #
 # Mark a release branch as end-of-life in the CI and Renovate configuration.
 #
-# Given the GA tag that just shipped (e.g. 2.1.0), compute the release branch
-# that is now two GA releases behind (release-1.9) and remove it from:
+# Given the release tag that just shipped (e.g. 2.1.0), compute the release branch
+# that is now two release tags behind (release-1.9) and remove it from:
 #   - .github/workflows/nightly.yaml                          (nightly matrix)
 #   - .github/workflows/nightly-upgrade-test.yaml             (upgrade paths)
-#   - .github/workflows/nightly-postgresql-upgrade-test.yaml  (upgrade paths)
 #   - .github/renovate.json                                   (disable updates)
 #
 # Dry-run by default; pass --write to apply the edits.
@@ -30,13 +29,13 @@ die()  { printf 'error: %s\n' "$*" >&2; exit 2; }
 usage() {
     cat <<'EOF'
 Usage:
-  ./hack/eol-release.sh --tag <GA tag> [--write] [--root <dir>] [--tags-file <file>]
+  ./hack/eol-release.sh --tag <release tag> [--write] [--root <dir>] [--tags-file <file>]
 
 Options:
-  --tag <x.y.0>     GA tag that just shipped, e.g. 2.1.0 (required)
+  --tag <x.y.z>     Release tag that just shipped, e.g. 2.1.0 (required)
   --write           Apply the edits (default: dry-run, prints a diff)
   --root <dir>      Repository root (default: parent of this script)
-  --tags-file <f>   Read GA tags from a file instead of `git tag` (tests)
+  --tags-file <f>   Read release tags from a file instead of `git tag` (tests)
   -h, --help        Show this help
 EOF
 }
@@ -54,33 +53,33 @@ parse_args() {
         esac
     done
     [[ -n "${TAG}" ]] || { usage >&2; die "--tag is required"; }
-    [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.0$ ]] || die "not a GA tag (expected x.y.0): ${TAG}"
+    [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "not a release tag (expected x.y.z): ${TAG}"
     [[ -d "${ROOT}/.github" ]] || die "not a repository root: ${ROOT}"
 }
 
-# Sorted GA tags, oldest first.
-ga_tags() {
+# Sorted release tags, oldest first.
+release_tags() {
     local list
     if [[ -n "${TAGS_FILE}" ]]; then
         list="$(cat "${TAGS_FILE}")"
     else
         list="$(git -C "${ROOT}" tag --list)"
     fi
-    printf '%s\n' "${list}" | grep -E '^[0-9]+\.[0-9]+\.0$' | sort -V || true
+    printf '%s\n' "${list}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true
 }
 
-# Print the release branch two GA tags behind $1; return 1 without history.
+# Print the release branch two release tags behind $1; return 1 without history.
 eol_branch_for_tag() {
     local tag="$1" list idx eol_tag
-    list="$(ga_tags)"
+    list="$(release_tags)"
     if ! printf '%s\n' "${list}" | grep -qxF -- "${tag}"; then
-        list="$(printf '%s\n%s\n' "${list}" "${tag}" | grep -E '^[0-9]+\.[0-9]+\.0$' | sort -V -u)"
+        list="$(printf '%s\n%s\n' "${list}" "${tag}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -u)"
     fi
     idx="$(printf '%s\n' "${list}" | grep -nxF -- "${tag}" | cut -d: -f1)"
     [[ -n "${idx}" ]] || die "tag ${tag} not found"
     (( idx >= 3 )) || return 1
     eol_tag="$(printf '%s\n' "${list}" | sed -n "$((idx - 2))p")"
-    printf 'release-%s\n' "${eol_tag%.0}"
+    printf 'release-%s\n' "${eol_tag%.*}"
 }
 
 # Swap $1 for $2, respecting dry-run and recording whether anything changed.
@@ -212,7 +211,7 @@ main() {
 
     local eol_branch changed=false
     if ! eol_branch="$(eol_branch_for_tag "${TAG}")"; then
-        log "not enough GA history for ${TAG}; nothing to do"
+        log "not enough release history to determine EOL branch for ${TAG}; nothing to do"
         write_outputs "" "false"
         exit 0
     fi
@@ -220,7 +219,6 @@ main() {
 
     edit_nightly_matrix "${ROOT}/.github/workflows/nightly.yaml" "${eol_branch}"
     edit_upgrade_matrix "${ROOT}/.github/workflows/nightly-upgrade-test.yaml" "${eol_branch}"
-    edit_upgrade_matrix "${ROOT}/.github/workflows/nightly-postgresql-upgrade-test.yaml" "${eol_branch}"
     edit_renovate "${ROOT}/.github/renovate.json" "${eol_branch}"
 
     (( CHANGED )) && changed=true
