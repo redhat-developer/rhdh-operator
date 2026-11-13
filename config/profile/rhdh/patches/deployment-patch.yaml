@@ -26,6 +26,17 @@ spec:
               value: quay.io/fedora/postgresql-18:latest
             - name: RELATED_IMAGE_backstage
               value: quay.io/rhdh-community/rhdh:next
+            # The images below are used by the default configuration flavours and plugin
+            # dependencies. They are listed here so that operator-sdk publishes them in
+            # the spec.relatedImages section of the bundle.
+            - name: RELATED_IMAGE_lightspeed_core
+              value: quay.io/lightspeed-core/lightspeed-stack:0.7.3
+            - name: RELATED_IMAGE_plugin_dep_okp
+              value: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
+            - name: RELATED_IMAGE_ubi_minimal
+              value: registry.access.redhat.com/ubi10-minimal:10.1
+            - name: RELATED_IMAGE_tekton_git
+              value: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9:v1.24.3-1793414738
           volumeMounts:
             - mountPath: /default-config/flavours/intelligent-assistant
               name: flavour-intelligent-assistant-config

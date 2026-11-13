@@ -69,7 +69,7 @@ Also, if Backstage CR configured with *EnabledLocalDb*,  it will create a Postgr
 By default, the Backstage Operator is configured to use publicly available images.
 If you plan to deploy to a [restricted environment](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/olm-restricted-networks),
 you will need to configure your cluster or network to allow these images to be pulled.
-For the list of related images deployed by the Operator, see the `RELATED_IMAGE_*` env vars or `relatedImages` section of the [CSV](../bundle/manifests/backstage-operator.clusterserviceversion.yaml).
+For the list of related images deployed by the Operator, see the `RELATED_IMAGE_*` env vars or `relatedImages` section of the [CSV](../bundle/rhdh/manifests/backstage-operator.clusterserviceversion.yaml).
 See also https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/olm-restricted-networks
 
 #### Plugin Registry Mirroring

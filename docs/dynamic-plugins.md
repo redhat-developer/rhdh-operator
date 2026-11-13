@@ -185,7 +185,7 @@ More details in [Catalog Entities Extraction](https://github.com/redhat-develope
 
 When `OPERATOR_DP_PROCESSING=false`, the RHDH `install-dynamic-plugins` init container handles catalog fetching using environment variables.
 
-By default, the `rhdh` profile [injects](../config/profile/rhdh/patches/deployment-patch.yaml#L31-L32) the `CATALOG_INDEX_IMAGE` environment variable. To use a different catalog index image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for an example.
+By default, the `rhdh` profile [injects](../config/profile/rhdh/default-config/deployment.yaml#L72) the `CATALOG_INDEX_IMAGE` environment variable. To use a different catalog index image, use the `extraEnvs` field in your Backstage CR. See [examples/catalog-index.yaml](../examples/catalog-index.yaml) for an example.
 
 For multiple catalog sources in this mode, use the `EXTRA_CATALOG_INDEX_IMAGES` environment variable. See [Using extra catalog index images](https://github.com/redhat-developer/rhdh/blob/main/docs/dynamic-plugins/installing-plugins.md#using-extra-catalog-index-images) for details.
 
@@ -197,6 +197,8 @@ This feature is currently a **Dev Preview** and is disabled by default. To enabl
 
 - `OPERATOR_DP_PROCESSING`: set to `"true"`
 - `RELATED_IMAGE_plugin_installer`: set to the plugin installer image (e.g., `quay.io/rhdh-community/rhdh-plugin-installer:latest`)
+
+The plugin installer image is configured manually only. `RELATED_IMAGE_plugin_installer` is not listed in `spec.relatedImages`, so it is not mirrored together with the Operator bundle.
 
 If using OLM, both can be set via the operator's `Subscription` spec:
 
