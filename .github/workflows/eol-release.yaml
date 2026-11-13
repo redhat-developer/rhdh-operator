@@ -1,15 +1,15 @@
 name: EOL release branch
 
 on:
-  # Any GA tag (x.y.0). Tags in this repo look like 2.1.0 / 1.10.0 (no "v" prefix).
+  # Any release tag (x.y.z). Tags in this repo look like 2.1.0 / 2.1.1 (no "v" prefix).
   push:
     tags:
-      - '[0-9]*.[0-9]*.0'
+      - '[0-9]*.[0-9]*.[0-9]*'
   # Manual replay, and the one-off backfill for 2.1.0 -> release-1.9.
   workflow_dispatch:
     inputs:
       tag:
-        description: "GA tag that just shipped (e.g. 2.1.0)"
+        description: "Release tag that just shipped (e.g. 2.1.0)"
         required: true
         type: string
 
@@ -36,8 +36,8 @@ jobs:
 
       - name: Validate tag format
         run: |
-          if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
-            echo "::error::${TAG} is not a GA tag (expected x.y.0)"
+          if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::${TAG} is not a release tag (expected x.y.z)"
             exit 1
           fi
 
@@ -54,21 +54,27 @@ jobs:
           EOL_VERSION: ${{ steps.eol.outputs.eol_version }}
         run: |
           set -euo pipefail
+          if [[ -z "${EOL_BRANCH}" || -z "${EOL_VERSION}" ]]; then
+            echo "::error::EOL_BRANCH or EOL_VERSION is empty"
+            exit 1
+          fi
           BRANCH="chore/eol-${EOL_BRANCH}"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
 
-          git checkout -b "${BRANCH}"
+          git stash push --include-untracked -m "generated EOL changes"
+          git rebase origin/main
+          git stash pop
+          git checkout -B "${BRANCH}"
           git add .github/workflows/nightly.yaml \
-                  .github/workflows/nightly-upgrade-test.yaml \
-                  .github/workflows/nightly-postgresql-upgrade-test.yaml \
                   .github/renovate.json
           git commit -m "chore(ci): end of life ${EOL_BRANCH} after ${TAG}"
           git push --force origin "${BRANCH}"
 
           BODY=$(cat <<EOF
-          Automated end-of-life for \`${EOL_BRANCH}\`, triggered by the \`${TAG}\` GA tag.
+          Automated end-of-life for \`${EOL_BRANCH}\`, triggered by the \`${TAG}\` release tag.
 
           - [x] Removed from the nightly matrix
           - [x] Removed from the standard upgrade paths
