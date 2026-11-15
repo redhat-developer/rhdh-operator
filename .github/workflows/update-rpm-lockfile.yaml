@@ -7,20 +7,22 @@ on:
     - cron: '0 3 * * 1'
   push:
     branches:
-      - main
-      - release-1.**
+      - 'main'
+      - 'release-1.[0-9]+'
     paths:
       - 'rpms.in.yaml'
+      - 'rpms.lock.yaml'
       - '.rhdh/docker/Dockerfile'
       - '.github/workflows/update-rpm-lockfile.yaml'
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
       - 'main'
-      - 'release-[0-9]+.[0-9]+'
+      - 'release-1.[0-9]+'
     paths:
       - 'rpms.in.yaml'
-      - 'Dockerfile'
+      - 'rpms.lock.yaml'
+      - '.rhdh/docker/Dockerfile'
       - '.github/workflows/update-rpm-lockfile.yaml'
 
 concurrency:
@@ -136,7 +138,8 @@ jobs:
           echo ""
           echo "This usually happens when you modify:"
           echo "  - rpms.in.yaml"
-          echo "  - Dockerfile"
+          echo "  - rpms.lock.yaml"
+          echo "  - .rhdh/docker/Dockerfile"
           echo ""
           echo "To fix this, run:"
           echo "  pip install https://github.com/konflux-ci/rpm-lockfile-prototype/archive/refs/tags/${RPM_LOCKFILE_PROTOTYPE_VERSION}.zip"
