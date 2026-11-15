@@ -11,6 +11,7 @@ on:
       - 'release-[0-9]+.[0-9]+'
     paths:
       - 'rpms.in.yaml'
+      - 'rpms.lock.yaml'
       - 'Dockerfile'
       - '.github/workflows/update-rpm-lockfile.yaml'
   pull_request:
@@ -20,6 +21,7 @@ on:
       - 'release-[0-9]+.[0-9]+'
     paths:
       - 'rpms.in.yaml'
+      - 'rpms.lock.yaml'
       - 'Dockerfile'
       - '.github/workflows/update-rpm-lockfile.yaml'
 
@@ -136,6 +138,7 @@ jobs:
           echo ""
           echo "This usually happens when you modify:"
           echo "  - rpms.in.yaml"
+          echo "  - rpms.lock.yaml"
           echo "  - Dockerfile"
           echo ""
           echo "To fix this, run:"
