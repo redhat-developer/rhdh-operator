@@ -351,7 +351,7 @@ bundles: ## Generate bundle manifests and metadata, then validate generated file
   	done
 
 .PHONY: bundle
-bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
+bundle: manifests kustomize operator-sdk yq ## Generate bundle manifests and metadata, then validate generated files.
 	$(OPERATOR_SDK) generate kustomize manifests -q --interactive=false \
 		--apis-dir ./api/ \
 		--input-dir ./config/manifests/$(PROFILE)/ \
@@ -362,6 +362,23 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 		sed 's|{{OPERATOR_DP_PROCESSING}}|$(OPERATOR_DP_PROCESSING)|g' | \
 		sed 's|{{RELATED_IMAGE_plugin_installer}}|$(RELATED_IMAGE_plugin_installer)|g' | \
 		$(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
+	# operator-sdk replaces relatedImages with env-derived entries. Merge the base
+	# CSV's discovery-only images back without adding unused runtime env variables.
+	@base_csv=config/manifests/$(PROFILE)/bases/backstage-operator.clusterserviceversion.yaml; \
+		count=$$($(YQ) '.spec.relatedImages | length' "$$base_csv"); \
+		if [ "$$count" -gt 0 ]; then \
+			BASE_CSV="$$base_csv" $(YQ) -i -c '.spec.relatedImages = ((.spec.relatedImages + load(strenv(BASE_CSV)).spec.relatedImages) | unique_by(.image))' \
+				bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml; \
+		fi
+ifeq ($(USE_IMAGE_DIGESTS), true)
+	# The SDK pins its generated entries; also pin images merged from the base CSV.
+	@$(YQ) -r '.spec.relatedImages[].image | select(contains("@sha256:") | not)' bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml | \
+		while IFS= read -r image; do \
+			pinned=$$(go run github.com/google/go-containerregistry/cmd/crane digest --full-ref "$$image"); \
+			IMAGE="$$image" PINNED_IMAGE="$$pinned" $(YQ) -i -c '(.spec.relatedImages[] | select(.image == strenv(IMAGE))).image = strenv(PINNED_IMAGE)' \
+				bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml; \
+		done
+endif
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 	@sed $(SED_I) 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
 	@sed $(SED_I) 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
@@ -565,6 +582,7 @@ GOIMPORTS ?= $(LOCALBIN)/goimports
 GOSEC ?= $(LOCALBIN)/gosec
 GINKGO ?= $(LOCALBIN)/ginkgo
 CRDIFY ?= $(LOCALBIN)/crdify
+YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
@@ -575,6 +593,7 @@ GOIMPORTS_VERSION ?= v0.46.0
 GOSEC_VERSION ?= v2.27.1
 GINKGO_VERSION ?= v2.28.1
 CRDIFY_VERSION ?= v0.6.0
+YQ_VERSION ?= v4.54.1
 
 ## Gosec options - default format is sarif so we can integrate with Github code scanning
 GOSEC_FMT ?= sarif  # for other options, see https://github.com/securego/gosec#output-formats
@@ -627,6 +646,11 @@ $(GINKGO): $(LOCALBIN)
 crdify: $(CRDIFY) ## Download crdify locally if necessary.
 $(CRDIFY): $(LOCALBIN)
 	$(call go-install-tool,$(CRDIFY),sigs.k8s.io/crdify,$(CRDIFY_VERSION))
+
+.PHONY: yq
+yq: $(YQ) ## Download yq locally if necessary.
+$(YQ): $(LOCALBIN)
+	$(call go-install-tool,$(YQ),github.com/mikefarah/yq/v4,$(YQ_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary (ideally with version)

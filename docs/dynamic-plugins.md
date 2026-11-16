@@ -198,7 +198,7 @@ This feature is currently a **Dev Preview** and is disabled by default. To enabl
 - `OPERATOR_DP_PROCESSING`: set to `"true"`
 - `RELATED_IMAGE_plugin_installer`: set to the plugin installer image (e.g., `quay.io/rhdh-community/rhdh-plugin-installer:latest`)
 
-The plugin installer image is configured manually only. `RELATED_IMAGE_plugin_installer` is not listed in `spec.relatedImages`, so it is not mirrored together with the Operator bundle.
+The plugin installer image is configured manually only. Its image is intentionally excluded from the CSV's `spec.relatedImages` while this feature is Dev Preview, so it is not mirrored together with the Operator bundle. In a disconnected environment, mirror it separately and set `RELATED_IMAGE_plugin_installer` to that mirror reference.
 
 If using OLM, both can be set via the operator's `Subscription` spec:
 
