@@ -234,7 +234,6 @@ main() {
 
     edit_nightly_matrix "${ROOT}/.github/workflows/nightly.yaml" "${eol_branch}"
     edit_upgrade_matrix "${ROOT}/.github/workflows/nightly-upgrade-test.yaml" "${eol_branch}"
-    edit_upgrade_matrix "${ROOT}/.github/workflows/nightly-postgresql-upgrade-test.yaml" "${eol_branch}"
     edit_renovate "${ROOT}/.github/renovate.json" "${eol_branch}"
 
     (( CHANGED )) && changed=true

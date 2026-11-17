@@ -105,7 +105,6 @@ jobs:
           git checkout -B "${BRANCH}"
           git add .github/workflows/nightly.yaml \
                   .github/workflows/nightly-upgrade-test.yaml \
-                  .github/workflows/nightly-postgresql-upgrade-test.yaml \
                   .github/renovate.json
           git commit -m "chore(ci): end of life ${EOL_BRANCH} after ${TAG}"
           git push --force origin "${BRANCH}"
@@ -116,7 +115,7 @@ jobs:
 
           - [x] Removed from the nightly matrix
           - [x] Removed from the standard upgrade paths
-          - [x] Checked the PostgreSQL upgrade matrix
+          - [x] Left `nightly-postgresql-upgrade-test.yaml` untouched
           - [x] Renovate rule added (\`enabled: false\`)
 
           > [!NOTE]
