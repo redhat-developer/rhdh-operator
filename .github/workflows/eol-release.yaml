@@ -2,7 +2,7 @@
 name: EOL release branch
 
 "on":
-  # GA release tags (x.y.0). Tags in this repo look like 2.1.0 (no "v" prefix).
+  # release tags (x.y.0). Tags in this repo look like 2.1.0 (no "v" prefix).
   push:
     tags:
       - '[0-9]*.[0-9]*.0'
@@ -39,7 +39,7 @@ jobs:
         id: validate-tag
         run: |
           if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
-            echo "::notice::${TAG} is not a GA release tag;" \
+            echo "::notice::${TAG} is not a release tag;" \
               "skipping EOL processing"
             echo "valid=false" >> "$GITHUB_OUTPUT"
             exit 0

@@ -66,7 +66,7 @@ parse_args() {
     [[ -d "${ROOT}/.github" ]] || die "not a repository root: ${ROOT}"
 }
 
-# Sorted GA release tags (x.y.0), oldest first.
+# Sorted release tags (x.y.0), oldest first.
 release_tags() {
     local list
     if [[ -n "${TAGS_FILE}" ]]; then
@@ -77,13 +77,13 @@ release_tags() {
     printf '%s\n' "${list}" | grep -E '^[0-9]+\.[0-9]+\.0$' | sort -V || true
 }
 
-# Print the release branch two GA releases behind the supplied release tag;
+# Print the release branch two releases behind the supplied release tag;
 # return 1 when there is not enough history.
 eol_branch_for_tag() {
     local release_tag="$1" list idx eol_tag
     list="$(release_tags)"
     if ! printf '%s\n' "${list}" | grep -qxF -- "${release_tag}"; then
-        die "tag ${release_tag} was not found among the fetched GA tags"
+        die "tag ${release_tag} was not found among the fetched release tags"
     fi
     idx="$(printf '%s\n' "${list}" | grep -nxF -- "${release_tag}" | cut -d: -f1)"
     (( idx >= 3 )) || return 1
