@@ -15,8 +15,7 @@ name: EOL release branch
         type: string
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: eol-release-${{ github.event.inputs.tag || github.ref_name }}
@@ -34,6 +33,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Validate tag format
         id: validate-tag
@@ -61,33 +61,22 @@ jobs:
           ./hack/eol-release.sh --tag "${TAG}" --write \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Require RHDH GitHub app secrets
+      - name: Require RHDH_BOT_TOKEN
         if: steps.eol.outputs.changed == 'true'
         env:
-          APP_ID: ${{ secrets.RHDH_GITHUB_APP_ID }}
-          APP_KEY: ${{ secrets.RHDH_GITHUB_APP_PRIVATE_KEY }}
+          RHDH_BOT_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
         run: |
-          if [[ -z "${APP_ID}" || -z "${APP_KEY}" ]]; then
-            echo "::error::RHDH_GITHUB_APP_ID and RHDH_GITHUB_APP_PRIVATE_KEY" \
-              "must be configured"
+          if [[ -z "${RHDH_BOT_TOKEN}" ]]; then
+            echo "::error::RHDH_BOT_TOKEN must be configured as a repo secret" \
+              "(rhdh-bot PAT). There is no GITHUB_TOKEN fallback."
             exit 1
           fi
-
-      # yamllint disable rule:line-length
-      - name: Generate GitHub App token
-        if: steps.eol.outputs.changed == 'true'
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
-        with:
-          app-id: ${{ secrets.RHDH_GITHUB_APP_ID }}
-          private-key: ${{ secrets.RHDH_GITHUB_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-      # yamllint enable rule:line-length
 
       - name: Open pull request
         if: steps.eol.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
           EOL_BRANCH: ${{ steps.eol.outputs.eol_branch }}
           EOL_VERSION: ${{ steps.eol.outputs.eol_version }}
         run: |
@@ -98,9 +87,23 @@ jobs:
           fi
           BRANCH="chore/eol-${EOL_BRANCH}"
 
-          git config user.name "github-actions[bot]"
-          git config user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "rhdh-bot"
+          git config user.email "rhdh-bot@redhat.com"
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+
+          set -euo pipefail
+          if [[ -z "${EOL_BRANCH}" || -z "${EOL_VERSION}". ]]; then
+            echo "::error::EOL_BRANCH or EOL_VERSION is empty"
+            exit 1
+          fi
+          BRANCH="chore/eol-${EOL_BRANCH}"
+
+          git config user.name "rhdh-bot"
+          git config user.email "rhdh-bot@redhat.com"
+
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
           git pull --rebase --autostash origin main
           git checkout -B "${BRANCH}"
           git add .github/workflows/nightly.yaml \
