@@ -53,7 +53,7 @@ parse_args() {
         esac
     done
     [[ -n "${TAG}" ]] || { usage >&2; die "--tag is required"; }
-    [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "not a release tag (expected x.y.z): ${TAG}"
+    [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.0$ ]] || die "not a release tag (expected x.y.0): ${TAG}"
     [[ -d "${ROOT}/.github" ]] || die "not a repository root: ${ROOT}"
 }
 

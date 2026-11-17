@@ -36,8 +36,8 @@ jobs:
 
       - name: Validate tag format
         run: |
-          if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::${TAG} is not a release tag (expected x.y.z)"
+          if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
+            echo "::error::${TAG} is not a release tag (expected x.y.0)"
             exit 1
           fi
 
