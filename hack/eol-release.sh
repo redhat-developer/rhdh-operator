@@ -15,7 +15,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/eol-release.XXXXXX")"
-trap 'rm -rf "${WORK}"' EXIT
+
+cleanup() {
+    local exit_code=$?
+    rm -rf -- "${WORK}" || true
+    return "${exit_code}"
+}
+
+trap cleanup EXIT
 
 TAG=""
 TAGS_FILE=""
