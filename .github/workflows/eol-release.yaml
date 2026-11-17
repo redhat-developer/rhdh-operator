@@ -1,10 +1,10 @@
 name: EOL release branch
 
 on:
-  # Any release tag (x.y.z). Tags in this repo look like 2.1.0 / 2.1.1 (no "v" prefix).
+  # GA release tags (x.y.0). Tags in this repo look like 2.1.0 (no "v" prefix).
   push:
     tags:
-      - '[0-9]*.[0-9]*.[0-9]*'
+      - '[0-9]*.[0-9]*.0'
   # Manual replay, and the one-off backfill for 2.1.0 -> release-1.9.
   workflow_dispatch:
     inputs:
@@ -62,13 +62,11 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-
-          git stash push --include-untracked -m "generated EOL changes"
-          git rebase origin/main
-          git stash pop
+          git pull --rebase --autostash origin main
           git checkout -B "${BRANCH}"
           git add .github/workflows/nightly.yaml \
+                  .github/workflows/nightly-upgrade-test.yaml \
+                  .github/workflows/nightly-postgresql-upgrade-test.yaml \
                   .github/renovate.json
           git commit -m "chore(ci): end of life ${EOL_BRANCH} after ${TAG}"
           git push --force origin "${BRANCH}"

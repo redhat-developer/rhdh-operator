@@ -57,7 +57,7 @@ parse_args() {
     [[ -d "${ROOT}/.github" ]] || die "not a repository root: ${ROOT}"
 }
 
-# Sorted release tags, oldest first.
+# Sorted GA release tags (x.y.0), oldest first.
 release_tags() {
     local list
     if [[ -n "${TAGS_FILE}" ]]; then
@@ -65,15 +65,15 @@ release_tags() {
     else
         list="$(git -C "${ROOT}" tag --list)"
     fi
-    printf '%s\n' "${list}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true
+    printf '%s\n' "${list}" | grep -E '^[0-9]+\.[0-9]+\.0$' | sort -V || true
 }
 
-# Print the release branch two release tags behind $1; return 1 without history.
+# Print the release branch two GA releases behind $1; return 1 without history.
 eol_branch_for_tag() {
     local tag="$1" list idx eol_tag
     list="$(release_tags)"
     if ! printf '%s\n' "${list}" | grep -qxF -- "${tag}"; then
-        list="$(printf '%s\n%s\n' "${list}" "${tag}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -u)"
+        list="$(printf '%s\n%s\n' "${list}" "${tag}" | grep -E '^[0-9]+\.[0-9]+\.0$' | sort -V -u)"
     fi
     idx="$(printf '%s\n' "${list}" | grep -nxF -- "${tag}" | cut -d: -f1)"
     [[ -n "${idx}" ]] || die "tag ${tag} not found"
@@ -219,6 +219,7 @@ main() {
 
     edit_nightly_matrix "${ROOT}/.github/workflows/nightly.yaml" "${eol_branch}"
     edit_upgrade_matrix "${ROOT}/.github/workflows/nightly-upgrade-test.yaml" "${eol_branch}"
+    edit_upgrade_matrix "${ROOT}/.github/workflows/nightly-postgresql-upgrade-test.yaml" "${eol_branch}"
     edit_renovate "${ROOT}/.github/renovate.json" "${eol_branch}"
 
     (( CHANGED )) && changed=true
