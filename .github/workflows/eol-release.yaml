@@ -36,13 +36,18 @@ jobs:
           fetch-depth: 0
 
       - name: Validate tag format
+        id: validate-tag
         run: |
           if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
-            echo "::error::${TAG} is not a release tag (expected x.y.0)"
-            exit 1
+            echo "::notice::${TAG} is not a GA release tag;" \
+              "skipping EOL processing"
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          echo "valid=true" >> "$GITHUB_OUTPUT"
 
       - name: Verify tag exists in the checkout
+        if: steps.validate-tag.outputs.valid == 'true'
         run: |
           if ! git show-ref --verify --quiet "refs/tags/${TAG}"; then
             echo "::error::${TAG} does not exist in the fetched repository tags"
@@ -50,6 +55,7 @@ jobs:
           fi
 
       - name: Compute EOL branch and update config files
+        if: steps.validate-tag.outputs.valid == 'true'
         id: eol
         run: |
           ./hack/eol-release.sh --tag "${TAG}" --write \
