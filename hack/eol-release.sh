@@ -80,10 +80,9 @@ eol_branch_for_tag() {
     local tag="$1" list idx eol_tag
     list="$(release_tags)"
     if ! printf '%s\n' "${list}" | grep -qxF -- "${tag}"; then
-        list="$(printf '%s\n%s\n' "${list}" "${tag}" | grep -E '^[0-9]+\.[0-9]+\.0$' | sort -V -u)"
+        die "tag ${tag} was not found among the fetched GA tags"
     fi
     idx="$(printf '%s\n' "${list}" | grep -nxF -- "${tag}" | cut -d: -f1)"
-    [[ -n "${idx}" ]] || die "tag ${tag} not found"
     (( idx >= 3 )) || return 1
     eol_tag="$(printf '%s\n' "${list}" | sed -n "$((idx - 2))p")"
     printf 'release-%s\n' "${eol_tag%.*}"
@@ -216,11 +215,17 @@ write_outputs() {
 main() {
     parse_args "$@"
 
-    local eol_branch changed=false
-    if ! eol_branch="$(eol_branch_for_tag "${TAG}")"; then
-        log "not enough release history to determine EOL branch for ${TAG}; nothing to do"
-        write_outputs "" "false"
-        exit 0
+    local eol_branch changed=false rc
+    if eol_branch="$(eol_branch_for_tag "${TAG}")"; then
+        :
+    else
+        rc=$?
+        if (( rc == 1 )); then
+            log "not enough release history to determine EOL branch for ${TAG}; nothing to do"
+            write_outputs "" "false"
+            exit 0
+        fi
+        exit "${rc}"
     fi
     log "tag=${TAG} eol=${eol_branch}"
 

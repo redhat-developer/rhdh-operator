@@ -41,6 +41,13 @@ jobs:
             exit 1
           fi
 
+      - name: Verify tag exists in the checkout
+        run: |
+          if ! git show-ref --verify --quiet "refs/tags/${TAG}"; then
+            echo "::error::${TAG} does not exist in the fetched repository tags"
+            exit 1
+          fi
+
       - name: Compute EOL branch and update config files
         id: eol
         run: |
