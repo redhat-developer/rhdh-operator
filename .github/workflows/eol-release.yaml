@@ -106,7 +106,7 @@ jobs:
 
           - [x] Removed from the nightly matrix
           - [x] Removed from the standard upgrade paths
-          - [x] Left `nightly-postgresql-upgrade-test.yaml` untouched
+          - [x] Left \`nightly-postgresql-upgrade-test.yaml\` untouched
           - [x] Renovate rule added (\`enabled: false\`)
 
           > [!NOTE]
