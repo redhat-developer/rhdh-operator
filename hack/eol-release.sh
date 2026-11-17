@@ -75,14 +75,15 @@ release_tags() {
     printf '%s\n' "${list}" | grep -E '^[0-9]+\.[0-9]+\.0$' | sort -V || true
 }
 
-# Print the release branch two GA releases behind $1; return 1 without history.
+# Print the release branch two GA releases behind the supplied release tag;
+# return 1 when there is not enough history.
 eol_branch_for_tag() {
-    local tag="$1" list idx eol_tag
+    local release_tag="$1" list idx eol_tag
     list="$(release_tags)"
-    if ! printf '%s\n' "${list}" | grep -qxF -- "${tag}"; then
-        die "tag ${tag} was not found among the fetched GA tags"
+    if ! printf '%s\n' "${list}" | grep -qxF -- "${release_tag}"; then
+        die "tag ${release_tag} was not found among the fetched GA tags"
     fi
-    idx="$(printf '%s\n' "${list}" | grep -nxF -- "${tag}" | cut -d: -f1)"
+    idx="$(printf '%s\n' "${list}" | grep -nxF -- "${release_tag}" | cut -d: -f1)"
     (( idx >= 3 )) || return 1
     eol_tag="$(printf '%s\n' "${list}" | sed -n "$((idx - 2))p")"
     printf 'release-%s\n' "${eol_tag%.*}"
