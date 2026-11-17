@@ -48,15 +48,17 @@ EOF
 }
 
 parse_args() {
+    local argument
     while [[ $# -gt 0 ]]; do
-        case "$1" in
+        argument="$1"
+        case "${argument}" in
             --tag)       [[ $# -ge 2 ]] || die "--tag needs a value"; TAG="$2"; shift 2 ;;
             --root)      [[ $# -ge 2 ]] || die "--root needs a value"; ROOT="$2"; shift 2 ;;
             --tags-file) [[ $# -ge 2 ]] || die "--tags-file needs a value"; TAGS_FILE="$2"; shift 2 ;;
             --write)     WRITE=1; shift ;;
             --dry-run)   WRITE=0; shift ;;
             -h|--help)   usage; exit 0 ;;
-            *) die "unknown argument: $1" ;;
+            *) die "unknown argument: ${argument}" ;;
         esac
     done
     [[ -n "${TAG}" ]] || { usage >&2; die "--tag is required"; }
