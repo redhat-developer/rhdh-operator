@@ -92,18 +92,6 @@ jobs:
           git remote set-url origin \
             "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
 
-          set -euo pipefail
-          if [[ -z "${EOL_BRANCH}" || -z "${EOL_VERSION}". ]]; then
-            echo "::error::EOL_BRANCH or EOL_VERSION is empty"
-            exit 1
-          fi
-          BRANCH="chore/eol-${EOL_BRANCH}"
-
-          git config user.name "rhdh-bot"
-          git config user.email "rhdh-bot@redhat.com"
-
-          git remote set-url origin \
-            "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
           git pull --rebase --autostash origin main
           git checkout -B "${BRANCH}"
           git add .github/workflows/nightly.yaml \
