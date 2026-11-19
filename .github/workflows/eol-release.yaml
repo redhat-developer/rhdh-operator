@@ -61,21 +61,31 @@ jobs:
           ./hack/eol-release.sh --tag "${TAG}" --write \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Require RHDH_BOT_TOKEN
+      - name: Require GitHub App credentials
         if: steps.eol.outputs.changed == 'true'
         env:
-          RHDH_BOT_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+          APP_ID: ${{ secrets.RHDH_GITHUB_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.RHDH_GITHUB_APP_PRIVATE_KEY }}
         run: |
-          if [[ -z "${RHDH_BOT_TOKEN}" ]]; then
-            echo "::error::RHDH_BOT_TOKEN must be configured as a repo secret" \
-              "(rhdh-bot PAT). There is no GITHUB_TOKEN fallback."
+          if [[ -z "${APP_ID}" || -z "${APP_PRIVATE_KEY}" ]]; then
+            echo "::error::RHDH_GITHUB_APP_ID and RHDH_GITHUB_APP_PRIVATE_KEY" \
+              "must be configured"
             exit 1
           fi
+      - name: Generate GitHub App token
+        if: steps.eol.outputs.changed == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          app-id: ${{ secrets.RHDH_GITHUB_APP_ID }}
+          private-key: ${{ secrets.RHDH_GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
 
       - name: Open pull request
         if: steps.eol.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.RHDH_BOT_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           REPOSITORY: ${{ github.repository }}
           EOL_BRANCH: ${{ steps.eol.outputs.eol_branch }}
           EOL_VERSION: ${{ steps.eol.outputs.eol_version }}
@@ -87,8 +97,12 @@ jobs:
           fi
           BRANCH="chore/eol-${EOL_BRANCH}"
 
-          git config user.name "rhdh-bot"
-          git config user.email "rhdh-bot@redhat.com"
+          APP_BOT_LOGIN="${APP_SLUG}[bot]"
+          APP_BOT_ID="$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)"
+
+          git config user.name "${APP_BOT_LOGIN}"
+          git config user.email \
+            "${APP_BOT_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
           git remote set-url origin \
             "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
 
