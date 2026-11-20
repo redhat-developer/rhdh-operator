@@ -73,7 +73,7 @@ For the known container images used by the RHDH profile's supported flavours and
 see `spec.relatedImages` in the [CSV](../bundle/rhdh/manifests/backstage-operator.clusterserviceversion.yaml).
 These entries enable image discovery for mirroring, not new environment overrides.
 The existing RHDH and PostgreSQL `RELATED_IMAGE_*` overrides are unchanged;
-the Dev Preview [plugin installer](dynamic-plugins.md#operator-dynamic-plugins-processing-mode)
+the Dev Preview [plugin installer](dynamic-plugins.md#operator-processing-mode-dev-preview)
 remains a separately configured image.
 See the [disconnected-environment guidance](../.rhdh/docs/airgap.adoc) for the
 OpenShift mirror-configuration requirement and exclusions.

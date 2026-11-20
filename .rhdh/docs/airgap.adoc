@@ -9,7 +9,7 @@ Deploying the RHDH Operator and running RHDH requires the following public resou
 
 The Operator bundle's CSV lists the known container images for the RHDH profile's supported flavours and plugin dependencies in `spec.relatedImages`.
 This includes optional dependencies such as OKP and Tekton; `oc-mirror` mirrors all listed images even if you do not enable the corresponding feature.
-The Dev Preview plugin installer is intentionally excluded and must be mirrored separately when enabled; see link:../../docs/dynamic-plugins.md[Operator Dynamic Plugins Processing Mode].
+The Dev Preview plugin installer is intentionally excluded and must be mirrored separately when enabled; see link:../../docs/dynamic-plugins.md#operator-processing-mode-dev-preview[Operator Dynamic Plugins Processing Mode].
 
 On OpenShift clusters with working `ImageDigestMirrorSet` or `ImageTagMirrorSet` (IDMS/ITMS) support, you can use the standard `oc-mirror` workflow for the listed container images, then apply the generated cluster mirror configuration before installing RHDH.
 The container runtime redirects image pulls to the mirror without changing the image references in the workload manifests.

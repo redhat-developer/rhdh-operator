@@ -118,12 +118,12 @@ spec:
     url: https://www.redhat.com/
   relatedImages:
   - image: quay.io/lightspeed-core/lightspeed-stack:0.7.3
-    name: lightspeed-core
+    name: flavour-intelligent-assistant-lightspeed-core
   - image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
     name: plugin-dep-okp
   - image: registry.access.redhat.com/ubi10-minimal
-    name: ubi-minimal
+    name: plugin-dep-tekton-ubi-minimal
   - image: cgr.dev/chainguard/git:root-2.39@sha256:7759f87050dd8bacabe61354d75ccd7f864d6b6f8ec42697db7159eccd491139
-    name: tekton-git
+    name: plugin-dep-tekton-git
   replaces: rhdh-operator.v2.1.0
   version: 2.2.0

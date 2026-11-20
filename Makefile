@@ -370,15 +370,6 @@ bundle: manifests kustomize operator-sdk yq ## Generate bundle manifests and met
 			BASE_CSV="$$base_csv" $(YQ) -i -c '.spec.relatedImages = ((.spec.relatedImages + load(strenv(BASE_CSV)).spec.relatedImages) | unique_by(.image))' \
 				bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml; \
 		fi
-ifeq ($(USE_IMAGE_DIGESTS), true)
-	# The SDK pins its generated entries; also pin images merged from the base CSV.
-	@$(YQ) -r '.spec.relatedImages[].image | select(contains("@sha256:") | not)' bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml | \
-		while IFS= read -r image; do \
-			pinned=$$(go run github.com/google/go-containerregistry/cmd/crane digest --full-ref "$$image"); \
-			IMAGE="$$image" PINNED_IMAGE="$$pinned" $(YQ) -i -c '(.spec.relatedImages[] | select(.image == strenv(IMAGE))).image = strenv(PINNED_IMAGE)' \
-				bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml; \
-		done
-endif
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 	@sed $(SED_I) 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
 	@sed $(SED_I) 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
