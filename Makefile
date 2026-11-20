@@ -364,12 +364,10 @@ bundle: manifests kustomize operator-sdk yq ## Generate bundle manifests and met
 		$(OPERATOR_SDK) generate bundle --kustomize-dir config/manifests/$(PROFILE) $(BUNDLE_GEN_FLAGS)
 	# operator-sdk replaces relatedImages with env-derived entries. Merge the base
 	# CSV's discovery-only images back without adding unused runtime env variables.
-	@base_csv=config/manifests/$(PROFILE)/bases/backstage-operator.clusterserviceversion.yaml; \
-		count=$$($(YQ) '.spec.relatedImages | length' "$$base_csv"); \
-		if [ "$$count" -gt 0 ]; then \
-			BASE_CSV="$$base_csv" $(YQ) -i -c '.spec.relatedImages = ((.spec.relatedImages + load(strenv(BASE_CSV)).spec.relatedImages) | unique_by(.image))' \
-				bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml; \
-		fi
+	# Profiles without relatedImages in their base CSV get an empty list, which is
+	# equivalent to omitting the field.
+	@$(YQ) -i -c '.spec.relatedImages = ((.spec.relatedImages + (load("config/manifests/$(PROFILE)/bases/backstage-operator.clusterserviceversion.yaml").spec.relatedImages // [])) | unique_by(.image))' \
+		bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
 	@mv -f bundle.Dockerfile ./bundle/$(PROFILE)/bundle.Dockerfile
 	@sed $(SED_I) 's/backstage-operator.v$(VERSION)/$(PROFILE_SHORT)-operator.v$(VERSION)/g' ./bundle/$(PROFILE)/manifests/backstage-operator.clusterserviceversion.yaml
 	@sed $(SED_I) 's/backstage-operator/$(BUNDLE_METADATA_PACKAGE_NAME)/g' ./bundle/$(PROFILE)/metadata/annotations.yaml
