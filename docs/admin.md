@@ -69,14 +69,20 @@ Also, if Backstage CR configured with *EnabledLocalDb*,  it will create a Postgr
 By default, the Backstage Operator is configured to use publicly available images.
 If you plan to deploy to a [restricted environment](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/olm-restricted-networks),
 you will need to configure your cluster or network to allow these images to be pulled.
-For the known container images used by the RHDH profile's supported flavours and plugin dependencies,
+For the known container images used by the RHDH profile's shipped flavours and plugin dependencies,
 see `spec.relatedImages` in the [CSV](../bundle/rhdh/manifests/backstage-operator.clusterserviceversion.yaml).
-These entries enable image discovery for mirroring, not new environment overrides.
+These entries must also reach the published file-based catalog's bundle metadata,
+which `oc-mirror v2` reads for discovery.
+These entries enable discovery only; they do not add environment overrides or establish full disconnected support.
 The existing RHDH and PostgreSQL `RELATED_IMAGE_*` overrides are unchanged;
 the Dev Preview [plugin installer](dynamic-plugins.md#operator-processing-mode-dev-preview)
 remains a separately configured image.
+Verify image pulls separately: use `ImageTagMirrorSet` (ITMS) for tag pulls
+and `ImageDigestMirrorSet` (IDMS) for digest pulls.
+The CSV currently lists UBI minimal `:10.1`, while the Tekton tasks request it
+without a tag (`:latest`); mirroring `:10.1` alone does not satisfy those requests.
 See the [disconnected-environment guidance](../.rhdh/docs/airgap.adoc) for the
-OpenShift mirror-configuration requirement and exclusions.
+catalog-discovery and workload-pull checks, the UBI runtime gap, and exclusions.
 See also https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/olm-restricted-networks
 
 #### Plugin Registry Mirroring

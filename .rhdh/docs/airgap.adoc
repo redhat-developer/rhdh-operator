@@ -7,17 +7,24 @@ Deploying the RHDH Operator and running RHDH requires the following public resou
 * Operator images (bundle, operator, catalog)
 * Operand images (RHDH, PostgreSQL, and the images used by the default configuration flavours and plugin dependencies)
 
-The Operator bundle's CSV lists the known container images for the RHDH profile's supported flavours and plugin dependencies in `spec.relatedImages`.
+The Operator bundle's CSV lists the known container images for the RHDH profile's shipped flavours and plugin dependencies in `spec.relatedImages`.
+For `oc-mirror v2` to discover these images, the entries must also appear in the published file-based catalog's bundle metadata.
 This includes optional dependencies such as OKP and Tekton; `oc-mirror` mirrors all listed images even if you do not enable the corresponding feature.
+Matching `RELATED_IMAGE_*` variables are not needed for discovery.
 The Dev Preview plugin installer is intentionally excluded and must be mirrored separately when enabled; see link:../../docs/dynamic-plugins.md#operator-processing-mode-dev-preview[Operator Dynamic Plugins Processing Mode].
 The default image of the Tekton `git-cli` task is also excluded, because that image is slated for deprecation; mirror it separately if you use that task.
 
-On OpenShift clusters with working `ImageDigestMirrorSet` or `ImageTagMirrorSet` (IDMS/ITMS) support, you can use the standard `oc-mirror` workflow for the listed container images, then apply the generated cluster mirror configuration before installing RHDH.
-The container runtime redirects image pulls to the mirror without changing the image references in the workload manifests.
+Discovery and successful image pulls are separate checks.
+On OpenShift, use `ImageTagMirrorSet` (ITMS) for workload tag pulls and `ImageDigestMirrorSet` (IDMS) for digest pulls, and ensure the mirror contains the references the workloads actually request.
+The container runtime applies those rules without changing workload image references; pinning only a CSV entry to a digest does not turn a workload's tag pull into a digest pull.
 Listing these images does not add `RELATED_IMAGE_*` environment overrides for flavour or plugin-dependency images, or provide a new resolution mechanism on clusters where IDMS/ITMS cannot be used.
-Dynamic plugin OCI artifacts and workflow runtime downloads are not covered by this container-image list.
+It does not establish full disconnected support or cover custom plugin dependencies, dynamic plugin OCI artifacts, or workflow runtime downloads.
 
-To make these resources available, you will need to replace them with their copies in a mirror registry accessible by the cluster.
+There is a known runtime gap: the CSV lists `registry.access.redhat.com/ubi10-minimal:10.1`, but the link:../../config/profile/rhdh/plugin-deps/tekton.yaml[Tekton tasks] request the repository without a tag, meaning `:latest`.
+Mirroring `:10.1` alone does not satisfy those pulls.
+Aligning the task references and mirror content remains separate runtime work; listing the UBI image does not establish disconnected Tekton support.
+
+To make these resources available, mirror the required content to a registry accessible by the cluster and configure image pulls to use it.
 
 The existing helper-script workflow is also available below. The new CSV entries do not change the script; images it does not discover must still be mirrored separately.
 
@@ -36,6 +43,18 @@ Below are the prerequisites regardless of the target disconnected environment.
 * `yq v4.44+`. See link:https://github.com/mikefarah/yq#install[Install].
 * (*Required on non-OpenShift clusters*) The cluster needs to have the Operator Lifecycle Manager installed and already working in disconnected environments. See link:https://github.com/operator-framework/operator-lifecycle-manager/blob/master/doc/install/install.md#installing-olm[Installing OLM].
 * (*Required on non-OpenShift clusters*) A mirror registry reachable from the cluster.
+
+=== Validating image discovery and mirror pulls
+
+Check discovery independently from workload pulls:
+
+* For the release being tested, inspect the published file-based catalog's bundle metadata and confirm that it contains the expected `relatedImages` entries from the RHDH CSV.
+Then verify that `oc-mirror v2` copies those images to the mirror.
+* After applying the appropriate ITMS/IDMS configuration and deploying RHDH, test the enabled flavours and plugin dependencies in a disconnected environment.
+Verify that the mirror serves the references the workloads actually request, without falling back to a public source registry.
+
+A generated CSV or successful mirroring run alone does not prove that workload pulls succeed.
+Record the discovery and pull results separately.
 
 === Mirroring and deploying the RHDH Operator
 
