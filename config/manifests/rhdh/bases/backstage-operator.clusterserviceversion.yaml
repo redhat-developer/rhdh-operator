@@ -123,7 +123,5 @@ spec:
     name: plugin-dep-okp
   - image: registry.access.redhat.com/ubi10-minimal
     name: plugin-dep-tekton-ubi-minimal
-  - image: cgr.dev/chainguard/git:root-2.39@sha256:7759f87050dd8bacabe61354d75ccd7f864d6b6f8ec42697db7159eccd491139
-    name: plugin-dep-tekton-git
   replaces: rhdh-operator.v2.1.0
   version: 2.2.0
