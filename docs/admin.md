@@ -71,7 +71,8 @@ If you plan to deploy to a [restricted environment](https://docs.redhat.com/en/d
 you will need to configure your cluster or network to allow these images to be pulled.
 For the known container images used by the RHDH profile's supported flavours and plugin dependencies,
 see `spec.relatedImages` in the [CSV](../bundle/rhdh/manifests/backstage-operator.clusterserviceversion.yaml).
-These entries enable image discovery for mirroring, not new environment overrides.
+These entries enable image discovery for mirroring.
+They are declared through `RELATED_IMAGE_*` environment variables, which are internal plumbing, not documented or supported overrides: the operator does not consume them.
 The existing RHDH and PostgreSQL `RELATED_IMAGE_*` overrides are unchanged;
 the Dev Preview [plugin installer](dynamic-plugins.md#operator-processing-mode-dev-preview)
 remains a separately configured image.

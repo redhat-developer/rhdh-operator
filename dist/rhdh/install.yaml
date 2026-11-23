@@ -5331,6 +5331,15 @@ spec:
           value: quay.io/fedora/postgresql-18:latest
         - name: RELATED_IMAGE_backstage
           value: quay.io/rhdh-community/rhdh:next
+        # The images below are declared so that bundle generation publishes them
+        # in the CSV's spec.relatedImages. They are internal plumbing, not
+        # documented or supported overrides: the operator does not consume them.
+        - name: RELATED_IMAGE_flavour_intelligent_assistant_lightspeed_core
+          value: quay.io/lightspeed-core/lightspeed-stack:0.7.3
+        - name: RELATED_IMAGE_plugin_dep_okp
+          value: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
+        - name: RELATED_IMAGE_plugin_dep_tekton_ubi_minimal
+          value: registry.access.redhat.com/ubi10-minimal:10.1
         - name: POD_NAME
           valueFrom:
             fieldRef:
