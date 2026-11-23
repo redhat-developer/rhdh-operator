@@ -501,7 +501,7 @@ spec:
     name: flavour-intelligent-assistant-lightspeed-core
   - image: registry.redhat.io/offline-knowledge-portal/rhokp-rhel9:1.3.0-1793303796
     name: plugin-dep-okp
-  - image: registry.access.redhat.com/ubi10-minimal
+  - image: registry.access.redhat.com/ubi10-minimal:10.1
     name: plugin-dep-tekton-ubi-minimal
   replaces: rhdh-operator.v2.1.0
   version: 2.2.0
