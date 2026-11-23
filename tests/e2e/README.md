@@ -75,8 +75,14 @@ To do so, you can:
 
 ##### `kind`
 
+The CI Kind clusters are created with NetworkPolicy enforcement enabled (KinD's
+default CNI, kindnet, ignores NetworkPolicies). To reproduce this locally, create
+the cluster with [`hack/kind-config.yaml`](../../hack/kind-config.yaml) and install
+Calico before running the tests:
+
 ```shell
-$ kind create cluster
+$ kind create cluster --config hack/kind-config.yaml --wait 0
+$ ./hack/install-calico.sh
 $ make test-e2e \
     BACKSTAGE_OPERATOR_TESTS_BUILD_IMAGES=true \
     BACKSTAGE_OPERATOR_TESTS_PLATFORM=kind

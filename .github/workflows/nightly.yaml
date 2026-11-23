@@ -85,7 +85,14 @@ jobs:
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           cluster_name: integration-test-cluster
+          config: hack/kind-config.yaml
+          # Nodes stay NotReady until a CNI is installed, so don't wait here.
+          wait: "0"
           ignore_failed_clean: true
+
+      - name: Install Calico CNI (integration tests)
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: ./hack/install-calico.sh
 
       - name: Run Controller
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
@@ -120,6 +127,9 @@ jobs:
           cat <<EOF > /tmp/kind-config.yaml
           apiVersion: kind.x-k8s.io/v1alpha4
           kind: Cluster
+          networking:
+            disableDefaultCNI: true
+            podSubnet: "192.168.0.0/16"
           nodes:
             - role: control-plane
               extraPortMappings:
@@ -137,7 +147,13 @@ jobs:
         with:
           cluster_name: e2e-test-cluster
           config: /tmp/kind-config.yaml
+          # Nodes stay NotReady until a CNI is installed, so don't wait here.
+          wait: "0"
           ignore_failed_clean: true
+
+      - name: Install Calico CNI (E2E NetworkPolicy enforcement)
+        if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}
+        run: ./hack/install-calico.sh
 
       - name: Install Ingress Controller
         if: ${{ steps.operator-image-existence-checker.outputs.OPERATOR_IMAGE_EXISTS == 'true' }}

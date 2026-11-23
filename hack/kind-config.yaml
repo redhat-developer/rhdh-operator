@@ -1,0 +1,13 @@
+# KinD cluster configuration with NetworkPolicy enforcement.
+#
+# kindnet (KinD's default CNI) does not enforce NetworkPolicies, so we disable it
+# and install Calico after the cluster is created (see hack/install-calico.sh).
+#
+# The podSubnet must match Calico's default IPv4 pool (192.168.0.0/16).
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+networking:
+  disableDefaultCNI: true
+  podSubnet: "192.168.0.0/16"
+nodes:
+  - role: control-plane

@@ -68,6 +68,9 @@ jobs:
           cat <<EOF > "$RUNNER_TEMP/kind-config.yaml"
           apiVersion: kind.x-k8s.io/v1alpha4
           kind: Cluster
+          networking:
+            disableDefaultCNI: true
+            podSubnet: "192.168.0.0/16"
           nodes:
             - role: control-plane
               extraPortMappings:
@@ -91,7 +94,12 @@ jobs:
         with:
           cluster_name: test-cluster
           config: ${{ runner.temp }}/kind-config.yaml
+          # Nodes stay NotReady until a CNI is installed, so don't wait here.
+          wait: "0"
           ignore_failed_clean: true
+
+      - name: Install Calico CNI (NetworkPolicy enforcement)
+        run: ./hack/install-calico.sh
 
       - name: Load target operator image
         run: kind load docker-image --name test-cluster "$TO_OPERATOR_IMAGE"
