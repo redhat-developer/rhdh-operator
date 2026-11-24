@@ -4,6 +4,12 @@ go 1.26.0
 
 toolchain go1.26.11
 
+// Tracks the go directive and must be updated together with it when the go
+// directive is intentionally bumped, on the main branch only. Release branches
+// inherit this pin at branch cut, where it preserves their runtime semantics if
+// the go directive is later raised for a security fix.
+godebug default=go1.26
+
 require (
 	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/google/go-containerregistry v0.21.9
