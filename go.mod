@@ -20,7 +20,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
 	github.com/stretchr/testify v1.12.1
 	github.com/tidwall/gjson v1.18.0
-	golang.org/x/exp v0.0.0-20261121134650-e1094eeca1b5
+	golang.org/x/exp v0.0.0-20261124000051-d6646c509b6d
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.37.2
 	k8s.io/apiextensions-apiserver v0.37.2
