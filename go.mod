@@ -4,6 +4,11 @@ go 1.26.0
 
 toolchain go1.26.11
 
+// Preserve the Go 1.25 runtime semantics on this branch, so that security
+// fixes requiring a newer go directive can still land without changing the
+// behaviour of a z-stream.
+godebug default=go1.25
+
 require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
