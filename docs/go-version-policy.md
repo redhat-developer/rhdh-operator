@@ -4,15 +4,16 @@
 
 | Control | Main branch | Release branches |
 |---|---|---|
-| `go` directive in `go.mod` | Bump to match the latest Go version available in go-toolset | Frozen at branch-cut value; do not bump |
+| `go` directive in `go.mod` | Bump to match the latest Go version available in go-toolset | Frozen at branch-cut value; do not bump, except for a security fix, which is behaviour-preserving thanks to the `godebug` pin (see [Preserving Runtime Semantics](#preserving-runtime-semantics-when-the-go-directive-must-be-bumped)) |
 | `toolchain` directive in `go.mod` | Update to the latest patch release of the declared `go` version | Patch-level updates via Renovate while the declared `go` version is supported |
+| `godebug` directive in `go.mod` | Must equal the `go` directive value; the two are updated together when the directive is deliberately bumped | Inherited at branch cut and frozen; never update |
 | go-toolset builder image | Track the latest available image | Track the latest available image |
-| `constraints.go` in Renovate config | Must match the `go` directive value | Must match the `go` directive value on that branch |
-| Dependency updates requiring a `go` bump | Allowed if go-toolset has the required version | Skip the update; escalate to Security if it is a CVE fix |
+| `constraints.go` in Renovate config | Must match the `go` directive value | Same value; Renovate reads its configuration from the default branch only, so this setting is not per-branch |
+| Dependency updates requiring a `go` bump | Allowed if go-toolset has the required version | Skip the update, except for security fixes, which land on top of the `godebug` pin without needing a case-by-case evaluation of the directive change |
 
 ## Purpose and Scope
 
-This policy governs how the Install team manages Go versions in the [rhdh-operator](https://github.com/redhat-developer/rhdh-operator) repository. It applies to all maintainers who review or approve changes to the operator's `go.mod` file, its Dockerfile base images, or the Renovate configuration that automates updates to both.
+This policy governs how the Install team manages Go versions in the [rhdh-operator](https://github.com/redhat-developer/rhdh-operator) repository. It applies to all maintainers who review or approve changes to the operator's `go.mod` file, its Dockerfile base images, the Renovate configuration that automates updates to both, or the `godebug` directive that pins the module's runtime semantics.
 
 The operator's build process involves two independent Go version controls. The [`go` directive](https://go.dev/doc/modules/gomod-ref) in `go.mod` declares the minimum Go language version required by the module's source code. The [go-toolset](https://catalog.redhat.com/en/software/containers/ubi9/go-toolset/61e5c00b4ec9945c18787690) container image provides the Go compiler and standard library that are linked into the shipped binary. These two controls are deliberately decoupled and follow different update rules. Understanding the distinction is essential to applying this policy correctly; the Go project's [toolchain management documentation](https://go.dev/doc/toolchain) explains the underlying mechanism in detail.
 
@@ -26,13 +27,29 @@ When the `go` directive is bumped, the `toolchain` directive should be updated t
 
 It is also acceptable to update the `go` and `toolchain` directives on the main branch before the scheduled release cycle bump if a dependency update requires a newer Go version and that version is available in go-toolset.
 
+The `godebug` directive on the main branch always carries the `go` directive value, so that the default branch compiles with the semantics of the version it declares; for example, a module declaring `go 1.26.0` carries `godebug default=go1.26`. The line is a no-op there, and it is updated in the same change whenever the `go` directive is bumped deliberately. This is the only place the line is updated. Lagging behind would silently keep the default branch on the previous version's semantics. A release branch cut from that point inherits the pin already in place and does not update it, as described in [Preserving Runtime Semantics](#preserving-runtime-semantics-when-the-go-directive-must-be-bumped).
+
 ## Language Version Policy on Release Branches
 
-The `go` directive on release branches is frozen at the value present when the branch was cut. Maintainers must not bump the `go` directive on release branches, even if the declared Go version becomes unsupported by the upstream Go project. The `toolchain` directive is also set at branch-cut time, but patch-level updates (for example, `go1.25.9` to `go1.25.10`) are permitted and automated by Renovate for as long as the declared `go` version remains supported.
+The `go` directive on release branches is frozen at the value present when the branch was cut. Maintainers must not bump the `go` directive on release branches, even if the declared Go version becomes unsupported by the upstream Go project. The only exception is a security fix, which is behaviour-preserving because every release branch inherits a `godebug` pin at branch cut that holds its runtime semantics in place (see [Preserving Runtime Semantics](#preserving-runtime-semantics-when-the-go-directive-must-be-bumped)). The `toolchain` directive is also set at branch-cut time, but patch-level updates (for example, `go1.25.9` to `go1.25.10`) are permitted and automated by Renovate for as long as the declared `go` version remains supported.
 
-This is safe because the Go version declared in `go.mod` does not determine the standard library linked into the shipped binary. The binary's standard library comes from the go-toolset compiler used at build time. As long as the go-toolset image is kept current (see the next section), the shipped binary continues to receive Go standard library and compiler security patches regardless of what `go.mod` declares.
+This is safe because the Go version declared in `go.mod` does not determine the standard library linked into the shipped binary. The binary's standard library comes from the go-toolset compiler used at build time. As long as the go-toolset image is kept current (see [Build Image Policy](#build-image-policy)), the shipped binary continues to receive Go standard library and compiler security patches regardless of what `go.mod` declares.
 
-The [GODEBUG mechanism](https://go.dev/doc/godebug) ensures that a newer compiler building a module with an older `go` directive will respect the behavior semantics of the declared version. When a Go release introduces a backward-incompatible change, the new behavior is gated behind a GODEBUG setting whose default is derived from the `go` directive in `go.mod`. A binary compiled with Go 1.26 against a module declaring `go 1.24` will therefore use the Go 1.24 behavior for any GODEBUG-controlled changes, preserving the expected runtime semantics without requiring a directive bump.
+The [GODEBUG mechanism](https://go.dev/doc/godebug) ensures that a newer compiler building a module with an older `go` directive will respect the behavior semantics of the declared version. When a Go release introduces a backward-incompatible change, the new behavior is gated behind a GODEBUG setting whose default is derived from the `go` directive in `go.mod`. A binary compiled with a newer toolchain against a module declaring an older `go` version will therefore use the older behavior for any GODEBUG-controlled changes, preserving the expected runtime semantics without requiring a directive bump.
+
+This is also the reason the directive is frozen: bumping it re-pins every GODEBUG default compiled into the binary. When a security fix nevertheless requires a newer directive, the branch keeps the behaviour of its original version using the mechanism described in the next section.
+
+## Preserving Runtime Semantics When the `go` Directive Must Be Bumped
+
+The `go` directive also selects the GODEBUG defaults baked into every binary, dependency code included, so raising it on a release branch changes runtime behaviour even though the compiler and standard library come from go-toolset.
+
+Every release branch therefore inherits a `godebug` pin from the default branch, which carries it set to its own `go` directive value (for example, `godebug default=go1.26` while the module declares `go 1.26.0`).
+
+On the branch, the line is a no-op until the `go` directive is raised, and then it keeps every GODEBUG default at the branch-cut value. Because it is evaluated independently of the language version, a security fix that requires a newer `go` directive — for example, `golang.org/x/net` v0.59.0 and later declare `go 1.26.0` — can be taken without changing behaviour, and without a case-by-case risk evaluation with the RHDH Security team. The vulnerability itself still follows the usual severity and release decision process. The language version rises as well, which is acceptable on a branch that receives no feature work.
+
+The line is updated together with the `go` directive on the main branch only; release branches inherit it and never touch it. It preserves behaviour only and does not lower the minimum compiler version, so prerequisites documented in the README must follow the `go` directive.
+
+The defaults it preserves are listed in the [GODEBUG history](https://go.dev/doc/godebug#history), and the semantics of a release are described in its release notes (for example, [Go 1.26](https://go.dev/doc/go1.26)).
 
 ## Build Image Policy
 
@@ -50,7 +67,7 @@ A version gap between the `go.mod` directive and the go-toolset compiler is expe
 
 When a dependency update on a release branch requires bumping the `go` directive in `go.mod` to a newer Go version, the update should be skipped. This commonly occurs with pseudo-versioned dependencies tied to newer upstream Git commits that have adopted a higher Go language version. Skipping the update preserves the stability of the release branch's declared compatibility surface.
 
-The exception to this rule is a critical security fix in a dependency. If a security vulnerability in a dependency can only be resolved by pulling in a version that requires a newer `go` directive, the situation must be evaluated on a case-by-case basis with the RHDH Security team. In such cases, bumping the `go` and `toolchain` directives on the release branch is acceptable if the Security team determines the risk of the vulnerability outweighs the risk of changing the language version on a release branch.
+The exception to this rule is a security fix in a dependency. If a security vulnerability in a dependency can only be resolved by pulling in a version that requires a newer `go` directive, the update is not skipped. Because every release branch inherits `godebug default=go<branch-cut version>` at cut time (see [Preserving Runtime Semantics](#preserving-runtime-semantics-when-the-go-directive-must-be-bumped)), bumping the `go` and `toolchain` directives is behaviour-preserving and does not need a case-by-case evaluation with the RHDH Security team. The dependency update and the directive bump land in a single pull request, so that they are reviewed together. The vulnerability itself still follows the usual severity and release decision process.
 
 When evaluating whether a dependency security fix truly requires a `go` directive bump, maintainers should check whether the fix is available in an older version of the dependency that remains compatible with the current `go` directive. The bump should be treated as a last resort, not a default response to a dependency update conflict.
 
@@ -62,9 +79,9 @@ Docker base image updates to the go-toolset image are classified by Renovate as 
 
 Docker minor updates to go-toolset are not automerged by the Renovate configuration. They produce a pull request that requires manual review and approval. This is intentional and must not be changed, because these updates may introduce a new Go compiler version that should be verified against the nightly test suite before merging. Docker patch updates (digest-only changes within the same tag), by contrast, are automerged. These patch updates can still carry Go compiler patch bumps, so maintainers should monitor the nightly test results after they merge.
 
-Go dependency updates are governed by the [`constraints.go`](https://docs.renovatebot.com/golang/#go-binary-version) setting in the Renovate configuration. This setting specifies the Go binary version that Renovate uses when running `go mod tidy` and other Go commands to evaluate dependency updates. The value must match the `go` directive in `go.mod` on each branch. When the `go` directive is bumped on the main branch, the `constraints.go` value must be updated in the same change or immediately after. A stale `constraints.go` value will cause Renovate's `go mod tidy` runs to use the wrong Go version, producing incorrect dependency resolutions or failures.
+Go dependency updates are governed by the [`constraints.go`](https://docs.renovatebot.com/golang/#go-binary-version) setting in the Renovate configuration. This setting specifies the Go binary version that Renovate uses when running `go mod tidy` and other Go commands to evaluate dependency updates. The value must match the `go` directive in `go.mod` on the default branch. Renovate reads its configuration from the repository's default branch only, even when it opens pull requests against release branches, so a copy of `.github/renovate.json` on a release branch is not read; the setting therefore applies to every branch. When the `go` directive is bumped on the main branch, the `constraints.go` value must be updated in the same change or immediately after. A stale `constraints.go` value will cause Renovate's `go mod tidy` runs to use the wrong Go version, producing incorrect dependency resolutions or failures.
 
-The `go` and `toolchain` directive bumps in `go.mod` are tracked and executed separately from go-toolset image updates. They are deliberate changes managed through the Jira release cycle process, not automated by Renovate. Renovate does automate patch-level updates to the `toolchain` directive (for example, `go1.25.9` to `go1.25.10`) and opens pull requests for these changes. These pull requests require manual review and are not automerged, which gives maintainers an opportunity to verify the patch before it reaches a release branch.
+The `go` and `toolchain` directive bumps in `go.mod` are tracked and executed separately from go-toolset image updates. They are deliberate changes managed through the Jira release cycle process, not automated by Renovate. On a release branch, a security-driven bump follows the procedure in [Preserving Runtime Semantics](#preserving-runtime-semantics-when-the-go-directive-must-be-bumped) and is covered by the `godebug` pin inherited at branch cut. Renovate does automate patch-level updates to the `toolchain` directive (for example, `go1.25.9` to `go1.25.10`) and opens pull requests for these changes. These pull requests require manual review and are not automerged, which gives maintainers an opportunity to verify the patch before it reaches a release branch.
 
 ## Compatibility Guarantee
 
@@ -75,6 +92,20 @@ The [GODEBUG mechanism](https://go.dev/doc/godebug), described in the Release Br
 This policy was first established during the discussion captured in [RHIDP-12347](https://redhat.atlassian.net/browse/RHIDP-12347), when go-toolset shipped Go 1.24 but the release-1.6 branch declared `go 1.22` in its `go.mod`. The conclusion at that time, which this document formalizes, was that building with a newer go-toolset is safe, that the "one version behind" policy applies to the `go` directive and not to the compiler, and that security fixes in the standard library are received through the go-toolset compiler regardless of the `go.mod` version.
 
 ## Verification
+
+To confirm the GODEBUG defaults that a module compiles into its binaries — for example, to verify that a `godebug` pin is in effect on a release branch — run:
+
+```
+go list -f '{{.DefaultGODEBUG}}' ./cmd
+```
+
+The output lists only the settings that differ from the toolchain defaults, so it is empty when the pin matches the `go` directive, as it does on the main branch. On a release branch whose directive was raised it reports the pinned values: for example, with `godebug default=go1.25` and `go 1.26.0`, `cryptocustomrand=1,httpservecontentmaxranges=1,tlssecpmlkem=0,urlstrictcolons=0`. The same value is recorded in the build information of the resulting binary, which can be inspected with `go version -m <binary>`.
+
+The pin itself can be read with:
+
+```
+go mod edit -json | jq -r '.GoDebug[] | "\(.Key)=\(.Value)"'
+```
 
 To check the Go compiler version inside a go-toolset image tag before approving a Renovate pull request, run:
 
@@ -105,6 +136,8 @@ skopeo inspect docker://registry.access.redhat.com/ubi9/go-toolset:latest | \
 
 - [Go 1 and the Future of Go Programs](https://go.dev/doc/go1compat) — the Go 1 compatibility promise
 - [Go, Backwards Compatibility, and GODEBUG](https://go.dev/doc/godebug) — how GODEBUG settings preserve backward compatibility
+- [GODEBUG History](https://go.dev/doc/godebug#history) — the settings introduced or changed in each Go release
+- [Go 1.26 Release Notes](https://go.dev/doc/go1.26) — the language and runtime semantics introduced by a Go release
 - [Go Toolchains](https://go.dev/doc/toolchain) — the `go` and `toolchain` directives in `go.mod`
 - [Go Release Policy](https://go.dev/doc/devel/release) — Go's release cadence and supported version policy
 - [go.mod File Reference](https://go.dev/doc/modules/gomod-ref) — specification of all `go.mod` directives
