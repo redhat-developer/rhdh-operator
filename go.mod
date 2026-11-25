@@ -15,7 +15,7 @@ require (
 	github.com/google/go-containerregistry v0.21.9
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
-	github.com/openshift/api v0.0.0-20261124163758-a9e5500fa984
+	github.com/openshift/api v0.0.0-20261124234522-49a0300ac4ed
 	github.com/openshift/controller-runtime-common v0.0.0-20261026124434-bdfc411d93cd
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
 	github.com/stretchr/testify v1.12.1
