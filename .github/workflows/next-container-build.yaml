@@ -270,7 +270,7 @@ jobs:
 
       - name: Install cosign
         if: env.HAS_QUAY_AUTH == 'true'
-        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
 
       - name: Create manifest lists and push
         run: |
