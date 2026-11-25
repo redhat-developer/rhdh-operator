@@ -1,8 +1,8 @@
 module github.com/redhat-developer/rhdh-operator
 
-go 1.26.0
+go 1.27.0
 
-toolchain go1.26.11
+toolchain go1.27.4
 
 // Tracks the go directive and must be updated together with it when the go
 // directive is intentionally bumped, on the main branch only. Release branches
