@@ -42,7 +42,8 @@ log "Installing Calico ${CALICO_VERSION} (NetworkPolicy enforcement)..."
 manifest="$(mktemp)"
 trap 'rm -f "${manifest}"' EXIT
 
-curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 "${MANIFEST_URL}" -o "${manifest}"
+curl --proto '=https' --proto-redir '=https' \
+  -fsSL --retry 5 --retry-all-errors --retry-delay 2 "${MANIFEST_URL}" -o "${manifest}"
 
 # Calico's manifest is large; server-side apply avoids the client-side
 # "metadata.annotations: Too long" limitation.
