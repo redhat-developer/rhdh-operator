@@ -166,6 +166,11 @@
       "matchDepTypes": ["indirect"],
       "matchUpdateTypes": ["major", "minor", "patch", "pin", "pinDigest", "digest", "lockFileMaintenance", "rollback", "replacement", "bump"],
       "enabled": false
+    },
+    {
+      "description": "release-1.9 is end-of-life: no dependency updates",
+      "matchBaseBranches": ["release-1.9"],
+      "enabled": false
     }
   ],
   "vulnerabilityAlerts": {
