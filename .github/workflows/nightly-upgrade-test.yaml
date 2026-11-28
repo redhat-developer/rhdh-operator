@@ -14,10 +14,6 @@ jobs:
       matrix:
         # Only adjacent upgrade paths are supported; skipping versions is not recommended.
         include:
-          - from_branch: release-1.8
-            to_branch: release-1.9
-          - from_branch: release-1.9
-            to_branch: release-1.10
           - from_branch: release-1.10
             to_branch: release-2.1
           - from_branch: release-2.1
