@@ -20,7 +20,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
 	github.com/stretchr/testify v1.12.1
 	github.com/tidwall/gjson v1.18.0
-	golang.org/x/exp v0.0.0-20261124000051-d6646c509b6d
+	golang.org/x/exp v0.0.0-20261128033645-f63ec7c7eed0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.37.3
 	k8s.io/apiextensions-apiserver v0.37.3
@@ -118,7 +118,7 @@ require (
 	golang.org/x/term v0.48.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.53.0 // indirect
+	golang.org/x/tools v0.53.1-0.20261126161324-9b1bd87ef490 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
