@@ -76,7 +76,14 @@ jobs:
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           cluster_name: test-cluster
+          config: hack/kind-config.yaml
+          # Nodes stay NotReady until a CNI is installed, so don't wait here.
+          wait: "0"
           ignore_failed_clean: true
+
+      - name: Install Calico CNI (NetworkPolicy enforcement)
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: ./hack/install-calico.sh
 
       - name: Run Controller
         if: steps.changed-files.outputs.any_changed == 'true'
